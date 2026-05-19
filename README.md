@@ -217,13 +217,6 @@ npm run test
 
 ---
 
-## 相关文档
-
-- [文档中心](./docs/README.md)
-- [发布指南](./docs/RELEASE_GUIDE.md)
-- [独立增量阅读插件开发边界标准](./docs/technical/STANDALONE_IR_DEVELOPMENT_BOUNDARY_STANDARD.md)
-- [独立增量阅读插件拆分状态](./docs/technical/STANDALONE_IR_SPLIT_STATUS_2026-05-19.md)
-
 ---
 
 ## 说明
