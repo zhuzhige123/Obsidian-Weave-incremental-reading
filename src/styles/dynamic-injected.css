@@ -1,0 +1,955 @@
+/* ============================================================
+ * 原本通过运行时样式注入方式挂载的样式
+ * 已迁移至此静态 CSS 文件，由 Vite 打包到 styles.css
+ * ============================================================ */
+
+/* --- notifications.ts --- */
+.weave-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000001;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateX(100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 400px;
+  min-width: 200px;
+  word-wrap: break-word;
+  font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  pointer-events: auto;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+body .weave-notification:hover {
+  transform: translateX(0) scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.weave-notification.is-visible {
+  transform: translateX(0);
+}
+
+.weave-notification.notification-success {
+  background: #059669;
+}
+
+.weave-notification.notification-error {
+  background: #dc2626;
+}
+
+.weave-notification.notification-warning {
+  background: #d97706;
+}
+
+.weave-notification.notification-info {
+  background: #2563eb;
+}
+
+.theme-dark .weave-notification.notification-success {
+  background: #10b981;
+}
+
+.theme-dark .weave-notification.notification-error {
+  background: #ef4444;
+}
+
+.theme-dark .weave-notification.notification-warning {
+  background: #f59e0b;
+}
+
+.theme-dark .weave-notification.notification-info {
+  background: #3b82f6;
+}
+
+.theme-dark .weave-notification {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.theme-light .weave-notification {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* --- progress-modal.ts --- */
+.weave-progress-modal .modal-close-button { display: none; }
+.weave-progress-modal .progress-bar-track {
+  width: 100%;
+  height: 14px;
+  background: var(--background-modifier-border);
+  border-radius: 7px;
+  overflow: hidden;
+  margin: 20px 0 12px 0;
+  position: relative;
+}
+.weave-progress-modal .progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 7px;
+  background: linear-gradient(90deg, var(--interactive-accent), var(--interactive-accent-hover, var(--interactive-accent)));
+  transition: width 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.weave-progress-modal .progress-bar-fill.animating::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    rgba(255,255,255,0.1) 6px,
+    rgba(255,255,255,0.1) 12px
+  );
+  animation: weave-stripe-move 0.6s linear infinite;
+}
+@keyframes weave-stripe-move {
+  0% { background-position-x: 0; }
+  100% { background-position-x: 17px; }
+}
+.weave-progress-modal .progress-bar-fill.complete {
+  background: var(--text-success, #4caf50);
+}
+.weave-progress-modal .progress-bar-fill.error {
+  background: var(--text-error, #e53935);
+}
+.weave-progress-modal .progress-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.weave-progress-modal .progress-percentage {
+  font-size: 22px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-normal);
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.weave-progress-modal .progress-eta {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-bottom: 16px;
+  min-height: 18px;
+}
+.weave-progress-modal .progress-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.weave-progress-modal .progress-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* --- BatchParsingManager.ts --- */
+.batch-progress-modal {
+  padding: 2rem;
+  min-width: 500px;
+}
+.batch-progress-modal h2 {
+  margin: 0 0 1.5rem 0;
+}
+.batch-progress-modal .progress-container {
+  height: 8px;
+  background: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.batch-progress-modal .progress-bar {
+  height: 100%;
+  background: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+.batch-progress-modal .status-text {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+.batch-progress-modal .details-text {
+  margin-bottom: 1.5rem;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+.batch-progress-modal button {
+  padding: 0.5rem 1.5rem;
+  background: var(--interactive-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.batch-progress-modal button:hover {
+  background: var(--interactive-hover);
+}
+
+/* --- MigrationConfirmModal.ts --- */
+.weave-migration-modal {
+  padding: 20px;
+}
+.weave-migration-modal h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.weave-migration-modal .migration-description {
+  margin-bottom: 16px;
+  color: var(--text-muted);
+}
+.weave-migration-modal .migration-stats {
+  background: var(--background-secondary);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 16px;
+}
+.weave-migration-modal .migration-stats .setting-item {
+  border: none;
+  padding: 4px 8px;
+}
+.weave-migration-modal .migration-tip {
+  margin-bottom: 20px;
+}
+.weave-migration-modal .migration-tip .mod-warning {
+  color: var(--text-warning);
+  font-size: 0.9em;
+}
+.weave-migration-modal .migration-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* --- SourceLocateOverlayService.ts --- */
+.weave-source-locate-overlay {
+  position: fixed;
+  z-index: 2147483000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  max-width: min(320px, calc(100vw - 24px));
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  animation: weave-source-locate-overlay-in 0.18s ease-out forwards;
+}
+
+.weave-source-locate-overlay--measuring {
+  opacity: 0;
+  animation: none;
+}
+
+.weave-source-locate-overlay__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent, #8b5cf6) 22%, transparent);
+  color: var(--interactive-accent, #8b5cf6);
+  flex: 0 0 24px;
+}
+
+.weave-source-locate-overlay__icon .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.weave-source-locate-overlay__label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+@keyframes weave-source-locate-overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* --- CleanupProgressModal.ts --- */
+.weave-cleanup-modal {
+  padding: 0;
+  width: 500px;
+  max-width: 90vw;
+}
+.cleanup-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.cleanup-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.cleanup-title-icon {
+  color: var(--text-accent);
+}
+.cleanup-progress-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.cleanup-progress-bar-container {
+  position: relative;
+  height: 24px;
+  background: var(--background-modifier-border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.cleanup-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--interactive-accent), var(--interactive-accent-hover));
+  border-radius: 12px;
+  transition: width 0.3s ease;
+}
+.cleanup-progress-bar.completed {
+  background: linear-gradient(90deg, var(--color-green), #34d058);
+}
+.cleanup-progress-percent {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--text-on-accent);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.cleanup-current-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+.cleanup-file-icon {
+  flex-shrink: 0;
+}
+.cleanup-file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.cleanup-timer-inline {
+  margin-left: auto;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.cleanup-stats-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.cleanup-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.cleanup-stats-cards {
+  display: flex;
+  gap: 12px;
+}
+.cleanup-stat-card {
+  flex: 1;
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  text-align: center;
+}
+.cleanup-stat-icon {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+.cleanup-stat-value {
+  font-size: 1.4em;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.cleanup-stat-label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+.cleanup-stat-cleaned .cleanup-stat-value {
+  color: var(--color-green);
+}
+.cleanup-details-section {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.cleanup-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cleanup-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 0.8em;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.cleanup-toggle-btn:hover {
+  background: var(--background-modifier-hover);
+}
+.cleanup-details-list {
+  max-height: 150px;
+  overflow-y: auto;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  padding: 8px;
+}
+.cleanup-details-list.collapsed {
+  display: none;
+}
+.cleanup-details-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  padding: 12px;
+}
+.cleanup-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.85em;
+  border-radius: 4px;
+}
+.cleanup-detail-item:hover {
+  background: var(--background-modifier-hover);
+}
+.cleanup-detail-status {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+.cleanup-detail-item.status-success .cleanup-detail-status {
+  color: var(--color-green);
+}
+.cleanup-detail-item.status-protected .cleanup-detail-status {
+  color: var(--color-yellow);
+}
+.cleanup-detail-item.status-error .cleanup-detail-status {
+  color: var(--color-red);
+}
+.cleanup-detail-item.status-skipped .cleanup-detail-status {
+  color: var(--text-muted);
+}
+.cleanup-detail-file {
+  font-weight: 500;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+.cleanup-detail-message {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cleanup-modal-footer {
+  padding: 16px 20px;
+}
+.cleanup-action-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.cleanup-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 0.9em;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+.cleanup-btn-cancel {
+  background: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+.cleanup-btn-cancel:hover {
+  background: var(--background-modifier-hover);
+}
+.cleanup-btn.hidden {
+  display: none;
+}
+.cleanup-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- mobile-modal-bounds.ts --- */
+body.is-mobile .weave-modal-backdrop,
+body.is-mobile .weave-modal-container,
+body.is-mobile .modal-overlay,
+body.is-mobile .test-result-backdrop,
+body.is-mobile .resizable-modal-overlay,
+body.is-mobile .receipt-modal {
+  position: fixed;
+  top: var(--weave-modal-top, env(safe-area-inset-top, 0px));
+  bottom: var(--weave-modal-bottom, env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overflow-y: auto;
+}
+
+body.is-mobile .resizable-modal-overlay {
+  overflow: hidden;
+}
+
+body.is-mobile .weave-modal,
+body.is-mobile .test-result-card,
+body.is-mobile .receipt-modal .modal-content {
+  max-height: var(
+    --weave-modal-max-height,
+    calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
+  );
+  overflow-y: auto;
+  margin: 0 auto;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+body.is-phone .weave-modal,
+body.is-phone .test-result-card,
+body.is-phone .receipt-modal .modal-content {
+  border-radius: 12px;
+  max-width: calc(100% - 16px);
+}
+
+body.is-mobile .receipt-modal .modal-background {
+  display: none;
+}
+
+body.is-mobile .receipt-modal .printer-container {
+  max-height: var(--weave-modal-max-height, calc(100vh - 130px));
+  overflow-y: auto;
+}
+
+/* --- CustomApiUrlModal.ts --- */
+.weave-custom-api-url-modal .weave-url-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.weave-custom-api-url-modal .weave-url-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-normal);
+}
+
+.weave-custom-api-url-modal .weave-url-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-family: var(--font-monospace);
+  font-size: 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-sizing: border-box;
+}
+
+.weave-custom-api-url-modal .weave-url-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+}
+
+.weave-custom-api-url-modal .weave-url-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.weave-custom-api-url-modal .weave-url-examples {
+  margin-top: 1.5rem;
+}
+
+.weave-custom-api-url-modal .weave-url-examples h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.weave-custom-api-url-modal .weave-example-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+}
+
+.weave-custom-api-url-modal .weave-example-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.weave-custom-api-url-modal .weave-example-url {
+  font-family: var(--font-monospace);
+  font-size: 0.85rem;
+  color: var(--text-accent);
+  word-break: break-all;
+}
+
+.weave-custom-api-url-modal .weave-url-notes {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-left: 3px solid var(--text-error);
+  border-radius: 6px;
+}
+
+.weave-custom-api-url-modal .weave-url-notes h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-error);
+}
+
+.weave-custom-api-url-modal .weave-url-notes ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.weave-custom-api-url-modal .weave-url-notes li {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.weave-custom-api-url-modal .weave-url-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+/* --- tablet-debug.ts --- */
+.weave-tablet-debug {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  max-width: 300px;
+  padding: 10px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-family: var(--font-monospace, monospace);
+  font-size: 12px;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.weave-tablet-debug__mock {
+  color: #facc15;
+}
+
+/* --- obsidian-navigation-service.ts --- */
+.weave-nav-button--action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weave-nav-button--action:hover {
+  background: var(--interactive-accent-hover);
+}
+
+/* --- IRV4SchedulerService.ts --- */
+.weave-ir-tag-drift-description {
+  margin-top: 4px;
+  opacity: 0.8;
+  font-size: 0.9em;
+}
+
+.weave-ir-tag-drift-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.weave-ir-tag-drift-button {
+  padding: 2px 12px;
+  cursor: pointer;
+}
+
+/* --- EPUB Reader Theme Overrides --- */
+.weave-epub-reader-host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- weaveSuggestModalTheme.ts --- */
+.suggestion-container.weave-batch-tag-suggest-popover,
+.suggestion-container.weave-ir-deck-suggest-popover,
+.suggestion-container.weave-vault-folder-suggest-popover,
+.suggestion-container.weave-markdown-file-suggest-popover {
+  padding: 6px;
+  border-radius: 14px;
+  z-index: calc(var(--z-index-modal, 400) + 10);
+  font-size: var(--font-ui-small, 13px);
+  max-height: var(--weave-suggest-popover-max-height, 360px);
+  overflow-y: auto;
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .suggestion,
+.suggestion-container.weave-ir-deck-suggest-popover .suggestion,
+.suggestion-container.weave-vault-folder-suggest-popover .suggestion,
+.suggestion-container.weave-markdown-file-suggest-popover .suggestion {
+  padding: 0;
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .suggestion-item,
+.suggestion-container.weave-ir-deck-suggest-popover .suggestion-item,
+.suggestion-container.weave-vault-folder-suggest-popover .suggestion-item,
+.suggestion-container.weave-markdown-file-suggest-popover .suggestion-item {
+  padding: 8px 10px;
+  margin: 2px 0;
+  border-radius: 10px;
+  font-size: var(--font-ui-small, 13px);
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .suggestion-item.is-selected,
+.suggestion-container.weave-ir-deck-suggest-popover .suggestion-item.is-selected,
+.suggestion-container.weave-vault-folder-suggest-popover .suggestion-item.is-selected,
+.suggestion-container.weave-markdown-file-suggest-popover .suggestion-item.is-selected {
+  background: var(--background-modifier-hover);
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover {
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .suggestion-item {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 66%, transparent);
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .suggestion-item.is-selected {
+  background: color-mix(in srgb, var(--background-modifier-hover) 88%, var(--background-primary));
+}
+
+.suggestion-container.weave-markdown-file-suggest-popover .suggestion-item {
+  padding: 7px 10px;
+  margin: 1px 0;
+  border-radius: 8px;
+}
+
+.suggestion-container.weave-markdown-file-suggest-popover .suggestion-item:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 64%, var(--background-primary));
+}
+
+.suggestion-container.weave-markdown-file-suggest-popover .suggestion-item.is-selected {
+  background: color-mix(in srgb, var(--background-modifier-hover) 76%, var(--background-primary));
+}
+
+.suggestion-container .weave-batch-tag-suggestion,
+.suggestion-container .weave-ir-deck-suggestion,
+.suggestion-container .weave-markdown-file-suggestion {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.suggestion-container .weave-batch-tag-suggestion__row,
+.suggestion-container .weave-ir-deck-suggestion-row,
+.suggestion-container .weave-markdown-file-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.suggestion-container .weave-markdown-file-suggestion.weave-markdown-file-suggestion--no-icon {
+  gap: 0;
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .weave-batch-tag-suggestion__row {
+  gap: 0;
+}
+
+.suggestion-container .weave-batch-tag-suggestion__icon,
+.suggestion-container .weave-ir-deck-suggestion-icon,
+.suggestion-container .weave-markdown-file-suggestion__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+}
+
+.suggestion-container .weave-batch-tag-suggestion__icon svg,
+.suggestion-container .weave-ir-deck-suggestion-icon svg,
+.suggestion-container .weave-markdown-file-suggestion__icon svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+.suggestion-container .weave-batch-tag-suggestion__title,
+.suggestion-container .weave-ir-deck-suggestion-name,
+.suggestion-container .weave-markdown-file-suggestion__title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small, 13px);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.suggestion-container.weave-batch-tag-suggest-popover .weave-batch-tag-suggestion__title {
+  font-weight: 500;
+}
+
+.suggestion-container .weave-batch-tag-suggestion__meta {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.suggestion-container .weave-markdown-file-suggestion__content {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.suggestion-container .weave-markdown-file-suggestion__path {
+  display: block;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-container.weave-suggest-modal-container--raised {
+  z-index: calc(var(--z-index-modal, 400) + 10);
+}
+
+.modal.weave-suggest-modal--raised {
+  z-index: calc(var(--z-index-modal, 400) + 10);
+}
+
+.modal-container.weave-suggest-modal-container--anchored {
+  align-items: flex-start;
+  justify-content: flex-start;
+  z-index: var(--weave-suggest-popover-z, calc(var(--z-index-modal, 400) + 10));
+}
+
+.modal-container.weave-suggest-modal-container--overlayless {
+  pointer-events: none;
+}
+
+.modal-container.weave-suggest-modal-container--overlayless .modal,
+.modal-container.weave-suggest-modal-container--overlayless .prompt {
+  pointer-events: auto;
+}
+
+.modal-bg.weave-suggest-modal-bg--hidden {
+  display: none;
+}
+
+.modal.weave-suggest-modal--anchored,
+.prompt.weave-suggest-modal--anchored {
+  position: fixed;
+  width: var(--weave-suggest-popover-width, min(320px, calc(100vw - 24px)));
+  max-width: var(--weave-suggest-popover-width, min(320px, calc(100vw - 24px)));
+  max-height: var(--weave-suggest-popover-max-height, calc(100vh - 24px));
+  margin: 0;
+  transform: none;
+  left: var(--weave-suggest-popover-left, 12px);
+  top: var(--weave-suggest-popover-top, 12px);
+  z-index: var(--weave-suggest-popover-z, calc(var(--z-index-modal, 400) + 10));
+}
+
+.modal.weave-suggest-modal--positioning,
+.prompt.weave-suggest-modal--positioning {
+  opacity: 0;
+  visibility: hidden;
+}

@@ -1,0 +1,388 @@
+<script lang="ts">
+  /**
+   * 增强的许可证状态卡片组件
+   * 提供清晰、突出的激活状态显示
+  */
+  
+  import type { EffectiveLicenseState } from '../../../types/license';
+  import type { LicenseInfo } from '../types/settings-types';
+  import { currentLanguage, tr } from '../../../utils/i18n';
+  import {
+    formatLicenseDeviceStats,
+    resolveLicenseDeviceStats,
+  } from '../../../utils/license-device-stats';
+  
+  interface Props {
+    license: LicenseInfo | null;
+    app?: import('obsidian').App;
+    effectiveState?: EffectiveLicenseState;
+    showActions?: boolean;
+    onVerify?: () => Promise<void>;
+    onReset?: () => Promise<void>;
+  }
+  
+  let { license, app, effectiveState, showActions = true, onVerify, onReset }: Props = $props();
+  let t = $derived($tr);
+  let locale = $derived($currentLanguage);
+ 
+  function formatLicenseSourcePluginName(sourcePluginId: string | undefined): string {
+    if (sourcePluginId === 'weave') {
+      return 'Weave';
+    }
+    if (sourcePluginId === 'weave-epub-reader') {
+      return t('about.license.statusCard.epubReader');
+    }
+    return t('about.license.statusCard.relatedProduct');
+  }
+  
+  // 状态计算
+  let localLicenseCount = $derived(effectiveState?.localLicenses.length ?? (license?.activationCode ? 1 : 0));
+
+  let inheritedLicenseCount = $derived(effectiveState?.inheritedLicenses.length ?? 0);
+
+  let displayLicense = $derived(effectiveState?.primaryLicense ?? license ?? null);
+
+  let isActivated = $derived(effectiveState?.isPremiumActive ?? (displayLicense?.isActivated || false));
+
+  let licenseSourceLabel = $derived.by(() => {
+    if (!displayLicense) return t('about.license.statusCard.notActivated');
+    if (displayLicense.source === 'inherited') {
+      return displayLicense.sourcePluginId
+				? t('about.license.statusCard.sharedLicenseFrom', { product: formatLicenseSourcePluginName(displayLicense.sourcePluginId) })
+				: t('about.license.statusCard.sharedLicense');
+    }
+    return t('about.license.statusCard.currentProductLicense');
+  });
+  
+  // 许可证类型显示
+  let licenseTypeInfo = $derived.by(() => {
+    if (!displayLicense?.licenseType) return { text: t('about.license.statusCard.unknown'), color: 'gray' };
+
+    switch (displayLicense.licenseType) {
+      case 'lifetime':
+        return { text: t('about.license.statusCard.lifetimeBuyout'), color: 'premium' };
+      case 'subscription':
+        return { text: t('about.license.statusCard.subscriptionLicense'), color: 'subscription' };
+      default:
+        return { text: t('about.license.statusCard.license'), color: 'default' };
+    }
+  });
+  
+  // 到期状态
+  let expiryInfo = $derived.by(() => {
+    if (!displayLicense?.expiresAt) return null;
+    
+    const expiryDate = new Date(displayLicense.expiresAt);
+    const now = new Date();
+    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiry < 0) {
+      return { status: 'expired', text: t('about.license.statusCard.expired'), color: 'red' };
+    } else if (daysUntilExpiry <= 30) {
+      return { status: 'expiring', text: t('about.license.statusCard.daysUntilExpiry', { days: daysUntilExpiry }), color: 'orange' };
+    } else if (daysUntilExpiry <= 365) {
+      return { status: 'active', text: t('about.license.statusCard.daysUntilExpiry', { days: daysUntilExpiry }), color: 'green' };
+    } else {
+      return { status: 'long-term', text: t('about.license.statusCard.longTermValid'), color: 'green' };
+    }
+  });
+
+  let deviceStats = $derived(resolveLicenseDeviceStats(displayLicense, app));
+  
+</script>
+
+{#if isActivated}
+  <!-- 激活状态卡片 -->
+  <div class="license-status-card activated">
+    <!-- 状态头部 -->
+    <div class="status-header">
+      <div class="status-badge success">
+        <span class="badge-text">{t('about.license.statusCard.activated')}</span>
+      </div>
+    </div>
+    
+    <!-- 许可证详情 -->
+    <div class="license-details">
+      <div class="detail-grid">
+        <!-- 许可证类型 -->
+        <div class="detail-item">
+          <div class="detail-label">{t('about.license.statusCard.licenseType')}</div>
+          <div class="detail-value">
+            <span class="license-type-badge {licenseTypeInfo.color}">
+              {licenseTypeInfo.text}
+            </span>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">{t('about.license.statusCard.licenseSource')}</div>
+          <div class="detail-value">{licenseSourceLabel}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">{t('about.license.statusCard.currentProductLicenseCount')}</div>
+          <div class="detail-value">{localLicenseCount}</div>
+        </div>
+
+        {#if inheritedLicenseCount > 0}
+          <div class="detail-item">
+            <div class="detail-label">{t('about.license.statusCard.sharedLicenseCount')}</div>
+            <div class="detail-value">{inheritedLicenseCount}</div>
+          </div>
+        {/if}
+
+        {#if deviceStats}
+          <div class="detail-item">
+            <div class="detail-label">{t('about.license.statusCard.deviceUsage')}</div>
+            <div class="detail-value">{formatLicenseDeviceStats(deviceStats)}</div>
+          </div>
+        {/if}
+        
+        <!-- 激活时间 -->
+        <div class="detail-item">
+          <div class="detail-label">{t('about.license.statusCard.activatedAt')}</div>
+          <div class="detail-value">
+            {displayLicense?.activatedAt ? new Date(displayLicense.activatedAt).toLocaleString(locale) : '-'}
+          </div>
+        </div>
+        
+        <!-- 到期时间 -->
+        {#if displayLicense?.expiresAt && displayLicense.licenseType !== 'lifetime'}
+          <div class="detail-item">
+            <div class="detail-label">{t('about.license.statusCard.expiresAt')}</div>
+            <div class="detail-value">
+              <span class="expiry-date {expiryInfo?.color}">
+                {new Date(displayLicense.expiresAt).toLocaleString(locale)}
+              </span>
+              {#if expiryInfo}
+                <span class="expiry-status {expiryInfo?.color ?? ''}">
+                  ({expiryInfo?.text ?? ''})
+                </span>
+              {/if}
+            </div>
+          </div>
+        {/if}
+        
+        <!-- 产品版本 -->
+        <div class="detail-item">
+          <div class="detail-label">{t('about.license.statusCard.productVersion')}</div>
+          <div class="detail-value">
+            {displayLicense?.productVersion || 'v0.5.0'}
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- 操作按钮 -->
+    {#if showActions}
+      <div class="license-actions">
+        {#if onVerify}
+          <button class="action-button primary" onclick={onVerify}>
+            {t('about.license.statusCard.verifyLicense')}
+          </button>
+        {/if}
+        {#if onReset}
+          <button class="action-button secondary" onclick={onReset}>
+            {t('about.license.statusCard.resetLicense')}
+          </button>
+        {/if}
+      </div>
+    {/if}
+  </div>
+{:else}
+  <!-- 未激活状态 -->
+  <div class="license-status-card not-activated">
+    <div class="status-header">
+      <div class="status-badge inactive">
+        <span class="badge-text">{t('about.license.statusCard.notActivated')}</span>
+      </div>
+    </div>
+    
+    <div class="inactive-message">
+      <p>{t('about.license.statusCard.inactiveMsg')}</p>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .license-status-card {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: 1rem 1.1rem;
+    background: var(--background-primary);
+  }
+  
+  .license-status-card.activated {
+    border-color: var(--color-green);
+    background: color-mix(in srgb, var(--background-primary) 92%, var(--color-green));
+  }
+  
+  .license-status-card.not-activated {
+    border-color: var(--color-orange);
+    background: color-mix(in srgb, var(--background-primary) 92%, var(--color-orange));
+  }
+  
+  .status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-s);
+    font-weight: 600;
+    font-size: var(--font-ui-small);
+  }
+  
+  .status-badge.success {
+    background: color-mix(in srgb, var(--background-secondary) 72%, var(--color-green));
+    color: var(--color-green);
+    border: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, var(--color-green));
+  }
+  
+  .status-badge.inactive {
+    background: color-mix(in srgb, var(--background-secondary) 72%, var(--color-orange));
+    color: var(--color-orange);
+    border: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, var(--color-orange));
+  }
+  
+  .license-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-s);
+    font-weight: 500;
+    font-size: var(--font-ui-smaller);
+    border: 1px solid var(--background-modifier-border);
+  }
+  
+  .license-type-badge.premium {
+    background: color-mix(in srgb, var(--background-secondary) 76%, var(--color-purple));
+    color: var(--text-normal);
+  }
+  
+  .license-type-badge.standard {
+    background: color-mix(in srgb, var(--background-secondary) 76%, var(--color-blue));
+    color: var(--text-normal);
+  }
+  
+  .license-type-badge.trial {
+    background: color-mix(in srgb, var(--background-secondary) 76%, var(--color-orange));
+    color: var(--text-normal);
+  }
+
+  .license-type-badge.subscription {
+    background: color-mix(in srgb, var(--background-secondary) 76%, var(--color-green));
+    color: var(--text-normal);
+  }
+  
+  .detail-grid {
+    display: grid;
+    gap: 0;
+    margin-bottom: 1rem;
+  }
+  
+  .detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    background: transparent;
+    border-radius: 0;
+    border-top: 1px solid var(--background-modifier-border-hover);
+  }
+
+  .detail-grid .detail-item:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+  
+  .detail-label {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+  }
+  
+  .detail-value {
+    font-weight: 600;
+    color: var(--text-normal);
+    text-align: right;
+  }
+  
+  .license-type-display {
+    font-weight: 600;
+  }
+  
+  .license-type-display.premium {
+    color: var(--color-purple);
+  }
+  
+  .lifetime-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.125rem 0.5rem;
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: white;
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smaller);
+    font-weight: 700;
+  }
+  
+  .expiry-status.green {
+    color: var(--color-green);
+  }
+  
+  .expiry-status.orange {
+    color: var(--color-orange);
+  }
+  
+  .expiry-status.red {
+    color: var(--color-red);
+  }
+  
+  
+  .license-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  
+  .action-button {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--button-radius, var(--radius-s));
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: var(--font-ui-small);
+  }
+  
+  .action-button:hover {
+    background: var(--background-modifier-hover);
+  }
+  
+  .action-button.primary {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+  }
+  
+  .action-button.primary:hover {
+    background: var(--interactive-accent-hover);
+  }
+  
+  .inactive-message {
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+</style>
