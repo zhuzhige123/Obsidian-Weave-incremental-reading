@@ -196,10 +196,6 @@ export default defineConfig(({ mode }) => {
 			},
 			viteStaticCopy({
 				targets: [
-					{
-						src: "public/assets/coffee-support-qr.png",
-						dest: "assets",
-					},
 					...(!isDev
 						? [
 								{
