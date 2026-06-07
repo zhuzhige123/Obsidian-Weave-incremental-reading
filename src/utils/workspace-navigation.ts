@@ -79,14 +79,18 @@ export function revealLeaf(app: App, leaf: WorkspaceLeaf, focus = true): void {
 				workspace.setActiveLeaf(leaf, focus);
 			}
 		}
-	} catch {}
+	} catch {
+		void 0;
+	}
 
 	try {
 		const maybeRevealLeaf = workspace?.["revealLeaf"];
 		if (typeof maybeRevealLeaf === "function") {
 			void maybeRevealLeaf.call(workspace, leaf);
 		}
-	} catch {}
+	} catch {
+		void 0;
+	}
 }
 
 function resolveLinkFile(app: App, linkText: string, contextPath: string): TFile | null {

@@ -1,5 +1,4 @@
 import {
-	App,
 	Menu,
 	MarkdownView,
 	Notice,
@@ -57,6 +56,9 @@ import type {
 } from "./types/license";
 import { DEFAULT_LICENSE_INFO, DEFAULT_LICENSE_STORE } from "./types/license";
 import { getInheritedLicensesFromLegacyWeave } from "./utils/plugin-access";
+import { findCollaboratorEpubHost } from "./utils/obsidian-plugin-registry";
+import type { CanvasMenuNode } from "./types/canvas-menu-node";
+import { readCanvasNodeData, readCanvasNodeText } from "./types/canvas-menu-node";
 import {
 	getLegacyPrimaryLicense,
 	LICENSED_PRODUCTS,
@@ -83,7 +85,6 @@ import {
 	generateSourceId,
 } from "./types/ir-types";
 import type {
-	IncrementalReadingFolderSubscriptionSettings,
 	IncrementalReadingSettings,
 	IRCalendarSidebarSettings,
 } from "./types/plugin-settings.d";
@@ -102,7 +103,6 @@ import {
 import { StandaloneIRSettingsTab } from "./components/settings/StandaloneIRSettingsTab";
 import {
 	buildDefaultIncrementalReadingSettings,
-	DEFAULT_IR_CALENDAR_SIDEBAR_SETTINGS,
 	normalizeIRCalendarSidebarSettings,
 	normalizeIncrementalReadingSettings,
 } from "./services/incremental-reading/ir-settings";
@@ -174,7 +174,7 @@ export default class StandaloneIncrementalReadingPlugin
 	implements EpubHostIRCapabilities, EpubHostReaderCapabilities
 {
 	settings: StandaloneIRSettings = { ...DEFAULT_STANDALONE_IR_SETTINGS };
-	dataStorage: any = null;
+	dataStorage: Record<string, unknown> | null = null;
 
 	/** 阅读材料兼容层：批量导入、文件化块、YAML 材料元数据仍走此管理器 */
 	readingMaterialStorage!: ReadingMaterialStorage;
@@ -194,12 +194,16 @@ export default class StandaloneIncrementalReadingPlugin
 		this.registerEvent(this.app.workspace.on("layout-change", () => {
 			try {
 				syncI18nWithObsidianLanguage();
-			} catch {}
+			} catch {
+				void 0;
+			}
 		}));
 		this.registerDomEvent(window, "focus", () => {
 			try {
 				syncI18nWithObsidianLanguage();
-			} catch {}
+			} catch {
+				void 0;
+			}
 		});
 
 		await this.loadSettings();
@@ -743,17 +747,6 @@ export default class StandaloneIncrementalReadingPlugin
 			options.preferredLeaf.detach();
 		}
 
-		try {
-			const workspaceAny = workspace as any;
-			if (typeof workspaceAny.setActiveLeaf === "function") {
-				try {
-					workspaceAny.setActiveLeaf(leaf, { focus: true });
-				} catch {
-					workspaceAny.setActiveLeaf(leaf, true);
-				}
-			}
-		} catch {}
-
 		revealLeaf(this.app, leaf);
 	}
 
@@ -783,17 +776,6 @@ export default class StandaloneIncrementalReadingPlugin
 				sourcePath,
 			},
 		});
-
-		try {
-			const workspaceAny = workspace as any;
-			if (typeof workspaceAny.setActiveLeaf === "function") {
-				try {
-					workspaceAny.setActiveLeaf(leaf, { focus: true });
-				} catch {
-					workspaceAny.setActiveLeaf(leaf, true);
-				}
-			}
-		} catch {}
 
 		revealLeaf(this.app, leaf);
 	}
@@ -984,13 +966,13 @@ export default class StandaloneIncrementalReadingPlugin
 
 	private registerCanvasNodeContextMenu(): void {
 		this.registerEvent(
-			(this.app.workspace as any).on("canvas:node-menu", (menu: Menu, node: any) => {
+			this.app.workspace.on("canvas:node-menu", (menu: Menu, node: CanvasMenuNode) => {
 				try {
 					if (!this.shouldShowPremiumEntry(PREMIUM_FEATURES.INCREMENTAL_READING)) {
 						return;
 					}
 
-					const nodeContent = this.getCanvasNodeContent(node);
+					const nodeContent = readCanvasNodeText(node);
 					if (!nodeContent) {
 						return;
 					}
@@ -998,7 +980,7 @@ export default class StandaloneIncrementalReadingPlugin
 					menu.addItem((item) => {
 						item.setTitle("添加到增量阅读专题");
 						item.setIcon("book-plus");
-						const submenu = (item as any).setSubmenu() as Menu;
+						const submenu = item.setSubmenu();
 						void this.buildCanvasIRDeckSubmenu(submenu, node);
 					});
 				} catch (error) {
@@ -1136,14 +1118,7 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	private getExternalEpubHost(): EpubHostReaderCapabilities | null {
-		const plugins = (this.app as any)?.plugins;
-		for (const pluginId of IR_RUNTIME.collaboratorHostPluginIds) {
-			const plugin = plugins?.getPlugin?.(pluginId);
-			if (plugin && plugin !== this && typeof plugin.openEpubReader === "function") {
-				return plugin as EpubHostReaderCapabilities;
-			}
-		}
-		return null;
+		return findCollaboratorEpubHost(this.app, IR_RUNTIME.collaboratorHostPluginIds, this);
 	}
 
 	private async resolveIRDeckById(deckId: string): Promise<{ id: string; name: string } | null> {
@@ -1219,23 +1194,8 @@ export default class StandaloneIncrementalReadingPlugin
 		};
 	}
 
-	private getCanvasNodeContent(node: any): string {
-		const nodeData = node?.getData?.() ?? node;
-		if (nodeData?.type === "text" && typeof nodeData?.text === "string") {
-			return nodeData.text.trim();
-		}
-		if (nodeData?.type === "file" && typeof nodeData?.file === "string") {
-			const filePath = nodeData.file.trim();
-			return filePath ? `![[${filePath}]]` : "";
-		}
-		if (nodeData?.type === "link" && typeof nodeData?.url === "string") {
-			return nodeData.url.trim();
-		}
-		return "";
-	}
-
 	private getActiveCanvasPath(): string | undefined {
-		const activeLeaf = this.app.workspace.activeLeaf;
+		const activeLeaf = this.app.workspace.getMostRecentLeaf?.() ?? null;
 		const activeCanvasPath =
 			activeLeaf?.view?.getViewType?.() === "canvas"
 				? (activeLeaf.view as { file?: { path?: string } }).file?.path
@@ -1253,23 +1213,23 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 
 		const canvasLeaf = this.app.workspace.getLeavesOfType("canvas")[0];
-		const canvasPath = (canvasLeaf?.view as any)?.file?.path;
+		const canvasPath = (canvasLeaf?.view as { file?: { path?: string } } | undefined)?.file?.path;
 		return typeof canvasPath === "string" && canvasPath.toLowerCase().endsWith(".canvas")
 			? canvasPath
 			: undefined;
 	}
 
-	private getCanvasNodeId(node: any): string | undefined {
+	private getCanvasNodeId(node: CanvasMenuNode): string | undefined {
 		return resolveCanvasMenuNodeId(node);
 	}
 
-	private buildCanvasNodeSourceLink(node: any): string | undefined {
+	private buildCanvasNodeSourceLink(node: CanvasMenuNode): string | undefined {
 		const canvasPath = this.getActiveCanvasPath();
 		if (!canvasPath) {
 			return undefined;
 		}
 
-		const nodeData = node?.getData?.() ?? node;
+		const nodeData = readCanvasNodeData(node);
 		const nodeId = this.getCanvasNodeId(node);
 		if (!nodeId) {
 			return `[[${canvasPath}]]`;
@@ -1290,7 +1250,7 @@ export default class StandaloneIncrementalReadingPlugin
 		return `[[${canvasPath}#^${nodeId}${query ? `?${query}` : ""}]]`;
 	}
 
-	private buildCanvasNodeIRPointContext(node: any): {
+	private buildCanvasNodeIRPointContext(node: CanvasMenuNode): {
 		canvasFile: TFile;
 		nodeId: string;
 		selectedText: string;
@@ -1298,7 +1258,7 @@ export default class StandaloneIncrementalReadingPlugin
 		initialTitle: string;
 		textCandidates: string[];
 	} | null {
-		const selectedText = this.getCanvasNodeContent(node);
+		const selectedText = readCanvasNodeText(node);
 		if (!selectedText) {
 			return null;
 		}
@@ -1319,9 +1279,9 @@ export default class StandaloneIncrementalReadingPlugin
 			return null;
 		}
 
-		const nodeData = node?.getData?.() ?? node;
+		const nodeData = readCanvasNodeData(node);
 		let initialTitle = "";
-		if (nodeData?.type === "file" && typeof nodeData?.file === "string") {
+		if (nodeData?.type === "file" && typeof nodeData.file === "string") {
 			const basename =
 				nodeData.file.split("/").pop()?.replace(/\.[^.]+$/u, "") || String(nodeData.file || "");
 			initialTitle = this.cleanIRReadingPointTitle(basename);

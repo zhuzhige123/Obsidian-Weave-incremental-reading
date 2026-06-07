@@ -1,8 +1,12 @@
 import { TFile, type App, type WorkspaceLeaf } from "obsidian";
-import { getIrEpubStorageService } from "../services/epub-integration/ir-epub-storage-access";
 import { EPUB_RUNTIME } from "../services/epub-integration/epub-runtime";
 import { isSupportedBookPath } from "../services/epub-integration/book-format";
 import { epubActiveDocumentStore } from "../stores/epub-active-document-store";
+import { getObsidianPluginAs } from "./obsidian-plugin-registry";
+import {
+	getRegisteredViewTypeForExtension,
+	isRegisteredViewType,
+} from "./obsidian-view-registry";
 import { getLeafLocation } from "./view-location-utils";
 import { revealLeaf } from "./workspace-navigation";
 
@@ -16,42 +20,6 @@ const KNOWN_EPUB_VIEW_TYPES = Array.from(
 
 function isCenterLeaf(leaf: WorkspaceLeaf | null | undefined): leaf is WorkspaceLeaf {
 	return !!leaf && getLeafLocation(leaf) === "center";
-}
-
-function readRegisteredViewTypeForExtension(app: App, extension: string): string | null {
-	const normalizedExtension = String(extension || "").trim().toLowerCase();
-	if (!normalizedExtension) {
-		return null;
-	}
-	const typeByExtension = (app as any)?.viewRegistry?.typeByExtension;
-	if (!typeByExtension) {
-		return null;
-	}
-	if (typeof typeByExtension.get === "function") {
-		return typeByExtension.get(normalizedExtension) ?? null;
-	}
-	if (typeof typeByExtension === "object") {
-		return typeByExtension[normalizedExtension] ?? null;
-	}
-	return null;
-}
-
-function isRegisteredViewType(app: App, viewType: string): boolean {
-	const registry = (app as any)?.viewRegistry;
-	if (!registry || !viewType) {
-		return false;
-	}
-	const creators = registry.viewByType ?? registry.viewCreators ?? registry.views;
-	if (!creators) {
-		return false;
-	}
-	if (typeof creators.get === "function") {
-		return Boolean(creators.get(viewType));
-	}
-	if (typeof creators === "object") {
-		return Boolean(creators[viewType]);
-	}
-	return false;
 }
 
 export function getAllOpenEpubLeaves(app: App): WorkspaceLeaf[] {
@@ -91,7 +59,7 @@ export function getOpenEpubFilePath(leaf: WorkspaceLeaf | null | undefined): str
 
 export function resolveRegisteredEpubViewType(app: App, filePath?: string): string | null {
 	const extension = String(filePath || "").split(".").pop() || "";
-	const mappedViewType = readRegisteredViewTypeForExtension(app, extension);
+	const mappedViewType = getRegisteredViewTypeForExtension(app, extension);
 	if (mappedViewType && KNOWN_EPUB_VIEW_TYPES.includes(mappedViewType)) {
 		return mappedViewType;
 	}
@@ -199,15 +167,13 @@ export async function resolveRecentEpubPath(app: App): Promise<string | null> {
 		return openLeafPath;
 	}
 
-	const reader = (app as { plugins?: { getPlugin?: (id: string) => unknown } }).plugins?.getPlugin?.(
-		"weave-epub-reader"
-	) as {
+	const reader = getObsidianPluginAs<{
 		getEpubStorageService?: () => {
 			loadBooks?: () => Promise<
 				Record<string, { filePath: string; readingStats?: { lastReadTime?: number } }>
 			>;
 		};
-	} | null;
+	}>(app, "weave-epub-reader");
 	const storageService = reader?.getEpubStorageService?.();
 	if (storageService && typeof storageService.loadBooks === "function") {
 		try {

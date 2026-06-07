@@ -15,6 +15,11 @@
 		"verbatimModuleSyntax": false,
 		"types": ["svelte", "node", "bun-types", "vitest/globals"]
 	},
-	"files": ["src/app.d.ts", "src/types/standalone-third-party.d.ts", "src/main.ts"],
+	"files": [
+		"src/app.d.ts",
+		"src/types/standalone-third-party.d.ts",
+		"src/types/obsidian-internal-augment.d.ts",
+		"src/main.ts"
+	],
 	"exclude": ["src/demo/**", "src/tests/**", "src/test-integration.ts", "dist/**"]
 }

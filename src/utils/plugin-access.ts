@@ -1,3 +1,4 @@
+import type { App } from "obsidian";
 import type { LicenseInfo, LicenseStore } from "../types/license";
 import {
 	cloneLicenseAsInherited,
@@ -6,7 +7,7 @@ import {
 } from "./license-state";
 import { WEAVE_MAIN_PLUGIN_ID } from "./weave-reader-access";
 
-export type PluginLookupApp = unknown;
+export type PluginLookupApp = App;
 
 type CompatiblePlugin = {
 	manifest?: {
@@ -21,14 +22,11 @@ type CompatiblePlugin = {
 };
 
 function getPluginById(app: PluginLookupApp | undefined, pluginId: string): CompatiblePlugin | null {
-	const appLike = app as
-		| {
-				plugins?: {
-					getPlugin?: (pluginId: string) => unknown;
-				};
-		  }
-		| undefined;
-	const plugin = appLike?.plugins?.getPlugin?.(pluginId);
+	if (!app) {
+		return null;
+	}
+
+	const plugin = app.plugins.getPlugin(pluginId);
 	return plugin && typeof plugin === "object" ? (plugin as CompatiblePlugin) : null;
 }
 

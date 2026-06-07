@@ -1,28 +1,6 @@
 import type { App, Plugin } from "obsidian";
 import { logger } from "./logger";
-
-function getRegisteredViewTypeForExtension(app: App, extension: string): string | null {
-	const normalizedExtension = extension.trim().toLowerCase();
-	if (!normalizedExtension) {
-		return null;
-	}
-
-	const viewRegistry = (app as any)?.viewRegistry;
-	const typeByExtension = viewRegistry?.typeByExtension;
-	if (!typeByExtension) {
-		return null;
-	}
-
-	if (typeof typeByExtension.get === "function") {
-		return typeByExtension.get(normalizedExtension) ?? null;
-	}
-
-	if (typeof typeByExtension === "object") {
-		return typeByExtension[normalizedExtension] ?? null;
-	}
-
-	return null;
-}
+import { getRegisteredViewTypeForExtension } from "./obsidian-view-registry";
 
 export function registerExtensionsSafely(
 	plugin: Plugin,

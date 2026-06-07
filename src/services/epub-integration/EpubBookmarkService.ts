@@ -1,5 +1,6 @@
 import { App, TFile, normalizePath, parseYaml } from "obsidian";
 import { DirectoryUtils } from "../../utils/directory-utils";
+import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
 import { logger } from "../../utils/logger";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
 import { EpubLinkService } from "./EpubLinkService";
@@ -83,9 +84,10 @@ export class EpubBookmarkService {
 			(value): value is string => typeof value === "string" && value.length > 0
 		);
 		for (const pluginId of pluginIds) {
-			const plugin = (this.app as App & {
-				plugins?: { getPlugin?: (id: string) => { settings?: { bookmarkFolder?: string } } | null };
-			}).plugins?.getPlugin?.(pluginId);
+			const plugin = getObsidianPluginAs<{ settings?: { bookmarkFolder?: string } }>(
+				this.app,
+				pluginId
+			);
 			const configured = normalizeEpubBookmarkFolderPath(plugin?.settings?.bookmarkFolder);
 			if (configured) {
 				return configured;
