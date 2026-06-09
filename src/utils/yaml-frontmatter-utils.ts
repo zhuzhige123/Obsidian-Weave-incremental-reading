@@ -8,18 +8,41 @@
  */
 
 import type { App, TFile } from "obsidian";
-import type { ReadingCategory, ReadingYAMLFields } from "../types/incremental-reading-types";
+import { ReadingCategory, type ReadingYAMLFields } from "../types/incremental-reading-types";
 import {
 	READING_LEGACY_DECK_YAML_KEY,
 	READING_TOPIC_YAML_KEY,
 	extractReadingTopicIdFromFrontmatter,
 } from "./ir-topic-compat";
 import { logger } from "./logger";
+import {
+	asRecord,
+	readNumber,
+	readOptionalString,
+	readString,
+	readStringArrayFromUnknown,
+} from "./unknown-record";
+
+type FrontmatterRecord = Record<string, unknown>;
+
+function asFrontmatterRecord(frontmatter: unknown): FrontmatterRecord {
+	if (typeof frontmatter !== "object" || frontmatter === null) {
+		return {};
+	}
+	return frontmatter as FrontmatterRecord;
+}
+
+function readReadingCategory(value: unknown): ReadingCategory | undefined {
+	const normalized = readString(value);
+	return Object.values(ReadingCategory).includes(normalized as ReadingCategory)
+		? (normalized as ReadingCategory)
+		: undefined;
+}
 
 function normalizeWeaveTags(tags: unknown[]): string[] {
 	const ordered = new Map<string, string>();
 	for (const rawTag of Array.isArray(tags) ? tags : []) {
-		const label = String(rawTag || "").trim();
+		const label = readString(rawTag);
 		const key = label.toLowerCase();
 		if (!key || ordered.has(key)) continue;
 		ordered.set(key, label);
@@ -62,7 +85,7 @@ export class YAMLFrontmatterManager {
 	async getReadingFields(file: TFile): Promise<Partial<ReadingYAMLFields> | null> {
 		try {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const frontmatter = cache?.frontmatter;
+			const frontmatter = asRecord(cache?.frontmatter);
 
 			if (!frontmatter) {
 				return null;
@@ -70,24 +93,21 @@ export class YAMLFrontmatterManager {
 
 			const fields: Partial<ReadingYAMLFields> = {};
 
-			if (frontmatter["weave-reading-id"]) {
-				fields["weave-reading-id"] = frontmatter["weave-reading-id"];
+			const readingId = readOptionalString(frontmatter["weave-reading-id"]);
+			if (readingId) {
+				fields["weave-reading-id"] = readingId;
 			}
-			if (frontmatter["weave-reading-category"]) {
-				fields["weave-reading-category"] = frontmatter["weave-reading-category"];
+			const category = readReadingCategory(frontmatter["weave-reading-category"]);
+			if (category) {
+				fields["weave-reading-category"] = category;
 			}
 			if (frontmatter["weave-reading-priority"] !== undefined) {
-				fields["weave-reading-priority"] = frontmatter["weave-reading-priority"];
+				fields["weave-reading-priority"] = readNumber(frontmatter["weave-reading-priority"]);
 			}
 			if (frontmatter["weave_tags"] !== undefined) {
-				const rawTags = Array.isArray(frontmatter["weave_tags"])
-					? frontmatter["weave_tags"]
-					: typeof frontmatter["weave_tags"] === "string"
-						? String(frontmatter["weave_tags"])
-								.split(",")
-								.map((tag) => tag.trim())
-						: [];
-				fields["weave_tags"] = normalizeWeaveTags(rawTags);
+				fields["weave_tags"] = normalizeWeaveTags(
+					readStringArrayFromUnknown(frontmatter["weave_tags"])
+				);
 			}
 			const topicId = extractReadingTopicIdFromFrontmatter(frontmatter);
 			if (topicId) {
@@ -119,10 +139,11 @@ export class YAMLFrontmatterManager {
 	 */
 	async updateReadingFields(file: TFile, updates: Partial<ReadingYAMLFields>): Promise<void> {
 		try {
-			await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+			await this.app.fileManager.processFrontMatter(file, (rawFrontmatter) => {
+				const frontmatter = asFrontmatterRecord(rawFrontmatter);
 				// 更新每个字段
 				if (updates["weave-reading-id"] !== undefined) {
-					const readingId = String(updates["weave-reading-id"] || "").trim();
+					const readingId = readString(updates["weave-reading-id"]);
 					if (readingId) {
 						frontmatter["weave-reading-id"] = readingId;
 					} else {
@@ -207,7 +228,8 @@ export class YAMLFrontmatterManager {
 	 */
 	async removeReadingFields(file: TFile): Promise<void> {
 		try {
-			await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+			await this.app.fileManager.processFrontMatter(file, (rawFrontmatter) => {
+				const frontmatter = asFrontmatterRecord(rawFrontmatter);
 				frontmatter["weave-reading-id"] = undefined;
 				frontmatter["weave-reading-category"] = undefined;
 				frontmatter["weave-reading-priority"] = undefined;

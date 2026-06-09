@@ -1,5 +1,5 @@
 import { type App, TFile, normalizePath } from "obsidian";
-import { getV2Paths, normalizeWeaveParentFolder } from "../../config/paths";
+import { getPluginPathsById, getV2Paths, normalizeWeaveParentFolder } from "../../config/paths";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
 import { getEpubRuntime } from "./epub-runtime";
@@ -40,7 +40,7 @@ export class IrEpubSourceRegistry implements IrEpubStorageLike {
 		);
 		this.basePath = getV2Paths(parentFolder).ir.epub;
 		this.unifiedDataPath = normalizePath(
-			`.obsidian/plugins/${runtime.pluginDirName}/state/incremental-reading/epub-reader-data.json`
+			getPluginPathsById(app, runtime.pluginId).state.incrementalReading.epubReaderData
 		);
 	}
 
@@ -236,7 +236,7 @@ export class IrEpubSourceRegistry implements IrEpubStorageLike {
 		}
 		try {
 			const binary = await adapter.readBinary(normalizedPath);
-			const input = binary instanceof Uint8Array ? binary : new Uint8Array(binary as ArrayBuffer);
+			const input = binary instanceof Uint8Array ? binary : new Uint8Array(binary);
 			const buffer = input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer;
 			const digest = await crypto.subtle.digest("SHA-256", buffer);
 			return Array.from(new Uint8Array(digest))

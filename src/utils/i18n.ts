@@ -1,5 +1,6 @@
 import { getLanguage } from "obsidian";
 import { logger } from "../utils/logger";
+import { isRecord } from "./unknown-record";
 import { vaultStorage } from "../utils/vault-local-storage";
 import { translations, translationOverrides } from "./i18n/resources";
 import type { I18nConfig, SupportedLanguage, TranslationKey } from "./i18n/types";
@@ -299,10 +300,10 @@ export class I18nService {
 	 */
 	private getDirectTranslation(key: string, language: SupportedLanguage): string | null {
 		const keys = key.split(".");
-		let current: any = translationCatalog[language];
+		let current: unknown = translationCatalog[language];
 
 		for (const k of keys) {
-			if (current && typeof current === "object" && k in current) {
+			if (isRecord(current) && k in current) {
 				current = current[k];
 			} else {
 				return null;
@@ -318,8 +319,12 @@ export class I18nService {
 	private interpolate(text: string, params?: Record<string, string | number>): string {
 		if (!params) return text;
 
-		return text.replace(/\{(\w+)\}/g, (match, key) => {
-			return params[key]?.toString() || match;
+		return text.replace(/\{(\w+)\}/g, (match, key: string) => {
+			if (!(key in params)) {
+				return match;
+			}
+			const value = params[key];
+			return value !== undefined ? String(value) : match;
 		});
 	}
 

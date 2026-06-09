@@ -61,7 +61,7 @@ export class IRSettingsEditor {
 		const incrementalReading = this.ensureIncrementalReadingSettings();
 		const savedSettings = (await this.plugin.saveIncrementalReadingSettings(incrementalReading, {
 			syncFolderSubscription,
-		})) as IncrementalReadingSettings;
+		}));
 		this.updateState({
 			...this.getState(),
 			incrementalReading: savedSettings,

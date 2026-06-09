@@ -172,7 +172,7 @@ class EditorContextManager {
 					logger.error("[EditorContextManager] setValue 失败:", error);
 				}
 			},
-		} as any;
+		} as Editor;
 	}
 }
 

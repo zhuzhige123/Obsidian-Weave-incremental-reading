@@ -526,6 +526,17 @@ body.styled-scrollbars .ir-paragraph-workbench__text-viewport::-webkit-scrollbar
 	);
 }
 
+.ir-paragraph-workbench__priority-panel .ir-priority-slider {
+	width: 100%;
+}
+
+.ir-paragraph-workbench__priority-panel .priority-editor {
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	padding: 0;
+}
+
 .ir-paragraph-workbench__panel-title {
 	font-size: 14px;
 	font-weight: 700;

@@ -8,7 +8,7 @@ export function markLatestSuggestionContainer(className: string): void {
 	}
 
 	window.requestAnimationFrame(() => {
-		const containers = Array.from(document.querySelectorAll(".suggestion-container")) as HTMLElement[];
+		const containers = Array.from(activeDocument.querySelectorAll(".suggestion-container"));
 		const latest = containers.at(-1);
 		if (!latest) {
 			return;

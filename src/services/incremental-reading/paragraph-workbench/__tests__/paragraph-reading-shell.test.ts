@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildParagraphWorkbenchDisplay,
-	normalizeParagraphPriorityLevel,
+	clampParagraphPriorityUi,
 	normalizeParagraphScheduleIntervalDays,
 	resolveParagraphPostponeMinutes,
 } from "../paragraph-reading-shell";
@@ -40,7 +40,8 @@ describe("paragraph-reading-shell", () => {
 	it("normalizes schedule and priority values", () => {
 		expect(normalizeParagraphScheduleIntervalDays(14)).toBe(14);
 		expect(normalizeParagraphScheduleIntervalDays("bad")).toBe(7);
-		expect(normalizeParagraphPriorityLevel(3)).toBe(3);
-		expect(normalizeParagraphPriorityLevel("bad")).toBe(2);
+		expect(clampParagraphPriorityUi(7.5)).toBe(7.5);
+		expect(clampParagraphPriorityUi("bad")).toBe(5);
+		expect(clampParagraphPriorityUi(12)).toBe(10);
 	});
 });

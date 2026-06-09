@@ -217,7 +217,9 @@ export class CloudLicenseValidator {
 	private getCache(): { result: CloudValidationResult; cached_at: number } | null {
 		try {
 			const cached = vaultStorage.getItem(this.cacheKey);
-			return cached ? JSON.parse(cached) : null;
+			return cached
+				? (JSON.parse(cached) as { result: CloudValidationResult; cached_at: number })
+				: null;
 		} catch {
 			return null;
 		}

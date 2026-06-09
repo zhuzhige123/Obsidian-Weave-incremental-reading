@@ -25,24 +25,23 @@ export class FocusManager {
 
 	static getInstance(): FocusManager {
 		if (typeof window !== "undefined") {
-			const w = window as any;
-			if (w.__weaveFocusManager) {
-				return w.__weaveFocusManager as FocusManager;
+			if (window.__weaveFocusManager) {
+				return window.__weaveFocusManager as FocusManager;
 			}
 
 			const instance = new FocusManager();
-			w.__weaveFocusManager = instance;
-			w.__weaveFocusManagerCleanup = () => {
+			window.__weaveFocusManager = instance;
+			window.__weaveFocusManagerCleanup = () => {
 				try {
-					(w.__weaveFocusManager as FocusManager | undefined)?.destroy();
+					(window.__weaveFocusManager as FocusManager | undefined)?.destroy();
 				} catch {}
 
 				try {
-					w.__weaveFocusManager = undefined;
-					w.__weaveFocusManagerCleanup = undefined;
+					window.__weaveFocusManager = undefined;
+					window.__weaveFocusManagerCleanup = undefined;
 				} catch {
-					w.__weaveFocusManager = null;
-					w.__weaveFocusManagerCleanup = null;
+					window.__weaveFocusManager = null;
+					window.__weaveFocusManagerCleanup = null;
 				}
 			};
 
@@ -60,10 +59,10 @@ export class FocusManager {
 	 * @param newFocusElement 可选的新焦点元素
 	 */
 	saveFocus(newFocusElement?: HTMLElement): void {
-		const currentFocus = document.activeElement as HTMLElement;
+		const currentFocus = activeDocument.activeElement as HTMLElement;
 
 		// 保存当前焦点到栈中
-		if (currentFocus && currentFocus !== document.body) {
+		if (currentFocus && currentFocus !== activeDocument.body) {
 			this.focusStack.push(currentFocus);
 			logger.debug("[FocusManager] 保存焦点:", {
 				element: currentFocus.tagName,
@@ -79,7 +78,7 @@ export class FocusManager {
 
 		// 如果提供了新焦点元素，设置焦点
 		if (newFocusElement) {
-			setTimeout(() => {
+			window.setTimeout(() => {
 				newFocusElement.focus();
 			}, 50);
 		}
@@ -94,7 +93,7 @@ export class FocusManager {
 
 		if (previousFocus && this.isElementFocusable(previousFocus)) {
 			// 使用 setTimeout 确保在模态窗口完全关闭后恢复焦点
-			setTimeout(() => {
+			window.setTimeout(() => {
 				try {
 					previousFocus.focus();
 					logger.debug("[FocusManager] 恢复焦点到:", {
@@ -143,7 +142,7 @@ export class FocusManager {
 		const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
 
 		// 设置初始焦点
-		setTimeout(() => {
+		window.setTimeout(() => {
 			if (firstFocusElement && container.contains(firstFocusElement)) {
 				firstFocusElement.focus();
 			} else {
@@ -155,7 +154,7 @@ export class FocusManager {
 		const handleTabKey = (e: KeyboardEvent) => {
 			if (e.key !== "Tab") return;
 
-			const activeElement = document.activeElement;
+			const activeElement = activeDocument.activeElement;
 
 			if (e.shiftKey) {
 				// Shift+Tab：向后导航
@@ -224,14 +223,14 @@ export class FocusManager {
 		if (!element) return false;
 
 		// 检查元素是否在文档中
-		if (!document.body.contains(element)) return false;
+		if (!activeDocument.body.contains(element)) return false;
 
 		// 检查元素是否可见
 		const style = window.getComputedStyle(element);
 		if (style.display === "none" || style.visibility === "hidden") return false;
 
 		// 检查元素是否被禁用
-		if ((element as any).disabled) return false;
+		if ("disabled" in element && Boolean((element as HTMLButtonElement).disabled)) return false;
 
 		// 检查tabindex
 		const tabindex = element.getAttribute("tabindex");
@@ -245,23 +244,23 @@ export class FocusManager {
 	 */
 	private findDefaultFocusableElement(): HTMLElement | null {
 		// 优先查找主内容区域
-		const mainContent = document.querySelector(
+		const mainContent = activeDocument.querySelector(
 			".workspace-leaf.mod-active .view-content"
 		) as HTMLElement;
 		if (mainContent) return mainContent;
 
 		// 查找任何激活的工作区
-		const activeLeaf = document.querySelector(".workspace-leaf.mod-active") as HTMLElement;
+		const activeLeaf = activeDocument.querySelector(".workspace-leaf.mod-active") as HTMLElement;
 		if (activeLeaf) return activeLeaf;
 
 		// 查找主要的输入框或按钮
-		const primaryInput = document.querySelector(
+		const primaryInput = activeDocument.querySelector(
 			"input:not([disabled]), button:not([disabled])"
 		) as HTMLElement;
 		if (primaryInput) return primaryInput;
 
 		// 最后返回body
-		return document.body;
+		return activeDocument.body;
 	}
 
 	/**
@@ -285,7 +284,7 @@ export class FocusManager {
 	 * 调试：获取当前焦点状态
 	 */
 	debugFocusState(): void {
-		const activeElement = document.activeElement;
+		const activeElement = activeDocument.activeElement;
 		logger.debug("[FocusManager] 当前焦点状态:", {
 			activeElement: activeElement,
 			tagName: activeElement?.tagName,

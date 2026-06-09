@@ -1,5 +1,6 @@
 import type { App, View, WorkspaceLeaf } from "obsidian";
 import { deriveWebPageTitleFromUrl } from "../incremental-reading/ir-web-reading-point";
+import { readString } from "../../utils/unknown-record";
 import { OBSIDIAN_WEB_VIEWER_VIEW_TYPE } from "./obsidian-open-web-url";
 
 export interface WebViewerPageContext {
@@ -25,7 +26,7 @@ export function readWebViewerUrlFromView(view: View | null | undefined): string 
 	}
 
 	const state = webView.getState?.() ?? {};
-	const url = String(state.url || "").trim();
+	const url = readString(state.url);
 	if (!url || url.startsWith("data:")) {
 		return "";
 	}
@@ -41,8 +42,8 @@ export function readWebViewerTitleFromView(view: View | null | undefined, url: s
 	const webView = view as WebViewerViewLike & { title?: string };
 	const directTitle = String(webView.title || "").trim();
 	const state = webView.getState?.() ?? {};
-	const stateTitle = String(state.title || "").trim();
-	const displayText = String(webView.getDisplayText?.() || "").trim();
+	const stateTitle = readString(state.title);
+	const displayText = readString(webView.getDisplayText?.());
 	const title = directTitle || stateTitle || displayText;
 	return title || deriveWebPageTitleFromUrl(url);
 }
@@ -68,7 +69,11 @@ export function getWebViewerPageContextFromView(
 }
 
 export function getActiveWebViewerPageContext(app: App): WebViewerPageContext | null {
-	const activeLeaf = app.workspace.activeLeaf;
+	const workspace = app.workspace as App["workspace"] & {
+		getActiveLeaf?: () => import("obsidian").WorkspaceLeaf | null;
+	};
+	const activeLeaf =
+		typeof workspace.getActiveLeaf === "function" ? workspace.getActiveLeaf() : null;
 	if (activeLeaf?.view?.getViewType?.() === OBSIDIAN_WEB_VIEWER_VIEW_TYPE) {
 		return getWebViewerPageContextFromView(activeLeaf.view);
 	}

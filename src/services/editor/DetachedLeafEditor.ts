@@ -8,6 +8,11 @@ import {
 	resolveDetachedEditorTempFolder,
 } from "./editor-temp-file-policy";
 import { applyStyleProps } from "../../utils/style-props";
+import {
+	asMarkdownViewInternal,
+	readMarkdownViewScope,
+} from "../../types/markdown-view-internal";
+import { readVaultConfigValue } from "../../utils/vault-config";
 
 export interface DetachedEditorOptions {
 	value?: string;
@@ -65,12 +70,15 @@ export class DetachedLeafEditor extends Component {
 
 	private getWorkspaceActiveLeaf(): WorkspaceLeaf | null {
 		try {
-			const ws: any = this.app.workspace as any;
-			if (typeof ws.getActiveLeaf === "function") {
-				return (ws.getActiveLeaf() as WorkspaceLeaf) || null;
+			const workspace = this.app.workspace as {
+				getActiveLeaf?: () => WorkspaceLeaf | null;
+				getMostRecentLeaf?: () => WorkspaceLeaf | null;
+			};
+			if (typeof workspace.getActiveLeaf === "function") {
+				return workspace.getActiveLeaf() || null;
 			}
-			if (typeof ws.getMostRecentLeaf === "function") {
-				return (ws.getMostRecentLeaf() as WorkspaceLeaf) || null;
+			if (typeof workspace.getMostRecentLeaf === "function") {
+				return workspace.getMostRecentLeaf() || null;
 			}
 			return null;
 		} catch {
@@ -81,28 +89,31 @@ export class DetachedLeafEditor extends Component {
 	private setWorkspaceActiveLeaf(leaf: WorkspaceLeaf | null, focus: boolean): void {
 		if (!leaf) return;
 		try {
-			const ws: any = this.app.workspace as any;
-			if (typeof ws.setActiveLeaf === "function") {
-				try {
-					const current = this.getWorkspaceActiveLeaf();
-					if (current === leaf) return;
-				} catch {}
+			const workspace = this.app.workspace as {
+				setActiveLeaf?: (target: WorkspaceLeaf, focus?: boolean | { focus?: boolean }) => void;
+			};
+			if (typeof workspace.setActiveLeaf !== "function") {
+				return;
+			}
 
-				try {
-					ws.setActiveLeaf(leaf, { focus });
-				} catch {
-					ws.setActiveLeaf(leaf, focus);
-				}
+			try {
+				const current = this.getWorkspaceActiveLeaf();
+				if (current === leaf) return;
+			} catch {}
+
+			try {
+				workspace.setActiveLeaf(leaf, { focus });
+			} catch {
+				workspace.setActiveLeaf(leaf, focus);
 			}
 		} catch {}
 	}
 
 	private pushViewScope(): void {
 		if (this.viewScopePushed) return;
-		const scope = (this.editorView as any)?.scope as Scope | undefined;
-		const keymap: any = (this.app as any)?.keymap;
-		if (!scope || !keymap) return;
-		if (typeof keymap.pushScope !== "function") return;
+		const scope = readMarkdownViewScope(this.editorView);
+		const keymap = this.app.keymap;
+		if (!scope || !keymap?.pushScope) return;
 
 		try {
 			keymap.pushScope(scope);
@@ -112,13 +123,9 @@ export class DetachedLeafEditor extends Component {
 
 	private popViewScope(): void {
 		if (!this.viewScopePushed) return;
-		const scope = (this.editorView as any)?.scope as Scope | undefined;
-		const keymap: any = (this.app as any)?.keymap;
-		if (!scope || !keymap) {
-			this.viewScopePushed = false;
-			return;
-		}
-		if (typeof keymap.popScope !== "function") {
+		const scope = readMarkdownViewScope(this.editorView);
+		const keymap = this.app.keymap;
+		if (!scope || !keymap?.popScope) {
 			this.viewScopePushed = false;
 			return;
 		}
@@ -129,8 +136,8 @@ export class DetachedLeafEditor extends Component {
 		this.viewScopePushed = false;
 	}
 
-	async onload() {
-		await this.initialize();
+	onload(): void {
+		void this.initialize();
 	}
 
 	private async waitForWorkspaceLayoutReady(): Promise<void> {
@@ -147,13 +154,7 @@ export class DetachedLeafEditor extends Component {
 
 	private shouldHidePropertiesInDocument(): boolean {
 		try {
-			const getCfg = (key: string) => {
-				try {
-					return (this.app.vault as any).getConfig?.(key);
-				} catch {
-					return undefined;
-				}
-			};
+			const getCfg = (key: string) => readVaultConfigValue(this.app, key);
 
 			const candidates = [
 				getCfg("propertiesInDocument"),
@@ -301,35 +302,41 @@ export class DetachedLeafEditor extends Component {
 	private createLeaf() {
 		// 使用 createLeafInParent 创建一个位于 rootSplit 的 leaf
 		// 这允许我们创建一个"真正的"编辑器实例，但将其隐藏
-		// @ts-ignore - 使用私有/高级 API
-		const ws: any = this.app.workspace as any;
+		const workspace = this.app.workspace;
 		const candidates = Platform.isMobile
-			? [ws.rightSplit, ws.leftSplit, ws.rootSplit]
-			: [ws.rootSplit];
+			? [workspace.rightSplit, workspace.leftSplit, workspace.rootSplit]
+			: [workspace.rootSplit];
 
-		const canUseSplit = (split: any) => {
+		const canUseSplit = (split: unknown) => {
 			try {
-				return !!split && typeof split.setDimension === "function";
+				return (
+					!!split &&
+					typeof (split as { setDimension?: (size: number) => void }).setDimension === "function"
+				);
 			} catch {
 				return false;
 			}
 		};
 
-		const parentSplit = candidates.find(canUseSplit) || ws.rootSplit;
+		const parentSplit = candidates.find(canUseSplit) || workspace.rootSplit;
 
 		try {
 			this.leaf = this.app.workspace.createLeafInParent(parentSplit, 0);
 		} catch (e) {
 			logger.warn("[DetachedLeafEditor] createLeafInParent 失败，回退到 rootSplit:", e);
 			try {
-				this.leaf = this.app.workspace.createLeafInParent(ws.rootSplit, 0);
+				this.leaf = this.app.workspace.createLeafInParent(workspace.rootSplit, 0);
 			} catch {
 				this.leaf = null;
 			}
 		}
 
+		if (!this.leaf) {
+			return;
+		}
+
 		// 立即隐藏，防止闪烁
-		const leafEl = (this.leaf as any).containerEl as HTMLElement;
+		const leafEl = (this.leaf as WorkspaceLeaf & { containerEl?: HTMLElement }).containerEl;
 		if (leafEl) {
 			leafEl.dataset.weaveDetachedLeafEditor = "true";
 			this.originalParent = leafEl.parentElement;
@@ -382,7 +389,7 @@ export class DetachedLeafEditor extends Component {
 				this.editorView = view;
 				return true;
 			}
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => window.setTimeout(resolve, 50));
 		}
 		return false;
 	}
@@ -395,7 +402,7 @@ export class DetachedLeafEditor extends Component {
 
 		const view = this.editorView;
 		const contentEl = view.contentEl; // 这是包含编辑器的主要元素
-		(contentEl as HTMLElement).dataset.weaveDetachedLeafEditor = "true";
+		(contentEl).dataset.weaveDetachedLeafEditor = "true";
 
 		try {
 			contentEl.querySelectorAll(".weave-ir-markdown-bottom-toolbar-container").forEach((el) => {
@@ -540,7 +547,7 @@ export class DetachedLeafEditor extends Component {
 			if (this.editorView?.editor) {
 				return;
 			}
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => window.setTimeout(resolve, 50));
 		}
 		logger.warn("[DetachedLeafEditor] 等待编辑器就绪超时");
 	}
@@ -548,7 +555,7 @@ export class DetachedLeafEditor extends Component {
 	private syncWithPreferredEditorMode(): void {
 		if (!this.editorView) return;
 
-		const globalLivePreview = (this.app.vault as any).getConfig?.("livePreview");
+		const globalLivePreview = readVaultConfigValue(this.app, "livePreview");
 		if (!globalLivePreview) return;
 
 		try {
@@ -559,7 +566,7 @@ export class DetachedLeafEditor extends Component {
 			// Obsidian 公开 API 只能区分 preview/source，无法直接区分
 			// source 模式下的 Live Preview 与纯源码模式，这里仅在内部状态明确表示
 			// 当前是纯源码模式时，才谨慎地切回 Live Preview。
-			const currentMode = (this.editorView as any)?.currentMode;
+			const currentMode = asMarkdownViewInternal(this.editorView)?.currentMode;
 			if (!currentMode || currentMode.type !== "source" || currentMode.sourceMode !== true) {
 				return;
 			}
@@ -607,12 +614,8 @@ export class DetachedLeafEditor extends Component {
 			let el: HTMLElement | null = null;
 			if (target instanceof HTMLElement) {
 				el = target;
-			} else {
-				const maybeNode = target as any;
-				const parentEl = maybeNode?.parentElement;
-				if (parentEl instanceof HTMLElement) {
-					el = parentEl;
-				}
+			} else if (target instanceof Node && target.parentElement instanceof HTMLElement) {
+				el = target.parentElement;
 			}
 
 			if (!el) return false;
@@ -658,13 +661,13 @@ export class DetachedLeafEditor extends Component {
 					}
 					this.activateLeafForHotkeys();
 
-					const fromProps = this.isEventFromPropertiesUI((ev as any)?.target ?? null);
+					const fromProps = this.isEventFromPropertiesUI(ev.target);
 					if (!fromProps) {
 						try {
 							this.editorView?.editor?.focus();
 						} catch {}
 
-						requestAnimationFrame(() => {
+						window.requestAnimationFrame(() => {
 							try {
 								this.editorView?.editor?.focus();
 							} catch {}
@@ -708,11 +711,11 @@ export class DetachedLeafEditor extends Component {
 					}
 
 					this.activateLeafForHotkeys();
-					requestAnimationFrame(() => {
+					window.requestAnimationFrame(() => {
 						this.activateLeafForHotkeys();
 					});
 
-					const fromProps = this.isEventFromPropertiesUI((ev as any)?.target ?? null);
+					const fromProps = this.isEventFromPropertiesUI(ev.target);
 					if (!fromProps) {
 						try {
 							this.editorView?.editor?.focus();

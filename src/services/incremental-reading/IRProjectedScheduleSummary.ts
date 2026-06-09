@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import {
 	migrateToIRBlockV4,
 	type IRBlock,
+	type IRBlockMeta,
 	type IRDeck,
 	type IRPriority,
 } from "../../types/ir-types";
@@ -13,8 +14,14 @@ import {
 } from "./IRScheduleKernel";
 import { resolveAssociatedNotePath, resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import { IRStorageService } from "./IRStorageService";
+import { resolveLegacyBlockResumeLink } from "./paragraph-workbench/paragraph-block-reference";
 
 type SessionLike = { blockId?: string; duration?: number };
+
+type LegacyScheduleBlock = IRBlock & {
+	associatedNotePaths?: string[];
+	meta?: Partial<IRBlockMeta>;
+};
 
 export interface IRProjectedScheduleSeedData {
 	decksRecord?: Record<string, IRDeck>;
@@ -131,7 +138,7 @@ function buildDeckIdentifierContext(decks: IRDeck[], requestedDeckIds: string[])
 
 	for (const deck of decks) {
 		const deckId = String(deck?.id || "").trim();
-		const deckPath = String((deck as any)?.path || "").trim();
+		const deckPath = String(deck.path || "").trim();
 		const identifiers = normalizeIdentifiers([deckId, deckPath]);
 		if (identifiers.length === 0) {
 			continue;
@@ -191,8 +198,8 @@ function buildLegacyBlockDeckIdsByBlockId(
 
 		const canonicalDeckId =
 			canonicalByIdentifier.get(String(deck.id || "").trim()) ||
-			canonicalByIdentifier.get(String((deck as any)?.path || "").trim()) ||
-			String(deck.id || (deck as any)?.path || "").trim();
+			canonicalByIdentifier.get(String(deck.path || "").trim()) ||
+			String(deck.id || deck.path || "").trim();
 		if (!canonicalDeckId) continue;
 
 		for (const blockId of deck.blockIds || []) {
@@ -274,15 +281,12 @@ function mapLegacyBlockToProjectedItem(
 	const migrated = migrateToIRBlockV4(block);
 	const nextRepDate = Number(migrated.nextRepDate || 0);
 	const title = getLegacyBlockTitle(block);
+	const legacyBlock = block as LegacyScheduleBlock;
 	const associatedNotePath = resolveAssociatedNotePaths({
 		associatedNotePath:
-			resolveAssociatedNotePath(block as any) ||
-			resolveAssociatedNotePath((((block as any).meta || null) as any) || null),
-		associatedNotePaths: Array.isArray((block as any).associatedNotePaths)
-			? (block as any).associatedNotePaths
-			: Array.isArray((block as any).meta?.associatedNotePaths)
-				? (block as any).meta.associatedNotePaths
-				: undefined,
+			resolveAssociatedNotePath(legacyBlock.meta) || undefined,
+		associatedNotePaths:
+			legacyBlock.associatedNotePaths || legacyBlock.meta?.associatedNotePaths,
 	})[0];
 	let scheduleStatus: string = migrated.status;
 	if (scheduleStatus !== "new" && nextRepDate > 0 && nextRepDate <= todayEndMs) {
@@ -308,6 +312,7 @@ function mapLegacyBlockToProjectedItem(
 		estimatedMinutes: estimateLegacyBlockMinutes(block, readingSecondsById),
 		deckId,
 		sourceType: "legacy-block",
+		resumeLink: resolveLegacyBlockResumeLink(block),
 	};
 }
 
@@ -362,7 +367,7 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 		}
 
 		const matchedDeckIds = new Set(blockDeckIdsById.get(String(block.id || "").trim()) || []);
-		const legacyDeckPath = String((block as any)?.deckPath || "").trim();
+		const legacyDeckPath = String(block.deckPath || "").trim();
 		if (legacyDeckPath && targetIdentifiers.has(legacyDeckPath)) {
 			matchedDeckIds.add(canonicalByIdentifier.get(legacyDeckPath) || legacyDeckPath);
 		}

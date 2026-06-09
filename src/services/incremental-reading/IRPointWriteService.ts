@@ -1,6 +1,11 @@
 import { normalizePath, type App } from "obsidian";
 import type { Card } from "../../data/types";
-import type { IRPriority } from "../../types/ir-types";
+import type { IRBlock, IRBlockMeta, IRPriority } from "../../types/ir-types";
+import {
+	buildPointWriteCardStub,
+	readCardPointKind,
+	resolveCardSourceDocumentPath,
+} from "../../utils/ir-card-point-access";
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import {
 	resolveExternalBookmarkTaskKind,
@@ -73,16 +78,10 @@ export interface IRPointWriteTarget {
 	sourceDocumentPath?: string;
 }
 
-function resolveCardSourceDocumentPath(card: Card): string | undefined {
-	const cardLike = card as any;
-	const rawPath = String(
-		cardLike.ir_source_document_key ||
-			cardLike.sourceDocumentKey ||
-			cardLike.sourceFile ||
-			cardLike.ir_source_file ||
-			""
-	).trim();
+type IRBlockWithMeta = IRBlock & { meta?: Partial<IRBlockMeta> };
 
+function normalizeCardSourceDocumentPath(card: Card): string | undefined {
+	const rawPath = resolveCardSourceDocumentPath(card);
 	return rawPath ? normalizePath(rawPath) : undefined;
 }
 
@@ -125,24 +124,28 @@ function resolveExternalBookmarkKind(
 		id: card.uuid,
 		sourceFile:
 			target?.sourceDocumentPath ||
-			resolveCardSourceDocumentPath(card) ||
-			(card as any).sourceFile,
+			normalizeCardSourceDocumentPath(card) ||
+			card.sourceFile,
 	});
 }
 
 function buildCardLikeTarget(target: IRPointWriteTarget): Card {
-	const metadata: Record<string, unknown> = {};
-	if (target.kind === "chunk") {
-		metadata.irChunk = true;
+	return buildPointWriteCardStub({
+		id: target.id,
+		kind: target.kind === "block" || target.kind === "chunk" ? target.kind : undefined,
+		sourceDocumentPath: target.sourceDocumentPath,
+	});
+}
+
+function applyBlockTagGroup(block: IRBlock, tagGroupId: string): void {
+	block.tagGroupId = tagGroupId;
+	const extendedBlock = block as IRBlockWithMeta;
+	if (extendedBlock.meta) {
+		extendedBlock.meta = {
+			...extendedBlock.meta,
+			tagGroup: tagGroupId,
+		};
 	}
-	if (target.kind === "block") {
-		metadata.irBlock = true;
-	}
-	return {
-		uuid: target.id,
-		metadata,
-		ir_source_document_key: target.sourceDocumentPath,
-	} as any;
 }
 
 export class IRPointWriteService {
@@ -224,11 +227,7 @@ export class IRPointWriteService {
 	async deleteCard(card: Card): Promise<boolean> {
 		return await this.deletePoint({
 			id: card.uuid,
-			kind: (card as any).metadata?.irBlock
-				? "block"
-				: (card as any).metadata?.irChunk
-					? "chunk"
-					: undefined,
+			kind: readCardPointKind(card),
 		});
 	}
 
@@ -286,6 +285,7 @@ export class IRPointWriteService {
 
 	async updateTags(card: Card, tags: string[]): Promise<IRPointWriteResult | null> {
 		const normalizedTags = normalizeReadingPointTags(tags);
+		const pointKind = readCardPointKind(card);
 
 		if (isPdfBookmarkTaskId(card.uuid)) {
 			const updatedTask = await this.pointTagService.savePdfTaskTags(card.uuid, normalizedTags);
@@ -295,7 +295,8 @@ export class IRPointWriteService {
 			return {
 				kind: "pdf",
 				sourceDocumentPath:
-					normalizePath(String(updatedTask.pdfPath || "").trim()) || resolveCardSourceDocumentPath(card),
+					normalizePath(String(updatedTask.pdfPath || "").trim()) ||
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
@@ -308,13 +309,13 @@ export class IRPointWriteService {
 				kind: "epub",
 				sourceDocumentPath:
 					normalizePath(String(updatedTask.epubFilePath || "").trim()) ||
-					resolveCardSourceDocumentPath(card),
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
 		await this.storage.initialize();
 
-		if ((card as any).metadata?.irChunk) {
+		if (pointKind === "chunk") {
 			const updatedChunk = await this.pointTagService.saveChunkTags(card.uuid, normalizedTags);
 			if (!updatedChunk) {
 				return null;
@@ -323,11 +324,11 @@ export class IRPointWriteService {
 				kind: "chunk",
 				sourceDocumentPath:
 					normalizePath(String(updatedChunk.filePath || "").trim()) ||
-					resolveCardSourceDocumentPath(card),
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
-		if ((card as any).metadata?.irBlock) {
+		if (pointKind === "block") {
 			const allBlocks = await this.storage.getAllBlocks();
 			const block = allBlocks[card.uuid];
 			if (!block) {
@@ -336,18 +337,12 @@ export class IRPointWriteService {
 
 			const nextGroupId = await this.pointTagService.matchGroupForTags(normalizedTags);
 			block.tags = normalizedTags;
-			block.tagGroupId = nextGroupId;
-			if ((block as any).meta && typeof (block as any).meta === "object") {
-				(block as any).meta = {
-					...(block as any).meta,
-					tagGroup: nextGroupId,
-				};
-			}
+			applyBlockTagGroup(block, nextGroupId);
 
 			await this.storage.saveBlock(block);
 			return {
 				kind: "block",
-				sourceDocumentPath: resolveCardSourceDocumentPath(card),
+				sourceDocumentPath: normalizeCardSourceDocumentPath(card),
 			};
 		}
 
@@ -355,6 +350,8 @@ export class IRPointWriteService {
 	}
 
 	async updatePriority(card: Card, priority: number): Promise<IRPointWriteResult | null> {
+		const pointKind = readCardPointKind(card);
+
 		if (isPdfBookmarkTaskId(card.uuid)) {
 			await this.pdfService.initialize();
 			const updatedTask = await this.pdfService.updateTask(card.uuid, {
@@ -367,7 +364,8 @@ export class IRPointWriteService {
 			return {
 				kind: "pdf",
 				sourceDocumentPath:
-					normalizePath(String(updatedTask.pdfPath || "").trim()) || resolveCardSourceDocumentPath(card),
+					normalizePath(String(updatedTask.pdfPath || "").trim()) ||
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
@@ -384,13 +382,13 @@ export class IRPointWriteService {
 				kind: "epub",
 				sourceDocumentPath:
 					normalizePath(String(updatedTask.epubFilePath || "").trim()) ||
-					resolveCardSourceDocumentPath(card),
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
 		await this.storage.initialize();
 
-		if ((card as any).metadata?.irChunk) {
+		if (pointKind === "chunk") {
 			const chunk = await this.storage.getChunkData(card.uuid);
 			if (!chunk) {
 				return null;
@@ -401,23 +399,24 @@ export class IRPointWriteService {
 			return {
 				kind: "chunk",
 				sourceDocumentPath:
-					normalizePath(String(chunk.filePath || "").trim()) || resolveCardSourceDocumentPath(card),
+					normalizePath(String(chunk.filePath || "").trim()) ||
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
-		if ((card as any).metadata?.irBlock) {
+		if (pointKind === "block") {
 			const allBlocks = await this.storage.getAllBlocks();
 			const block = allBlocks[card.uuid];
 			if (!block) {
 				return null;
 			}
-			(block as any).priorityUi = priority;
-			(block as any).priorityEff = priority;
+			block.priorityUi = priority;
+			block.priorityEff = priority;
 			block.priority = resolveLegacyPriority(priority);
 			await this.storage.saveBlock(block);
 			return {
 				kind: "block",
-				sourceDocumentPath: resolveCardSourceDocumentPath(card),
+				sourceDocumentPath: normalizeCardSourceDocumentPath(card),
 			};
 		}
 
@@ -452,11 +451,10 @@ export class IRPointWriteService {
 			await this.pdfService.initialize();
 			const updatedTask = await this.pdfService.updateTask(card.uuid, {
 				meta: {
-					...((card as any).meta || (card as any).metadata?.meta || {}),
 					primaryAssociatedNotePath: primaryPath,
 					associatedNotePath: primaryPath,
 					associatedNotePaths: normalizedNotePaths,
-				} as any,
+				},
 			});
 			if (!updatedTask) {
 				return null;
@@ -464,17 +462,17 @@ export class IRPointWriteService {
 			result = {
 				kind: "pdf",
 				sourceDocumentPath:
-					normalizePath(String(updatedTask.pdfPath || "").trim()) || resolveCardSourceDocumentPath(card),
+					normalizePath(String(updatedTask.pdfPath || "").trim()) ||
+					normalizeCardSourceDocumentPath(card),
 			};
 		} else if (externalKind === "epub") {
 			await this.epubService.initialize();
 			const updatedTask = await this.epubService.updateTask(card.uuid, {
 				meta: {
-					...((card as any).meta || (card as any).metadata?.meta || {}),
 					primaryAssociatedNotePath: primaryPath,
 					associatedNotePath: primaryPath,
 					associatedNotePaths: normalizedNotePaths,
-				} as any,
+				},
 			});
 			if (!updatedTask) {
 				return null;
@@ -483,7 +481,7 @@ export class IRPointWriteService {
 				kind: "epub",
 				sourceDocumentPath:
 					normalizePath(String(updatedTask.epubFilePath || "").trim()) ||
-					resolveCardSourceDocumentPath(card),
+					normalizeCardSourceDocumentPath(card),
 			};
 		} else if (normalizedNotePaths.length > 0) {
 			return null;
@@ -520,6 +518,7 @@ export class IRPointWriteService {
 
 	async updateDecks(card: Card, deckIds: string[]): Promise<IRPointWriteResult | null> {
 		const normalizedDeckIds = normalizeDeckIds(deckIds).slice(0, 1);
+		const pointKind = readCardPointKind(card);
 
 		if (isPdfBookmarkTaskId(card.uuid)) {
 			await this.pdfService.initialize();
@@ -534,7 +533,8 @@ export class IRPointWriteService {
 			return {
 				kind: "pdf",
 				sourceDocumentPath:
-					normalizePath(String(updatedTask.pdfPath || "").trim()) || resolveCardSourceDocumentPath(card),
+					normalizePath(String(updatedTask.pdfPath || "").trim()) ||
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
@@ -552,23 +552,24 @@ export class IRPointWriteService {
 				kind: "epub",
 				sourceDocumentPath:
 					normalizePath(String(updatedTask.epubFilePath || "").trim()) ||
-					resolveCardSourceDocumentPath(card),
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
 		await this.storage.initialize();
 
-		if ((card as any).metadata?.irChunk) {
+		if (pointKind === "chunk") {
 			await this.storage.updateChunkDecks(card.uuid, normalizedDeckIds);
 			const chunk = await this.storage.getChunkData(card.uuid);
 			return {
 				kind: "chunk",
 				sourceDocumentPath:
-					normalizePath(String(chunk?.filePath || "").trim()) || resolveCardSourceDocumentPath(card),
+					normalizePath(String(chunk?.filePath || "").trim()) ||
+					normalizeCardSourceDocumentPath(card),
 			};
 		}
 
-		if ((card as any).metadata?.irBlock) {
+		if (pointKind === "block") {
 			const allDecks = await this.storage.getAllDecks();
 			const currentDeckIds = Object.values(allDecks)
 				.filter((deck) => Array.isArray(deck.blockIds) && deck.blockIds.includes(card.uuid))
@@ -591,7 +592,7 @@ export class IRPointWriteService {
 
 			return {
 				kind: "block",
-				sourceDocumentPath: resolveCardSourceDocumentPath(card),
+				sourceDocumentPath: normalizeCardSourceDocumentPath(card),
 			};
 		}
 

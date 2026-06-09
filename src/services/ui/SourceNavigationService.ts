@@ -1,15 +1,18 @@
 import { type App, type Editor, MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
+import { readCanvasNodeData } from "../../types/canvas-menu-node";
+import {
+	type CanvasRuntimeNode,
+	type CanvasViewLike,
+	readCanvasNodeElement,
+} from "../../types/canvas-runtime";
 import {
 	openFileWithExistingLeaf,
 	openLinkWithExistingLeaf,
 } from "../../utils/workspace-navigation";
+import { normalizeCanvasNodeId, resolveCanvasMenuNodeId } from "./canvas-source-locate";
 import { getSourceLocateOverlayService } from "./SourceLocateOverlayService";
 import {
 	buildSourceLocateTimestampCandidates,
-	EPUB_LOCATE_CFI_PREFIX,
-	EPUB_LOCATE_EXCERPT_PREFIX,
-	EPUB_LOCATE_LINK_PREFIX,
-	EPUB_LOCATE_TIME_PREFIX,
 	isDescriptiveSourceLocateTextCandidate,
 	normalizeSourceLocateMatchValue,
 	parseTaggedSourceLocateCandidates,
@@ -52,13 +55,13 @@ export class SourceNavigationService {
 	constructor(private readonly app: App) {}
 
 	async locateInMarkdownView(
-		view: MarkdownView | any,
+		view: MarkdownView,
 		candidates: string[],
 		options: LocateOptions = {}
 	): Promise<boolean> {
 		if (!view?.containerEl) return false;
 
-		const target = this.overlay.findMarkdownLocateTarget(view.containerEl as HTMLElement, candidates);
+		const target = this.overlay.findMarkdownLocateTarget(view.containerEl, candidates);
 		if (!target) {
 			const editor = view?.editor as Editor | undefined;
 			if (!editor || !this.locateInMarkdownEditor(editor, candidates)) {
@@ -80,7 +83,7 @@ export class SourceNavigationService {
 	}
 
 	private showMarkdownOverlayFromViewWithRetry(
-		view: MarkdownView | any,
+		view: MarkdownView,
 		candidates: string[],
 		options: LocateOptions,
 		attempt: number
@@ -109,7 +112,7 @@ export class SourceNavigationService {
 	}
 
 	private showMarkdownOverlayWithRetry(
-		view: MarkdownView | any,
+		view: MarkdownView,
 		candidates: string[],
 		options: LocateOptions,
 		fallbackTarget: { overlayRect: DOMRect; scrollTarget: HTMLElement },
@@ -164,13 +167,13 @@ export class SourceNavigationService {
 		attempt: number
 	): void {
 		const delay = attempt === 0 ? options.delayMs ?? 220 : this.markdownLocateRetryDelayMs;
-		window.setTimeout(async () => {
+		window.setTimeout(() => {
+			void (async () => {
 			try {
-				const activeView = (
+				const activeView =
 					openedLeaf?.view?.getViewType?.() === "markdown"
-						? openedLeaf.view
-						: this.app.workspace.getActiveViewOfType("markdown" as any)
-				) as any;
+						? (openedLeaf.view as MarkdownView)
+						: this.app.workspace.getActiveViewOfType(MarkdownView);
 				const located = activeView
 					? await this.locateInMarkdownView(activeView, candidates, options)
 					: false;
@@ -193,6 +196,7 @@ export class SourceNavigationService {
 			} catch (_e) {
 				/* ignore */
 			}
+			})();
 		}, delay);
 	}
 
@@ -218,7 +222,7 @@ export class SourceNavigationService {
 	): Promise<WorkspaceLeaf | null> {
 		let canvasLeaf =
 			this.app.workspace.getLeavesOfType("canvas").find((leaf) => {
-				return (leaf.view as any)?.file?.path === canvasPath;
+				return (leaf.view as CanvasViewLike)?.file?.path === canvasPath;
 			}) || null;
 
 		if (!canvasLeaf) {
@@ -515,8 +519,8 @@ export class SourceNavigationService {
 	): void {
 		window.setTimeout(() => {
 			try {
-				const canvasView = canvasLeaf.view as any;
-				const canvas = canvasView?.canvas;
+				const canvasView = canvasLeaf.view as CanvasViewLike;
+				const canvas = canvasView.canvas;
 				const nodesMap = canvas?.nodes;
 				if (!canvas || !nodesMap) {
 					if (attempt < 5) {
@@ -546,12 +550,8 @@ export class SourceNavigationService {
 				canvas.selectOnly(matchedNode);
 				canvas.zoomToSelection();
 
-				const nodeEl =
-					(matchedNode as any)?.nodeEl ||
-					(matchedNode as any)?.contentEl ||
-					(matchedNode as any)?.containerEl ||
-					(matchedNode as any)?.el;
-				if (nodeEl instanceof HTMLElement) {
+				const nodeEl = readCanvasNodeElement(matchedNode);
+				if (nodeEl) {
 					window.setTimeout(() => {
 						this.overlay.showAtRect(nodeEl.getBoundingClientRect(), {
 							label: options.label || DEFAULT_LABEL,
@@ -567,38 +567,21 @@ export class SourceNavigationService {
 		}, (options.delayMs ?? 350) + attempt * 180);
 	}
 
-	private findCanvasNodeById(nodes: any[], nodeId?: string): any | null {
-		const normalizedNodeId = this.normalizeCanvasNodeId(nodeId);
+	private findCanvasNodeById(nodes: CanvasRuntimeNode[], nodeId?: string): CanvasRuntimeNode | null {
+		const normalizedNodeId = normalizeCanvasNodeId(nodeId);
 		if (!normalizedNodeId) return null;
 		for (const node of nodes) {
-			const data = typeof node?.getData === "function" ? node.getData() : node;
-			const currentId = node?.id || data?.id || node?.unknownData?.id;
-			if (typeof currentId === "string" && currentId === normalizedNodeId) {
+			if (resolveCanvasMenuNodeId(node) === normalizedNodeId) {
 				return node;
 			}
 		}
 		return null;
 	}
 
-	private normalizeCanvasNodeId(nodeId?: string): string | undefined {
-		if (!nodeId || typeof nodeId !== "string") return undefined;
-		const trimmed = nodeId.trim();
-		if (!trimmed) return undefined;
-
-		let withoutPrefix = trimmed;
-		if (withoutPrefix.startsWith("canvas-file-node:")) {
-			withoutPrefix = withoutPrefix.slice("canvas-file-node:".length);
-		} else if (withoutPrefix.startsWith("canvas-node:")) {
-			withoutPrefix = withoutPrefix.slice("canvas-node:".length);
-		} else if (withoutPrefix.startsWith("canvas:")) {
-			withoutPrefix = withoutPrefix.slice(7);
-		}
-		const withoutCaret = withoutPrefix.startsWith("^") ? withoutPrefix.slice(1) : withoutPrefix;
-		const queryIndex = withoutCaret.indexOf("?");
-		return queryIndex >= 0 ? withoutCaret.slice(0, queryIndex) : withoutCaret;
-	}
-
-	private findCanvasNodeByLocateCandidates(nodes: any[], candidates: string[]): any | null {
+	private findCanvasNodeByLocateCandidates(
+		nodes: CanvasRuntimeNode[],
+		candidates: string[]
+	): CanvasRuntimeNode | null {
 		const parsed = this.parseEditorLocateCandidates(candidates);
 		const rawCandidates = candidates.filter(
 			(candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0
@@ -614,7 +597,7 @@ export class SourceNavigationService {
 			return null;
 		}
 
-		let bestNode: any | null = null;
+		let bestNode: CanvasRuntimeNode | null = null;
 		let bestScore = 0;
 
 		for (const node of nodes) {
@@ -632,19 +615,19 @@ export class SourceNavigationService {
 		return bestScore > 0 ? bestNode : null;
 	}
 
-	private buildCanvasNodeSearchText(node: any): string {
-		const data = typeof node?.getData === "function" ? node.getData() : node;
+	private buildCanvasNodeSearchText(node: CanvasRuntimeNode): string {
+		const data = readCanvasNodeData(node);
 		const values = [
-			node?.id,
+			node.id,
 			data?.id,
-			node?.text,
+			node.text,
 			data?.text,
-			node?.file,
+			node.file,
 			data?.file,
-			node?.label,
+			node.label,
 			data?.label,
-			node?.unknownData?.text,
-			node?.unknownData?.file,
+			node.unknownData?.text,
+			node.unknownData?.file,
 		];
 		return values
 			.map((value) => String(value || "").trim())
@@ -672,16 +655,19 @@ export class SourceNavigationService {
 		return score;
 	}
 
-	private findCanvasNodeByRect(nodes: any[], nodeRect?: LocateOptions["nodeRect"]): any | null {
+	private findCanvasNodeByRect(
+		nodes: CanvasRuntimeNode[],
+		nodeRect?: LocateOptions["nodeRect"]
+	): CanvasRuntimeNode | null {
 		if (!nodeRect || !Number.isFinite(nodeRect.x) || !Number.isFinite(nodeRect.y)) {
 			return null;
 		}
 
-		let bestNode: any | null = null;
+		let bestNode: CanvasRuntimeNode | null = null;
 		let bestScore = Number.POSITIVE_INFINITY;
 
 		for (const node of nodes) {
-			const data = typeof node?.getData === "function" ? node.getData() : node;
+			const data = readCanvasNodeData(node);
 			const x = Number(data?.x);
 			const y = Number(data?.y);
 			if (!Number.isFinite(x) || !Number.isFinite(y)) continue;

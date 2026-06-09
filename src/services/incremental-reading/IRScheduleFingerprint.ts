@@ -52,7 +52,7 @@ function stableStringify(value: unknown): string {
 			.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
 			.join(",")}}`;
 	}
-	return JSON.stringify(String(value));
+	return JSON.stringify(value);
 }
 
 function hashString(input: string): string {

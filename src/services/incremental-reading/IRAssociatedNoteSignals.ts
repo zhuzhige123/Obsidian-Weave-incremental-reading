@@ -25,10 +25,6 @@ function clampCardPriority(value: number | undefined): number {
 	return Math.max(1, Math.min(4, value));
 }
 
-function hasExplicitExtension(path: string): boolean {
-	return /\.[^/.]+$/i.test(path);
-}
-
 function normalizeNotePath(path: string | undefined | null): string | null {
 	if (!path || typeof path !== "string") {
 		return null;

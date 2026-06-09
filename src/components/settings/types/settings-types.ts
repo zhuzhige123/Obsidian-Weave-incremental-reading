@@ -4,7 +4,7 @@
  */
 
 import type WeavePlugin from "../../../main";
-export type RatingLabelStyle = "emoji" | "text" | "number" | string;
+export type RatingLabelStyle = "emoji" | "text" | "number" | (string & {});
 import type { NoteTypeConfig } from "../../../types/extract-types";
 import type { LicenseInfo as UnifiedLicenseInfo, LicenseStore as UnifiedLicenseStore } from "../../../types/license";
 import type { SimplifiedParsingSettings } from "../../../types/newCardParsingTypes";
@@ -179,8 +179,8 @@ export type LicenseStore = UnifiedLicenseStore;
 export interface DataStorageInterface {
 	dataFolder?: string;
 	createBackup?: () => Promise<string>;
-	exportData?: () => Promise<any>;
-	importData?: (data: any) => Promise<any>;
+	exportData?: () => Promise<unknown>;
+	importData?: (data: unknown) => Promise<unknown>;
 	rebuildStatesFromLogs?: () => Promise<void>;
 }
 
@@ -231,7 +231,7 @@ export interface ErrorContext {
 export interface ErrorResult {
 	success: boolean;
 	error?: string;
-	data?: any;
+	data?: unknown;
 }
 
 // 备份相关类型
@@ -253,7 +253,7 @@ export interface ValidationRule {
 	minLength?: number;
 	maxLength?: number;
 	pattern?: RegExp;
-	custom?: (value: any) => boolean;
+	custom?: (value: unknown) => boolean;
 }
 
 export interface FieldValidation {
@@ -266,8 +266,8 @@ export interface FieldValidation {
 export interface SettingsUpdateEvent {
 	section: string;
 	field: string;
-	oldValue: any;
-	newValue: any;
+	oldValue: unknown;
+	newValue: unknown;
 	timestamp: number;
 }
 
@@ -401,9 +401,9 @@ export interface CardSyncMetadata {
 // 备份数据类型
 export interface BackupData {
 	timestamp: string;
-	cards: any[];
-	decks: any[];
-	settings?: any;
+	cards: unknown[];
+	decks: unknown[];
+	settings?: unknown;
 	version?: string;
 }
 

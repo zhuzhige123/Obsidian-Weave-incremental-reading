@@ -37,7 +37,12 @@ function yamlStringify(obj: Record<string, unknown>): string {
 			continue;
 		}
 
-		lines.push(`${key}: ${value}`);
+		if (typeof value === "number" || typeof value === "boolean") {
+			lines.push(`${key}: ${value}`);
+			continue;
+		}
+
+		lines.push(`${key}: ${JSON.stringify(value)}`);
 	}
 	return lines.join("\n");
 }

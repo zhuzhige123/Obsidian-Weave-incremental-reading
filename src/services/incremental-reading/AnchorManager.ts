@@ -8,8 +8,8 @@
  * @version 1.0.0
  */
 
-import type { App, Editor, MarkdownView, TFile } from "obsidian";
-import { Notice } from "obsidian";
+import type { App, Editor, TFile } from "obsidian";
+import { MarkdownView, Notice } from "obsidian";
 import type {
 	AnchorRecord,
 	ReadingMaterial,
@@ -74,9 +74,12 @@ export class AnchorManager {
 
 	private async isIRFile(file: TFile): Promise<boolean> {
 		try {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const fmType = cache?.frontmatter?.weave_type;
-			if (typeof fmType === "string" && fmType.startsWith("ir-")) {
+			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+			const fmType =
+				frontmatter && typeof frontmatter.weave_type === "string"
+					? frontmatter.weave_type
+					: undefined;
+			if (fmType?.startsWith("ir-")) {
 				return true;
 			}
 		} catch {
@@ -141,7 +144,7 @@ export class AnchorManager {
 
 			// 检查是否需要创建阅读材料
 			let materialCreated = false;
-			let material = await this.storage.getMaterialByPath(file.path);
+			let material = this.storage.getMaterialByPath(file.path);
 
 			if (!material) {
 				// 首次标记锚点，自动创建阅读材料
@@ -362,9 +365,9 @@ export class AnchorManager {
 			await new Promise((resolve) => window.setTimeout(resolve, 100));
 
 			// 获取编辑器并设置光标位置
-			const view = this.app.workspace.getActiveViewOfType(this.app.workspace.constructor as any);
-			if (view && "editor" in view) {
-				const editor = (view as any).editor as Editor;
+			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (view?.editor) {
+				const editor = view.editor;
 
 				// 设置光标位置
 				editor.setCursor({ line: anchor.lineNumber, ch: 0 });
@@ -397,7 +400,7 @@ export class AnchorManager {
 	private highlightAnchorLine(editor: Editor, lineNumber: number): void {
 		try {
 			// 使用 CodeMirror 的行高亮功能
-			const cm = (editor as any).cm;
+			const cm = editor.cm;
 			if (!cm) return;
 
 			// 添加高亮类
@@ -411,7 +414,7 @@ export class AnchorManager {
 					// 忽略移除失败（可能视图已关闭）
 				}
 			}, 2000);
-		} catch (_error) {
+		} catch {
 			// 降级方案：使用选中效果
 			logger.debug("[AnchorManager] CodeMirror高亮不可用，使用选中效果");
 			const line = editor.getLine(lineNumber);

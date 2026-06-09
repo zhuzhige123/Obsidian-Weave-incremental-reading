@@ -1,11 +1,11 @@
 import { applyStyleProps } from "./style-props";
 
 function writeWithExecCommand(text: string): boolean {
-	if (typeof document === "undefined" || !document.body) {
+	if (typeof document === "undefined" || !activeDocument.body) {
 		return false;
 	}
 
-	const textarea = document.createElement("textarea");
+	const textarea = activeDocument.createElement("textarea");
 	textarea.value = text;
 	textarea.setAttribute("readonly", "true");
 	applyStyleProps(textarea, {
@@ -13,12 +13,15 @@ function writeWithExecCommand(text: string): boolean {
 		opacity: "0",
 		pointerEvents: "none",
 	});
-	document.body.appendChild(textarea);
+	activeDocument.body.appendChild(textarea);
 	textarea.select();
 	textarea.setSelectionRange(0, text.length);
 
 	try {
-		return document.execCommand("copy");
+		const execCommand = (
+			activeDocument as { execCommand?: (commandId: string) => boolean }
+		).execCommand;
+		return execCommand?.call(activeDocument, "copy") ?? false;
 	} finally {
 		textarea.remove();
 	}

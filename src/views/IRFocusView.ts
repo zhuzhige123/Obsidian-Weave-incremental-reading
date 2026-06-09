@@ -27,7 +27,7 @@ export class IRFocusView extends ItemView {
 		super(leaf);
 		this.plugin = plugin;
 		this.redirectController = new DeferredLeafRedirectController({
-			workspace: plugin.app.workspace as any,
+			workspace: plugin.app.workspace,
 			leaf,
 			shouldRedirect: () => this.isOpen && !this.redirectStarted,
 			onRedirect: () => {

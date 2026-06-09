@@ -31,6 +31,11 @@ import {
 	generateStableDeviceFingerprint,
 } from "./device-fingerprint";
 import { vaultStorage } from "./vault-local-storage";
+import {
+	isActivationAttempt,
+	parseActivationCodeDataJson,
+	readActivationCodeData,
+} from "./license-code-parse";
 
 // 重新导出类型供其他模块使用（向后兼容）
 export type { LicenseInfo, CloudSyncInfo, ActivationCodeData };
@@ -66,13 +71,13 @@ export class LicenseManager {
 	 */
 	private async generateDeviceFingerprint(): Promise<string> {
 		if (!this.app) {
-			return this.generateDeviceFingerprintLegacy();
+			return this.generateDeviceFingerprintWithoutApp();
 		}
 		return generateStableDeviceFingerprint(this.app);
 	}
 
-	/** @deprecated 仅作 app 未注入时的兜底 */
-	private async generateDeviceFingerprintLegacy(): Promise<string> {
+	/** app 未注入时的兜底指纹（测试或极早期初始化）。 */
+	private async generateDeviceFingerprintWithoutApp(): Promise<string> {
 		const components = await this.collectDeviceComponents();
 		const fingerprint = components.join("|");
 		return this.sha256(fingerprint);
@@ -105,20 +110,20 @@ export class LicenseManager {
 		components.push(navigator.maxTouchPoints?.toString() || "0");
 
 		// 内存信息（如果可用）
-		const memory = (navigator as any).deviceMemory;
+		const memory = navigator.deviceMemory;
 		if (memory) {
 			components.push(`${memory}GB`);
 		}
 
 		// 网络信息（如果可用）
-		const connection = (navigator as any).connection;
+		const connection = navigator.connection;
 		if (connection) {
 			components.push(connection.effectiveType || "unknown");
-			components.push(connection.downlink?.toString() || "unknown");
+			components.push(String(connection.downlink ?? "unknown"));
 		}
 
 		// Obsidian 特有信息
-		const obsidianApp = (window as any).app;
+		const obsidianApp = window.app;
 		if (obsidianApp) {
 			components.push(obsidianApp.appId || "obsidian");
 			// 移除 vault.adapter.path，避免路径变化触发设备变更
@@ -126,11 +131,11 @@ export class LicenseManager {
 
 		// 系统信息（如果可用）
 		try {
-			const os = (window as any).require?.("os");
+			const os = window.require?.("os");
 			if (os) {
-				components.push(os.platform() || "unknown");
-				components.push(os.arch() || "unknown");
-				components.push(os.hostname() || "unknown");
+				components.push(os.platform?.() || "unknown");
+				components.push(os.arch?.() || "unknown");
+				components.push(os.hostname?.() || "unknown");
 			}
 		} catch {
 			components.push("no-os-info");
@@ -138,7 +143,7 @@ export class LicenseManager {
 
 		// Canvas指纹（轻量级）
 		try {
-			const canvas = document.createElement("canvas");
+			const canvas = activeDocument.createElement("canvas");
 			const ctx = canvas.getContext("2d");
 			if (ctx) {
 				ctx.textBaseline = "top";
@@ -152,13 +157,13 @@ export class LicenseManager {
 
 		// WebGL信息（如果可用）
 		try {
-			const canvas = document.createElement("canvas");
-			const gl = canvas.getContext("webgl") as WebGLRenderingContext | null;
+			const canvas = activeDocument.createElement("canvas");
+			const gl = canvas.getContext("webgl");
 			if (gl) {
-				const renderer = gl.getParameter(gl.RENDERER);
-				const vendor = gl.getParameter(gl.VENDOR);
-				components.push(renderer || "unknown-renderer");
-				components.push(vendor || "unknown-vendor");
+				const renderer = gl.getParameter(gl.RENDERER) as unknown;
+				const vendor = gl.getParameter(gl.VENDOR) as unknown;
+				components.push(typeof renderer === "string" ? renderer : "unknown-renderer");
+				components.push(typeof vendor === "string" ? vendor : "unknown-vendor");
 			}
 		} catch {
 			components.push("no-webgl");
@@ -166,7 +171,11 @@ export class LicenseManager {
 
 		// 音频上下文指纹（轻量级）
 		try {
-			const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+			const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+			if (!AudioContextCtor) {
+				throw new Error("AudioContext unavailable");
+			}
+			const audioContext = new AudioContextCtor();
 			const oscillator = audioContext.createOscillator();
 			const analyser = audioContext.createAnalyser();
 			const gainNode = audioContext.createGain();
@@ -182,12 +191,6 @@ export class LicenseManager {
 		} catch {
 			components.push("no-audio");
 		}
-
-		// 插件和扩展检测（基础）
-		const plugins = Array.from(navigator.plugins || [])
-			.map((p) => p.name)
-			.slice(0, 5);
-		components.push(plugins.join(",") || "no-plugins");
 
 		return components.filter((_c) => _c && _c !== "undefined");
 	}
@@ -311,7 +314,10 @@ export class LicenseManager {
 			}
 
 			// 解析数据
-			const data: ActivationCodeData = JSON.parse(parsed.data);
+			const data = parseActivationCodeDataJson(parsed.data);
+			if (!data) {
+				return { isValid: false, error: "激活码数据格式无效" };
+			}
 
 			const entitlements = mapActivationDataToEntitlements(data);
 			if (entitlements.length === 0) {
@@ -881,7 +887,14 @@ export class ActivationAttemptLimiter {
 	private static getAttempts(): ActivationAttempt[] {
 		try {
 			const stored = vaultStorage.getItem(this.STORAGE_KEY);
-			return stored ? JSON.parse(stored) : [];
+			if (!stored) {
+				return [];
+			}
+			const parsed: unknown = JSON.parse(stored);
+			if (!Array.isArray(parsed)) {
+				return [];
+			}
+			return parsed.filter(isActivationAttempt);
 		} catch {
 			return [];
 		}
@@ -987,17 +1000,12 @@ export class ActivationCodeValidator {
 		// 检查数据部分是否为有效JSON
 		try {
 			const dataString = atob(dataBase64);
-			const data = JSON.parse(dataString);
-
-			// 检查必要字段
-			const requiredFields = ["userId", "productId", "licenseType", "expiresAt"];
-			for (const field of requiredFields) {
-				if (!data[field]) {
-					return {
-						isValid: false,
-						error: `激活码数据不完整，缺少${field}字段`,
-					};
-				}
+			const data = readActivationCodeData(JSON.parse(dataString));
+			if (!data) {
+				return {
+					isValid: false,
+					error: "激活码数据不完整或格式无效",
+				};
 			}
 
 			// 检查产品ID（兼容更名前的旧产品ID与增量阅读专属码）

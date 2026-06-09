@@ -9,12 +9,15 @@ import type {
 } from "../../types/ir-types";
 import { getTaskTopicId } from "../../utils/ir-topic-compat";
 import { logger } from "../../utils/logger";
+import { readStringArrayFromUnknown } from "../../utils/unknown-record";
+import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
 import {
 	getProjectedDayLoad,
 	getProjectedScheduleSummary,
 	type IRProjectedScheduleSummary,
 } from "./IRProjectedScheduleSummary";
+import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
 import { IRStorageService } from "./IRStorageService";
 
@@ -33,8 +36,8 @@ export interface IRWorkspaceDataSnapshot {
 	chunksRecord: Record<string, IRChunkFileData>;
 	sourcesRecord: Record<string, IRSourceFileMeta>;
 	history: { sessions?: IRSession[] };
-	pdfTasks: any[];
-	epubTasks: any[];
+	pdfTasks: IRPdfBookmarkTask[];
+	epubTasks: IREpubBookmarkTask[];
 }
 
 export interface IRDeckOverviewSnapshot {
@@ -427,7 +430,7 @@ export class IRWorkspaceSnapshotService {
 				}
 				continue;
 			}
-			for (const deckKey of deckKeysByIdentifier.get(String((block as any).deckPath || "").trim()) || []) {
+			for (const deckKey of deckKeysByIdentifier.get(String(block.deckPath || "").trim()) || []) {
 				map.get(deckKey)?.push(block);
 			}
 		}
@@ -466,12 +469,12 @@ export class IRWorkspaceSnapshotService {
 		for (const chunk of chunks) {
 			if (this.hasIgnoreTagInFile(chunk.filePath, ignoreTagByFile)) continue;
 			const matchedDeckKeys = new Set<string>();
-			for (const identifier of this.normalizeIdentifiers((chunk as any).deckIds || [])) {
+			for (const identifier of this.normalizeIdentifiers(chunk.deckIds || [])) {
 				for (const deckKey of deckKeysByIdentifier.get(identifier) || []) {
 					matchedDeckKeys.add(deckKey);
 				}
 			}
-			const deckTag = String((chunk as any).deckTag || "").trim();
+			const deckTag = String(chunk.deckTag || "").trim();
 			if (deckTag && deckKeysByTag.has(deckTag)) {
 				matchedDeckKeys.add(deckKeysByTag.get(deckTag)!);
 			}
@@ -483,7 +486,7 @@ export class IRWorkspaceSnapshotService {
 		return map;
 	}
 
-	private buildTasksByDeckKey<T extends { deckId?: string }>(
+	private buildTasksByDeckKey<T extends { deckId?: string; topicId?: string }>(
 		decks: IRDeck[],
 		tasks: T[],
 		deckKeysByIdentifier: Map<string, Set<string>>
@@ -494,7 +497,7 @@ export class IRWorkspaceSnapshotService {
 		}
 
 		for (const task of tasks) {
-			const identifier = String(getTaskTopicId(task as any) || (task as any)?.deckId || "").trim();
+			const identifier = String(getTaskTopicId(task) || task.deckId || "").trim();
 			if (!identifier) continue;
 			for (const deckKey of deckKeysByIdentifier.get(identifier) || []) {
 				map.get(deckKey)?.push(task);
@@ -523,12 +526,9 @@ export class IRWorkspaceSnapshotService {
 		if (file instanceof TFile) {
 			const fileCache = this.app.metadataCache.getFileCache(file);
 			const inlineTags = fileCache?.tags?.map((tag) => String(tag.tag || "").replace(/^#/, "").toLowerCase()) || [];
-			const frontmatterTagsRaw = (fileCache?.frontmatter as any)?.tags;
-			const frontmatterTags = Array.isArray(frontmatterTagsRaw)
-				? frontmatterTagsRaw.map((tag) => String(tag || "").trim().toLowerCase())
-				: typeof frontmatterTagsRaw === "string"
-					? frontmatterTagsRaw.split(",").map((tag) => tag.trim().toLowerCase())
-					: [];
+			const frontmatterTags = readStringArrayFromUnknown(fileCache?.frontmatter?.tags).map((tag) =>
+				tag.toLowerCase()
+			);
 			ignored =
 				inlineTags.includes("ignore") ||
 				frontmatterTags.includes("ignore") ||

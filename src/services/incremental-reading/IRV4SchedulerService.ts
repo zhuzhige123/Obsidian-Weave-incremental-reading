@@ -15,10 +15,16 @@ import type {
 	IRBlock,
 	IRBlockStatus,
 	IRBlockV4,
+	IRChunkFileData,
 	IRSession,
+	IRSourceFileMeta,
 } from "../../types/ir-types";
-import { DEFAULT_ADVANCED_SCHEDULE_SETTINGS, migrateToIRBlockV4 } from "../../types/ir-types";
+import { migrateToIRBlockV4 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
+import {
+	readAdvancedScheduleSettingsSnapshot,
+	readTagGroupFollowMode,
+} from "../../utils/ir-plugin-host-access";
 import { generateCardUUID } from "../identifier/WeaveIDGenerator";
 import { IRChunkScheduleAdapter } from "./IRChunkScheduleAdapter";
 import { IRCognitiveProfileService } from "./IRCognitiveProfileService";
@@ -165,7 +171,7 @@ export class IRV4SchedulerService {
 			/*
 			logger.warn("[IRV4SchedulerService] autoBackfillTagGroupsOnce 失败:", error);
 			*/
-		} catch (error) {
+		} catch {
 		}
 		this.initialized = true;
 
@@ -252,19 +258,19 @@ export class IRV4SchedulerService {
 			return;
 		}
 
-		const updatedSources: import("../../types/ir-types").IRSourceFileMeta[] = [];
-		const updatedChunks: import("../../types/ir-types").IRChunkFileData[] = [];
+		const updatedSources: IRSourceFileMeta[] = [];
+		const updatedChunks: IRChunkFileData[] = [];
 
 		let updatedSourceCount = 0;
 		let updatedChunkCount = 0;
 
 		for (const source of Object.values(sources)) {
-			const currentGroup = (source as any)?.tagGroup;
+			const currentGroup = source.tagGroup;
 			if (currentGroup && currentGroup !== "default") {
 				continue;
 			}
 
-			const originalPath = (source as any)?.originalPath;
+			const originalPath = source.originalPath;
 			if (typeof originalPath !== "string" || !originalPath.trim()) {
 				continue;
 			}
@@ -285,19 +291,21 @@ export class IRV4SchedulerService {
 				updatedSourceCount++;
 			}
 
-			const chunkIds = (source as any)?.chunkIds;
+			const chunkIds = source.chunkIds;
 			if (Array.isArray(chunkIds)) {
 				for (const chunkId of chunkIds) {
-					const chunk = (chunks as any)[chunkId];
+					const chunk = chunks[chunkId];
 					if (!chunk) continue;
-					const currentChunkGroup = (chunk as any)?.meta?.tagGroup;
+					const currentChunkGroup = chunk.meta?.tagGroup;
 					if (!currentChunkGroup || currentChunkGroup === "default") {
-						(chunk as any).meta = {
-							...(chunk as any).meta,
-							tagGroup: matched,
-						};
-						(chunk as any).updatedAt = Date.now();
-						updatedChunks.push(chunk);
+						updatedChunks.push({
+							...chunk,
+							meta: {
+								...chunk.meta,
+								tagGroup: matched,
+							},
+							updatedAt: Date.now(),
+						});
 						updatedChunkCount++;
 					}
 				}
@@ -343,44 +351,14 @@ export class IRV4SchedulerService {
 	}
 
 	private getAdvancedSettingsSnapshot(): IRAdvancedScheduleSettings {
-		const defaults = DEFAULT_ADVANCED_SCHEDULE_SETTINGS;
-
-		try {
-			const plugin: any = (this.app as any)?.plugins?.getPlugin?.("weave");
-			const ir = plugin?.settings?.incrementalReading;
-
-			const enableTagGroupPrior = ir?.enableTagGroupPrior ?? defaults.enableTagGroupPrior;
-
-			return {
-				...defaults,
-				dailyTimeBudgetMinutes: ir?.dailyTimeBudgetMinutes ?? defaults.dailyTimeBudgetMinutes,
-				maxAppearancesPerDay: ir?.maxAppearancesPerDay ?? defaults.maxAppearancesPerDay,
-				interleaveMode: ir?.interleaveMode ?? defaults.interleaveMode,
-				maxConsecutiveSameTopic:
-					ir?.maxConsecutiveSameTopic ?? defaults.maxConsecutiveSameTopic,
-				enableTagGroupPrior,
-				agingStrength: ir?.agingStrength ?? defaults.agingStrength,
-				autoPostponeStrategy: ir?.autoPostponeStrategy ?? defaults.autoPostponeStrategy,
-				priorityHalfLifeDays: ir?.priorityHalfLifeDays ?? defaults.priorityHalfLifeDays,
-				tagGroupLearningSpeed: enableTagGroupPrior ? "medium" : "off",
-				defaultIntervalFactor: ir?.defaultIntervalFactor ?? defaults.defaultIntervalFactor,
-				maxIntervalDays: ir?.maxInterval ?? defaults.maxIntervalDays,
-			};
-		} catch {
-			return defaults;
-		}
+		return readAdvancedScheduleSettingsSnapshot(this.app);
 	}
 
 	/**
 	 * 获取标签组跟随模式设置
 	 */
 	private getTagGroupFollowMode(): "off" | "ask" | "auto" {
-		try {
-			const plugin: any = (this.app as any)?.plugins?.getPlugin?.("weave");
-			return plugin?.settings?.incrementalReading?.tagGroupFollowMode ?? "ask";
-		} catch {
-			return "ask";
-		}
+		return readTagGroupFollowMode(this.app);
 	}
 
 	async getStudyQueueV4(
@@ -518,12 +496,12 @@ export class IRV4SchedulerService {
 			if (!changed) continue;
 
 			if (isPdfBookmarkTaskId(updated.id)) {
-				await this._pdfBookmarkTaskService.updateTaskFromBlock(updated as any);
+				await this._pdfBookmarkTaskService.updateTaskFromBlock(updated);
 				persistedTransitions++;
 				continue;
 			}
 			if (isEpubBookmarkTaskId(updated.id)) {
-				await this._epubBookmarkTaskService.updateTaskFromBlock(updated as any);
+				await this._epubBookmarkTaskService.updateTaskFromBlock(updated);
 				persistedTransitions++;
 				continue;
 			}
@@ -623,11 +601,11 @@ export class IRV4SchedulerService {
 				activeBlockId = updatedFirst.id;
 
 				if (isPdfBookmarkTaskId(updatedFirst.id)) {
-					await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedFirst as any);
+					await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedFirst);
 					await this._pdfBookmarkTaskService.recordTaskInteraction(updatedFirst.id, 0, {});
 					persistedTransitions++;
 				} else if (isEpubBookmarkTaskId(updatedFirst.id)) {
-					await this._epubBookmarkTaskService.updateTaskFromBlock(updatedFirst as any);
+					await this._epubBookmarkTaskService.updateTaskFromBlock(updatedFirst);
 					await this._epubBookmarkTaskService.recordTaskInteraction(updatedFirst.id, 0, {});
 					persistedTransitions++;
 				} else {
@@ -944,7 +922,7 @@ export class IRV4SchedulerService {
 
 		// 5. 持久化调度
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 			await this._pdfBookmarkTaskService.recordTaskInteraction(
 				updatedBlock.id,
 				data.readingTimeSeconds,
@@ -955,7 +933,7 @@ export class IRV4SchedulerService {
 				}
 			);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 			await this._epubBookmarkTaskService.recordTaskInteraction(
 				updatedBlock.id,
 				data.readingTimeSeconds,
@@ -1030,12 +1008,13 @@ export class IRV4SchedulerService {
 							const drift = await this.tagGroupService.detectTagGroupDrift(originalPath, tagGroup);
 							if (drift) {
 								const storageAdapter = {
-									getChunkData: (id: string) =>
-										this.storageService.getChunkData(id) as Promise<any>,
-									saveChunkData: (d: any) => this.storageService.saveChunkData(d),
-									getSource: (id: string) => this.storageService.getSource(id) as Promise<any>,
-									saveSource: (d: any) => this.storageService.saveSource(d),
-									getAllChunkData: () => this.storageService.getAllChunkData() as Promise<any>,
+									getChunkData: (id: string) => this.storageService.getChunkData(id),
+									saveChunkData: (data: IRChunkFileData) =>
+										this.storageService.saveChunkData(data),
+									getSource: (id: string) => this.storageService.getSource(id),
+									saveSource: (data: IRSourceFileMeta) =>
+										this.storageService.saveSource(data),
+									getAllChunkData: () => this.storageService.getAllChunkData(),
 								};
 
 								if (followMode === "auto") {
@@ -1060,7 +1039,7 @@ export class IRV4SchedulerService {
 									const capturedSourceId = sourceId;
 									const newGroupId = drift.newGroupId;
 
-									const fragment = document.createDocumentFragment();
+									const fragment = activeDocument.createDocumentFragment();
 									const msgEl = fragment.createEl("div");
 									msgEl.createEl("div", {
 										text: `"${originalPath.split("/").pop()}" 的标签已变化`,
@@ -1079,19 +1058,21 @@ export class IRV4SchedulerService {
 
 									const notice = new Notice(fragment, 15000);
 
-									switchBtn.addEventListener("click", async () => {
-										try {
-											await this.tagGroupService.applyTagGroupSwitch(
-												blockId,
-												capturedSourceId,
-												newGroupId,
-												storageAdapter
-											);
-											new Notice(`已切换到标签组「${drift.newGroupName}」`);
-										} catch (e) {
-											logger.error("[IRV4SchedulerService] 标签组切换失败:", e);
-										}
-										notice.hide();
+									switchBtn.addEventListener("click", () => {
+										void (async () => {
+											try {
+												await this.tagGroupService.applyTagGroupSwitch(
+													blockId,
+													capturedSourceId,
+													newGroupId,
+													storageAdapter
+												);
+												new Notice(`已切换到标签组「${drift.newGroupName}」`);
+											} catch (e) {
+												logger.error("[IRV4SchedulerService] 标签组切换失败:", e);
+											}
+											notice.hide();
+										})();
 									});
 									keepBtn.addEventListener("click", () => {
 										notice.hide();
@@ -1170,9 +1151,9 @@ export class IRV4SchedulerService {
 
 		// 持久化
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else {
 			await this.chunkAdapter.updateChunkSchedule(updatedBlock.id, {
 				priorityUi: updatedBlock.priorityUi,
@@ -1233,9 +1214,9 @@ export class IRV4SchedulerService {
 
 		// 持久化
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else {
 			await this.chunkAdapter.updateChunkSchedule(updatedBlock.id, {
 				scheduleStatus: "suspended",
@@ -1284,9 +1265,9 @@ export class IRV4SchedulerService {
 
 		// 持久化
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else {
 			await this.chunkAdapter.updateChunkSchedule(updatedBlock.id, {
 				scheduleStatus: updatedBlock.status,
@@ -1337,9 +1318,9 @@ export class IRV4SchedulerService {
 
 		// 持久化
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else {
 			await this.chunkAdapter.updateChunkSchedule(updatedBlock.id, {
 				scheduleStatus: "done",
@@ -1402,9 +1383,9 @@ export class IRV4SchedulerService {
 
 		// 持久化
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else {
 			await this.chunkAdapter.updateChunkSchedule(updatedBlock.id, {
 				scheduleStatus: "removed",
@@ -1701,9 +1682,9 @@ export class IRV4SchedulerService {
 
 		// 持久化
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 		} else {
 			await this.chunkAdapter.updateChunkSchedule(updatedBlock.id, {
 				scheduleStatus: updatedBlock.status,
@@ -1768,11 +1749,11 @@ export class IRV4SchedulerService {
 		}
 	): Promise<void> {
 		if (isPdfBookmarkTaskId(block.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(block as any);
+			await this._pdfBookmarkTaskService.updateTaskFromBlock(block);
 			return;
 		}
 		if (isEpubBookmarkTaskId(block.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(block as any);
+			await this._epubBookmarkTaskService.updateTaskFromBlock(block);
 			return;
 		}
 

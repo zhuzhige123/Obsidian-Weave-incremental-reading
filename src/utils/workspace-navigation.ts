@@ -72,24 +72,20 @@ export function revealLeaf(app: App, leaf: WorkspaceLeaf, focus = true): void {
 	const workspace = app.workspace as WorkspaceCompat;
 
 	try {
-		if (typeof workspace.setActiveLeaf === "function") {
-			try {
-				workspace.setActiveLeaf(leaf, { focus });
-			} catch {
-				workspace.setActiveLeaf(leaf, focus);
-			}
-		}
-	} catch {
-		void 0;
-	}
-
-	try {
-		const maybeRevealLeaf = workspace?.["revealLeaf"];
+		const maybeRevealLeaf = workspace?.revealLeaf;
 		if (typeof maybeRevealLeaf === "function") {
 			void maybeRevealLeaf.call(workspace, leaf);
 		}
 	} catch {
 		void 0;
+	}
+
+	if (focus) {
+		try {
+			leaf.containerEl?.focus({ preventScroll: true });
+		} catch {
+			void 0;
+		}
 	}
 }
 

@@ -1,7 +1,14 @@
-import { migrateToIRBlockV4, type IRBlock, type IRChunkFileData } from "../../types/ir-types";
+import {
+	migrateToIRBlockV4,
+	type IRBlock,
+	type IRBlockMeta,
+	type IRChunkFileData,
+} from "../../types/ir-types";
 import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import { supportsPointLinkedNotes, supportsPointLinkedNotesForScheduleItem } from "./IRLinkedNotePolicy";
+import { readString } from "../../utils/unknown-record";
+import { resolveLegacyBlockResumeLink } from "./paragraph-workbench/paragraph-block-reference";
 import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
 import type { IRProjectedScheduleItem } from "./IRProjectedScheduleSummary";
 import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
@@ -9,6 +16,13 @@ import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import type { IRScheduleExplanation } from "./IRScheduleKernel";
 
 export type ScheduleItemSourceType = IRProjectedScheduleItem["sourceType"];
+
+type LegacyScheduleBlock = IRBlock & {
+	primaryAssociatedNotePath?: string;
+	associatedNotePath?: string;
+	associatedNotePaths?: string[];
+	meta?: Partial<IRBlockMeta>;
+};
 
 export interface ScheduleItem {
 	id: string;
@@ -48,7 +62,7 @@ function extractChunkTitle(chunk: IRChunkFileData, fallbackId?: string): string 
 	const chunkMeta = (chunk?.meta || {}) as unknown as Record<string, unknown>;
 	const pointTitle =
 		typeof chunkMeta.pointTitle === "string"
-			? String((chunkMeta.pointTitle as string) || "").trim()
+			? String((chunkMeta.pointTitle) || "").trim()
 			: "";
 	if (pointTitle) {
 		return pointTitle;
@@ -64,7 +78,7 @@ function getLegacyBlockDisplayName(block: IRBlock): string | undefined {
 }
 
 function getLegacyBlockAssociatedNoteFields(
-	block: IRBlock
+	block: LegacyScheduleBlock
 ): Pick<
 	ScheduleItem,
 	"primaryAssociatedNotePath" | "associatedNotePath" | "associatedNotePaths" | "associatedNoteScope"
@@ -75,10 +89,10 @@ function getLegacyBlockAssociatedNoteFields(
 
 	const associatedNotePaths = resolveAssociatedNotePaths({
 		associatedNotePath:
-			(block as any).primaryAssociatedNotePath ||
-			(block as any).associatedNotePath ||
-			(block as any).meta?.associatedNotePath,
-		associatedNotePaths: (block as any).associatedNotePaths || (block as any).meta?.associatedNotePaths,
+			block.primaryAssociatedNotePath ||
+			block.associatedNotePath ||
+			block.meta?.associatedNotePath,
+		associatedNotePaths: block.associatedNotePaths || block.meta?.associatedNotePaths,
 	});
 	const primaryAssociatedNotePath = associatedNotePaths[0] || undefined;
 	return {
@@ -105,9 +119,9 @@ function getScheduleItemSequenceMeta(meta: unknown): Pick<
 	"sourceSequenceGroup" | "sourceSequenceOrder" | "sourceSequenceLocked" | "sourceSequenceAnchorDateKey"
 > {
 	const record = meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
-	const sourceSequenceGroup = String(record?.sourceSequenceGroup || "").trim() || undefined;
+	const sourceSequenceGroup = readString(record?.sourceSequenceGroup) || undefined;
 	const sourceSequenceOrder = normalizeScheduleItemSequenceOrder(record?.sourceSequenceOrder);
-	const sourceSequenceAnchorDateKey = String(record?.sourceSequenceAnchorDateKey || "").trim() || undefined;
+	const sourceSequenceAnchorDateKey = readString(record?.sourceSequenceAnchorDateKey) || undefined;
 
 	return {
 		sourceSequenceGroup,
@@ -154,11 +168,12 @@ export function buildScheduleItemFromProjectedItem(item: IRProjectedScheduleItem
 }
 
 export function buildScheduleItemFromLegacyBlock(block: IRBlock): ScheduleItem {
+	const legacyBlock = block as LegacyScheduleBlock;
 	const migrated = migrateToIRBlockV4(block);
 	const displayName = getLegacyBlockDisplayName(block);
 	const title =
 		displayName ||
-		String((block as any).headingText || "").trim() ||
+		String(block.headingText || "").trim() ||
 		String(block.contentPreview || "").trim().replace(/\s+/g, " ").slice(0, 60) ||
 		String(block.id || "").trim() ||
 		"Untitled";
@@ -168,14 +183,15 @@ export function buildScheduleItemFromLegacyBlock(block: IRBlock): ScheduleItem {
 		title,
 		displayName,
 		sourceFile: String(block.filePath || "").trim(),
-		deckId: String((block as any).deckPath || "").trim() || undefined,
-		...getLegacyBlockAssociatedNoteFields(block),
-		priority: Number((block as any).priorityUi ?? (block as any).priorityEff ?? 5),
-		intervalDays: Number((block as any).interval ?? migrated.intervalDays ?? 1),
-		scheduleStatus: String((block as any).state || migrated.status || "new"),
+		deckId: String(block.deckPath || "").trim() || undefined,
+		...getLegacyBlockAssociatedNoteFields(legacyBlock),
+		priority: Number(block.priorityUi ?? block.priorityEff ?? 5),
+		intervalDays: Number(block.interval ?? migrated.intervalDays ?? 1),
+		scheduleStatus: String(block.state || migrated.status || "new"),
 		nextRepDate: Number(migrated.nextRepDate || 0),
 		nextReviewDate: migrated.nextRepDate ? new Date(migrated.nextRepDate) : null,
-		...getScheduleItemSequenceMeta((block as any).meta),
+		resumeLink: resolveLegacyBlockResumeLink(block),
+		...getScheduleItemSequenceMeta(legacyBlock.meta),
 		sourceType: "legacy-block",
 	};
 }

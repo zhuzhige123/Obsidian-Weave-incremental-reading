@@ -4,9 +4,10 @@ import { safeReadJson, safeWriteJson } from "../../utils/safe-json-io";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
+import { readString } from "../../utils/unknown-record";
 import { normalizeChunkForRuntime } from "../../utils/ir-topic-compat";
 import { parseYAMLFromContent } from "../../utils/yaml-utils";
-import { remapAssociatedNotePaths, resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
+import { remapAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import {
 	deriveLegacyBlockTitle,
 	getLegacyBlocksData,
@@ -20,9 +21,8 @@ import {
 	resolveLegacyTopicName,
 	type IRLegacyReadApi,
 } from "./IRPointStorageLegacyMigration";
-import type { ReadingMaterial, ReadingMaterialsIndex } from "../../types/incremental-reading-types";
+import type { ReadingMaterial } from "../../types/incremental-reading-types";
 import type {
-	IRBlock,
 	IRChunkFileData,
 	IRDeck,
 	IRSourceFileMeta,
@@ -236,7 +236,8 @@ function toReadingTimeMs(stats: IRLegacyPointInput["stats"] | undefined): number
 }
 
 function normalizeMaterialSourcePath(path: unknown): string {
-	const normalized = normalizePath(String(path || "").trim());
+	const rawPath = typeof path === "string" ? path.trim() : "";
+	const normalized = rawPath ? normalizePath(rawPath) : "";
 	return normalized ? normalized.toLowerCase() : "";
 }
 
@@ -274,11 +275,11 @@ export class IRPointStorageService {
 	}
 
 	private getV2Paths() {
-		return getV2PathsFromApp(this.app as any);
+		return getV2PathsFromApp(this.app);
 	}
 
 	private getPluginPaths() {
-		return getPluginPaths(this.app as any);
+		return getPluginPaths(this.app);
 	}
 
 	private getLegacyReadApi(): IRLegacyReadApi {
@@ -338,24 +339,24 @@ export class IRPointStorageService {
 	}
 
 	private async ensureFile(path: string, content: string): Promise<void> {
-		await DirectoryUtils.ensureDirForFile(this.adapter as any, path);
+		await DirectoryUtils.ensureDirForFile(this.adapter, path);
 		if (!(await this.adapter.exists(path))) {
 			await this.adapter.write(path, content);
 		}
 	}
 
 	private async readJson<T>(path: string, fallback: T): Promise<T> {
-		const value = await safeReadJson<T>(this.adapter as any, path, this.app as any);
+		const value = await safeReadJson<T>(this.adapter, path, this.app);
 		return value ?? fallback;
 	}
 
 	private async writeJson(path: string, payload: unknown): Promise<void> {
-		await DirectoryUtils.ensureDirForFile(this.adapter as any, path);
+		await DirectoryUtils.ensureDirForFile(this.adapter, path);
 		await safeWriteJson(
-			this.adapter as any,
+			this.adapter,
 			path,
 			JSON.stringify(payload, null, 2),
-			this.app as any
+			this.app
 		);
 	}
 
@@ -365,10 +366,10 @@ export class IRPointStorageService {
 		}
 
 		await Promise.all([
-			DirectoryUtils.ensureDirRecursive(this.adapter as any, this.getPointsDir()),
-			DirectoryUtils.ensureDirRecursive(this.adapter as any, this.getReaderStateDir()),
-			DirectoryUtils.ensureDirRecursive(this.adapter as any, this.getReaderArtifactsDir()),
-			DirectoryUtils.ensureDirRecursive(this.adapter as any, this.getPluginPaths().migration.root),
+			DirectoryUtils.ensureDirRecursive(this.adapter, this.getPointsDir()),
+			DirectoryUtils.ensureDirRecursive(this.adapter, this.getReaderStateDir()),
+			DirectoryUtils.ensureDirRecursive(this.adapter, this.getReaderArtifactsDir()),
+			DirectoryUtils.ensureDirRecursive(this.adapter, this.getPluginPaths().migration.root),
 		]);
 
 		await Promise.all([
@@ -475,7 +476,7 @@ export class IRPointStorageService {
 		sourceType: unknown,
 		sourcePath: string
 	): IRPointSourceRecord["type"] {
-		const normalizedType = String(sourceType || "").trim().toLowerCase();
+		const normalizedType = readString(sourceType).toLowerCase();
 		if (normalizedType === "epub" || normalizedType === "epub-bookmark") {
 			return "epub";
 		}
@@ -553,7 +554,9 @@ export class IRPointStorageService {
 			String(input.legacyMaterialRecord?.id || "").trim() ||
 			String(input.legacyMaterial?.uuid || "").trim() ||
 			this.deriveMaterialId(
-				String(input.sourceType || input.legacyMaterialRecord?.source?.type || "file"),
+				readString(input.sourceType) ||
+					readString(input.legacyMaterialRecord?.source?.type) ||
+					"file",
 				fallbackPath || this.readPointMetadataString(input.point, "sourcePath"),
 				undefined
 			);
@@ -2086,7 +2089,7 @@ export class IRPointStorageService {
 			});
 		}
 
-		await DirectoryUtils.pruneEmptyDirsUnder(this.adapter as any, this.getV2Paths().ir.root, {
+		await DirectoryUtils.pruneEmptyDirsUnder(this.adapter, this.getV2Paths().ir.root, {
 			preserveRoot: true,
 		});
 
@@ -3572,7 +3575,7 @@ export class IRPointStorageService {
 			(item) => String(item?.topicId || "").trim() === topicId
 		);
 		const previousAbsolutePath = this.resolveIndexedPointFilePath(previous?.file)?.absolutePath || null;
-		const { relativePath, absolutePath } = await this.resolvePointFilePath(index, topicId, topicName);
+		const { absolutePath } = await this.resolvePointFilePath(index, topicId, topicName);
 		await this.renameTopicFileIfNeeded(previousAbsolutePath, absolutePath);
 
 		const fileData = await this.readPointFile(absolutePath, topicId, topicName);
@@ -4074,7 +4077,7 @@ export class IRPointStorageService {
 
 		const trace = isRecord(point.trace) ? point.trace : null;
 		const locator = isRecord(trace?.locator) ? trace.locator : null;
-		const chunkId = String(locator?.chunkId || "").trim();
+		const chunkId = readString(locator?.chunkId);
 		if (chunkId) {
 			ids.add(chunkId);
 		}
@@ -4891,7 +4894,7 @@ export class IRPointStorageService {
 			issues.push(...cleanup.failures);
 		}
 
-		await DirectoryUtils.pruneEmptyDirsUnder(this.adapter as any, this.getV2Paths().ir.root, {
+		await DirectoryUtils.pruneEmptyDirsUnder(this.adapter, this.getV2Paths().ir.root, {
 			preserveRoot: true,
 		});
 

@@ -10,7 +10,13 @@
 /**
  * 摘录类型（内置类型）
  */
-export type ExtractType = "note" | "important" | "todo" | "idea" | "capsule" | string;
+export type ExtractType =
+	| "note"
+	| "important"
+	| "todo"
+	| "idea"
+	| "capsule"
+	| (string & {});
 
 // ===== 自定义笔记类型配置 =====
 
@@ -140,7 +146,7 @@ export const TYPE_COLORS: Record<ExtractType, TypeColorConfig> = {
  * 类型筛选配置
  */
 export interface ExtractTypeConfig {
-	key: ExtractType | "all";
+	key: "all" | ExtractType;
 	label: string;
 	icon: string; // Obsidian 图标名称（lucide 图标库）
 	color: string;

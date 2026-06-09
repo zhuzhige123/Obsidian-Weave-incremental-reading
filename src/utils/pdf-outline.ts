@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import type { App, TFile, WorkspaceLeaf } from "obsidian";
 
 export interface PdfOutlineItem {
 	title: string;
@@ -13,6 +13,37 @@ interface PdfOutlineDocumentLike {
 	destroy?(): Promise<void> | void;
 }
 
+type PdfOutlineEntry = {
+	title?: string;
+	dest?: string | unknown[];
+	items?: PdfOutlineEntry[];
+	children?: PdfOutlineEntry[];
+};
+
+type PdfViewerViewLike = {
+	file?: { path?: string };
+	viewer?: {
+		pdfViewer?: { pdfDocument?: PdfOutlineDocumentLike };
+		pdfDocument?: PdfOutlineDocumentLike;
+	};
+	pdfViewer?: { pdfDocument?: PdfOutlineDocumentLike };
+	pdfDocument?: PdfOutlineDocumentLike;
+};
+
+type PdfJsLoadingTask = {
+	promise: Promise<PdfOutlineDocumentLike>;
+	destroy?: () => Promise<void> | void;
+};
+
+type PdfJsLibLike = {
+	getDocument: (options: { data: Uint8Array }) => PdfJsLoadingTask;
+};
+
+type PdfWorkspaceLike = {
+	getLeavesOfType: (type: string) => WorkspaceLeaf[];
+	getMostRecentLeaf?: () => WorkspaceLeaf | null;
+};
+
 export interface GetPdfOutlineForFileOptions {
 	includeEntriesWithoutPage?: boolean;
 	preferOpenView?: boolean;
@@ -23,23 +54,23 @@ export interface GetPdfOutlineForFileOptions {
 export const DEFAULT_PDF_OUTLINE_DIRECT_LOAD_TIMEOUT_MS = 20_000;
 export const DEFAULT_PDF_OUTLINE_BINARY_SIZE_LIMIT_BYTES = 128 * 1024 * 1024;
 
-function extractPdfDocumentFromView(view: any): PdfOutlineDocumentLike | null {
+function extractPdfDocumentFromView(view: PdfViewerViewLike | null | undefined): PdfOutlineDocumentLike | null {
 	const pdfDocument =
-		view?.viewer?.pdfViewer?.pdfDocument
-		|| view?.pdfViewer?.pdfDocument
-		|| view?.viewer?.pdfDocument
-		|| view?.pdfDocument;
+		view?.viewer?.pdfViewer?.pdfDocument ||
+		view?.pdfViewer?.pdfDocument ||
+		view?.viewer?.pdfDocument ||
+		view?.pdfDocument;
 
-	return typeof pdfDocument?.getOutline === "function" ? (pdfDocument as PdfOutlineDocumentLike) : null;
+	return typeof pdfDocument?.getOutline === "function" ? pdfDocument : null;
 }
 
 export function getOpenWorkspacePdfDocument(app: App, filePath: string): PdfOutlineDocumentLike | null {
-	const workspaceAny = app.workspace as any;
+	const workspace = app.workspace as PdfWorkspaceLike;
 
 	try {
-		const leaves = workspaceAny?.getLeavesOfType?.("pdf") || [];
+		const leaves = workspace.getLeavesOfType("pdf");
 		for (const leaf of leaves) {
-			const view = leaf?.view;
+			const view = leaf.view as PdfViewerViewLike | undefined;
 			if (view?.file?.path !== filePath) {
 				continue;
 			}
@@ -50,7 +81,7 @@ export function getOpenWorkspacePdfDocument(app: App, filePath: string): PdfOutl
 			}
 		}
 
-		const recentView = workspaceAny?.getMostRecentLeaf?.()?.view;
+		const recentView = workspace.getMostRecentLeaf?.()?.view as PdfViewerViewLike | undefined;
 		if (recentView?.file?.path === filePath) {
 			return extractPdfDocumentFromView(recentView);
 		}
@@ -63,9 +94,9 @@ export function getOpenWorkspacePdfDocument(app: App, filePath: string): PdfOutl
 
 async function resolvePdfOutlinePageNumber(
 	pdfDocument: PdfOutlineDocumentLike,
-	item: any
+	item: PdfOutlineEntry
 ): Promise<number> {
-	const dest = item?.dest;
+	const dest = item.dest;
 	if (!dest) {
 		return 0;
 	}
@@ -102,9 +133,9 @@ export async function extractPdfOutlineFromDocument(
 
 	const results: PdfOutlineItem[] = [];
 
-	const walk = async (items: any[], ancestors: string[]) => {
+	const walk = async (items: PdfOutlineEntry[], ancestors: string[]) => {
 		for (const item of items) {
-			const title = String(item?.title || "").trim() || "目录";
+			const title = String(item.title || "").trim() || "目录";
 			const nextPath = [...ancestors, title];
 			const pageNumber = await resolvePdfOutlinePageNumber(pdfDocument, item);
 
@@ -112,14 +143,14 @@ export async function extractPdfOutlineFromDocument(
 				results.push({ title, pageNumber, path: nextPath });
 			}
 
-			const children = item?.items ?? item?.children;
+			const children = item.items ?? item.children;
 			if (Array.isArray(children) && children.length > 0) {
 				await walk(children, nextPath);
 			}
 		}
 	};
 
-	await walk(outline, []);
+	await walk(outline as PdfOutlineEntry[], []);
 	return results;
 }
 
@@ -128,25 +159,27 @@ async function loadPdfDocumentFromBinary(
 	pdfFile: TFile,
 	timeoutMs: number
 ): Promise<{ pdfDocument: PdfOutlineDocumentLike; cleanup: () => Promise<void> } | null> {
-	const pdfjsLib = (window as any).pdfjsLib;
+	const pdfjsLib = (window as Window & { pdfjsLib?: PdfJsLibLike }).pdfjsLib;
 	if (!pdfjsLib?.getDocument) {
 		return null;
 	}
 
-	let loadingTask: any = null;
+	let loadingTask: PdfJsLoadingTask | null = null;
 	try {
-		const arrayBuffer = await (app.vault as any).readBinary(pdfFile);
+		const arrayBuffer = await app.vault.adapter.readBinary(pdfFile.path);
 		loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
 		const pdfDocument = await Promise.race([
 			loadingTask.promise,
-			new Promise<never>((_, reject) => setTimeout(() => reject(new Error("PDF load timeout")), timeoutMs)),
+			new Promise<never>((_, reject) =>
+				window.setTimeout(() => reject(new Error("PDF load timeout")), timeoutMs)
+			),
 		]);
 
 		return {
 			pdfDocument,
 			cleanup: async () => {
 				try {
-					await Promise.resolve(pdfDocument?.destroy?.());
+					await Promise.resolve(pdfDocument.destroy?.());
 				} catch {}
 				try {
 					await Promise.resolve(loadingTask?.destroy?.());
@@ -186,9 +219,9 @@ export async function getPdfOutlineForFile(
 
 	const fileSize = Number(pdfFile.stat?.size ?? 0);
 	if (
-		Number.isFinite(maxDirectLoadFileSizeBytes)
-		&& maxDirectLoadFileSizeBytes > 0
-		&& fileSize > maxDirectLoadFileSizeBytes
+		Number.isFinite(maxDirectLoadFileSizeBytes) &&
+		maxDirectLoadFileSizeBytes > 0 &&
+		fileSize > maxDirectLoadFileSizeBytes
 	) {
 		return [];
 	}

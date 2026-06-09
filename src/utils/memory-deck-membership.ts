@@ -1,4 +1,5 @@
 import type { Deck } from "../data/types";
+import { readString } from "./unknown-record";
 
 export type DeckIdentifierLookup = Pick<Deck, "id" | "name" | "purpose">;
 
@@ -11,7 +12,7 @@ export interface NormalizedDeckEntry {
 }
 
 function normalizeLookupValue(value: unknown): string {
-	return String(value || "").trim();
+	return readString(value);
 }
 
 function buildLookupMaps(decks?: DeckIdentifierLookup[]) {

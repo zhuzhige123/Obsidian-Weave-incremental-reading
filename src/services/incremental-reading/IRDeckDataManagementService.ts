@@ -15,6 +15,7 @@ import type {
 import { IR_POINT_STORAGE_VERSION } from "../../types/ir-point-storage-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
+import { readString } from "../../utils/unknown-record";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
 import { IRPointStorageService } from "./IRPointStorageService";
 
@@ -154,15 +155,19 @@ export class IRDeckDataManagementService {
 		}
 
 		const fileName = normalizedPath.split("/").pop() || "";
-		const topicId = String(raw.topicId || "").trim();
-		const topicName = String(raw.topicName || "").trim() || fileName.replace(/\.irdeck$/i, "");
+		const topicId = readString(raw.topicId);
+		const topicName = readString(raw.topicName) || fileName.replace(/\.irdeck$/i, "");
 		const points = Array.isArray(raw.points) ? raw.points : null;
 
 		if (Number(raw.schemaVersion) !== IR_POINT_STORAGE_VERSION) {
 			issues.push({
 				code: "schema_version",
 				message: `schemaVersion 应为 ${IR_POINT_STORAGE_VERSION}，当前为 ${
-					raw.schemaVersion === undefined ? "缺失" : String(raw.schemaVersion)
+					raw.schemaVersion === undefined
+						? "缺失"
+						: typeof raw.schemaVersion === "string" || typeof raw.schemaVersion === "number"
+							? String(raw.schemaVersion)
+							: "无效"
 				}`,
 				severity: "warning",
 			});
@@ -176,7 +181,7 @@ export class IRDeckDataManagementService {
 			});
 		}
 
-		if (!String(raw.topicName || "").trim()) {
+		if (!readString(raw.topicName)) {
 			issues.push({
 				code: "missing_topic_name",
 				message: "缺少 topicName，迁移时将使用文件名",
@@ -232,14 +237,14 @@ export class IRDeckDataManagementService {
 					continue;
 				}
 				const record = point as Record<string, unknown>;
-				if (!String(record.id || "").trim()) {
+				if (!readString(record.id)) {
 					missingPointIdCount += 1;
 				}
 				const source =
 					record.source && typeof record.source === "object"
 						? (record.source as Record<string, unknown>)
 						: null;
-				if (!String(source?.path || "").trim()) {
+				if (!readString(source?.path)) {
 					missingSourcePathCount += 1;
 				}
 			}
@@ -489,7 +494,7 @@ export class IRDeckDataManagementService {
 		await this.pointStorage.initialize();
 		const targetDir = normalizePath(plan[0]?.targetPath.split("/").slice(0, -1).join("/") || "");
 		if (targetDir) {
-			await DirectoryUtils.ensureDirRecursive(this.adapter as any, targetDir);
+			await DirectoryUtils.ensureDirRecursive(this.adapter, targetDir);
 		}
 
 		let moved = 0;
@@ -534,7 +539,7 @@ export class IRDeckDataManagementService {
 	): Promise<string> {
 		const normalizedTarget =
 			normalizePath(String(targetDir || "").trim()) || this.getCanonicalPointsDir();
-		await DirectoryUtils.ensureDirRecursive(this.adapter as any, normalizedTarget);
+		await DirectoryUtils.ensureDirRecursive(this.adapter, normalizedTarget);
 
 		const raw = await this.adapter.read(entry.absolutePath);
 		const parsed = JSON.parse(raw) as {

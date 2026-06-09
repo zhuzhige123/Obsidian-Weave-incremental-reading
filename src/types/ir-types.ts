@@ -405,6 +405,20 @@ export interface IRBlockMeta {
 	associatedNotePath?: string;
 	/** 关联的 Markdown 笔记路径列表 */
 	associatedNotePaths?: string[];
+	/** 外部文档 / Canvas / 网页阅读点扩展字段 */
+	externalDocument?: boolean;
+	pointTitle?: string;
+	resumeLink?: string;
+	canvasNodeId?: string;
+	canvasTextCandidates?: string[];
+	sourceSequenceLocked?: boolean;
+	sourceSequenceAnchorDateKey?: string;
+	readingMaterialId?: string;
+	webUrl?: string;
+	notes?: string;
+	autoSubscribedAt?: string;
+	autoSubscribedFolderPath?: string;
+	autoSubscribedBadgeUntil?: string;
 }
 
 /**
@@ -465,6 +479,10 @@ export interface IRBlockV4 {
 	notes?: string;
 	/** 收藏 */
 	favorite?: boolean;
+	/** 展示标题（从块文件解析） */
+	headingText?: string;
+	/** 内容预览（从块文件解析） */
+	contentPreview?: string;
 }
 
 /**

@@ -168,7 +168,7 @@ export class ReadingMaterialStorage {
 		try {
 			if (await adapter.exists(storagePaths.LEGACY_MATERIALS_INDEX)) {
 				const content = await adapter.read(storagePaths.LEGACY_MATERIALS_INDEX);
-				const index: ReadingMaterialsIndex = JSON.parse(content);
+				const index = JSON.parse(content) as ReadingMaterialsIndex;
 				for (const [uuid, material] of Object.entries(index.materials || {})) {
 					store.materials[uuid] = normalizeReadingMaterialForRuntime(material);
 				}
@@ -234,11 +234,11 @@ export class ReadingMaterialStorage {
 					: new Date().toISOString(),
 			materials:
 				candidate.materials && typeof candidate.materials === "object"
-					? (candidate.materials as Record<string, ReadingMaterial>)
+					? (candidate.materials)
 					: {},
 			sessionsByMaterial:
 				candidate.sessionsByMaterial && typeof candidate.sessionsByMaterial === "object"
-					? (candidate.sessionsByMaterial as Record<string, ReadingSession[]>)
+					? (candidate.sessionsByMaterial)
 					: {},
 		};
 	}
@@ -413,7 +413,7 @@ export class ReadingMaterialStorage {
 			}
 
 			const content = await adapter.read(this.storagePaths.ANCHORS_CACHE);
-			return JSON.parse(content);
+			return JSON.parse(content) as AnchorsCache;
 		} catch (error) {
 			logger.warn("[ReadingMaterialStorage] 加载锚点缓存失败:", error);
 			return null;
@@ -475,8 +475,8 @@ export class ReadingMaterialStorage {
 	/**
 	 * 按分类获取材料
 	 */
-	getMaterialsByCategory(category: string): ReadingMaterial[] {
-		return Array.from(this.materialsCache.values()).filter((m) => m.category === category);
+	getMaterialsByCategory(category: ReadingMaterial["category"]): ReadingMaterial[] {
+		return Array.from(this.materialsCache.values()).filter((material) => material.category === category);
 	}
 
 	/**

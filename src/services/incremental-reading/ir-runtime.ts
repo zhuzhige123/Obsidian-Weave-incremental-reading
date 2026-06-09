@@ -1,3 +1,7 @@
+import type { App } from "obsidian";
+import type { IncrementalReadingPluginHost } from "../../types/incremental-reading-plugin-host";
+import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
+
 export interface IRRuntimeConfig {
 	pluginId: string;
 	pluginDirName: string;
@@ -44,24 +48,18 @@ export function getIRRuntime(): IRRuntimeConfig {
 	return IR_RUNTIME;
 }
 
-export function getIncrementalReadingPlugin(app: unknown): any | null {
-	const pluginHost = app as { plugins?: { getPlugin?: (id: string) => unknown } } | null | undefined;
-	const plugins = pluginHost?.plugins;
-	if (!plugins?.getPlugin) {
-		return null;
-	}
-
-	const primary = plugins.getPlugin(IR_RUNTIME.pluginId);
+export function getIncrementalReadingPlugin(app: App): IncrementalReadingPluginHost | null {
+	const primary = getObsidianPluginAs<IncrementalReadingPluginHost>(app, IR_RUNTIME.pluginId);
 	if (primary) {
 		return primary;
 	}
 
 	for (const pluginId of IR_RUNTIME.collaboratorHostPluginIds) {
-		const collaborator = plugins.getPlugin(pluginId);
+		const collaborator = getObsidianPluginAs<IncrementalReadingPluginHost>(app, pluginId);
 		if (collaborator) {
 			return collaborator;
 		}
 	}
 
-	return plugins.getPlugin("weave") ?? null;
+	return getObsidianPluginAs<IncrementalReadingPluginHost>(app, "weave");
 }

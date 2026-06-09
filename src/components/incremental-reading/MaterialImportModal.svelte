@@ -2171,7 +2171,7 @@
     const rootFolder = plugin.app.vault.getRoot();
     treeData = buildTreeChildren(rootFolder, false, false);
     initialized = true;
-    setTimeout(() => { showContent = true; }, 50);
+    window.setTimeout(() => { showContent = true; }, 50);
   }
   
   async function loadAvailableDecks(): Promise<void> {

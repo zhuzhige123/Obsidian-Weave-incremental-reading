@@ -2,7 +2,7 @@
  * Source document path matching helpers.
  *
  * Used by card-management document filtering so cards can be matched against
- * the currently active Markdown / EPUB / Canvas document.
+ * the currently active Markdown / EPUB / Canvas activeDocument.
  */
 
 import type { Card } from "../data/types";
@@ -184,8 +184,8 @@ export function extractAllSourcePaths(card: Card): string[] {
 	}
 
 	appendUniqueSourcePath(paths, card.sourceFile);
-	appendUniqueSourcePath(paths, card.fields?.source_file as string | undefined);
-	appendUniqueSourcePath(paths, card.fields?.source_document as string | undefined);
+	appendUniqueSourcePath(paths, card.fields?.source_file);
+	appendUniqueSourcePath(paths, card.fields?.source_document);
 	appendUniqueSourcePath(paths, card.customFields?.obsidianFilePath as string | undefined);
 
 	return paths;
@@ -209,7 +209,7 @@ export function extractSourceBlock(card: Card): string | null {
 		sourceInfo.sourceBlock,
 		card.sourceBlock,
 		card.customFields?.blockId as string | undefined,
-		card.fields?.obsidian_block_link as string | undefined,
+		card.fields?.obsidian_block_link,
 	];
 
 	for (const candidate of candidates) {
@@ -250,7 +250,7 @@ export function extractBasename(path: string): string {
 }
 
 /**
- * Checks whether a card belongs to the target document.
+ * Checks whether a card belongs to the target activeDocument.
  *
  * Multi-source cards match if any real source path matches the target.
  */
@@ -265,7 +265,7 @@ export function matchesSourceDocument(card: Card, targetPath: string): boolean {
 }
 
 /**
- * Filters cards to those that come from the target document.
+ * Filters cards to those that come from the target activeDocument.
  */
 export function filterCardsBySourceDocument(cards: Card[], targetPath: string | null): Card[] {
 	if (!targetPath) {
@@ -332,8 +332,8 @@ export function debugSourceInfo(card: Card): {
 	return {
 		hasSource: extractedPath !== null,
 		sourceFile: card.sourceFile,
-		fieldsSourceFile: card.fields?.source_file as string | undefined,
-		fieldsSourceDoc: card.fields?.source_document as string | undefined,
+		fieldsSourceFile: card.fields?.source_file,
+		fieldsSourceDoc: card.fields?.source_document,
 		extractedBlock: extractSourceBlock(card),
 		customFieldsPath: card.customFields?.obsidianFilePath as string | undefined,
 		extractedPath,

@@ -10,7 +10,9 @@
  * @module services/incremental-reading/IRMonitoringService
  */
 
+import type { App, Vault } from "obsidian";
 import { getPluginPaths, getV2PathsFromApp } from "../../config/paths";
+import { isRecord } from "../../utils/unknown-record";
 import type { IRBlock, IRTagGroupProfile } from "../../types/ir-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
@@ -202,6 +204,8 @@ function createEmptyDailyStats(date: string): DailyStats {
 // 服务实现
 // ============================================
 
+type MonitoringVault = Pick<Vault, "adapter"> & { app?: App };
+
 /**
  * 增量阅读监控服务
  */
@@ -209,12 +213,12 @@ export class IRMonitoringService {
 	private data: IRMonitoringData;
 	private readonly storagePath: string;
 	private readonly legacyStoragePath: string;
-	private vault: any; // Obsidian Vault
+	private vault: MonitoringVault;
 
-	constructor(vault: any, basePath?: string) {
+	constructor(vault: MonitoringVault, basePath?: string) {
 		this.vault = vault;
 		const resolvedBasePath =
-			basePath || getPluginPaths(vault?.app as any).state.incrementalReading.root;
+			basePath || getPluginPaths(vault.app).state.incrementalReading.root;
 		this.storagePath = `${resolvedBasePath}/monitoring.json`;
 		this.legacyStoragePath = `${getV2PathsFromApp(vault?.app).ir.root}/monitoring.json`;
 		this.data = { ...DEFAULT_MONITORING_DATA };
@@ -239,8 +243,11 @@ export class IRMonitoringService {
 					continue;
 				}
 				const content = await this.vault.adapter.read(path);
-				const parsed = JSON.parse(content);
-				this.data = { ...DEFAULT_MONITORING_DATA, ...parsed };
+				const parsed: unknown = JSON.parse(content);
+				this.data = {
+					...DEFAULT_MONITORING_DATA,
+					...(isRecord(parsed) ? (parsed as Partial<IRMonitoringData>) : {}),
+				};
 				return;
 			} catch (error) {
 				logger.warn(`[IRMonitoringService] 加载监控数据失败，已尝试回退: ${path}`, error);
@@ -262,7 +269,7 @@ export class IRMonitoringService {
 
 			const content = JSON.stringify(this.data);
 
-			await DirectoryUtils.ensureDirForFile(this.vault.adapter as any, this.storagePath);
+			await DirectoryUtils.ensureDirForFile(this.vault.adapter, this.storagePath);
 			await this.vault.adapter.write(this.storagePath, content);
 		} catch (error) {
 			logger.error("[IRMonitoringService] 保存监控数据失败:", error);
@@ -688,6 +695,6 @@ export class IRMonitoringService {
 /**
  * 创建监控服务实例
  */
-export function createIRMonitoringService(vault: any, basePath?: string): IRMonitoringService {
+export function createIRMonitoringService(vault: MonitoringVault, basePath?: string): IRMonitoringService {
 	return new IRMonitoringService(vault, basePath);
 }

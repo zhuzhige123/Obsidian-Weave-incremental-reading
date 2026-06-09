@@ -1,8 +1,14 @@
-import { Notice, TFile, type App, normalizePath } from "obsidian";
+import { Notice, TFile, type App } from "obsidian";
 import { IRDeckSelectorModal } from "../../modals/IRDeckSelectorModal";
 import { getTaskTopicId } from "../../utils/ir-topic-compat";
-import type { IRDeck, IRChunkFileData } from "../../types/ir-types";
-import { createDefaultChunkFileData, generateChunkId, generateSourceId } from "../../types/ir-types";
+import type { IRBlockMeta, IRChunkFileData } from "../../types/ir-types";
+import {
+	createDefaultChunkFileData,
+	DEFAULT_IR_BLOCK_META,
+	generateChunkId,
+	generateSourceId,
+} from "../../types/ir-types";
+import type { ExistingChunkLike } from "./folder-subscription-sync-state";
 import { logger } from "../../utils/logger";
 import { getIrEpubStorageService } from "../epub-integration/ir-epub-storage-access";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
@@ -46,7 +52,7 @@ export interface IREnsureExternalDocumentChunkScheduledOptions {
 	autoSubscribedFolderPath?: string;
 	pinToToday?: boolean;
 	storage?: IRStorageService;
-	existingChunk?: IRChunkFileData | null;
+	existingChunk?: IRChunkFileData | ExistingChunkLike | null;
 	/** 与笔记 YAML 中 weave-reading-id 一致，用于 point 存储与月历检索关联 */
 	readingMaterialId?: string;
 	/** 网页阅读点：打开时使用的 URL（写入 chunk.meta.resumeLink / webUrl） */
@@ -170,7 +176,7 @@ export class IRHostSharedService {
 		try {
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
-			const deck = await storage.getDeck(normalizedDeckId);
+			const deck = await storage.getDeckById(normalizedDeckId);
 			if (!deck || deck.archivedAt) {
 				return null;
 			}
@@ -202,7 +208,7 @@ export class IRHostSharedService {
 		try {
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
-			const storedDeck = await storage.getDeck(deckId);
+			const storedDeck = await storage.getDeckById(deckId);
 			const legacyPath = String(storedDeck?.path || "").trim();
 			if (legacyPath) {
 				identifiers.add(legacyPath);
@@ -237,7 +243,7 @@ export class IRHostSharedService {
 					resolve(value);
 				};
 
-				const modal = new IRDeckSelectorModal(this.app, decks as IRDeck[], (deck) => {
+				const modal = new IRDeckSelectorModal(this.app, decks, (deck) => {
 					settle({ id: deck.id, name: deck.name, path: deck.path });
 				});
 				const originalOnClose = (modal as { onClose?: () => void }).onClose?.bind(modal);
@@ -399,7 +405,10 @@ export class IRHostSharedService {
 				existingStatus === "suspended" ||
 				!existingStatus ||
 				!Number(existing.nextRepDate || 0);
-			const existingMeta = { ...(existing.meta || {}) } as Record<string, unknown>;
+			const existingMeta: IRBlockMeta = {
+				...DEFAULT_IR_BLOCK_META,
+				...(existing.meta || {}),
+			};
 			let changed = false;
 
 			if (existingDeckIds.length !== 1 || existingDeckIds[0] !== deckId) {
@@ -487,7 +496,7 @@ export class IRHostSharedService {
 			}
 
 			existing.updatedAt = now;
-			existing.meta = existingMeta as any;
+			existing.meta = existingMeta;
 			await storage.saveChunkData(existing);
 			return true;
 		}
@@ -500,6 +509,7 @@ export class IRHostSharedService {
 		chunk.updatedAt = now;
 		chunk.nextRepDate = pinToToday ? todayStartMs : now;
 		chunk.meta = {
+			...DEFAULT_IR_BLOCK_META,
 			...(chunk.meta || {}),
 			externalDocument: true,
 			...(nextResumeLink ? { resumeLink: nextResumeLink } : {}),
@@ -521,7 +531,7 @@ export class IRHostSharedService {
 						).toISOString(),
 				  }
 				: {}),
-		} as any;
+		};
 		await storage.saveChunkData(chunk);
 		return true;
 	}

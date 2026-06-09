@@ -59,9 +59,9 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 
 		menu.addItem((item) => {
 			item.setTitle(openAllTitle).setIcon("files");
-			const subMenu = (item as any).setSubmenu();
+			const subMenu = item.setSubmenu();
 			for (const notePath of notePaths) {
-				subMenu.addItem((subItem: any) => {
+				subMenu.addItem((subItem) => {
 					subItem
 						.setTitle(getLabel(notePath))
 						.setIcon(getLinkableVaultNoteIcon(notePath))
@@ -109,10 +109,10 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 
 	menu.addItem((item) => {
 		item.setTitle(uiText("\u8bbe\u4e3a\u4e3b\u7b14\u8bb0", "Set primary note")).setIcon("star");
-		const subMenu = (item as any).setSubmenu();
+		const subMenu = item.setSubmenu();
 		for (const notePath of notePaths) {
 			const isPrimary = notePath === notePaths[0];
-			subMenu.addItem((subItem: any) => {
+			subMenu.addItem((subItem) => {
 				subItem
 					.setTitle(
 						`${isPrimary ? uiText("\u4e3b\u7b14\u8bb0", "Primary") : uiText("\u8bbe\u4e3a\u4e3b\u7b14\u8bb0", "Set primary note")}: ${getLabel(notePath)}`
@@ -130,9 +130,9 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 
 	menu.addItem((item) => {
 		item.setTitle(uiText("\u79fb\u9664\u5173\u8054\u7b14\u8bb0", "Remove linked note")).setIcon("trash");
-		const subMenu = (item as any).setSubmenu();
+		const subMenu = item.setSubmenu();
 		for (const notePath of notePaths) {
-			subMenu.addItem((subItem: any) => {
+			subMenu.addItem((subItem) => {
 				subItem
 					.setTitle(getLabel(notePath))
 					.setIcon("trash")
@@ -155,7 +155,7 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 }
 
 function sanitizeAssociatedNoteBaseName(rawName: string): string {
-	const normalized = String(rawName || "").trim().replace(/[\\/:*?"<>|#^\[\]]+/g, " ");
+	const normalized = String(rawName || "").trim().replace(/[\\/:*?"<>|#^[\]]+/g, " ");
 	const compact = normalized.replace(/\s+/g, " ").trim();
 	return compact || untitledNoteLabel();
 }

@@ -275,7 +275,10 @@ export class IRPdfBookmarkTaskService {
 
 	async updateTask(
 		id: string,
-		updates: Partial<Omit<IRPdfBookmarkTask, "id" | "createdAt">>
+		updates: Partial<Omit<IRPdfBookmarkTask, "id" | "createdAt" | "meta" | "stats">> & {
+			meta?: Partial<IRBlockMeta>;
+			stats?: Partial<IRBlockStats>;
+		}
 	): Promise<IRPdfBookmarkTask | null> {
 		const existing = await this.getTask(id);
 		if (!existing) {
@@ -428,8 +431,14 @@ export class IRPdfBookmarkTaskService {
 		return deletedCount;
 	}
 
-	toBlockV4(task: IRPdfBookmarkTask): IRBlockV4 {
-		const block: IRBlockV4 = {
+	toBlockV4(
+		task: IRPdfBookmarkTask
+	): IRBlockV4 & {
+		pdfBookmarkLink?: string;
+		pdfBookmarkTitle?: string;
+		pdfBookmarkAnnotationId?: string;
+	} {
+		return {
 			id: task.id,
 			sourcePath: task.pdfPath,
 			blockId: task.id,
@@ -444,13 +453,10 @@ export class IRPdfBookmarkTaskService {
 			tags: task.tags || [],
 			createdAt: task.createdAt,
 			updatedAt: task.updatedAt,
+			contentPreview: task.title,
+			pdfBookmarkLink: task.link,
+			pdfBookmarkTitle: task.title,
+			pdfBookmarkAnnotationId: task.annotationId,
 		};
-
-		(block as any).contentPreview = task.title;
-		(block as any).pdfBookmarkLink = task.link;
-		(block as any).pdfBookmarkTitle = task.title;
-		(block as any).pdfBookmarkAnnotationId = task.annotationId;
-
-		return block;
 	}
 }

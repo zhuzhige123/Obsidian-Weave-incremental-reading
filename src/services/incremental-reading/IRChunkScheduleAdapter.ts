@@ -1,6 +1,6 @@
 /** 让文件化块的 YAML 状态与调度存储保持一致。 */
 
-import { App, TFile } from "obsidian";
+import { App } from "obsidian";
 import type {
 	ChunkFileStatus,
 	IRBlockStatus,

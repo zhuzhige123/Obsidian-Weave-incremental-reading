@@ -6,18 +6,17 @@
 	import MarkdownRenderer from "../../atoms/MarkdownRenderer.svelte";
 	import IRParagraphShellEditorHost from "./IRParagraphShellEditorHost.svelte";
 	import {
-		PARAGRAPH_PRIORITY_LEVELS,
 		PARAGRAPH_SCHEDULE_INTERVAL_DAYS,
+		clampParagraphPriorityUi,
 		clampParagraphWorkbenchFontScale,
-		normalizeParagraphPriorityLevel,
 		normalizeParagraphScheduleIntervalDays,
 		normalizeParagraphWorkbenchSurfaceStyle,
 		normalizeParagraphWorkbenchTransitionStyle,
 		resolveParagraphPostponeMinutes,
 		resolveParagraphWorkbenchDisplaySettings,
-		type ParagraphPriorityLevel,
 		type ParagraphScheduleIntervalDays,
 	} from "../../../services/incremental-reading/paragraph-workbench/paragraph-reading-shell";
+	import IRPrioritySlider from "../IRPrioritySlider.svelte";
 	import { ParagraphWorkbenchService } from "../../../services/incremental-reading/paragraph-workbench/ParagraphWorkbenchService";
 	import type {
 		ParagraphWorkbenchOpenInput,
@@ -37,20 +36,22 @@
 	let { plugin, initialInput = null }: Props = $props();
 
 	let t = $derived($tr);
-	let workbenchService = $state<ParagraphWorkbenchService | null>(null);
+	const workbenchService = new ParagraphWorkbenchService(plugin.app);
 	let session = $state<ParagraphWorkbenchSession | null>(null);
 	let display = $derived(workbenchService?.getDisplay() ?? null);
 	let currentSegment = $derived(session?.segments?.[session.currentIndex] ?? null);
 	let paragraphViewMode = $state<"preview" | "edit">("preview");
 	let priorityPanelOpen = $state(false);
 	let schedulePanelOpen = $state(false);
-	let priorityLevel = $state<ParagraphPriorityLevel>(2);
+	let priorityUi = $state(5);
 	let scheduleIntervalDays = $state<ParagraphScheduleIntervalDays>(7);
 	let settingsPanelOpen = $state(false);
 	let settingsButtonEl = $state<HTMLElement | null>(null);
 	let settingsPanelEl = $state<HTMLElement | null>(null);
 	let workbenchRootEl = $state<HTMLElement | null>(null);
+	let textViewportEl = $state<HTMLElement | null>(null);
 	let immersive = $state(false);
+	let hasTextSelection = $state(false);
 
 	let fontScale = $state(resolveParagraphWorkbenchDisplaySettings().fontScale);
 	let surfaceStyle = $state<IRParagraphWorkbenchSurfaceStyle>(
@@ -108,25 +109,29 @@
 		await plugin.saveSettings();
 	}
 
-	async function loadSession(input: ParagraphWorkbenchOpenInput | null | undefined): Promise<void> {
-		if (!workbenchService) {
-			return;
-		}
-		if (!input) {
-			session = null;
-			return;
-		}
-		session = await workbenchService.open(input);
-		priorityLevel = workbenchService.getPriorityLevel();
-		scheduleIntervalDays = workbenchService.getScheduleIntervalDays();
-	}
-
 	$effect(() => {
-		workbenchService = new ParagraphWorkbenchService(plugin.app);
-	});
+		const input = initialInput;
+		let cancelled = false;
 
-	$effect(() => {
-		void loadSession(initialInput);
+		void (async () => {
+			if (!input) {
+				if (!cancelled) {
+					session = null;
+				}
+				return;
+			}
+			const next = await workbenchService.open(input);
+			if (cancelled) {
+				return;
+			}
+			session = next;
+			priorityUi = workbenchService.getPriorityUi();
+			scheduleIntervalDays = workbenchService.getScheduleIntervalDays();
+		})();
+
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	$effect(() => {
@@ -170,22 +175,42 @@
 		settingsPanelOpen = false;
 	}
 
-	function selectPriorityLevel(level: ParagraphPriorityLevel): void {
-		priorityLevel = normalizeParagraphPriorityLevel(level);
-		workbenchService?.setPriorityLevel(priorityLevel);
-		workbenchService?.applyPriority(t("irParagraphWorkbench.prioritySaved"));
+	function handlePriorityUiChange(nextUi: number): void {
+		priorityUi = clampParagraphPriorityUi(nextUi);
+		workbenchService.setPriorityUi(priorityUi);
+		void workbenchService.applyPriority(t("irParagraphWorkbench.prioritySaved"));
 	}
 
 	function selectScheduleInterval(days: ParagraphScheduleIntervalDays): void {
 		scheduleIntervalDays = normalizeParagraphScheduleIntervalDays(days);
-		workbenchService?.setScheduleIntervalDays(scheduleIntervalDays);
-		workbenchService?.applyScheduleInterval(t("irParagraphWorkbench.scheduleSaved"));
+		workbenchService.setScheduleIntervalDays(scheduleIntervalDays);
+		void workbenchService.applyScheduleInterval(t("irParagraphWorkbench.scheduleSaved"));
+	}
+
+	function refreshTextSelectionState(): void {
+		hasTextSelection = Boolean(
+			workbenchService.getSelectedTextFromWorkbench(workbenchRootEl, textViewportEl)?.trim()
+		);
+	}
+
+	async function openTopicPicker(): Promise<void> {
+		const next = await workbenchService.openAddToTopicModal();
+		if (next) {
+			session = next;
+			priorityUi = workbenchService.getPriorityUi();
+		}
+	}
+
+	async function handleExcerpt(): Promise<void> {
+		const selectedText = workbenchService.getSelectedTextFromWorkbench(
+			workbenchRootEl,
+			textViewportEl
+		);
+		await workbenchService.createMemoryCardFromSelection(selectedText);
+		refreshTextSelectionState();
 	}
 
 	async function navigateRelative(direction: -1 | 1): Promise<void> {
-		if (!workbenchService) {
-			return;
-		}
 		session = await workbenchService.navigateRelative(direction);
 	}
 
@@ -278,12 +303,38 @@
 			closeSettingsPanel();
 		};
 
+		const handleSelectionActivity = () => {
+			refreshTextSelectionState();
+		};
+
 		document.addEventListener("fullscreenchange", handleFullscreenChange);
 		document.addEventListener("pointerdown", handlePointerDown, true);
+		document.addEventListener("selectionchange", handleSelectionActivity);
+
 		return () => {
 			document.removeEventListener("fullscreenchange", handleFullscreenChange);
 			document.removeEventListener("pointerdown", handlePointerDown, true);
+			document.removeEventListener("selectionchange", handleSelectionActivity);
 			applyImmersiveClass(false);
+		};
+	});
+
+	$effect(() => {
+		const viewport = textViewportEl;
+		if (!viewport) {
+			return;
+		}
+
+		const handleSelectionActivity = () => {
+			refreshTextSelectionState();
+		};
+
+		viewport.addEventListener("mouseup", handleSelectionActivity);
+		viewport.addEventListener("keyup", handleSelectionActivity);
+
+		return () => {
+			viewport.removeEventListener("mouseup", handleSelectionActivity);
+			viewport.removeEventListener("keyup", handleSelectionActivity);
 		};
 	});
 </script>
@@ -296,7 +347,7 @@
 >
 	<header class="ir-paragraph-workbench__header">
 		<div class="ir-paragraph-workbench__header-left">
-			<button type="button" class="clickable-icon ir-paragraph-workbench__topic-btn">
+			<button type="button" class="clickable-icon ir-paragraph-workbench__topic-btn" onclick={() => void openTopicPicker()}>
 				<span class="ir-paragraph-workbench__topic-icon" use:icon={"book-plus"}></span>
 				<span>{session?.topicName || t("irParagraphWorkbench.selectIrTopic")}</span>
 			</button>
@@ -464,6 +515,7 @@
 				data-content-mode={paragraphViewMode}
 				data-surface-style={surfaceStyle}
 				data-transition-style={transitionStyle}
+				bind:this={textViewportEl}
 			>
 				{#if currentSegment}
 					<div
@@ -500,16 +552,21 @@
 	<div class="ir-paragraph-workbench__footer-slot">
 		<div class="ir-paragraph-workbench__ir-toolbar" aria-label={t("irParagraphWorkbench.title")}>
 			<div class="ir-paragraph-workbench__ir-actions">
-				<button type="button" class="clickable-icon ir-paragraph-workbench__ir-btn ir-paragraph-workbench__ir-btn--primary" onclick={() => void workbenchService?.pushNextSegment().then((next) => { session = next; })}>
+				<button type="button" class="clickable-icon ir-paragraph-workbench__ir-btn ir-paragraph-workbench__ir-btn--primary" onclick={() => void workbenchService.pushNextSegment().then((next) => { session = next; })}>
 					{t("irParagraphWorkbench.pushNextParagraph")}
 				</button>
-				<button type="button" class="clickable-icon ir-paragraph-workbench__ir-btn" disabled>
+				<button
+					type="button"
+					class="clickable-icon ir-paragraph-workbench__ir-btn"
+					disabled={!hasTextSelection}
+					onclick={() => void handleExcerpt()}
+				>
 					{t("irParagraphWorkbench.excerptToCard")}
 				</button>
-				<button type="button" class="clickable-icon ir-paragraph-workbench__ir-btn" onclick={() => void workbenchService?.applyPostpone(t("irParagraphWorkbench.postponeSaved"), t("irParagraphWorkbench.postponeFailed"))}>
+				<button type="button" class="clickable-icon ir-paragraph-workbench__ir-btn" onclick={() => void workbenchService.applyPostpone(t("irParagraphWorkbench.postponeSaved"), t("irParagraphWorkbench.postponeFailed"))}>
 					{getPostponeButtonLabel()}
 				</button>
-				<button type="button" class="clickable-icon ir-paragraph-workbench__ir-btn" onclick={() => workbenchService?.archive(t("irParagraphWorkbench.archiveNotice"))}>
+				<button type="button" class="clickable-icon ir-paragraph-workbench__ir-btn" onclick={() => void workbenchService.archive(t("irParagraphWorkbench.archiveNotice"))}>
 					{t("irParagraphWorkbench.archive")}
 				</button>
 			</div>
@@ -525,18 +582,13 @@
 
 		{#if priorityPanelOpen}
 			<section class="ir-paragraph-workbench__priority-panel" aria-label={t("irParagraphWorkbench.priorityPanelTitle")}>
-				<div class="ir-paragraph-workbench__panel-title">{t("irParagraphWorkbench.priorityPanelTitle")}</div>
-				<div class="ir-paragraph-workbench__panel-status">
-					<span class="ir-paragraph-workbench__panel-status-label">{t("irParagraphWorkbench.priorityCurrent")}</span>
-					<strong>{t("irParagraphWorkbench.priorityLevelLabel", { level: priorityLevel })}</strong>
-				</div>
-				<div class="ir-paragraph-workbench__panel-pills" role="group" aria-label={t("irParagraphWorkbench.priorityPanelTitle")}>
-					{#each PARAGRAPH_PRIORITY_LEVELS as level (level)}
-						<button type="button" class="clickable-icon ir-paragraph-workbench__panel-pill" class:is-active={priorityLevel === level} aria-pressed={priorityLevel === level} onclick={() => selectPriorityLevel(level)}>
-							{t("irParagraphWorkbench.priorityLevelShort", { level })}
-						</button>
-					{/each}
-				</div>
+				<IRPrioritySlider
+					value={priorityUi}
+					expanded={true}
+					disabled={!session?.pointId}
+					onToggle={togglePriorityPanel}
+					onChange={handlePriorityUiChange}
+				/>
 			</section>
 		{/if}
 

@@ -3,6 +3,7 @@ import type { WeavePlugin } from "../main";
 import { IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
+import { readString } from "../utils/unknown-record";
 import { DeferredLeafRedirectController } from "./DeferredLeafRedirectController";
 
 export const VIEW_TYPE_IRDECK = IR_RUNTIME.viewTypes.deck;
@@ -18,7 +19,7 @@ export class IRDeckView extends ItemView {
 		super(leaf);
 		this.plugin = plugin;
 		this.redirectController = new DeferredLeafRedirectController({
-			workspace: plugin.app.workspace as any,
+			workspace: plugin.app.workspace,
 			leaf,
 			shouldRedirect: () => this.isOpen && !!this.filePath && !this.redirecting,
 			onRedirect: () => {
@@ -61,7 +62,7 @@ export class IRDeckView extends ItemView {
 	async setState(state: Record<string, unknown>, result: ViewStateResult): Promise<void> {
 		await super.setState(state, result);
 
-		const incomingPath = String(state?.filePath || state?.file || "").trim();
+		const incomingPath = readString(state?.filePath) || readString(state?.file);
 		if (incomingPath) {
 			this.filePath = incomingPath;
 		}

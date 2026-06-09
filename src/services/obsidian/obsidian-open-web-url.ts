@@ -44,7 +44,7 @@ async function openUrlInWebViewerTab(app: App, url: string): Promise<boolean> {
 			},
 			active: true,
 		});
-		app.workspace.revealLeaf(leaf);
+		void app.workspace.revealLeaf(leaf);
 		return true;
 	} catch {
 		return false;

@@ -1,5 +1,6 @@
 import type { App, TFile } from "obsidian";
 import { normalizePath } from "obsidian";
+import { readString } from "../../utils/unknown-record";
 import { extractAllTags } from "../../utils/yaml-utils";
 import { IR_RUNTIME } from "./ir-runtime";
 import {
@@ -68,9 +69,7 @@ function normalizeComparablePath(path: string): string {
 }
 
 function normalizeWeaveType(value: unknown): string {
-	return String(value || "")
-		.trim()
-		.replace(/^['"]|['"]$/g, "");
+	return readString(value).replace(/^['"]|['"]$/g, "");
 }
 
 function readYamlReadingId(app: App, file: TFile): string {

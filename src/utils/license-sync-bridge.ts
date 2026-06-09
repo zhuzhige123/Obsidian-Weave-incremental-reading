@@ -116,12 +116,12 @@ export function registerLicenseSyncBridge(
 	};
 
 	plugin.registerEvent(
-		(plugin.app.workspace as any).on(WEAVE_LICENSE_CHANGED_WORKSPACE_EVENT, handleLicenseChanged)
+		plugin.app.workspace.on(WEAVE_LICENSE_CHANGED_WORKSPACE_EVENT, handleLicenseChanged)
 	);
-	plugin.registerDomEvent(window, WEAVE_LICENSE_CHANGED_WINDOW_EVENT as any, handleLicenseChanged);
+	plugin.registerDomEvent(window, WEAVE_LICENSE_CHANGED_WINDOW_EVENT, handleLicenseChanged);
 	plugin.registerDomEvent(window, "focus", handlePassiveSync);
-	plugin.registerDomEvent(document, "visibilitychange", () => {
-		if (!document.hidden) {
+	plugin.registerDomEvent(activeDocument, "visibilitychange", () => {
+		if (!activeDocument.hidden) {
 			handlePassiveSync();
 		}
 	});

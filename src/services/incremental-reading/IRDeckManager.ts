@@ -14,12 +14,9 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
 import { resolveIRImportFolder } from "../../config/paths";
 import type { IRDeck, IRDeckSettings, IRDeckStats } from "../../types/ir-types";
-import {
-	DEFAULT_IR_DECK_SETTINGS,
-	createDefaultIRDeck,
-	generateIRDeckId,
-} from "../../types/ir-types";
+import { createDefaultIRDeck } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
+import { getIncrementalReadingPlugin } from "./ir-runtime";
 import { IRStorageService } from "./IRStorageService";
 import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
 
@@ -31,28 +28,28 @@ export class IRDeckManager {
 	constructor(app: App, storage: IRStorageService, chunkRoot?: string) {
 		this.app = app;
 		this.storage = storage;
-		const plugin: any = (app as any)?.plugins?.getPlugin?.("weave");
+		const plugin = getIncrementalReadingPlugin(app);
 		const parentFolder = plugin?.settings?.weaveParentFolder;
 		this.chunkRoot = normalizePath(resolveIRImportFolder(chunkRoot, parentFolder));
 	}
 
 	private async cleanAllEmptyFoldersUnderChunks(): Promise<void> {
-		const adapter = this.app.vault.adapter as any;
+		const adapter = this.app.vault.adapter;
 		const chunksRoot = this.chunkRoot;
-		if (!adapter?.exists || !(await adapter.exists(chunksRoot))) {
+		if (!(await adapter.exists(chunksRoot))) {
 			return;
 		}
 
 		const walk = async (dir: string): Promise<void> => {
 			const normalizedDir = normalizePath(dir);
-			let listing: any;
+			let listing: { folders: string[] };
 			try {
 				listing = await adapter.list(normalizedDir);
 			} catch {
 				return;
 			}
 
-			const folders: string[] = Array.isArray(listing?.folders) ? listing.folders : [];
+			const folders = listing.folders;
 			for (const sub of folders) {
 				await walk(sub);
 			}
@@ -73,8 +70,8 @@ export class IRDeckManager {
 	private async cleanEmptyFolder(folderPath: string): Promise<boolean> {
 		try {
 			const normalizedFolderPath = normalizePath(folderPath);
-			const adapter = this.app.vault.adapter as any;
-			if (!adapter?.exists || !(await adapter.exists(normalizedFolderPath))) {
+			const adapter = this.app.vault.adapter;
+			if (!(await adapter.exists(normalizedFolderPath))) {
 				return false;
 			}
 
@@ -245,7 +242,7 @@ export class IRDeckManager {
 	 * 更新牌组设置
 	 */
 	async updateDeckSettings(deckPath: string, settings: Partial<IRDeckSettings>): Promise<IRDeck> {
-		const deck = await this.storage.getDeck(deckPath);
+		const deck = await this.storage.getDeckById(deckPath);
 		if (!deck) {
 			throw new Error(`专题不存在: ${deckPath}`);
 		}
@@ -321,7 +318,7 @@ export class IRDeckManager {
 		}
 
 		// 检查是否已导入
-		const existing = await this.storage.getDeck(folderPath);
+		const existing = await this.storage.getDeckById(folderPath);
 		if (existing) {
 			return { canImport: false, reason: "该文件夹已作为专题导入" };
 		}
@@ -366,7 +363,7 @@ export class IRDeckManager {
 		removed: number;
 		unchanged: number;
 	}> {
-		const deck = await this.storage.getDeck(deckPath);
+		const deck = await this.storage.getDeckById(deckPath);
 		if (!deck) {
 			throw new Error(`专题不存在: ${deckPath}`);
 		}

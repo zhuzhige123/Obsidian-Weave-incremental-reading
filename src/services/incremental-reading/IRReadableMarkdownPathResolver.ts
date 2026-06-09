@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import { normalizePath } from "obsidian";
+import { readString } from "../../utils/unknown-record";
 
 type VaultConfigLike = {
 	getConfig?: (key: string) => unknown;
@@ -115,18 +116,12 @@ export function resolveObsidianDefaultNewNoteFolder(
 		allowActiveFileFallback?: boolean;
 	} = {}
 ): string | null {
-	const locationValue = String(
-		readVaultConfigValue(app, "newFileLocation") ??
-			readVaultConfigValue(app, "newFileDestination") ??
-			""
-	)
-		.trim()
-		.toLowerCase();
-	const configuredFolderPath = String(
-		readVaultConfigValue(app, "newFileFolderPath") ??
-			readVaultConfigValue(app, "newFileFolder") ??
-			""
-	).trim();
+	const locationValue = readString(
+		readVaultConfigValue(app, "newFileLocation") ?? readVaultConfigValue(app, "newFileDestination")
+	).toLowerCase();
+	const configuredFolderPath = readString(
+		readVaultConfigValue(app, "newFileFolderPath") ?? readVaultConfigValue(app, "newFileFolder")
+	);
 	const contextFolder =
 		resolveContextFolder(app, options.contextPath) ||
 		(options.allowActiveFileFallback ? resolveContextFolder(app, getActiveFilePath(app)) : null);

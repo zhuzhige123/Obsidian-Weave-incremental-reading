@@ -2,9 +2,14 @@ import { App, TFile, normalizePath } from "obsidian";
 import { ParagraphParser } from "../ParagraphParser";
 import { normalizeCanvasNodeId } from "../../ui/canvas-source-locate";
 import {
+	extractObsidianBlockIdFromText,
+	formatObsidianBlockId,
+} from "./paragraph-block-reference";
+import {
 	getEpubParagraphSnapshot,
 	navigateEpubParagraphRelative,
 } from "./epub-paragraph-bridge";
+import { readOptionalString } from "../../../utils/unknown-record";
 import type {
 	ParagraphWorkbenchOpenInput,
 	ParagraphWorkbenchSegment,
@@ -32,17 +37,26 @@ async function loadMarkdownSegments(app: App, filePath: string): Promise<Paragra
 	const content = await app.vault.read(file);
 	const parser = new ParagraphParser();
 	const paragraphs = parser.parseDocument(content);
-	return paragraphs.map((paragraph) => ({
-		id: String(paragraph.anchorId || paragraph.index),
-		index: paragraph.index,
-		title: paragraph.headingText,
-		text: paragraph.content,
-		sourceLink: `${filePath}#${paragraph.anchorId || `line-${paragraph.startLine + 1}`}`,
-		metadata: {
-			startLine: paragraph.startLine,
-			endLine: paragraph.endLine,
-		},
-	}));
+	return paragraphs.map((paragraph) => {
+		const obsidianBlockId = extractObsidianBlockIdFromText(paragraph.content);
+		const blockRef = obsidianBlockId
+			? formatObsidianBlockId(obsidianBlockId)
+			: paragraph.anchorId
+				? String(paragraph.anchorId)
+				: `line-${paragraph.startLine + 1}`;
+		return {
+			id: obsidianBlockId || String(paragraph.anchorId || paragraph.index),
+			index: paragraph.index,
+			title: paragraph.headingText,
+			text: paragraph.content,
+			sourceLink: `${filePath}#${blockRef}`,
+			metadata: {
+				startLine: paragraph.startLine,
+				endLine: paragraph.endLine,
+				obsidianBlockId,
+			},
+		};
+	});
 }
 
 async function loadCanvasSegments(
@@ -201,4 +215,37 @@ export function getCurrentWorkbenchSegment(
 		return null;
 	}
 	return session.segments[normalizeSegmentIndex(session.currentIndex, session.segments.length)] ?? null;
+}
+
+/** 重新从源文件加载段落列表，保留当前会话上下文（专题、索引等）。 */
+export async function reloadParagraphWorkbenchSession(
+	app: App,
+	session: ParagraphWorkbenchSession
+): Promise<ParagraphWorkbenchSession | null> {
+	const currentIndex = session.currentIndex;
+	const reloaded = await createParagraphWorkbenchSession(app, {
+		sourceType: session.sourceType,
+		sourcePath: session.sourcePath,
+		segmentIndex: currentIndex,
+		topicId: session.topicId,
+		topicName: session.topicName,
+		pointId: session.pointId,
+		canvasNodeId:
+			session.sourceType === "canvas"
+				? readOptionalString(session.segments[currentIndex]?.metadata?.canvasNodeId)
+				: undefined,
+		epubCfi:
+			session.sourceType === "epub"
+				? readOptionalString(session.segments[currentIndex]?.metadata?.cfiRange)
+				: undefined,
+	});
+	if (!reloaded) {
+		return session;
+	}
+	return {
+		...reloaded,
+		queueDone: session.queueDone,
+		queueTotal: session.queueTotal,
+		remainingMs: session.remainingMs,
+	};
 }

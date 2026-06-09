@@ -344,7 +344,7 @@
   let loadDataInFlight: Promise<void> | null = null;
   let loadDataQueued = false;
   let loadDataQueuedForceRecompute = false;
-  let enrichDeferredTimer: ReturnType<typeof setTimeout> | null = null;
+  let enrichDeferredTimer: number | null = null;
   let enrichmentPausedUntilMs = 0;
   let enrichFailureStreak = 0;
   let enrichDegradedUntilMs = 0;
@@ -353,7 +353,7 @@
   let lastAppliedScheduleGeneratedAt = 0;
   let pendingLocalRefreshGeneratedAt = 0;
   let lastLocallyHandledBroadcastGeneratedAt = 0;
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let debounceTimer: number | null = null;
 
   function getWorkspaceSnapshotService() {
     return getSharedIRWorkspaceSnapshotService(plugin.app);
@@ -4550,7 +4550,7 @@
     }
   ): void {
     if (enrichDeferredTimer) {
-      clearTimeout(enrichDeferredTimer);
+      window.clearTimeout(enrichDeferredTimer);
       enrichDeferredTimer = null;
     }
     if (isCalendarSidebarInteractionPaused()) {
@@ -4561,7 +4561,7 @@
       return;
     }
     resetEnrichProgress();
-    enrichDeferredTimer = setTimeout(() => {
+    enrichDeferredTimer = window.setTimeout(() => {
       enrichDeferredTimer = null;
       if (requestId !== loadDataRequestId || isCalendarSidebarInteractionPaused() || loadDataInFlight) {
         return;
@@ -5422,9 +5422,9 @@
     window.addEventListener('keydown', handleUserInteractionPressure);
 
     const handleDataUpdate = (event: Event) => {
-      if (debounceTimer) clearTimeout(debounceTimer);
+      if (debounceTimer) window.clearTimeout(debounceTimer);
       const detail = (event as CustomEvent<UpdatedEventDetail>).detail;
-      debounceTimer = setTimeout(async () => {
+      debounceTimer = window.setTimeout(async () => {
         const generatedAt = detail?.generatedAt ?? 0;
         if (
           generatedAt > 0 &&
@@ -5463,9 +5463,9 @@
     window.addEventListener('Weave:ir-material-finished', handleMaterialFinished as EventListener);
 
     return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
+      if (debounceTimer) window.clearTimeout(debounceTimer);
       if (enrichDeferredTimer) {
-        clearTimeout(enrichDeferredTimer);
+        window.clearTimeout(enrichDeferredTimer);
         enrichDeferredTimer = null;
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);

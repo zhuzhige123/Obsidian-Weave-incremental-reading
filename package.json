@@ -1,7 +1,7 @@
 {
   "name": "weave-incremental-reading",
   "private": true,
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Standalone incremental reading workflow with topics, reading points, calendar scheduling, and source tracing",
   "main": "main.js",
   "type": "module",

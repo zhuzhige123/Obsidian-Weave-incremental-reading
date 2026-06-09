@@ -50,9 +50,9 @@ export function getLeafLocation(leaf: WorkspaceLeaf): ViewLocation {
 	}
 
 	// 某些布局下 root 不是直接的 left/rightSplit，这里用 DOM 结构兜底。
-	const containerEl = ((leaf as any)?.containerEl ??
-		(leaf.view as any)?.containerEl ??
-		null) as HTMLElement | null;
+	const containerEl =
+		leaf.containerEl ??
+		(leaf.view instanceof ItemView ? leaf.view.containerEl : null);
 
 	if (containerEl?.closest(".workspace-split.mod-left-split")) {
 		return "left";

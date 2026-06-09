@@ -19,7 +19,6 @@ import { getSharedIRPointStorageService, type IRPointStorageService } from "./IR
 import {
 	buildExternalBookmarkTasksRevision,
 	buildScheduleFingerprint,
-	hashStableValue,
 } from "./IRScheduleFingerprint";
 
 export const IR_SCHEDULE_INDEX_VERSION = "1.0.0";
@@ -78,7 +77,7 @@ export class IRScheduleIndexService {
 	}
 
 	private getIndexPath(): string {
-		return getPluginPaths(this.app as any).cache.incrementalReading.scheduleIndex;
+		return getPluginPaths(this.app).cache.incrementalReading.scheduleIndex;
 	}
 
 	private normalizeStore(raw: unknown): IRScheduleIndexStore | null {
@@ -98,11 +97,11 @@ export class IRScheduleIndexService {
 			snapshotCacheVersion: Number(candidate.snapshotCacheVersion ?? -1),
 			externalTasksRevision: String(candidate.externalTasksRevision || ""),
 			scheduleFingerprint: String(candidate.scheduleFingerprint || ""),
-			chunks: Array.isArray(candidate.chunks) ? (candidate.chunks as IRChunkFileData[]) : [],
-			blocks: Array.isArray(candidate.blocks) ? (candidate.blocks as IRBlock[]) : [],
-			pdfTasks: Array.isArray(candidate.pdfTasks) ? (candidate.pdfTasks as IRPdfBookmarkTask[]) : [],
+			chunks: Array.isArray(candidate.chunks) ? (candidate.chunks) : [],
+			blocks: Array.isArray(candidate.blocks) ? (candidate.blocks) : [],
+			pdfTasks: Array.isArray(candidate.pdfTasks) ? (candidate.pdfTasks) : [],
 			epubTasks: Array.isArray(candidate.epubTasks)
-				? (candidate.epubTasks as IREpubBookmarkTask[])
+				? (candidate.epubTasks)
 				: [],
 		};
 	}

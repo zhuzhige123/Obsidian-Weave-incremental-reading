@@ -27,7 +27,6 @@ import type {
 } from "../../types/ir-types";
 import {
 	DEFAULT_ADVANCED_SCHEDULE_SETTINGS,
-	DEFAULT_TAG_GROUP_PROFILE,
 	PROCESSING_STRATEGY,
 	READING_LIST_STRATEGY,
 } from "../../types/ir-types";

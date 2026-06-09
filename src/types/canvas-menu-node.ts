@@ -1,6 +1,7 @@
 export type CanvasNodeData = {
 	type?: string;
 	text?: string;
+	label?: string;
 	file?: string;
 	url?: string;
 	x?: number;

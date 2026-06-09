@@ -5,7 +5,6 @@ import type {
 	DailyLoad,
 	SchedulingConfig,
 	SchedulingImpact,
-	SchedulingStrategy,
 } from "../../types/ir-import-scheduling";
 import type { IRBlock } from "../../types/ir-types";
 import type { IRProjectedScheduleItem } from "./IRProjectedScheduleSummary";

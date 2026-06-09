@@ -24,6 +24,7 @@ import {
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import { supportsPointLinkedNotesForSourcePath } from "./IRLinkedNotePolicy";
 import type { ReadingMaterialStorage } from "./ReadingMaterialStorage";
+import { getIncrementalReadingPlugin } from "./ir-runtime";
 
 /** 创建阅读材料时可覆盖的选项。 */
 export interface CreateMaterialOptions {
@@ -95,9 +96,12 @@ export class ReadingMaterialManager {
 
 	private async isIRFile(file: TFile): Promise<boolean> {
 		try {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const fmType = cache?.frontmatter?.weave_type;
-			if (typeof fmType === "string" && fmType.startsWith("ir-")) {
+			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+			const fmType =
+				frontmatter && typeof frontmatter.weave_type === "string"
+					? frontmatter.weave_type
+					: undefined;
+			if (fmType?.startsWith("ir-")) {
 				return true;
 			}
 		} catch {}
@@ -243,12 +247,9 @@ export class ReadingMaterialManager {
 	// ===== 材料创建 =====
 
 	/** 独立 IR 插件 id 与历史 Weave 主插件 id（导入目录等设置仍挂在同名 settings 形状上） */
-	private getHostPluginForIncrementalReadingSettings(): any {
+	private getHostPluginForIncrementalReadingSettings() {
 		try {
-			const plugins = (this.app as any)?.plugins;
-			return (
-				plugins?.getPlugin?.("weave-incremental-reading") ?? plugins?.getPlugin?.("weave") ?? null
-			);
+			return getIncrementalReadingPlugin(this.app);
 		} catch {
 			return null;
 		}
@@ -559,13 +560,13 @@ export class ReadingMaterialManager {
 	private async findMaterialByFile(file: TFile): Promise<ReadingMaterial | null> {
 		const readingId = await this.yamlManager.getReadingId(file);
 		if (readingId) {
-			const material = await this.storage.getMaterialById(readingId);
+			const material = this.storage.getMaterialById(readingId);
 			if (material) {
 				return material;
 			}
 		}
 
-		return await this.storage.getMaterialByPath(file.path);
+		return this.storage.getMaterialByPath(file.path);
 	}
 
 	// ===== 分类管理 =====
@@ -575,7 +576,7 @@ export class ReadingMaterialManager {
 		materialId: string,
 		newCategory: ReadingCategory
 	): Promise<CategoryChangeResult> {
-		const material = await this.storage.getMaterialById(materialId);
+		const material = this.storage.getMaterialById(materialId);
 		if (!material) {
 			return {
 				success: false,
@@ -641,7 +642,7 @@ export class ReadingMaterialManager {
 
 	/** 更新阅读材料优先级，并同步 YAML。 */
 	async updatePriority(materialId: string, priority: number): Promise<boolean> {
-		const material = await this.storage.getMaterialById(materialId);
+		const material = this.storage.getMaterialById(materialId);
 		if (!material) {
 			return false;
 		}
@@ -665,7 +666,7 @@ export class ReadingMaterialManager {
 
 	/** 根据未访问天数衰减非收藏材料的优先级。 */
 	async applyPriorityDecay(): Promise<number> {
-		const materials = await this.storage.getAllMaterials();
+		const materials = this.storage.getAllMaterials();
 		const now = new Date();
 		let updatedCount = 0;
 
@@ -902,7 +903,7 @@ export class ReadingMaterialManager {
 		materialId: string,
 		label = "材料"
 	): Promise<ReadingMaterial | null> {
-		const material = await this.storage.getMaterialById(materialId);
+		const material = this.storage.getMaterialById(materialId);
 		if (!material) {
 			logger.warn(`[ReadingMaterialManager] ${label}不存在: ${materialId}`);
 			return null;
@@ -988,7 +989,7 @@ export class ReadingMaterialManager {
 				if (file.extension === "md") {
 					const existingId = await this.yamlManager.getReadingId(file);
 					if (existingId) {
-						const existingMaterial = await this.storage.getMaterialById(existingId);
+						const existingMaterial = this.storage.getMaterialById(existingId);
 						if (existingMaterial) {
 							result.skipped++;
 							logger.debug(`[ReadingMaterialManager] 跳过已导入文件: ${filePath}`);
@@ -998,7 +999,7 @@ export class ReadingMaterialManager {
 				}
 
 				const potentialTargetPath = `${targetFolder}/${file.basename}.${file.extension}`;
-				const existingByPath = await this.storage.getMaterialByPath(potentialTargetPath);
+				const existingByPath = this.storage.getMaterialByPath(potentialTargetPath);
 				if (existingByPath) {
 					const targetFileExists = this.app.vault.getAbstractFileByPath(potentialTargetPath);
 					if (targetFileExists) {
@@ -1121,7 +1122,7 @@ export class ReadingMaterialManager {
 		const irStorage = new (await import("./IRStorageService")).IRStorageService(this.app);
 		await irStorage.initialize();
 
-		const allMaterials = await this.storage.getAllMaterials();
+		const allMaterials = this.storage.getAllMaterials();
 		const children = allMaterials.filter((m) => m.parentMaterialId === materialId);
 		for (const child of children) {
 			child.parentMaterialId = material.parentMaterialId;
@@ -1191,7 +1192,7 @@ export class ReadingMaterialManager {
 	async getExtractCards(
 		deckId?: string
 	): Promise<import("../../types/extract-types").ExtractCard[]> {
-		const materials = await this.storage.getAllMaterials();
+		const materials = this.storage.getAllMaterials();
 		const extractCards: import("../../types/extract-types").ExtractCard[] = [];
 
 		for (const material of materials) {

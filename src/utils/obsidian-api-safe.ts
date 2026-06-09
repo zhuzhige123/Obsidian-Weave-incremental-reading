@@ -4,6 +4,7 @@ import { logger } from "../utils/logger";
  * 解决 Svelte 5 与 Obsidian API 的兼容性问题
  */
 
+import type { App } from "obsidian";
 import { Notice } from "obsidian";
 import { untrack } from "svelte";
 import { applyStyleProps } from "./style-props";
@@ -59,8 +60,7 @@ export class SafeNotice {
 					this.notice?.hide();
 				});
 			} else if (this.notice && "isShown" in this.notice) {
-				// 尝试替代方案：检查 isShown 属性
-				const isShown = (this.notice as any).isShown;
+				const isShown = this.notice.isShown;
 				if (typeof isShown === "boolean" && isShown) {
 					// 如果 Notice 仍然显示，尝试通过 DOM 操作隐藏
 					this.hideViaDom();
@@ -82,7 +82,7 @@ export class SafeNotice {
 	private hideViaDom(): void {
 		try {
 			// 查找并隐藏相关的 Notice DOM 元素
-			const noticeElements = document.querySelectorAll(".notice");
+			const noticeElements = activeDocument.querySelectorAll(".notice");
 			noticeElements.forEach((_element) => {
 				const htmlElement = _element as HTMLElement;
 				if (htmlElement.style.display !== "none") {
@@ -105,7 +105,7 @@ export class SafeNotice {
 		try {
 			// 安全检查 isShown 属性/方法
 			if ("isShown" in this.notice) {
-				const isShown = (this.notice as any).isShown;
+				const isShown = this.notice.isShown;
 				if (typeof isShown === "function") {
 					return untrack(() => isShown.call(this.notice));
 				} else if (typeof isShown === "boolean") {
@@ -145,17 +145,19 @@ export function createSafeNotice(message: string, timeout?: number): SafeNotice 
 /**
  * 安全的设置页面打开
  */
-export function safeOpenSettings(app: any, tabId?: string): void {
+export function safeOpenSettings(app: App, tabId?: string): void {
 	try {
 		untrack(() => {
-			if (app?.setting && typeof app.setting.open === "function") {
-				app.setting.open();
+			const setting = app.setting;
+			if (setting && typeof setting.open === "function") {
+				setting.open();
 
-				if (tabId && typeof app.setting.openTabById === "function") {
+				if (tabId && typeof setting.openTabById === "function") {
+					const openTabById = setting.openTabById;
 					// 延迟打开特定标签，确保设置页面已加载
 					window.setTimeout(() => {
 						try {
-							app.setting.openTabById(tabId);
+							openTabById(tabId);
 						} catch (tabError) {
 							logger.warn("[SafeSettings] 打开标签失败:", tabError);
 						}
@@ -211,17 +213,15 @@ export function safeEventHandler<T extends Event>(handler: (event: T) => void): 
 export function cleanupCompatibilityIssues(): void {
 	try {
 		// 清理可能的错误标记
-		const errorElements = document.querySelectorAll("[data-svelte-error]");
+		const errorElements = activeDocument.querySelectorAll("[data-svelte-error]");
 		errorElements.forEach((el) => el.removeAttribute("data-svelte-error"));
 
 		// 清理可能的隐藏 Notice
-		const hiddenNotices = document.querySelectorAll('.notice[style*="display: none"]');
+		const hiddenNotices = activeDocument.querySelectorAll('.notice[style*="display: none"]');
 		hiddenNotices.forEach((el) => el.remove());
 
 		// 强制垃圾回收（如果可用）
-		if (typeof window !== "undefined" && (window as any).gc) {
-			(window as any).gc();
-		}
+		window.gc?.();
 	} catch (error) {
 		logger.warn("[Cleanup] 清理过程中出现错误:", error);
 	}

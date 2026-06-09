@@ -381,15 +381,15 @@ export class IRCalendarDayIndexService {
 		}
 		const daySummaries =
 			raw.daySummaries && typeof raw.daySummaries === "object"
-				? (raw.daySummaries as Record<string, IRCalendarDaySummary>)
+				? (raw.daySummaries)
 				: {};
 		const slices =
 			raw.slices && typeof raw.slices === "object"
-				? (raw.slices as Record<string, SerializedDayScheduleItem[]>)
+				? (raw.slices)
 				: {};
 		const monthSummaries =
 			raw.monthSummaries && typeof raw.monthSummaries === "object"
-				? (raw.monthSummaries as Record<string, Record<string, number>>)
+				? (raw.monthSummaries)
 				: buildMonthSummariesFromDayCounts(daySummaries);
 
 		return {

@@ -1,6 +1,7 @@
 import type { App, TAbstractFile, TFile, TFolder } from "obsidian";
 import { normalizePath, TFile as TFileClass, TFolder as TFolderClass } from "obsidian";
 import type { IncrementalReadingFolderSubscriptionRule } from "../../types/plugin-settings.d";
+import { readString } from "../../utils/unknown-record";
 import { normalizeIncrementalReadingFolderSubscriptionPath } from "./folder-subscription-settings";
 
 function scanMarkdownFilesInFolder(app: App, folderPath: string): TFile[] {
@@ -78,5 +79,5 @@ function isVaultMarkdownFile(file: TAbstractFile): file is TFile {
 	if (file instanceof TFileClass) {
 		return true;
 	}
-	return "extension" in file && String(file.extension || "").toLowerCase() === "md";
+	return "extension" in file && readString((file as { extension?: unknown }).extension).toLowerCase() === "md";
 }

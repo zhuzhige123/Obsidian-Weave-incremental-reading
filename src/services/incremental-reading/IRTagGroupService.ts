@@ -157,7 +157,7 @@ export class IRTagGroupService {
 	}
 
 	private getDocumentMapPath(): string {
-		return getPluginPaths(this.app as any).cache.incrementalReading.documentGroupMap;
+		return getPluginPaths(this.app).cache.incrementalReading.documentGroupMap;
 	}
 
 	private getLegacyDocumentMapPath(): string {
@@ -653,7 +653,7 @@ export class IRTagGroupService {
 			map: this.documentMapCache,
 		};
 
-		await DirectoryUtils.ensureDirForFile(adapter as any, filePath);
+		await DirectoryUtils.ensureDirForFile(adapter, filePath);
 		await adapter.write(filePath, JSON.stringify(store));
 	}
 
@@ -768,10 +768,10 @@ export class IRTagGroupService {
 		groupId: string,
 		options?: {
 			targetTopicIds?: string[];
-			getAllChunkData?: () => Promise<Record<string, any>>;
-			saveChunkData?: (data: any) => Promise<void>;
-			getAllSources?: () => Promise<Record<string, any>>;
-			saveSource?: (data: any) => Promise<void>;
+			getAllChunkData?: () => Promise<Record<string, import("../../types/ir-types").IRChunkFileData>>;
+			saveChunkData?: (data: import("../../types/ir-types").IRChunkFileData) => Promise<void>;
+			getAllSources?: () => Promise<Record<string, import("../../types/ir-types").IRSourceFileMeta>>;
+			saveSource?: (data: import("../../types/ir-types").IRSourceFileMeta) => Promise<void>;
 		}
 	): Promise<void> {
 		await this.initialize();
@@ -1076,11 +1076,11 @@ export class IRTagGroupService {
 		sourceId: string | undefined,
 		newGroupId: string,
 		storageService: {
-			getChunkData: (id: string) => Promise<any>;
-			saveChunkData: (data: any) => Promise<void>;
-			getSource: (id: string) => Promise<any>;
-			saveSource: (data: any) => Promise<void>;
-			getAllChunkData?: () => Promise<Record<string, any>>;
+			getChunkData: (id: string) => Promise<import("../../types/ir-types").IRChunkFileData | null>;
+			saveChunkData: (data: import("../../types/ir-types").IRChunkFileData) => Promise<void>;
+			getSource: (id: string) => Promise<import("../../types/ir-types").IRSourceFileMeta | null>;
+			saveSource: (data: import("../../types/ir-types").IRSourceFileMeta) => Promise<void>;
+			getAllChunkData?: () => Promise<Record<string, import("../../types/ir-types").IRChunkFileData>>;
 		}
 	): Promise<void> {
 		await this.initialize();

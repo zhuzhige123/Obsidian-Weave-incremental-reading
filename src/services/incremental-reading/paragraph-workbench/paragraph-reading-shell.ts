@@ -56,8 +56,20 @@ export function resolveParagraphWorkbenchDisplaySettings(
 export const PARAGRAPH_SCHEDULE_INTERVAL_DAYS = [1, 3, 7, 14] as const;
 export type ParagraphScheduleIntervalDays = (typeof PARAGRAPH_SCHEDULE_INTERVAL_DAYS)[number];
 
-export const PARAGRAPH_PRIORITY_LEVELS = [1, 2, 3] as const;
-export type ParagraphPriorityLevel = (typeof PARAGRAPH_PRIORITY_LEVELS)[number];
+export const PARAGRAPH_PRIORITY_UI_MIN = 0;
+export const PARAGRAPH_PRIORITY_UI_MAX = 10;
+export const PARAGRAPH_PRIORITY_UI_DEFAULT = 5;
+
+export function clampParagraphPriorityUi(value: unknown, fallback = PARAGRAPH_PRIORITY_UI_DEFAULT): number {
+	const numeric = typeof value === "number" ? value : Number(value);
+	if (!Number.isFinite(numeric)) {
+		return fallback;
+	}
+	return Math.max(
+		PARAGRAPH_PRIORITY_UI_MIN,
+		Math.min(PARAGRAPH_PRIORITY_UI_MAX, Math.round(numeric * 2) / 2)
+	);
+}
 
 export function buildParagraphWorkbenchDisplay(input: {
 	bookPercent: number;
@@ -126,13 +138,3 @@ export function normalizeParagraphScheduleIntervalDays(
 	return fallback;
 }
 
-export function normalizeParagraphPriorityLevel(
-	value: unknown,
-	fallback: ParagraphPriorityLevel = 2
-): ParagraphPriorityLevel {
-	const numeric = typeof value === "number" ? value : Number(value);
-	if (numeric === 1 || numeric === 2 || numeric === 3) {
-		return numeric;
-	}
-	return fallback;
-}

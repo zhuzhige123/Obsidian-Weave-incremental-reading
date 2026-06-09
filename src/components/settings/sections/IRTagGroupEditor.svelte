@@ -288,7 +288,7 @@
               bind:value={tagInput}
               onkeydown={handleTagKeydown}
               onfocus={() => showTagSuggestions = true}
-              onblur={() => setTimeout(() => showTagSuggestions = false, 200)}
+              onblur={() => window.setTimeout(() => showTagSuggestions = false, 200)}
             />
 
             {#if showTagSuggestions && filteredSuggestions.length > 0}

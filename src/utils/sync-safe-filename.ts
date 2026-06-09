@@ -6,8 +6,7 @@
  */
 
 // ===== Emoji 正则（覆盖常见 Emoji 范围） =====
-const EMOJI_REGEX =
-	/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
+const EMOJI_REGEX = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
 
 // ===== 全角标点映射 =====
 const FULLWIDTH_MAP: Record<string, string> = {
@@ -63,7 +62,7 @@ export function hasUnsyncableChars(name: string): boolean {
 	if (FULLWIDTH_CHARS_REGEX.test(name)) return true;
 	FULLWIDTH_CHARS_REGEX.lastIndex = 0;
 
-	if (/[\[\]]/.test(name)) return true;
+	if (/[[\]]/.test(name)) return true;
 
 	return false;
 }
@@ -88,7 +87,7 @@ export function diagnoseFilename(name: string, isFile = false, fullPathLength = 
 		issues.push("fullwidth_punctuation");
 	}
 
-	if (/[\[\]]/.test(name)) {
+	if (/[[\]]/.test(name)) {
 		issues.push("square_brackets");
 	}
 

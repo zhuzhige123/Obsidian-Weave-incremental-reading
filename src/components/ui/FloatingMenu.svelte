@@ -103,7 +103,7 @@
     mountToBody();
     await updatePosition();
 
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       if (runId !== positionRunId) return;
       void updatePosition();
     });

@@ -1,7 +1,6 @@
 import type { App } from "obsidian";
 import type { ReadingMaterial } from "../../types/incremental-reading-types";
 import {
-	DEFAULT_ADVANCED_SCHEDULE_SETTINGS,
 	type IRAdvancedScheduleSettings,
 	type IRChunkFileData,
 	type IRDeck,
@@ -11,6 +10,7 @@ import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
 import { logger } from "../../utils/logger";
 import {
+	type IRAssociatedNoteSignal,
 	type IRAssociatedNoteSignalIndex,
 	buildAssociatedNoteSignalIndex,
 	getAssociatedNoteSignal,
@@ -26,6 +26,7 @@ import { IRStorageService } from "./IRStorageService";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { computeTagGroupPriorityBias, IRTagGroupService } from "./IRTagGroupService";
 import { getIncrementalReadingPlugin } from "./ir-runtime";
+import { readAdvancedScheduleSettingsSnapshot } from "../../utils/ir-plugin-host-access";
 
 export type ScheduleRecomputeReason =
 	| "complete_block"
@@ -305,23 +306,7 @@ export class IRScheduleKernel {
 	}
 
 	private getPlanningSettingsSnapshot(): IRAdvancedScheduleSettings {
-		const defaults = DEFAULT_ADVANCED_SCHEDULE_SETTINGS;
-
-		try {
-			const plugin: any = (this.app as any)?.plugins?.getPlugin?.("weave");
-			const ir = plugin?.settings?.incrementalReading;
-			return {
-				...defaults,
-				dailyTimeBudgetMinutes: ir?.dailyTimeBudgetMinutes ?? defaults.dailyTimeBudgetMinutes,
-				interleaveMode: ir?.interleaveMode ?? defaults.interleaveMode,
-				enableTagGroupPrior: ir?.enableTagGroupPrior ?? defaults.enableTagGroupPrior,
-				defaultIntervalFactor: ir?.defaultIntervalFactor ?? defaults.defaultIntervalFactor,
-				maxConsecutiveSameTopic:
-					ir?.maxConsecutiveSameTopic ?? defaults.maxConsecutiveSameTopic,
-			};
-		} catch {
-			return defaults;
-		}
+		return readAdvancedScheduleSettingsSnapshot(this.app);
 	}
 
 	private resolveTopicKey(sourceFile: string, tagGroup?: string | null): string {
@@ -354,7 +339,7 @@ export class IRScheduleKernel {
 
 		for (const deck of decks) {
 			const deckId = String(deck?.id || "").trim();
-			const deckPath = String((deck as any)?.path || "").trim();
+			const deckPath = String(deck.path || "").trim();
 			const identifiers = this.normalizeIdentifiers([deckId, deckPath]);
 			if (identifiers.length === 0) {
 				continue;
@@ -440,7 +425,7 @@ export class IRScheduleKernel {
 		await this.storage.initialize();
 		await this.pdfService.initialize();
 		await this.epubService.initialize();
-		if ((this.app as any)?.vault?.adapter) {
+		if (this.app.vault.adapter) {
 			await this.tagGroupService.initialize();
 		}
 
@@ -455,8 +440,8 @@ export class IRScheduleKernel {
 		const leanSchedule = options?.leanSchedule === true;
 		const readingMaterials = leanSchedule ? [] : await this.getReadingMaterials();
 		const readingMaterialByPath = this.getReadingMaterialMap(readingMaterials);
-		const associatedNoteSignalIndex = leanSchedule
-			? new Map()
+		const associatedNoteSignalIndex: IRAssociatedNoteSignalIndex = leanSchedule
+			? new Map<string, IRAssociatedNoteSignal>()
 			: await this.getAssociatedNoteSignalIndex();
 		const { chunks, pdfTasks, epubTasks } = await this.loadScheduleCandidates();
 
@@ -635,10 +620,10 @@ export class IRScheduleKernel {
 	}
 
 	private async getReadingMaterials(): Promise<ReadingMaterial[]> {
-		const plugin: any = getIncrementalReadingPlugin(this.app);
+		const plugin = getIncrementalReadingPlugin(this.app);
 		if (plugin?.readingMaterialManager) {
 			try {
-				return await plugin.readingMaterialManager.getAllMaterials();
+				return plugin.readingMaterialManager.getAllMaterials();
 			} catch (error) {
 				logger.warn("[IRScheduleKernel] 读取阅读材料失败:", error);
 			}
@@ -651,7 +636,7 @@ export class IRScheduleKernel {
 	}
 
 	private async getAssociatedNoteSignalIndex(): Promise<IRAssociatedNoteSignalIndex> {
-		const plugin: any = getIncrementalReadingPlugin(this.app);
+		const plugin = getIncrementalReadingPlugin(this.app);
 		if (plugin?.dataStorage?.getAllCards) {
 			try {
 				const cards = await plugin.dataStorage.getAllCards();
@@ -823,7 +808,7 @@ export class IRScheduleKernel {
 				typeof chunkMeta.resumeLink === "string" && chunkMeta.resumeLink.trim()
 					? chunkMeta.resumeLink.trim()
 					: material?.resumeLink,
-			priority: (chunk.priorityUi as number | undefined) ?? chunk.priorityEff ?? 5,
+			priority: (chunk.priorityUi) ?? chunk.priorityEff ?? 5,
 			intervalDays: Number(chunk.intervalDays ?? 1),
 			scheduleStatus,
 			nextRepDate,
@@ -898,7 +883,7 @@ export class IRScheduleKernel {
 	}
 
 	private mapPdfTaskToPlannedItem(
-		task: any,
+		task: IRPdfBookmarkTask,
 		readingMaterialByPath: Map<string, ReadingMaterial>,
 		associatedNoteSignalIndex: IRAssociatedNoteSignalIndex,
 		nowMs: number,
@@ -964,7 +949,7 @@ export class IRScheduleKernel {
 	}
 
 	private mapEpubTaskToPlannedItem(
-		task: any,
+		task: IREpubBookmarkTask,
 		readingMaterialByPath: Map<string, ReadingMaterial>,
 		associatedNoteSignalIndex: IRAssociatedNoteSignalIndex,
 		nowMs: number,
@@ -1036,7 +1021,7 @@ export class IRScheduleKernel {
 		const chunks = (await this.storage.getAllChunkDataWithSync()) || {};
 		const chunk =
 			(chunks[itemId] as IRChunkFileData | undefined) ||
-			(Object.values(chunks).find((entry) => entry?.chunkId === itemId) as IRChunkFileData | undefined);
+			(Object.values(chunks).find((entry) => entry?.chunkId === itemId));
 		if (chunk) {
 			return this.mapChunkToPlannedItem(
 				chunk,
@@ -1099,7 +1084,7 @@ export class IRScheduleKernel {
 		pdfTasks: IRPdfBookmarkTask[];
 		epubTasks: IREpubBookmarkTask[];
 	}> {
-		if (!(this.app as any)?.vault?.adapter) {
+		if (!this.app.vault.adapter) {
 			return await this.loadScheduleCandidatesFromStorage();
 		}
 

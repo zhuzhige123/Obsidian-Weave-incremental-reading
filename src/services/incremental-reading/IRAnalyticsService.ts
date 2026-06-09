@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import { normalizePath } from "obsidian";
+import { readString } from "../../utils/unknown-record";
 import type { Card } from "../../data/types";
 import type {
 	IRBlock,
@@ -17,6 +18,7 @@ import { resolveAssociatedNotePath, resolveAssociatedNotePaths } from "./IRAssoc
 import { getIRPriorityValue } from "./IRCardManagementAdapter";
 import { IRMonitoringService } from "./IRMonitoringService";
 import { type IRPdfBookmarkTask, IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
+import { getIncrementalReadingPlugin } from "./ir-runtime";
 import { IRStorageService } from "./IRStorageService";
 import {
 	buildProjectedDayLoadMap,
@@ -814,9 +816,8 @@ export class IRAnalyticsService {
 			};
 			const associatedNotePaths = resolveAssociatedNotePaths({
 				associatedNotePath:
-					resolveAssociatedNotePath(legacyBlock as any) ||
-					resolveAssociatedNotePath((legacyBlock.meta || null) as any) ||
-					resolveAssociatedNotePath(material as any),
+					resolveAssociatedNotePath(legacyBlock.meta) ||
+					resolveAssociatedNotePath(material ?? null),
 				associatedNotePaths:
 					legacyBlock.associatedNotePaths ||
 					legacyBlock.meta?.associatedNotePaths ||
@@ -826,8 +827,8 @@ export class IRAnalyticsService {
 				id: block.id,
 				title: sourceTitle,
 				status: String(migrated.status || block.state || "new"),
-				priorityUi: getIRPriorityValue((block as any).priorityUi, (block as any).priorityEff, block.priority),
-				priorityEff: getIRPriorityValue((block as any).priorityEff, (block as any).priorityUi, block.priority),
+				priorityUi: getIRPriorityValue(block.priorityUi, block.priorityEff, block.priority),
+				priorityEff: getIRPriorityValue(block.priorityEff, block.priorityUi, block.priority),
 				intervalDays: Number(migrated.intervalDays || block.interval || 0),
 				nextRepDate: Number(migrated.nextRepDate || 0),
 				createdAt: Number(migrated.createdAt ?? 0),
@@ -859,8 +860,8 @@ export class IRAnalyticsService {
 			const normalizedTags = normalizeAnalyticsTags((chunk as { tags?: string[] }).tags || []);
 			const associatedNotePaths = resolveAssociatedNotePaths({
 				associatedNotePath:
-					resolveAssociatedNotePath((chunk.meta || null) as any) || resolveAssociatedNotePath(material as any),
-				associatedNotePaths: (chunk.meta as { associatedNotePaths?: string[] } | null)?.associatedNotePaths || material?.associatedNotePaths,
+					resolveAssociatedNotePath(chunk.meta) || resolveAssociatedNotePath(material ?? null),
+				associatedNotePaths: chunk.meta?.associatedNotePaths || material?.associatedNotePaths,
 			});
 			units.push({
 				id: chunk.chunkId,
@@ -893,7 +894,7 @@ export class IRAnalyticsService {
 				continue;
 			}
 			const associatedNotePaths = resolveAssociatedNotePaths({
-				associatedNotePath: resolveAssociatedNotePath((task.meta || null) as any),
+				associatedNotePath: resolveAssociatedNotePath(task.meta),
 				associatedNotePaths: task.meta?.associatedNotePaths,
 			});
 			units.push({
@@ -928,7 +929,7 @@ export class IRAnalyticsService {
 				continue;
 			}
 			const associatedNotePaths = resolveAssociatedNotePaths({
-				associatedNotePath: resolveAssociatedNotePath((task.meta || null) as any),
+				associatedNotePath: resolveAssociatedNotePath(task.meta),
 				associatedNotePaths: task.meta?.associatedNotePaths,
 			});
 			units.push({
@@ -961,8 +962,8 @@ export class IRAnalyticsService {
 	private extractChunkTopicKeys(chunk: IRChunkFileData): string[] {
 		const keys = new Set<string>();
 		const rawKeys = [
-			...((chunk.topicIds || []) as string[]),
-			...((chunk.deckIds || []) as string[]),
+			...((chunk.topicIds || [])),
+			...((chunk.deckIds || [])),
 		];
 		for (const rawKey of rawKeys) {
 			const key = normalizeSelectionKey(rawKey);
@@ -982,7 +983,7 @@ export class IRAnalyticsService {
 
 	private extractLegacyBlockTopicKeys(block: IRBlock, decksRecord: Record<string, IRDeck>): string[] {
 		const keys = new Set<string>();
-		const normalizedDeckPath = normalizeSelectionKey(String((block as any).deckPath || ""));
+		const normalizedDeckPath = normalizeSelectionKey(readString(block.deckPath));
 		if (normalizedDeckPath) {
 			keys.add(normalizedDeckPath);
 		}
@@ -1254,7 +1255,7 @@ export class IRAnalyticsService {
 	}
 
 	private async getAllMemoryCards(): Promise<Card[]> {
-		const plugin: any = (this.app as any)?.plugins?.getPlugin?.("weave");
+		const plugin = getIncrementalReadingPlugin(this.app);
 		if (!plugin?.dataStorage?.getAllCards) {
 			return [];
 		}
@@ -1266,19 +1267,19 @@ export class IRAnalyticsService {
 	}
 
 	private async getAllReadingMaterials(): Promise<ReadingMaterial[]> {
-		const plugin: any = (this.app as any)?.plugins?.getPlugin?.("weave");
+		const plugin = getIncrementalReadingPlugin(this.app);
 		if (!plugin?.readingMaterialManager?.getAllMaterials) {
 			return [];
 		}
 		try {
-			return await plugin.readingMaterialManager.getAllMaterials();
+			return plugin.readingMaterialManager.getAllMaterials();
 		} catch {
 			return [];
 		}
 	}
 
-	private getPluginInstance(): any {
-		return (this.app as any)?.plugins?.getPlugin?.("weave");
+	private getPluginInstance() {
+		return getIncrementalReadingPlugin(this.app);
 	}
 
 	private getDailyReadingBudgetMinutes(): number {

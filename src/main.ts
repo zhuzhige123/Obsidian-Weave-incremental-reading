@@ -81,8 +81,10 @@ import {
 import {
 	createDefaultChunkFileData,
 	createDefaultIRDeck,
+	DEFAULT_IR_BLOCK_META,
 	generateChunkId,
 	generateSourceId,
+	type IRBlockMeta,
 } from "./types/ir-types";
 import type {
 	IncrementalReadingSettings,
@@ -133,9 +135,8 @@ type StandaloneIRSettings = {
 		width?: number;
 		height?: number;
 	};
-	ankiConnect?: {
+	ankiConnect?: Record<string, unknown> & {
 		incrementalSyncState?: unknown;
-		[key: string]: any;
 	};
 };
 
@@ -362,12 +363,12 @@ export default class StandaloneIncrementalReadingPlugin
 			return;
 		}
 
-		this.registerView(VIEW_TYPE_IR_CALENDAR, (leaf) => new IRCalendarView(leaf, this as any));
-		this.registerView(VIEW_TYPE_IRDECK, (leaf) => new IRDeckView(leaf, this as any));
-		this.registerView(VIEW_TYPE_IR_FOCUS, (leaf) => new IRFocusView(leaf, this as any));
+		this.registerView(VIEW_TYPE_IR_CALENDAR, (leaf) => new IRCalendarView(leaf, this));
+		this.registerView(VIEW_TYPE_IRDECK, (leaf) => new IRDeckView(leaf, this));
+		this.registerView(VIEW_TYPE_IR_FOCUS, (leaf) => new IRFocusView(leaf, this));
 		this.registerView(
 			VIEW_TYPE_IR_PARAGRAPH_WORKBENCH,
-			(leaf) => new IRParagraphWorkbenchView(leaf, this as any)
+			(leaf) => new IRParagraphWorkbenchView(leaf, this)
 		);
 		registerExtensionsSafely(
 			this,
@@ -492,6 +493,34 @@ export default class StandaloneIncrementalReadingPlugin
 		);
 		await this.saveData(this.settings);
 		await this.refreshPremiumState();
+	}
+
+	getEditorModalSizeState(): {
+		preset: "small" | "medium" | "large" | "extra-large" | "custom";
+		customWidth?: number;
+		customHeight?: number;
+	} {
+		const saved = this.settings.editorModalSize;
+		return {
+			preset: "custom",
+			customWidth: saved?.width ?? 800,
+			customHeight: saved?.height ?? 600,
+		};
+	}
+
+	async saveEditorModalSizeState(state: {
+		preset: "small" | "medium" | "large" | "extra-large" | "custom";
+		customWidth?: number;
+		customHeight?: number;
+	}): Promise<void> {
+		this.settings.editorModalSize = {
+			...this.settings.editorModalSize,
+			rememberLastSize: true,
+			enableResize: this.settings.editorModalSize?.enableResize ?? true,
+			width: state.customWidth,
+			height: state.customHeight,
+		};
+		await this.saveSettings();
 	}
 
 	getIncrementalReadingSettings(): IncrementalReadingSettings {
@@ -648,7 +677,7 @@ export default class StandaloneIncrementalReadingPlugin
 			ensureChunkScheduled: async (file, deckId, deckName, scheduleOptions) =>
 				await this.ensureExternalDocumentChunkScheduled(file, deckId, deckName, {
 					...scheduleOptions,
-					existingChunk: scheduleOptions.existingChunk as any,
+					existingChunk: scheduleOptions.existingChunk,
 					readingMaterialId: scheduleOptions.readingMaterialId,
 				}),
 		});
@@ -1324,13 +1353,17 @@ export default class StandaloneIncrementalReadingPlugin
 			canvasNodeId: string;
 			canvasTextCandidates: string[];
 		},
-		existingMeta: Record<string, unknown> = {}
-	): Record<string, unknown> {
+		existingMeta?: IRBlockMeta
+	): IRBlockMeta {
 		const todayStart = this.getIncrementalReadingTodayStart();
 		const todayDateKey = this.getIncrementalReadingDateKey(todayStart);
+		const baseMeta = existingMeta ?? DEFAULT_IR_BLOCK_META;
 
 		return {
-			...existingMeta,
+			...baseMeta,
+			priorityLog: baseMeta.priorityLog ?? DEFAULT_IR_BLOCK_META.priorityLog,
+			siblings: baseMeta.siblings ?? DEFAULT_IR_BLOCK_META.siblings,
+			tagGroup: baseMeta.tagGroup ?? DEFAULT_IR_BLOCK_META.tagGroup,
 			externalDocument: true,
 			pointTitle: context.pointTitle,
 			resumeLink: context.resumeLink,
@@ -1360,11 +1393,11 @@ export default class StandaloneIncrementalReadingPlugin
 		const todayStart = this.getIncrementalReadingTodayStart();
 		const todayStartMs = todayStart.getTime();
 		const now = Date.now();
-		const existing = Object.values(chunks).find((chunk: any) => {
-			const chunkPath = normalizePath(String(chunk?.filePath || "").trim());
-			const chunkNodeId = String(chunk?.meta?.canvasNodeId || "").trim();
+		const existing = Object.values(chunks).find((chunk) => {
+			const chunkPath = normalizePath(chunk.filePath.trim());
+			const chunkNodeId = String(chunk.meta?.canvasNodeId || "").trim();
 			return chunkPath === normalizedCanvasPath && chunkNodeId === context.nodeId;
-		}) as any;
+		});
 
 		if (existing) {
 			const existingMeta = { ...(existing.meta || {}) };
@@ -1431,7 +1464,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		const chunkId = generateChunkId();
 		const sourceId = this.buildCanvasIRSourceId(context.canvasFile.path) || generateSourceId();
-		const chunk = createDefaultChunkFileData(chunkId, sourceId, context.canvasFile.path) as any;
+		const chunk = createDefaultChunkFileData(chunkId, sourceId, context.canvasFile.path);
 		chunk.topicIds = [deckId];
 		chunk.deckIds = [deckId];
 		chunk.topicTag = `#IR_deck_${deckName}`;
@@ -1448,7 +1481,7 @@ export default class StandaloneIncrementalReadingPlugin
 		return "created";
 	}
 
-	private async buildCanvasIRDeckSubmenu(submenu: Menu, node: any): Promise<void> {
+	private async buildCanvasIRDeckSubmenu(submenu: Menu, node: CanvasMenuNode): Promise<void> {
 		try {
 			const context = this.buildCanvasNodeIRPointContext(node);
 			if (!context) {
@@ -1816,7 +1849,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		const storage = new IRStorageService(this.app);
 		await storage.initialize();
-		const rawDeck = await storage.getDeck(deckId);
+		const rawDeck = await storage.getDeckById(deckId);
 		if (!rawDeck || rawDeck.archivedAt) {
 			new Notice("所选专题不存在或已归档", 3000);
 			throw new Error("web-ir-deck-missing");
@@ -1882,7 +1915,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		const storage = new IRStorageService(this.app);
 		await storage.initialize();
-		const rawDeck = await storage.getDeck(deckId);
+		const rawDeck = await storage.getDeckById(deckId);
 		if (!rawDeck || rawDeck.archivedAt) {
 			new Notice("所选专题不存在或已归档", 3000);
 			throw new Error("selection-ir-deck-missing");
@@ -1974,4 +2007,4 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 }
 
-export type WeavePlugin = StandaloneIncrementalReadingPlugin & Record<string, any>;
+export type WeavePlugin = StandaloneIncrementalReadingPlugin;

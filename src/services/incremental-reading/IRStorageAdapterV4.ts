@@ -10,16 +10,47 @@
  */
 import { TFile } from "obsidian";
 import type { App } from "obsidian";
-import type { IRBlock, IRDeck, IRSession } from "../../types/ir-types";
-import type { IRBlockMeta, IRBlockStats, IRBlockStatus, IRBlockV4 } from "../../types/ir-types";
-import {
-	DEFAULT_IR_BLOCK_META,
-	DEFAULT_IR_BLOCK_STATS,
-	mapStateToStatus,
-	migrateToIRBlockV4,
+import type {
+	IRBlock,
+	IRChunkFileData,
+	IRDeck,
+	IRSession,
+	IRSourceFileMeta,
 } from "../../types/ir-types";
+import type { IRBlockStats, IRBlockStatus, IRBlockV4 } from "../../types/ir-types";
+import { migrateToIRBlockV4 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
+import { readString } from "../../utils/unknown-record";
 import { IRStorageService } from "./IRStorageService";
+
+function hasValidChunkFilePath(chunk: IRChunkFileData): boolean {
+	return readString(chunk.filePath).length > 0;
+}
+
+function readTagsFromFileCache(
+	app: App,
+	filePath: string
+): string[] {
+	const file = app.vault.getAbstractFileByPath(filePath);
+	if (!(file instanceof TFile)) {
+		return [];
+	}
+
+	const cache = app.metadataCache.getFileCache(file);
+	const inlineTags = cache?.tags?.map((tag) => tag.tag.replace(/^#/, "")) || [];
+	const fmTags = readStringArrayFromFileFrontmatter(cache?.frontmatter?.tags);
+	return [...new Set([...fmTags, ...inlineTags])].filter(Boolean);
+}
+
+function readStringArrayFromFileFrontmatter(value: unknown): string[] {
+	if (Array.isArray(value)) {
+		return value.map((entry) => String(entry));
+	}
+	if (typeof value === "string") {
+		return value.split(",").map((entry) => entry.trim());
+	}
+	return [];
+}
 
 /**
  * V4 存储适配器
@@ -79,11 +110,9 @@ export class IRStorageAdapterV4 {
 			const deckTag = `#IR_deck_${deck.name}`;
 
 			const matchedChunks = Object.values(allChunks).filter((_chunk) => {
-				if (
-					typeof (_chunk as any).filePath !== "string" ||
-					String((_chunk as any).filePath).trim() === ""
-				)
+				if (!hasValidChunkFilePath(_chunk)) {
 					return false;
+				}
 				if (_chunk.deckTag === deckTag) return true;
 				if (_chunk.deckIds?.includes(deckId)) return true;
 				return false;
@@ -140,11 +169,9 @@ export class IRStorageAdapterV4 {
 			const deckTag = `#IR_deck_${deck.name}`;
 
 			const matchedChunks = Object.values(allChunks).filter((_chunk) => {
-				if (
-					typeof (_chunk as any).filePath !== "string" ||
-					String((_chunk as any).filePath).trim() === ""
-				)
+				if (!hasValidChunkFilePath(_chunk)) {
 					return false;
+				}
 				if (_chunk.deckTag === deckTag) return true;
 				if (_chunk.deckIds?.includes(deckId)) return true;
 				return false;
@@ -182,20 +209,13 @@ export class IRStorageAdapterV4 {
 	 * @param chunk 块数据
 	 * @param sourceOriginalPath 可选的源文档原始路径（用于文档关联筛选）
 	 */
-	private chunkToV4(
-		chunk: import("../../types/ir-types").IRChunkFileData,
-		_sourceOriginalPath?: string
-	): IRBlockV4 {
+	private chunkToV4(chunk: IRChunkFileData, _sourceOriginalPath?: string): IRBlockV4 {
 		// v6.1: sourcePath 优先使用源文档的原始路径，便于卡片管理界面的文档关联筛选
 		const sourcePath =
-			typeof _sourceOriginalPath === "string" && _sourceOriginalPath.trim().length > 0
-				? _sourceOriginalPath
-				: typeof (chunk as any).filePath === "string"
-				? chunk.filePath
-				: "";
+			readString(_sourceOriginalPath).length > 0 ? readString(_sourceOriginalPath) : readString(chunk.filePath);
 
 		const priorityUi =
-			typeof (chunk as any).priorityUi === "number" ? (chunk as any).priorityUi : chunk.priorityEff;
+			typeof chunk.priorityUi === "number" ? chunk.priorityUi : chunk.priorityEff;
 		return {
 			id: chunk.chunkId,
 			sourcePath,
@@ -218,16 +238,16 @@ export class IRStorageAdapterV4 {
 	 * v6.1: 支持传入 sources 数据，用于设置正确的 sourcePath（源文档路径）
 	 */
 	private async chunkToV4WithTitle(
-		chunk: import("../../types/ir-types").IRChunkFileData,
-		sources?: Record<string, import("../../types/ir-types").IRSourceFileMeta>
+		chunk: IRChunkFileData,
+		sources?: Record<string, IRSourceFileMeta>
 	): Promise<IRBlockV4> {
 		// v6.1: 通过 sourceId 查找源文档的原始路径
 		const sourceOriginalPath = sources?.[chunk.sourceId]?.originalPath;
 		const block = this.chunkToV4(chunk, sourceOriginalPath);
 
-		const sourceTagGroup = sources?.[chunk.sourceId]?.tagGroup;
-		if (typeof sourceTagGroup === "string" && sourceTagGroup.trim().length > 0) {
-			const current = (block.meta as any)?.tagGroup;
+		const sourceTagGroup = readString(sources?.[chunk.sourceId]?.tagGroup);
+		if (sourceTagGroup) {
+			const current = block.meta.tagGroup;
 			if (!current || current === "default") {
 				block.meta = {
 					...block.meta,
@@ -237,11 +257,8 @@ export class IRStorageAdapterV4 {
 		}
 
 		try {
-			if (
-				typeof (chunk as any).filePath !== "string" ||
-				String((chunk as any).filePath).trim() === ""
-			) {
-				logger.warn(`[IRStorageAdapterV4] 块 filePath 无效: ${String((chunk as any).filePath)}`);
+			if (!hasValidChunkFilePath(chunk)) {
+				logger.warn(`[IRStorageAdapterV4] 块 filePath 无效: ${String(chunk.filePath)}`);
 				return block;
 			}
 
@@ -261,24 +278,12 @@ export class IRStorageAdapterV4 {
 				const yamlContent = yamlMatch[1];
 				const tags = this.extractTagsFromYamlContent(yamlContent);
 				if (tags.length > 0) {
-					(block as any).tags = tags;
+					block.tags = tags;
 				}
 			} else {
-				const file = this.app.vault.getAbstractFileByPath(chunk.filePath);
-				if (file instanceof TFile) {
-					const cache = this.app.metadataCache.getFileCache(file);
-					const inlineTags = cache?.tags?.map((t) => t.tag.replace(/^#/, "")) || [];
-					const fmTagsRaw = cache?.frontmatter?.tags;
-					let fmTags: string[] = [];
-					if (Array.isArray(fmTagsRaw)) {
-						fmTags = fmTagsRaw.map((t) => String(t));
-					} else if (typeof fmTagsRaw === "string") {
-						fmTags = fmTagsRaw.split(",").map((t) => t.trim());
-					}
-					const allTags = [...new Set([...fmTags, ...inlineTags])].filter(Boolean);
-					if (allTags.length > 0) {
-						(block as any).tags = allTags;
-					}
+				const allTags = readTagsFromFileCache(this.app, chunk.filePath);
+				if (allTags.length > 0) {
+					block.tags = allTags;
 				}
 			}
 
@@ -320,9 +325,8 @@ export class IRStorageAdapterV4 {
 			// 生成内容预览（前200字符，移除标题行）
 			const contentPreview = bodyContent.substring(0, 200).replace(/\n/g, " ");
 
-			// 扩展 block 对象添加标题信息
-			(block as any).headingText = title || "未命名内容块";
-			(block as any).contentPreview = contentPreview;
+			block.headingText = title || "未命名内容块";
+			block.contentPreview = contentPreview;
 		} catch (error) {
 			logger.warn(`[IRStorageAdapterV4] 读取块文件失败: ${chunk.filePath}`, error);
 		}
@@ -331,15 +335,15 @@ export class IRStorageAdapterV4 {
 	}
 
 	private chunkToV4Fast(
-		chunk: import("../../types/ir-types").IRChunkFileData,
-		sources?: Record<string, import("../../types/ir-types").IRSourceFileMeta>
+		chunk: IRChunkFileData,
+		sources?: Record<string, IRSourceFileMeta>
 	): IRBlockV4 {
 		const sourceOriginalPath = sources?.[chunk.sourceId]?.originalPath;
 		const block = this.chunkToV4(chunk, sourceOriginalPath);
 
-		const sourceTagGroup = sources?.[chunk.sourceId]?.tagGroup;
-		if (typeof sourceTagGroup === "string" && sourceTagGroup.trim().length > 0) {
-			const current = (block.meta as any)?.tagGroup;
+		const sourceTagGroup = readString(sources?.[chunk.sourceId]?.tagGroup);
+		if (sourceTagGroup) {
+			const current = block.meta.tagGroup;
 			if (!current || current === "default") {
 				block.meta = {
 					...block.meta,
@@ -349,27 +353,15 @@ export class IRStorageAdapterV4 {
 		}
 
 		try {
-			const filePath = (chunk as any).filePath;
-			if (typeof filePath === "string" && filePath.trim()) {
+			const filePath = readString(chunk.filePath);
+			if (filePath) {
 				const baseName = filePath.replace(/^.*\//, "").replace(/\.md$/, "");
 				const derived = baseName.replace(/^\d+_/, "").trim();
-				(block as any).headingText = derived || "未命名内容块";
+				block.headingText = derived || "未命名内容块";
 
-				const file = this.app.vault.getAbstractFileByPath(filePath);
-				if (file instanceof TFile) {
-					const cache = this.app.metadataCache.getFileCache(file);
-					const inlineTags = cache?.tags?.map((t) => t.tag.replace(/^#/, "")) || [];
-					const fmTagsRaw = cache?.frontmatter?.tags;
-					let fmTags: string[] = [];
-					if (Array.isArray(fmTagsRaw)) {
-						fmTags = fmTagsRaw.map((t) => String(t));
-					} else if (typeof fmTagsRaw === "string") {
-						fmTags = fmTagsRaw.split(",").map((t) => t.trim());
-					}
-					const allTags = [...new Set([...fmTags, ...inlineTags])].filter(Boolean);
-					if (allTags.length > 0) {
-						(block as any).tags = allTags;
-					}
+				const allTags = readTagsFromFileCache(this.app, filePath);
+				if (allTags.length > 0) {
+					block.tags = allTags;
 				}
 			}
 		} catch {}
@@ -391,7 +383,7 @@ export class IRStorageAdapterV4 {
 						if (!inner) return [];
 						return inner
 							.split(",")
-							.map((t) => t.trim().replace(/^['\"]|['\"]$/g, ""))
+							.map((t) => t.trim().replace(/^['"]|['"]$/g, ""))
 							.filter(Boolean);
 					}
 				}
@@ -404,7 +396,7 @@ export class IRStorageAdapterV4 {
 				continue;
 			}
 
-			if (/^[A-Za-z0-9_\-]+:/.test(line)) {
+			if (/^[A-Za-z0-9_-]+:/.test(line)) {
 				break;
 			}
 		}
@@ -412,15 +404,13 @@ export class IRStorageAdapterV4 {
 	}
 
 	private hasIgnoreTag(block: IRBlockV4): boolean {
-		const tags = (block as any).tags as string[] | undefined;
 		const hasIgnoreInTags =
-			tags?.some((_tag) => {
+			block.tags?.some((_tag) => {
 				const t = String(_tag).toLowerCase();
 				return t === "ignore" || t === "#ignore";
 			}) || false;
 
-		const contentPreview = (block as any).contentPreview as string | undefined;
-		const hasIgnoreInContent = /#ignore\b/i.test(contentPreview || "");
+		const hasIgnoreInContent = /#ignore\b/i.test(block.contentPreview || "");
 		return hasIgnoreInTags || hasIgnoreInContent;
 	}
 
@@ -670,10 +660,10 @@ export class IRStorageAdapterV4 {
 			filePath: block.sourcePath || "",
 			headingPath: block.headingPath || "",
 			headingLevel: block.headingLevel || 0,
-			headingText: (block as any).headingText || "",
+			headingText: block.headingText || "",
 			startLine: block.startLine || 0,
 			endLine: block.endLine || 0,
-			contentPreview: (block as any).contentPreview || "",
+			contentPreview: block.contentPreview || "",
 			deckPath: block.sourcePath || "",
 
 			// 状态字段

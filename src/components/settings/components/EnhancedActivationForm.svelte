@@ -125,7 +125,7 @@
 
   function handlePaste(event: ClipboardEvent) {
     // 允许粘贴，然后清理格式
-    setTimeout(() => {
+    window.setTimeout(() => {
       activationCode = cleanActivationCodeInput(activationCode);
       validateInput();
     }, 0);
@@ -140,7 +140,7 @@
     validationState = 'validating';
     
     // 模拟验证延迟
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (isValidLength && isValidFormat) {
         validationState = 'valid';
       } else {
@@ -323,7 +323,7 @@
         showNotification(result.message || t('about.license.activation.deactivated'), 'success');
         
         // 修复失焦问题：延迟恢复焦点到激活码输入框
-        setTimeout(() => {
+        window.setTimeout(() => {
           const activationCodeInput = document.getElementById('activation-code');
           if (activationCodeInput) {
             activationCodeInput.focus();

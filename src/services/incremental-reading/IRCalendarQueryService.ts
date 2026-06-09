@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { getPluginPaths } from "../../config/paths";
 import { getIncrementalReadingPlugin } from "./ir-runtime";
+import { readIncrementalReadingSettings } from "../../utils/ir-plugin-host-access";
 import type { ReadingMaterial } from "../../types/incremental-reading-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
@@ -611,7 +612,7 @@ export class IRCalendarQueryService {
 	}
 
 	private async getReadingMaterials(): Promise<ReadingMaterial[]> {
-		const plugin: any = getIncrementalReadingPlugin(this.app);
+		const plugin = getIncrementalReadingPlugin(this.app);
 		if (!plugin?.readingMaterialManager) {
 			return [];
 		}
@@ -703,7 +704,7 @@ export class IRCalendarQueryService {
 	}
 
 	private getDiskCachePath(): string {
-		return getPluginPaths(this.app as any).cache.incrementalReading.irCalendarCache;
+		return getPluginPaths(this.app).cache.incrementalReading.irCalendarCache;
 	}
 
 	private createEmptyDiskCacheStore(): IRCalendarDiskCacheStore {
@@ -734,7 +735,7 @@ export class IRCalendarQueryService {
 					: new Date().toISOString(),
 			entries:
 				candidate.entries && typeof candidate.entries === "object"
-					? (candidate.entries as Record<string, IRCalendarDiskCacheEntry>)
+					? (candidate.entries)
 					: {},
 		};
 	}
@@ -972,8 +973,7 @@ export class IRCalendarQueryService {
 	}
 
 	private buildSettingsFingerprint(): string {
-		const plugin: any = getIncrementalReadingPlugin(this.app);
-		return hashStableValue(plugin?.settings?.incrementalReading ?? null);
+		return hashStableValue(readIncrementalReadingSettings(this.app));
 	}
 
 	private buildQueryScope(
@@ -986,7 +986,7 @@ export class IRCalendarQueryService {
 
 		for (const deck of Object.values(workspaceData.decksRecord || {})) {
 			const deckId = String(deck?.id || "").trim();
-			const deckPath = String((deck as any)?.path || "").trim();
+			const deckPath = String(deck.path || "").trim();
 			const identifiers = this.normalizeIdentifiers([deckId, deckPath]);
 			if (identifiers.length === 0) {
 				continue;
@@ -1029,7 +1029,7 @@ export class IRCalendarQueryService {
 
 		for (const deck of Object.values(workspaceData.decksRecord || {})) {
 			const deckId = String(deck?.id || "").trim();
-			const deckPath = String((deck as any)?.path || "").trim();
+			const deckPath = String(deck.path || "").trim();
 			if (normalizedIdentifier === deckId || normalizedIdentifier === deckPath) {
 				return deckId || normalizedIdentifier;
 			}

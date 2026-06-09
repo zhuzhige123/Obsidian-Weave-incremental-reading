@@ -14,10 +14,9 @@
  * @version 4.1.0
  */
 
-import type { IRBlockStatus, IRBlockV4, IRPriorityLogEntry } from "../../types/ir-types";
+import type { IRBlockStatus, IRBlockV4 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
 import {
-	EWMA_ALPHA,
 	calculateNextInterval,
 	calculateNextRepDate,
 	calculatePriorityEWMA,

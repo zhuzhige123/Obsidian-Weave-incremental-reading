@@ -24,7 +24,7 @@ export function openIRPremiumFeaturePreview(
 
 	closeIRPremiumFeaturePreview();
 
-	hostEl = document.body.createDiv("weave-ir-premium-feature-preview-host");
+	hostEl = activeDocument.body.createDiv("weave-ir-premium-feature-preview-host");
 	popoverComponent = mount(IRPremiumFeaturePopover, {
 		target: hostEl,
 		props: {

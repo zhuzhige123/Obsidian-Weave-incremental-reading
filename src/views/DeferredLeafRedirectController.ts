@@ -1,12 +1,10 @@
-import type { EventRef, WorkspaceLeaf } from "obsidian";
+import type { EventRef, Workspace, WorkspaceLeaf } from "obsidian";
 
-type WorkspaceLike = {
-	layoutReady?: boolean;
-	activeLeaf?: WorkspaceLeaf | null;
+type WorkspaceLike = Pick<
+	Workspace,
+	"layoutReady" | "activeLeaf" | "on" | "offref" | "onLayoutReady"
+> & {
 	getActiveLeaf?: () => WorkspaceLeaf | null;
-	on?: (name: string, callback: (leaf: WorkspaceLeaf | null) => void) => EventRef;
-	offref?: (ref: EventRef) => void;
-	onLayoutReady?: (callback: () => void) => void;
 };
 
 type DeferredLeafRedirectControllerOptions = {
@@ -121,7 +119,7 @@ export class DeferredLeafRedirectController {
 		const activeLeaf =
 			typeof this.workspace.getActiveLeaf === "function"
 				? this.workspace.getActiveLeaf()
-				: this.workspace.activeLeaf;
+				: null;
 
 		return activeLeaf === this.leaf;
 	}

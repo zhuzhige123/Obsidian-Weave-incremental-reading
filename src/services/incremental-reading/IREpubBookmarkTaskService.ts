@@ -434,7 +434,10 @@ export class IREpubBookmarkTaskService {
 
 	async updateTask(
 		id: string,
-		updates: Partial<Omit<IREpubBookmarkTask, "id" | "createdAt">>
+		updates: Partial<Omit<IREpubBookmarkTask, "id" | "createdAt" | "meta" | "stats">> & {
+			meta?: Partial<IRBlockMeta>;
+			stats?: Partial<IRBlockStats>;
+		}
 	): Promise<IREpubBookmarkTask | null> {
 		const existing = await this.getTask(id);
 		if (!existing) {
@@ -647,8 +650,15 @@ export class IREpubBookmarkTaskService {
 		return deletedCount;
 	}
 
-	toBlockV4(task: IREpubBookmarkTask): IRBlockV4 {
-		const block: IRBlockV4 = {
+	toBlockV4(
+		task: IREpubBookmarkTask
+	): IRBlockV4 & {
+		epubBookmarkHref?: string;
+		epubBookmarkTitle?: string;
+		epubBookmarkLevel?: number;
+		epubBookmarkResumeCfi?: string;
+	} {
+		return {
 			id: task.id,
 			sourcePath: task.epubFilePath,
 			blockId: task.id,
@@ -663,14 +673,11 @@ export class IREpubBookmarkTaskService {
 			tags: task.tags || [],
 			createdAt: task.createdAt,
 			updatedAt: task.updatedAt,
+			contentPreview: task.title,
+			epubBookmarkHref: task.tocHref,
+			epubBookmarkTitle: task.title,
+			epubBookmarkLevel: task.tocLevel,
+			epubBookmarkResumeCfi: task.resumeCfi,
 		};
-
-		(block as any).contentPreview = task.title;
-		(block as any).epubBookmarkHref = task.tocHref;
-		(block as any).epubBookmarkTitle = task.title;
-		(block as any).epubBookmarkLevel = task.tocLevel;
-		(block as any).epubBookmarkResumeCfi = task.resumeCfi;
-
-		return block;
 	}
 }

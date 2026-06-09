@@ -371,6 +371,7 @@ export interface Card {
 
 	// 增量阅读视图扩展字段（运行时临时字段，非持久化）
 	ir_title?: string;
+	ir_source_document_key?: string;
 	ir_source_file?: string;
 	ir_deck?: string;
 	ir_state?: string;
