@@ -347,3 +347,78 @@ describe('EpubLinkService legacy link compatibility', () => {
 		expect(result.content).toMatch(/^\[\[Books\/demo\.epub#weave-cfi=epubcfi\(\/6\/2\)&sid=epubsrc-[^|]+\|demo\]\]$/);
 	});
 });
+
+describe('EpubLinkService schedule navigation', () => {
+	const mockLeaf = { id: 'leaf-1' };
+
+	beforeEach(() => {
+		vi.resetModules();
+	});
+
+	it('uses pendingCfi when navigating from stored resume cfi', async () => {
+		const openEpubInPreferredLeaf = vi.fn(async () => mockLeaf);
+		vi.doMock('../../../utils/epub-leaf-utils', () => ({
+			openEpubInPreferredLeaf,
+		}));
+		vi.doMock('../epub-premium', () => ({
+			ensureEpubPremiumAccess: () => true,
+		}));
+		vi.doMock('../ir-epub-storage-access', () => ({
+			getIrEpubStorageService: () => ({
+				resolveSourceFilePath: async (_sourceId?: string, filePath?: string) => filePath || '',
+			}),
+		}));
+
+		const { EpubLinkService: ScheduleEpubLinkService } = await import('../EpubLinkService');
+		const setActiveLeaf = vi.fn();
+		const service = new ScheduleEpubLinkService({
+			workspace: { setActiveLeaf },
+		} as any);
+
+		await service.navigateToEpubScheduleMaterial('Books/demo.epub', {
+			cfi: 'epubcfi(/6/28!/4/8,/1:0,/1:30)',
+			sourceId: 'epubsrc-demo',
+		});
+
+		expect(openEpubInPreferredLeaf).toHaveBeenCalledWith(
+			expect.anything(),
+			'Books/demo.epub',
+			expect.objectContaining({
+				pendingCfi: 'epubcfi(/6/28!/4/8,/1:0,/1:30)',
+			})
+		);
+		expect(setActiveLeaf).toHaveBeenCalledWith(mockLeaf, { focus: true });
+	});
+
+	it('parses resumeLink when resume cfi is missing', async () => {
+		const openEpubInPreferredLeaf = vi.fn(async () => mockLeaf);
+		vi.doMock('../../../utils/epub-leaf-utils', () => ({
+			openEpubInPreferredLeaf,
+		}));
+		vi.doMock('../epub-premium', () => ({
+			ensureEpubPremiumAccess: () => true,
+		}));
+		vi.doMock('../ir-epub-storage-access', () => ({
+			getIrEpubStorageService: () => ({
+				resolveSourceFilePath: async (_sourceId?: string, filePath?: string) => filePath || '',
+			}),
+		}));
+
+		const { EpubLinkService: ScheduleEpubLinkService } = await import('../EpubLinkService');
+		const service = new ScheduleEpubLinkService({
+			workspace: { setActiveLeaf: vi.fn() },
+		} as any);
+		const resumeLink =
+			'[标题](obsidian://weave-epub-reader?file=Books%2Fdemo.epub&cfi=epubcfi(/6/2)&chapter=13&sid=epubsrc-demo)';
+
+		await service.navigateToEpubScheduleMaterial('Books/demo.epub', { resumeLink });
+
+		expect(openEpubInPreferredLeaf).toHaveBeenCalledWith(
+			expect.anything(),
+			'Books/demo.epub',
+			expect.objectContaining({
+				pendingCfi: 'epubcfi(/6/2)',
+			})
+		);
+	});
+});

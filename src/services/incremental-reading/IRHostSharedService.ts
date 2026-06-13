@@ -50,6 +50,8 @@ export interface IRTopicRef {
 export interface IREnsureExternalDocumentChunkScheduledOptions {
 	autoSubscribedAt?: string;
 	autoSubscribedFolderPath?: string;
+	/** 指定排期日期（当天 0 点），优先于 pinToToday */
+	scheduleDate?: Date;
 	pinToToday?: boolean;
 	storage?: IRStorageService;
 	existingChunk?: IRChunkFileData | ExistingChunkLike | null;
@@ -389,9 +391,24 @@ export class IRHostSharedService {
 		const nextWebUrl = String(options?.webUrl || options?.resumeLink || "").trim();
 		const nextWebSelectionExcerpt = String(options?.webSelectionExcerpt || "").trim();
 		const pinToToday = options?.pinToToday === true;
+		const scheduleDate = options?.scheduleDate ? new Date(options.scheduleDate) : null;
+		if (scheduleDate) {
+			scheduleDate.setHours(0, 0, 0, 0);
+		}
 		const todayStart = this.getIncrementalReadingTodayStart();
 		const todayStartMs = todayStart.getTime();
 		const todayDateKey = this.getIncrementalReadingDateKey(todayStart);
+		const pinnedStartMs = scheduleDate
+			? scheduleDate.getTime()
+			: pinToToday
+				? todayStartMs
+				: now;
+		const pinnedDateKey = scheduleDate
+			? this.getIncrementalReadingDateKey(scheduleDate)
+			: pinToToday
+				? todayDateKey
+				: "";
+		const shouldPinSchedule = Boolean(scheduleDate) || pinToToday;
 		const deckTag = `#IR_deck_${deckName}`;
 
 		if (existing) {
@@ -399,7 +416,7 @@ export class IRHostSharedService {
 			const existingTopicIds = Array.isArray(existing.topicIds) ? existing.topicIds : [];
 			const existingStatus = String(existing.scheduleStatus || "").trim();
 			const shouldResetDueAt =
-				pinToToday ||
+				shouldPinSchedule ||
 				existingStatus === "removed" ||
 				existingStatus === "done" ||
 				existingStatus === "suspended" ||
@@ -427,8 +444,8 @@ export class IRHostSharedService {
 				existing.deckTag = deckTag;
 				changed = true;
 			}
-			if (shouldResetDueAt && existing.nextRepDate !== (pinToToday ? todayStartMs : now)) {
-				existing.nextRepDate = pinToToday ? todayStartMs : now;
+			if (shouldResetDueAt && existing.nextRepDate !== (shouldPinSchedule ? pinnedStartMs : now)) {
+				existing.nextRepDate = shouldPinSchedule ? pinnedStartMs : now;
 				changed = true;
 			}
 			if (!existing.intervalDays) {
@@ -458,12 +475,16 @@ export class IRHostSharedService {
 				existingMeta.autoSubscribedFolderPath = nextAutoSubscribedFolderPath;
 				changed = true;
 			}
-			if (pinToToday && existingMeta.sourceSequenceLocked !== true) {
+			if (shouldPinSchedule && existingMeta.sourceSequenceLocked !== true) {
 				existingMeta.sourceSequenceLocked = true;
 				changed = true;
 			}
-			if (pinToToday && existingMeta.sourceSequenceAnchorDateKey !== todayDateKey) {
-				existingMeta.sourceSequenceAnchorDateKey = todayDateKey;
+			if (
+				shouldPinSchedule &&
+				pinnedDateKey &&
+				existingMeta.sourceSequenceAnchorDateKey !== pinnedDateKey
+			) {
+				existingMeta.sourceSequenceAnchorDateKey = pinnedDateKey;
 				changed = true;
 			}
 			if (nextResumeLink && existingMeta.resumeLink !== nextResumeLink) {
@@ -478,11 +499,11 @@ export class IRHostSharedService {
 				existingMeta.notes = nextWebSelectionExcerpt;
 				changed = true;
 			}
-			if (!pinToToday && existingMeta.sourceSequenceLocked !== undefined) {
+			if (!shouldPinSchedule && existingMeta.sourceSequenceLocked !== undefined) {
 				delete existingMeta.sourceSequenceLocked;
 				changed = true;
 			}
-			if (!pinToToday && existingMeta.sourceSequenceAnchorDateKey !== undefined) {
+			if (!shouldPinSchedule && existingMeta.sourceSequenceAnchorDateKey !== undefined) {
 				delete existingMeta.sourceSequenceAnchorDateKey;
 				changed = true;
 			}
@@ -507,7 +528,7 @@ export class IRHostSharedService {
 		chunk.topicTag = deckTag;
 		chunk.deckTag = deckTag;
 		chunk.updatedAt = now;
-		chunk.nextRepDate = pinToToday ? todayStartMs : now;
+		chunk.nextRepDate = shouldPinSchedule ? pinnedStartMs : now;
 		chunk.meta = {
 			...DEFAULT_IR_BLOCK_META,
 			...(chunk.meta || {}),
@@ -516,10 +537,10 @@ export class IRHostSharedService {
 			...(nextWebUrl ? { [IR_WEB_CHUNK_META_URL_KEY]: nextWebUrl } : {}),
 			...(nextWebSelectionExcerpt ? { notes: nextWebSelectionExcerpt } : {}),
 			...(readingMaterialId ? { readingMaterialId } : {}),
-			...(pinToToday
+			...(shouldPinSchedule && pinnedDateKey
 				? {
 						sourceSequenceLocked: true,
-						sourceSequenceAnchorDateKey: todayDateKey,
+						sourceSequenceAnchorDateKey: pinnedDateKey,
 				  }
 				: {}),
 			...(nextAutoSubscribedAt

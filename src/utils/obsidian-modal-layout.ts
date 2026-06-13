@@ -1,8 +1,18 @@
 import type { Modal } from "obsidian";
 
+export type WeaveObsidianModalTitleAccent =
+	| "purple"
+	| "blue"
+	| "green"
+	| "cyan"
+	| "orange"
+	| "pink"
+	| "red";
+
 interface ConfigureWeaveObsidianModalLayoutOptions {
 	modalClass: string;
 	contentClass: string;
+	titleAccent?: WeaveObsidianModalTitleAccent;
 }
 
 export function configureWeaveObsidianModalLayout(
@@ -18,4 +28,8 @@ export function configureWeaveObsidianModalLayout(
 		"weave-obsidian-modal-content-shell",
 		...options.contentClass.split(/\s+/).filter(Boolean)
 	);
+
+	if (options.titleAccent) {
+		modal.titleEl.addClass("with-accent-bar", `accent-${options.titleAccent}`);
+	}
 }

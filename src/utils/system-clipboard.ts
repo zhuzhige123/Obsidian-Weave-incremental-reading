@@ -27,7 +27,10 @@ function writeWithExecCommand(text: string): boolean {
 	}
 }
 
-/** Read plain text from the system clipboard (Obsidian community guideline entrypoint). */
+/**
+ * Read plain text from the system clipboard (Obsidian community guideline entrypoint).
+ * Call only from an explicit user gesture (button click / menu), not on modal open.
+ */
 export async function readSystemClipboardText(): Promise<string> {
 	if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
 		try {

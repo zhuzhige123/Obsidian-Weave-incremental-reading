@@ -323,6 +323,14 @@ export default class StandaloneIncrementalReadingPlugin
 			},
 		});
 
+		this.addCommand({
+			id: "add-ir-reading-target",
+			name: "添加阅读目标到增量阅读",
+			callback: () => {
+				void this.runAddReadingTargetQuickCreate();
+			},
+		});
+
 		// 注册完视图与命令后即可恢复 UI；重 I/O 与索引任务放到后台，避免拖慢 Obsidian 启动计时。
 		markServiceReady("allCoreServices");
 		scheduleIRWorkspaceWarmup(this.app);
@@ -851,11 +859,13 @@ export default class StandaloneIncrementalReadingPlugin
 
 	async openEpubReader(filePath: string): Promise<void> {
 		const host = this.getExternalEpubHost();
-		if (!host?.openEpubReader) {
-			new Notice("未找到可协作的 EPUB 阅读器插件", 3000);
+		if (host?.openEpubReader) {
+			await host.openEpubReader(filePath);
 			return;
 		}
-		await host.openEpubReader(filePath);
+
+		const { notifyEpubReaderUnavailable } = await import("./utils/epub-reader-access");
+		notifyEpubReaderUnavailable(this.app);
 	}
 
 	async getAvailableEpubIncrementalReadingTopics(): Promise<EpubHostIncrementalReadingTopicOption[]> {
@@ -1147,7 +1157,7 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	private getExternalEpubHost(): EpubHostReaderCapabilities | null {
-		return findCollaboratorEpubHost(this.app, IR_RUNTIME.collaboratorHostPluginIds, this);
+		return findCollaboratorEpubHost(this.app, IR_RUNTIME.epubReaderHostPluginIds, this);
 	}
 
 	private async resolveIRDeckById(deckId: string): Promise<{ id: string; name: string } | null> {
@@ -1663,6 +1673,38 @@ export default class StandaloneIncrementalReadingPlugin
 			}).open();
 		} catch (error) {
 			logger.error("[Standalone IR] 打开网页阅读点创建窗口失败:", error);
+			new Notice("打开添加窗口失败，请重试", 3000);
+		}
+	}
+
+	async runAddReadingTargetQuickCreate(options?: {
+		initialLink?: string;
+		initialTitle?: string;
+		initialDeckId?: string;
+		scheduleDate?: Date;
+	}): Promise<void> {
+		if (
+			!this.ensurePremiumFeatureAccess(
+				PREMIUM_FEATURES.INCREMENTAL_READING,
+				"增量阅读"
+			)
+		) {
+			return;
+		}
+
+		try {
+			const { AddReadingTargetModalObsidian } = await import(
+				"./components/incremental-reading/AddReadingTargetModalObsidian"
+			);
+			new AddReadingTargetModalObsidian(this.app, {
+				plugin: this,
+				initialLink: options?.initialLink,
+				initialTitle: options?.initialTitle,
+				initialDeckId: options?.initialDeckId,
+				scheduleDate: options?.scheduleDate,
+			}).open();
+		} catch (error) {
+			logger.error("[Standalone IR] 打开添加阅读目标窗口失败:", error);
 			new Notice("打开添加窗口失败，请重试", 3000);
 		}
 	}

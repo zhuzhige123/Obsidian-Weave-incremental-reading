@@ -24,6 +24,11 @@ interface CalendarDataManagementMenuOptions {
   onOpenDataManagement: () => void;
 }
 
+interface CalendarMaterialImportMenuOptions {
+	importTitle: string;
+	onOpenImport: () => void;
+}
+
 interface CalendarMenuItemLike {
   setTitle(title: string): this;
   setIcon(icon: string): this;
@@ -104,6 +109,20 @@ export function populateCalendarFolderSubscriptionSyncMenu(
         options.onSync();
       });
   });
+}
+
+export function populateCalendarMaterialImportMenu(
+	menu: CalendarMenuLike,
+	options: CalendarMaterialImportMenuOptions
+): void {
+	menu.addItem((item) => {
+		item
+			.setTitle(options.importTitle)
+			.setIcon("folder-input")
+			.onClick(() => {
+				options.onOpenImport();
+			});
+	});
 }
 
 export function populateCalendarDataManagementMenu(

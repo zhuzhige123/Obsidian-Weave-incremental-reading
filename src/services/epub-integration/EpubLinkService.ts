@@ -878,4 +878,73 @@ export class EpubLinkService {
 			logger.error("[EpubLinkService] Navigation failed:", error);
 		}
 	}
+
+	/**
+	 * Open an EPUB schedule item with the same pending locator contract as markdown / protocol links.
+	 */
+	async navigateToEpubScheduleMaterial(
+		filePath: string,
+		options: {
+			cfi?: string;
+			text?: string;
+			sourceId?: string;
+			tocHref?: string;
+			resumeLink?: string;
+		} = {}
+	): Promise<void> {
+		let cfi = String(options.cfi || "").trim();
+		let text = String(options.text || "").trim();
+		let sourceId = options.sourceId;
+		let resolvedPath = String(filePath || "").trim();
+
+		const resumeLink = String(options.resumeLink || "").trim();
+		if (!cfi && resumeLink) {
+			const parsed = EpubLinkService.parseLinkMarkup(resumeLink);
+			if (parsed?.cfi) {
+				cfi = parsed.cfi;
+				text = text || parsed.text || "";
+				sourceId = sourceId || parsed.sourceId;
+				if (!resolvedPath && parsed.filePath) {
+					resolvedPath = parsed.filePath;
+				}
+			}
+		}
+
+		if (cfi) {
+			if (!text) {
+				text = EpubLinkService.extractEmbeddedTextFromReadiumLocator(cfi) || "";
+			}
+			await this.navigateToEpubLocation(resolvedPath, cfi, text, sourceId);
+			return;
+		}
+
+		const tocHref = String(options.tocHref || "").trim();
+		if (!tocHref) {
+			return;
+		}
+
+		try {
+			if (!ensureEpubPremiumAccess(this.app)) {
+				return;
+			}
+			const { getIrEpubStorageService } = await import("./ir-epub-storage-access");
+			const resolvedFilePath = await getIrEpubStorageService(this.app).resolveSourceFilePath(
+				sourceId,
+				resolvedPath
+			);
+			if (!resolvedFilePath) {
+				return;
+			}
+			const targetLeaf = await openEpubInPreferredLeaf(this.app, resolvedFilePath, {
+				pendingHref: tocHref,
+				href: tocHref,
+			});
+			if (!targetLeaf) {
+				return;
+			}
+			this.app.workspace.setActiveLeaf(targetLeaf, { focus: true });
+		} catch (error) {
+			logger.error("[EpubLinkService] Chapter navigation failed:", error);
+		}
+	}
 }

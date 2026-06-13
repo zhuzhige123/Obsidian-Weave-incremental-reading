@@ -2,6 +2,7 @@
 /* 约束：全局类统一使用 .weave- 前缀，CSS 变量限定在 .weave-app 作用域内。 */
 
 /* 样式模块导入 */
+@import './weave-owned-menu.css';         /* Weave 自有 Menu 层级（禁止污染裸 .menu） */
 @import './core/index.css';              /* 核心样式：tokens + animations + components + utilities */
 @import './codemirror-theme.css';        /* CodeMirror编辑器主题 */
 @import './settings-common.css';         /* 设置界面样式 */

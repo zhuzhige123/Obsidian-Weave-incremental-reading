@@ -2,6 +2,7 @@ import { Menu, type MenuItem } from '../../tests/mocks/obsidian';
 import {
   populateCalendarBackgroundWallMenu,
   populateCalendarFolderSubscriptionSyncMenu,
+  populateCalendarMaterialImportMenu,
   populateCalendarPointDeckScanMenu,
 } from './ir-calendar-tools-menu';
 
@@ -88,5 +89,20 @@ describe('populateCalendarFolderSubscriptionSyncMenu', () => {
 
     menu.findItemByTitle('更新订阅文件夹')?.trigger();
     expect(onSync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('populateCalendarMaterialImportMenu', () => {
+  it('提供导入阅读材料入口', () => {
+    const menu = new Menu() as TrackingMenu;
+    const onOpenImport = vi.fn();
+
+    populateCalendarMaterialImportMenu(menu, {
+      importTitle: '导入阅读材料',
+      onOpenImport,
+    });
+
+    menu.findItemByTitle('导入阅读材料')?.trigger();
+    expect(onOpenImport).toHaveBeenCalledTimes(1);
   });
 });

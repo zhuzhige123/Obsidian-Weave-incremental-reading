@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Menu } from 'obsidian';
+  import { showWeaveMenuAtMouseEvent, showWeaveMenuAtPosition } from '../../utils/weave-owned-menu';
   import ObsidianIcon from './ObsidianIcon.svelte';
 
   interface DropdownOption {
@@ -68,7 +69,7 @@
 
     try {
       if (triggerEvent) {
-        menu.showAtMouseEvent(triggerEvent);
+        showWeaveMenuAtMouseEvent(menu, triggerEvent);
         return;
       }
 
@@ -77,14 +78,14 @@
         x: Math.round(rect.left),
         y: Math.round(rect.bottom)
       };
-      menu.showAtPosition(position);
+      showWeaveMenuAtPosition(menu, position);
     } catch {
       const rect = buttonRef.getBoundingClientRect();
       const position = {
         x: Math.round(rect.left),
         y: Math.round(rect.bottom)
       };
-      menu.showAtPosition(position);
+      showWeaveMenuAtPosition(menu, position);
     }
   }
 
@@ -178,9 +179,5 @@
 
   .placeholder {
     color: var(--text-muted);
-  }
-
-  :global(body > .menu) {
-    z-index: var(--weave-z-dropdown, 1600);
   }
 </style>

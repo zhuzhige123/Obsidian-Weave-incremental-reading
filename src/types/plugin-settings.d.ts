@@ -418,6 +418,18 @@ export interface IncrementalReadingSettings {
   selectionQuickCreateSourceDocumentBacklinkPosition?: 'start' | 'end';
 
   appendSourceDocumentBacklinkOnSplitImport?: boolean;
+
+  /** 添加入口默认「收件箱」专题 ID */
+  readingTargetInboxDeckId?: string;
+
+  /** 添加入口上次选择的专题 ID */
+  readingTargetLastDeckId?: string;
+
+  /** 块引用轻量添加时，是否在源笔记末尾追加标记 */
+  readingTargetAppendSourceBacklink?: boolean;
+
+  /** Vault 链接是否默认创建阅读笔记（网页始终创建） */
+  readingTargetDefaultNoteBacked?: boolean;
   
   /**
    * Global sidebar settings.
@@ -513,6 +525,10 @@ export const DEFAULT_IR_SETTINGS: IncrementalReadingSettings = {
   selectionQuickCreateBacklinkPosition: 'start',
   selectionQuickCreateSourceDocumentBacklinkPosition: 'start',
   appendSourceDocumentBacklinkOnSplitImport: false,
+  readingTargetInboxDeckId: '',
+  readingTargetLastDeckId: '',
+  readingTargetAppendSourceBacklink: false,
+  readingTargetDefaultNoteBacked: false,
   // v3.0 新增
   scheduleStrategy: 'processing',
   dailyTimeBudgetMinutes: 40,

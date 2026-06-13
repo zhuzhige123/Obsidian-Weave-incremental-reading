@@ -16,6 +16,8 @@ export interface IRRuntimeConfig {
 		premiumUiStateChanged: string;
 	};
 	collaboratorHostPluginIds: string[];
+	/** 打开 EPUB 阅读器时优先委托的宿主插件（standalone 仅直连阅读器，不经 Weave 中转） */
+	epubReaderHostPluginIds: string[];
 }
 
 declare const __WEAVE_IR_STANDALONE__: boolean;
@@ -42,6 +44,7 @@ export const IR_RUNTIME: IRRuntimeConfig = {
 			: "Weave:premium-ui-state-changed",
 	},
 	collaboratorHostPluginIds: isStandalone ? ["weave", "weave-epub-reader"] : [],
+	epubReaderHostPluginIds: isStandalone ? ["weave-epub-reader"] : ["weave"],
 };
 
 export function getIRRuntime(): IRRuntimeConfig {

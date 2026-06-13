@@ -23,25 +23,30 @@ export interface EpubRuntimeConfig {
 }
 
 declare const __WEAVE_EPUB_STANDALONE__: boolean;
+declare const __WEAVE_IR_STANDALONE__: boolean;
 
-const isStandalone = typeof __WEAVE_EPUB_STANDALONE__ !== "undefined" && __WEAVE_EPUB_STANDALONE__;
+const isEpubStandaloneBuild =
+	typeof __WEAVE_EPUB_STANDALONE__ !== "undefined" && __WEAVE_EPUB_STANDALONE__;
+const isIrStandaloneBuild =
+	typeof __WEAVE_IR_STANDALONE__ !== "undefined" && __WEAVE_IR_STANDALONE__;
+const useReaderProtocol = isEpubStandaloneBuild || isIrStandaloneBuild;
 
-const primaryProtocolName = isStandalone ? "weave-epub-reader" : "weave-epub";
-const legacyProtocolNames = isStandalone ? ["weave-epub"] : [];
-const bookshelfDataChangedEvent = isStandalone
+const primaryProtocolName = useReaderProtocol ? "weave-epub-reader" : "weave-epub";
+const legacyProtocolNames = useReaderProtocol ? ["weave-epub"] : [];
+const bookshelfDataChangedEvent = isEpubStandaloneBuild
 	? "WeaveEpubStandalone:epub-bookshelf-data-changed"
 	: "Weave:epub-bookshelf-data-changed";
-const bookshelfRefreshRequestEvent = isStandalone
+const bookshelfRefreshRequestEvent = isEpubStandaloneBuild
 	? "WeaveEpubStandalone:epub-bookshelf-refresh-request"
 	: "Weave:epub-bookshelf-refresh-request";
 
 export const EPUB_RUNTIME: EpubRuntimeConfig = {
-	pluginId: isStandalone ? "weave-epub-reader" : "weave",
-	pluginDirName: isStandalone ? "weave-epub-reader" : "weave",
+	pluginId: useReaderProtocol ? "weave-epub-reader" : "weave",
+	pluginDirName: useReaderProtocol ? "weave-epub-reader" : "weave",
 	viewTypes: {
-		reader: isStandalone ? "weave-epub-reader-standalone" : "weave-epub-reader",
-		sidebar: isStandalone ? "weave-epub-sidebar-standalone" : "weave-epub-sidebar",
-		bookshelfSidebar: isStandalone
+		reader: useReaderProtocol ? "weave-epub-reader-standalone" : "weave-epub-reader",
+		sidebar: useReaderProtocol ? "weave-epub-sidebar-standalone" : "weave-epub-sidebar",
+		bookshelfSidebar: useReaderProtocol
 			? "weave-epub-bookshelf-sidebar-standalone"
 			: "weave-epub-bookshelf-sidebar",
 	},
@@ -53,14 +58,14 @@ export const EPUB_RUNTIME: EpubRuntimeConfig = {
 	events: {
 		bookshelfDataChanged: bookshelfDataChangedEvent,
 		bookshelfRefreshRequest: bookshelfRefreshRequestEvent,
-		navigate: isStandalone ? "WeaveEpubStandalone:epub-navigate" : "Weave:epub-navigate",
+		navigate: useReaderProtocol ? "WeaveEpubStandalone:epub-navigate" : "Weave:epub-navigate",
 	},
 	globals: {
-		pendingNavigationKey: isStandalone
+		pendingNavigationKey: useReaderProtocol
 			? "__weaveEpubStandalonePendingNav"
 			: "__weaveEpubPendingNav",
 	},
-	collaboratorHostPluginIds: isStandalone ? ["weave", "weave-incremental-reading"] : [],
+	collaboratorHostPluginIds: useReaderProtocol ? ["weave", "weave-incremental-reading"] : [],
 };
 
 export function getEpubRuntime(): EpubRuntimeConfig {

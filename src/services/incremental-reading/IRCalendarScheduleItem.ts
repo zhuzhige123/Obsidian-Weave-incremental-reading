@@ -296,6 +296,7 @@ export async function buildScheduleItemFromEpubTask(
 		}),
 		associatedNoteScope:
 			task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath ? "point" : undefined,
+		resumeLink: typeof task?.meta?.resumeLink === "string" ? task.meta.resumeLink : undefined,
 		priority: Number(task?.priorityUi ?? task?.priorityEff ?? 5),
 		intervalDays: Number(task?.intervalDays ?? 1),
 		scheduleStatus: String(task?.status || "new"),

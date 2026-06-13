@@ -14,7 +14,7 @@
   import { IREpubBookmarkTaskService, isEpubBookmarkTaskId } from '../../services/incremental-reading/IREpubBookmarkTaskService';
   import { getIrEpubStorageService } from '../../services/epub-integration/ir-epub-storage-access';
   import type { IrEpubStorageLike } from '../../services/epub-integration/ir-epub-storage-types';
-  import { EPUB_RUNTIME } from '../../services/epub-integration';
+  import { EpubLinkService } from '../../services/epub-integration/EpubLinkService';
   import { IRPointWriteService, type IRPointWriteTarget } from '../../services/incremental-reading/IRPointWriteService';
   import { IRPointTagService, normalizeReadingPointTags } from '../../services/incremental-reading/IRPointTagService';
   import { IRV4SchedulerService } from '../../services/incremental-reading/IRV4SchedulerService';
@@ -41,6 +41,7 @@
   import IRPrioritySlider from './IRPrioritySlider.svelte';
   import IRScheduleImpactPreviewPanel, { type PreviewDetails } from './IRScheduleImpactPreviewPanel.svelte';
   import { MaterialImportModalObsidian } from './MaterialImportModalObsidian';
+  import { AddReadingTargetModalObsidian } from './AddReadingTargetModalObsidian';
   import AddReadingPointModal from './AddReadingPointModal.svelte';
   import { IRAnalyticsModalObsidian } from './IRAnalyticsModalObsidian';
   import {
@@ -69,7 +70,6 @@
     hasVisibleAssociatedNote as hasVisibleAssociatedNoteBase
   } from '../../services/incremental-reading/IRAssociatedNoteVisibility';
   import type { BatchImportResult } from '../../services/incremental-reading/ReadingMaterialManager';
-  import { findOpenEpubLeaf } from '../../utils/epub-leaf-utils';
   import { logger } from '../../utils/logger';
   import { currentLanguage, tr } from '../../utils/i18n';
   import { getChunkTopicIds, getTaskTopicId } from '../../utils/ir-topic-compat';
@@ -96,7 +96,8 @@
   import IRCalendarMaterialList from './IRCalendarMaterialList.svelte';
   import {
     populateCalendarBackgroundWallMenu,
-    populateCalendarFolderSubscriptionSyncMenu
+    populateCalendarFolderSubscriptionSyncMenu,
+    populateCalendarMaterialImportMenu
   } from './ir-calendar-tools-menu';
   import { IRDataManagementModalObsidian } from './IRDataManagementModalObsidian';
   import { PremiumFeatureGuard, PREMIUM_FEATURES } from '../../services/premium/PremiumFeatureGuard';
@@ -311,6 +312,7 @@
 
 
   let importModalInstance: MaterialImportModalObsidian | null = null;
+  let addReadingTargetModalInstance: AddReadingTargetModalObsidian | null = null;
   let analyticsModalInstance: IRAnalyticsModalObsidian | null = null;
   let continueReadingSuggestionsModalInstance: IRContinueReadingSuggestionsModalObsidian | null = null;
   let continueReadingSuggestionsModalOpenSignature = $state('');
@@ -2277,6 +2279,11 @@
         });
     });
 
+    populateCalendarMaterialImportMenu(menu, {
+      importTitle: t('irSidebar.header.importTitle'),
+      onOpenImport: openImportModal
+    });
+
     if (shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)) {
       menu.addSeparator();
 
@@ -2624,6 +2631,30 @@
            d1.getDate() === d2.getDate();
   }
 
+
+  function openAddReadingTargetModal(): void {
+    if (addReadingTargetModalInstance) {
+      addReadingTargetModalInstance.close();
+      addReadingTargetModalInstance = null;
+    }
+
+    addReadingTargetModalInstance = new AddReadingTargetModalObsidian(plugin.app, {
+      plugin,
+      initialDeckId: getActiveDeckFilterId(),
+      scheduleDate: new Date(selectedDate),
+      defaultScheduleMode: 'custom',
+      onClose: () => {
+        addReadingTargetModalInstance = null;
+      },
+      onAdded: () => {
+        void refreshSidebarAfterDataUpdate({
+          includeProgress: false,
+          priorityDateKeys: [formatDateKey(selectedDate)]
+        });
+      }
+    });
+    addReadingTargetModalInstance.open();
+  }
 
   function openImportModal(): void {
     if (importModalInstance) {
@@ -3124,27 +3155,18 @@
             return;
           }
 
-          const navDetail: any = { filePath: resolvedFilePath };
-          if (task.resumeCfi) {
-            navDetail.cfi = task.resumeCfi;
-          } else if (task.tocHref) {
-            navDetail.href = task.tocHref;
-          }
+          const resumeLink =
+            (typeof material.resumeLink === 'string' && material.resumeLink.trim()) ||
+            (typeof task.meta?.resumeLink === 'string' && task.meta.resumeLink.trim()) ||
+            '';
 
-          const existingLeaf = findOpenEpubLeaf(plugin.app, resolvedFilePath);
-
-          if (existingLeaf) {
-            plugin.app.workspace.setActiveLeaf(existingLeaf, { focus: true });
-            window.dispatchEvent(new CustomEvent(EPUB_RUNTIME.events.navigate, { detail: navDetail }));
-          } else {
-            (window as any)[EPUB_RUNTIME.globals.pendingNavigationKey] = navDetail;
-            if (typeof plugin.openEpubReader === 'function') {
-              await plugin.openEpubReader(resolvedFilePath);
-            } else {
-              const ctxPath = plugin.app.workspace.getActiveFile()?.path ?? '';
-              await plugin.app.workspace.openLinkText(resolvedFilePath, ctxPath, false);
-            }
-          }
+          const epubLinkService = new EpubLinkService(plugin.app);
+          await epubLinkService.navigateToEpubScheduleMaterial(resolvedFilePath, {
+            cfi: task.resumeCfi,
+            sourceId: task.sourceId,
+            tocHref: task.tocHref,
+            resumeLink,
+          });
         } catch (e) {
           logger.warn('[IRCalendarSidebar] Recovered warning message.', e);
           await showMissingSourceDocumentDialog(material, filePath);
@@ -4173,6 +4195,8 @@
     closeContinueReadingSuggestionsModal('refresh');
     importModalInstance?.close();
     importModalInstance = null;
+    addReadingTargetModalInstance?.close();
+    addReadingTargetModalInstance = null;
     analyticsModalInstance?.close();
     analyticsModalInstance = null;
   });
@@ -5643,11 +5667,11 @@
       <button
         class="calendar-top-action-btn clickable-icon nav-action-button"
         type="button"
-        onclick={() => openImportModal()}
-        title={t('irSidebar.header.importTitle')}
-        aria-label={t('irSidebar.header.importTitle')}
+        onclick={() => openAddReadingTargetModal()}
+        title={uiText('添加到增量阅读', 'Add reading target')}
+        aria-label={uiText('添加到增量阅读', 'Add reading target')}
       >
-        <ObsidianIcon name="folder-input" size="var(--icon-size)" />
+        <ObsidianIcon name="plus" size="var(--icon-size)" />
       </button>
       <button
         class="calendar-top-action-btn clickable-icon nav-action-button"

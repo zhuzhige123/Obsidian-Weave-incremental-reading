@@ -151,6 +151,136 @@
   --weave-obsidian-modal-max-height: 80vh;
 }
 
+.weave-add-reading-target-modal {
+  --weave-obsidian-modal-width: min(640px, calc(100vw - 32px));
+  --weave-obsidian-modal-max-width: 640px;
+  --weave-obsidian-modal-height: min(85vh, 760px);
+  --weave-obsidian-modal-max-height: min(85vh, 760px);
+  --weave-obsidian-modal-overflow: hidden;
+  --weave-obsidian-modal-min-height: 0;
+  box-sizing: border-box;
+}
+
+.modal.weave-add-reading-target-modal .modal-content.weave-add-reading-target-modal-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.weave-add-reading-target-modal-content {
+  --weave-obsidian-modal-content-padding: var(--size-4-4) var(--size-4-6) 0;
+  --weave-obsidian-modal-content-overflow: hidden;
+  --weave-obsidian-modal-content-flex: 1 1 auto;
+  --weave-obsidian-modal-content-min-height: 0;
+}
+
+.weave-add-reading-target-modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--size-4-4) var(--size-4-6);
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.weave-add-reading-target-modal-content > * {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.weave-add-reading-target-modal-content .add-reading-target-body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.weave-add-reading-target-modal-content .add-reading-target-panel,
+.weave-add-reading-target-modal-content .link-input,
+.weave-add-reading-target-modal-content .title-input,
+.weave-add-reading-target-modal-content .picker-button {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.weave-add-reading-target-modal-content .option-row span {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.weave-add-reading-target-modal-content .preview-surface {
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.weave-add-reading-target-modal-content .preview-surface .markdown-preview-helper,
+.weave-add-reading-target-modal-content .preview-surface .internal-embed {
+  max-height: 120px;
+  overflow: hidden;
+}
+
+/* Obsidian 原生模态窗标题 — 插件标识色条（与设置页一致） */
+.modal.weave-obsidian-modal-shell .modal-title.with-accent-bar {
+  position: relative;
+  padding-left: 16px;
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.with-accent-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 80%;
+  border-radius: 2px;
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.accent-purple::before {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.8), rgba(147, 51, 234, 0.6));
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.accent-blue::before {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.6));
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.accent-green::before {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.6));
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.accent-cyan::before {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.8), rgba(14, 165, 233, 0.6));
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.accent-orange::before {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.8), rgba(234, 88, 12, 0.6));
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.accent-pink::before {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.8), rgba(219, 39, 119, 0.6));
+}
+
+.modal.weave-obsidian-modal-shell .modal-title.accent-red::before {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.6));
+}
+
 .weave-selection-to-ir-modal {
   width: min(720px, 92vw);
 }

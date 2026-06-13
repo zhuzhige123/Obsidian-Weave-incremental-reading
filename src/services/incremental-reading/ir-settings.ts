@@ -93,6 +93,10 @@ export function normalizeIncrementalReadingSettings(
     // 保留用户输入（允许为空）；实际使用路径在读取调用侧通过 resolveIRImportFolder 再做兜底解析
     importFolder: String(settings?.importFolder || "").trim(),
     selectionQuickCreateLastFolder: String(settings?.selectionQuickCreateLastFolder || "").trim(),
+    readingTargetInboxDeckId: String(settings?.readingTargetInboxDeckId || "").trim(),
+    readingTargetLastDeckId: String(settings?.readingTargetLastDeckId || "").trim(),
+    readingTargetAppendSourceBacklink: settings?.readingTargetAppendSourceBacklink === true,
+    readingTargetDefaultNoteBacked: settings?.readingTargetDefaultNoteBacked === true,
     folderSubscription: normalizeIncrementalReadingFolderSubscriptionSettings(settings?.folderSubscription),
     calendarSidebar: normalizeIRCalendarSidebarSettings(settings?.calendarSidebar),
     paragraphWorkbench: resolveParagraphWorkbenchDisplaySettings(settings?.paragraphWorkbench)

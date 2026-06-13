@@ -2,18 +2,4 @@ export function ensureSuggestModalTheme(): void {
 	// Suggest modal theme has been migrated to static CSS bundled in styles.css.
 }
 
-export function markLatestSuggestionContainer(className: string): void {
-	if (typeof document === "undefined") {
-		return;
-	}
-
-	window.requestAnimationFrame(() => {
-		const containers = Array.from(activeDocument.querySelectorAll(".suggestion-container"));
-		const latest = containers.at(-1);
-		if (!latest) {
-			return;
-		}
-
-		latest.classList.add(className);
-	});
-}
+export { markSuggestionContainer as markLatestSuggestionContainer } from "../utils/suggestion-container-scope";
