@@ -1,5 +1,10 @@
 import { App, Modal } from "obsidian";
 
+/**
+ * Obsidian-native confirm/input dialogs.
+ * Do NOT use window.confirm/alert/prompt — see check:native-dialogs and obsidian-native-dialogs skill.
+ */
+
 export interface ConfirmOptions {
 	title?: string;
 	confirmText?: string;

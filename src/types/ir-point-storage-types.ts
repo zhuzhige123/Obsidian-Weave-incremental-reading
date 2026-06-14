@@ -316,4 +316,8 @@ export interface IRLegacyPointInput {
 		lastInteractionAt?: number;
 	};
 	metadata?: Record<string, unknown>;
+	parameterContext?: IRParameterContext;
+	traceState?: IRTraceState;
+	traceConfidence?: number;
+	lastVerifiedAt?: string;
 }

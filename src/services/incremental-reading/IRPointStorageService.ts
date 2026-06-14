@@ -3402,6 +3402,43 @@ export class IRPointStorageService {
 					: topicId
 						? [topicId]
 						: [];
+			const mergedMetadata =
+				input.metadata && typeof input.metadata === "object"
+					? {
+							...(existingPoint.metadata || {}),
+							...Object.fromEntries(
+								Object.entries(input.metadata).filter(([, value]) => value !== undefined)
+							),
+						}
+					: existingPoint.metadata;
+			const shouldMergeTrace =
+				Boolean(input.locatorType) ||
+				(input.locator && typeof input.locator === "object") ||
+				Boolean(input.traceState) ||
+				input.traceConfidence !== undefined ||
+				Boolean(input.lastVerifiedAt);
+			const mergedTrace = shouldMergeTrace
+				? {
+						...existingPoint.trace,
+						...(input.locatorType ? { locatorType: input.locatorType } : {}),
+						...(input.locator && typeof input.locator === "object"
+							? {
+									locator: {
+										...(existingPoint.trace?.locator || {}),
+										...Object.fromEntries(
+											Object.entries(input.locator).filter(([, value]) => value !== undefined)
+										),
+									},
+								}
+							: {}),
+						...(input.traceState ? { traceState: input.traceState } : {}),
+						...(input.traceConfidence !== undefined
+							? { traceConfidence: input.traceConfidence }
+							: {}),
+						...(input.lastVerifiedAt ? { lastVerifiedAt: input.lastVerifiedAt } : {}),
+					}
+				: existingPoint.trace;
+			const shouldTouchUpdatedAt = shouldMergeTrace || Boolean(input.metadata);
 
 			return {
 				...existingPoint,
@@ -3421,6 +3458,14 @@ export class IRPointStorageService {
 					...existingPoint.relations,
 					topicIds,
 				},
+				trace: mergedTrace,
+				metadata: mergedMetadata,
+				timestamps: shouldTouchUpdatedAt
+					? {
+							...existingPoint.timestamps,
+							updatedAt: new Date().toISOString(),
+						}
+					: existingPoint.timestamps,
 				audit:
 					existingPoint.audit || {
 						createdBy: "legacy-migration",
@@ -3482,15 +3527,16 @@ export class IRPointStorageService {
 			trace: {
 				locatorType: input.locatorType,
 				locator: input.locator,
-				traceState: existingPoint?.trace.traceState || "verified",
+				traceState: input.traceState || existingPoint?.trace.traceState || "verified",
 				traceConfidence:
+					input.traceConfidence ??
 					existingPoint?.trace.traceConfidence ??
 					(input.sourceType === "epub-bookmark" ? 1 : 0.95),
 				fallbackLocators: [...(existingPoint?.trace.fallbackLocators || [])],
-				lastVerifiedAt: existingPoint?.trace.lastVerifiedAt || updatedAt,
+				lastVerifiedAt: input.lastVerifiedAt || existingPoint?.trace.lastVerifiedAt || updatedAt,
 				repairStrategy: existingPoint?.trace.repairStrategy,
 			},
-			parameterContext: existingPoint?.parameterContext || parameterContext,
+			parameterContext: input.parameterContext || existingPoint?.parameterContext || parameterContext,
 			schedule: {
 				status: input.status || existingPoint?.schedule.status || "new",
 				priorityScore:
@@ -3596,6 +3642,7 @@ export class IRPointStorageService {
 			point: existingPoint,
 		});
 		const parameterContext =
+			input.parameterContext ||
 			existingPoint?.parameterContext ||
 			this.buildParameterContext(this.inferMaterialClass(source.type, source.path));
 		const point = this.buildPointFromLegacyInput(

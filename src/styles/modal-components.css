@@ -217,6 +217,128 @@
   min-width: 0;
 }
 
+.weave-reading-point-compact-modal,
+.weave-edit-reading-point-modal {
+  --weave-obsidian-modal-width: min(680px, calc(100vw - 32px));
+  --weave-obsidian-modal-max-width: 680px;
+  --weave-obsidian-modal-height: auto;
+  --weave-obsidian-modal-max-height: min(85vh, 760px);
+  --weave-obsidian-modal-overflow: hidden;
+  --weave-obsidian-modal-min-height: 0;
+  box-sizing: border-box;
+}
+
+.modal.weave-reading-point-compact-modal .modal-content.weave-reading-point-compact-modal-content,
+.modal.weave-edit-reading-point-modal .modal-content.weave-edit-reading-point-modal-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.weave-reading-point-compact-modal-content,
+.weave-edit-reading-point-modal-content {
+  --weave-obsidian-modal-content-padding: var(--size-4-4) var(--size-4-6) 0;
+  --weave-obsidian-modal-content-overflow: hidden;
+  --weave-obsidian-modal-content-flex: 0 1 auto;
+  --weave-obsidian-modal-content-min-height: 0;
+}
+
+.weave-reading-point-compact-modal-footer,
+.weave-edit-reading-point-modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--size-4-4) var(--size-4-6);
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.weave-reading-point-compact-modal-content > *,
+.weave-edit-reading-point-modal-content > * {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.weave-reading-point-compact-modal-content .reading-point-compact-modal,
+.weave-reading-point-compact-modal-content .edit-reading-point-body,
+.weave-edit-reading-point-modal-content .edit-reading-point-body {
+  flex: 0 1 auto;
+  max-height: min(52vh, 520px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.weave-reading-point-compact-modal-content .edit-panel,
+.weave-reading-point-compact-modal-content .link-input,
+.weave-reading-point-compact-modal-content .title-input,
+.weave-reading-point-compact-modal-content .picker-button,
+.weave-edit-reading-point-modal-content .edit-panel,
+.weave-edit-reading-point-modal-content .link-input,
+.weave-edit-reading-point-modal-content .title-input,
+.weave-edit-reading-point-modal-content .picker-button {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.weave-reading-point-rename-modal {
+  --weave-obsidian-modal-width: min(480px, calc(100vw - 32px));
+  --weave-obsidian-modal-max-width: 480px;
+}
+
+.weave-reading-point-rename-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  width: 100%;
+}
+
+.weave-reading-point-rename-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.weave-reading-point-rename-hint {
+  margin: 0;
+  padding: 0;
+}
+
+.weave-reading-point-trace-link-prompt,
+.weave-reading-point-tags-prompt {
+  --weave-obsidian-modal-width: min(640px, calc(100vw - 32px));
+  --weave-obsidian-modal-max-width: 640px;
+}
+
+.weave-reading-point-trace-link-panel-host {
+  width: 100%;
+  min-width: 0;
+}
+
+.weave-reading-point-tags-prompt .weave-reading-point-tags-panel-host {
+  margin-top: var(--size-4-2);
+}
+
+.weave-reading-point-tags-prompt .reading-point-tags-prompt-panel {
+  width: 100%;
+}
+
 .weave-add-reading-target-modal-content .option-row span {
   flex: 1 1 auto;
   min-width: 0;

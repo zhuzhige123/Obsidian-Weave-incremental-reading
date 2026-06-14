@@ -14,7 +14,6 @@
   import { IREpubBookmarkTaskService, isEpubBookmarkTaskId } from '../../services/incremental-reading/IREpubBookmarkTaskService';
   import { getIrEpubStorageService } from '../../services/epub-integration/ir-epub-storage-access';
   import type { IrEpubStorageLike } from '../../services/epub-integration/ir-epub-storage-types';
-  import { EpubLinkService } from '../../services/epub-integration/EpubLinkService';
   import { IRPointWriteService, type IRPointWriteTarget } from '../../services/incremental-reading/IRPointWriteService';
   import { IRPointTagService, normalizeReadingPointTags } from '../../services/incremental-reading/IRPointTagService';
   import { IRV4SchedulerService } from '../../services/incremental-reading/IRV4SchedulerService';
@@ -42,6 +41,15 @@
   import IRScheduleImpactPreviewPanel, { type PreviewDetails } from './IRScheduleImpactPreviewPanel.svelte';
   import { MaterialImportModalObsidian } from './MaterialImportModalObsidian';
   import { AddReadingTargetModalObsidian } from './AddReadingTargetModalObsidian';
+  import { canEditReadingPointLink, resolveReadingPointOpenLink } from '../../services/incremental-reading/reading-point-edit/IRReadingPointEditLinkResolver';
+  import { tryOpenReadingPointFromScheduleItem } from '../../services/incremental-reading/reading-point-edit/IRReadingPointOpenNavigation';
+  import {
+    closeActiveReadingPointPrompt,
+    openReadingPointTagsPrompt,
+    openReadingPointTraceLinkPrompt,
+    promptRenameReadingPoint
+  } from '../../services/incremental-reading/reading-point-edit/readingPointQuickEdit';
+  import { populateReadingPointTopicSubmenu } from '../../services/incremental-reading/reading-point-edit/readingPointTopicSubmenu';
   import AddReadingPointModal from './AddReadingPointModal.svelte';
   import { IRAnalyticsModalObsidian } from './IRAnalyticsModalObsidian';
   import {
@@ -76,13 +84,7 @@
   import { showObsidianConfirm, showObsidianInput } from '../../utils/obsidian-confirm';
   import { showMissingSourceDocumentModal } from './MissingSourceDocumentModal';
   import { IRMonitoringService } from '../../services/incremental-reading/IRMonitoringService';
-  import { SourceNavigationService } from '../../services/ui/SourceNavigationService';
-  import { openObsidianWebUrl } from '../../services/obsidian/obsidian-open-web-url';
   import { resolveScheduleItemWebUrl } from '../../services/incremental-reading/ir-web-reading-point';
-  import {
-    getCanvasNodeIdFromSourceLink,
-    getCanvasSourceNodeRectFromSourceLink
-  } from '../../services/ui/canvas-source-locate';
   import type { IRCalendarSidebarSettings } from '../../types/plugin-settings.d';
   import type { IRCalendarMaterialListProps } from './ir-calendar-sidebar-types';
   import {
@@ -2656,6 +2658,31 @@
     addReadingTargetModalInstance.open();
   }
 
+  function refreshAfterReadingPointPropertyEdit(): void {
+    void refreshSidebarAfterDataUpdate({
+      includeProgress: false,
+      priorityDateKeys: [formatDateKey(selectedDate)]
+    });
+  }
+
+  function openRenameReadingPoint(material: ScheduleItem): void {
+    void promptRenameReadingPoint(plugin.app, material, refreshAfterReadingPointPropertyEdit);
+  }
+
+  function openEditReadingPointTraceLink(material: ScheduleItem): void {
+    void openReadingPointTraceLinkPrompt(plugin, material, (result) => {
+      if (result.linkChanged && result.savedResumeLink) {
+        applyLocalMaterialResumeLinkUpdate(material.id, result.savedResumeLink);
+        getWorkspaceSnapshotService().invalidate();
+      }
+      refreshAfterReadingPointPropertyEdit();
+    });
+  }
+
+  function openEditReadingPointTags(material: ScheduleItem): void {
+    void openReadingPointTagsPrompt(plugin.app, material, refreshAfterReadingPointPropertyEdit);
+  }
+
   function openImportModal(): void {
     if (importModalInstance) {
       importModalInstance.close();
@@ -2845,6 +2872,77 @@
           : entry
       );
     }
+  }
+
+  function applyLocalMaterialResumeLinkUpdate(materialId: string, nextResumeLink: string): void {
+    const normalizedId = String(materialId || '').trim();
+    const normalizedResumeLink = String(nextResumeLink || '').trim();
+    if (!normalizedId || !normalizedResumeLink) return;
+
+    const updateItem = (item: ScheduleItem): ScheduleItem => {
+      if (item.id !== normalizedId) return item;
+      return {
+        ...item,
+        resumeLink: normalizedResumeLink
+      };
+    };
+
+    materialsByDate = new Map(
+      Array.from(materialsByDate.entries(), ([dateKey, items]) => [
+        dateKey,
+        items.map(updateItem)
+      ])
+    );
+
+    pinnedByDate = new Map(
+      Array.from(pinnedByDate.entries(), ([dateKey, items]) => [
+        dateKey,
+        items.map(updateItem)
+      ])
+    );
+
+    siblingCache = new Map(
+      Array.from(siblingCache.entries(), ([cacheKey, items]) => [
+        cacheKey,
+        items.map(updateItem)
+      ])
+    );
+
+    readingMaterials = readingMaterials.map((entry) => {
+      const updatedItems = Array.from(materialsByDate.values())
+        .flat()
+        .filter((item) => item.id === normalizedId);
+      const sourcePaths = new Set(
+        updatedItems
+          .map((item) => normalizePath(String(item.sourceFile || '').trim()))
+          .filter(Boolean)
+      );
+      const entryPath = normalizePath(String(entry.filePath || '').trim());
+      if (!entryPath || !sourcePaths.has(entryPath)) {
+        return entry;
+      }
+      return {
+        ...entry,
+        resumeLink: normalizedResumeLink
+      };
+    });
+  }
+
+  async function resolveScheduleItemOpenResumeLink(
+    material: ScheduleItem,
+    filePath: string
+  ): Promise<string> {
+    const persistedLink = await resolveReadingPointOpenLink(plugin.app, material);
+    if (persistedLink.trim()) {
+      return persistedLink.trim();
+    }
+
+    if (material.resumeLink?.trim()) return material.resumeLink.trim();
+
+    const rm = readingMaterials.find(m => m.filePath === filePath);
+    if (rm?.resumeLink?.trim()) return rm.resumeLink.trim();
+
+    return filePath;
   }
 
   async function getChunkScheduleAdapter(): Promise<IRChunkScheduleAdapter> {
@@ -3113,12 +3211,11 @@
 
   async function openMaterial(material: ScheduleItem) {
     try {
-      const webUrl = resolveScheduleItemWebUrl(plugin.app, material);
-      if (webUrl) {
-        const opened = await openObsidianWebUrl(plugin.app, webUrl);
-        if (!opened) {
-          new Notice(uiText('无法在 Obsidian 浏览器中打开该网页', 'Failed to open this page in Web Viewer'));
-        }
+      if (await tryOpenReadingPointFromScheduleItem(plugin.app, material)) {
+        return;
+      }
+      if (resolveScheduleItemWebUrl(plugin.app, material)) {
+        new Notice(uiText('无法在 Obsidian 浏览器中打开该网页', 'Failed to open this page in Web Viewer'));
         return;
       }
 
@@ -3137,44 +3234,6 @@
         return;
       }
 
-      // EPUB: reuse existing tab or open new, then navigate
-      if (isEpubBookmarkTaskId(material.id)) {
-        try {
-          const task = await getWorkspaceEpubTaskById(material.id);
-          if (!task) {
-            logger.warn('[IRCalendarSidebar] Recovered warning message.', { materialId: material.id, reason: 'epub_task_missing' });
-            await showMissingSourceDocumentDialog(material, filePath);
-            return;
-          }
-
-          const resolvedFilePath = await resolveEpubTaskFilePath(task);
-          const epubFile = plugin.app.vault.getAbstractFileByPath(resolvedFilePath);
-          if (!(epubFile instanceof TFile)) {
-            logger.warn('[IRCalendarSidebar] Recovered warning message.', { materialId: material.id, resolvedFilePath, reason: 'epub_source_missing' });
-            await showMissingSourceDocumentDialog(material, resolvedFilePath || filePath);
-            return;
-          }
-
-          const resumeLink =
-            (typeof material.resumeLink === 'string' && material.resumeLink.trim()) ||
-            (typeof task.meta?.resumeLink === 'string' && task.meta.resumeLink.trim()) ||
-            '';
-
-          const epubLinkService = new EpubLinkService(plugin.app);
-          await epubLinkService.navigateToEpubScheduleMaterial(resolvedFilePath, {
-            cfi: task.resumeCfi,
-            sourceId: task.sourceId,
-            tocHref: task.tocHref,
-            resumeLink,
-          });
-        } catch (e) {
-          logger.warn('[IRCalendarSidebar] Recovered warning message.', e);
-          await showMissingSourceDocumentDialog(material, filePath);
-        }
-        return;
-      }
-
-
       const file = plugin.app.vault.getAbstractFileByPath(filePath);
       if (!(file instanceof TFile)) {
         logger.warn('[IRCalendarSidebar] Recovered warning message.', filePath);
@@ -3190,45 +3249,8 @@
         return;
       }
 
-      const normalizedFilePath = normalizePath(filePath).toLowerCase();
-
-      if (material.sourceType === 'chunk' && normalizedFilePath.endsWith('.canvas')) {
-        const rm = readingMaterials.find(m => normalizePath(String(m.filePath || '').trim()) === normalizePath(filePath));
-        const chunk = await getWorkspaceChunkById(material.id);
-        const chunkMeta = ((chunk as any)?.meta || {}) as Record<string, unknown>;
-        const rawLink = (material.resumeLink && material.resumeLink.trim().length > 0)
-          ? material.resumeLink.trim()
-          : (typeof chunkMeta.resumeLink === 'string' && chunkMeta.resumeLink.trim().length > 0)
-            ? chunkMeta.resumeLink.trim()
-            : ((rm?.resumeLink && rm.resumeLink.trim().length > 0) ? rm.resumeLink.trim() : `[[${filePath}]]`);
-        const nodeId =
-          (typeof chunkMeta.canvasNodeId === 'string' && chunkMeta.canvasNodeId.trim().length > 0)
-            ? chunkMeta.canvasNodeId.trim()
-            : getCanvasNodeIdFromSourceLink(rawLink);
-        const textCandidates = Array.isArray(chunkMeta.canvasTextCandidates)
-          ? chunkMeta.canvasTextCandidates
-            .map((value) => String(value || '').trim())
-            .filter(Boolean)
-          : [];
-        const sourceNavigationService = new SourceNavigationService(plugin.app);
-        await sourceNavigationService.openCanvasAndLocate(
-          filePath,
-          textCandidates,
-          nodeId,
-          {
-            focus: true,
-            nodeRect: getCanvasSourceNodeRectFromSourceLink(rawLink)
-          }
-        );
-        return;
-      }
-
       const contextPath = plugin.app.workspace.getActiveFile()?.path ?? '';
-      const rm = readingMaterials.find(m => m.filePath === filePath);
-      let rawLink = (material.resumeLink && material.resumeLink.trim().length > 0)
-        ? material.resumeLink
-        : ((rm?.resumeLink && rm.resumeLink.trim().length > 0) ? rm.resumeLink : filePath);
-
+      const rawLink = await resolveScheduleItemOpenResumeLink(material, filePath);
       const linkToOpen = rawLink.trim().replace(/^!?\[\[/, '').replace(/\]\]$/, '').split('|')[0];
       await plugin.app.workspace.openLinkText(linkToOpen, contextPath, false);
       logger.debug('[IRCalendarSidebar] Recovered debug message.', linkToOpen);
@@ -4197,6 +4219,7 @@
     importModalInstance = null;
     addReadingTargetModalInstance?.close();
     addReadingTargetModalInstance = null;
+    closeActiveReadingPointPrompt();
     analyticsModalInstance?.close();
     analyticsModalInstance = null;
   });
@@ -4657,195 +4680,6 @@
     await saveMaterialReadingPointTags(material, nextTags);
   }
 
-  function buildGroupedTagSections(tags: string[], groups: IRTagGroup[]): Array<{ key: string; label: string; icon: string; tags: string[] }> {
-    const sortedGroups = [...groups]
-      .filter((group) => group.id !== 'default')
-      .sort((a, b) => (a.matchPriority ?? 0) - (b.matchPriority ?? 0));
-    const grouped = new Map<string, { key: string; label: string; icon: string; tags: string[] }>();
-    const ungrouped: string[] = [];
-
-    for (const rawTag of tags) {
-      const tag = String(rawTag || '').trim();
-      if (!tag) continue;
-      const normalized = tag.toLowerCase();
-      const matchedGroup = sortedGroups.find((group) =>
-        (group.matchAnyTags || []).some((candidate) => String(candidate || '').trim().replace(/^#/, '').toLowerCase() === normalized.replace(/^#/, ''))
-      );
-
-      if (!matchedGroup) {
-        ungrouped.push(tag);
-        continue;
-      }
-
-      if (!grouped.has(matchedGroup.id)) {
-        grouped.set(matchedGroup.id, {
-          key: matchedGroup.id,
-          label: matchedGroup.name,
-          icon: 'tags',
-          tags: [],
-        });
-      }
-      grouped.get(matchedGroup.id)?.tags.push(tag);
-    }
-
-    const sections = Array.from(grouped.values())
-      .map((section) => ({
-        ...section,
-        tags: [...new Set(section.tags)].sort((a, b) => a.localeCompare(b, 'zh-CN')),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'));
-
-    if (ungrouped.length > 0) {
-      sections.push({
-        key: '__ungrouped__',
-        label: uiText('\u672a\u5206\u7ec4', 'Ungrouped'),
-        icon: 'tag',
-        tags: [...new Set(ungrouped)].sort((a, b) => a.localeCompare(b, 'zh-CN')),
-      });
-    }
-
-    return sections;
-  }
-
-  async function loadReadingTagSubmenu(sub: Menu, material: ScheduleItem): Promise<void> {
-    if (!ensurePremiumFeature(PREMIUM_FEATURES.TAG_GROUPS)) {
-      return;
-    }
-    try {
-      const tagService = await getPointTagService();
-      const [currentTags, knownTags, groups] = await Promise.all([
-        getMaterialReadingPointTags(material),
-        tagService.getAllKnownTags(),
-        tagService.getTagGroups(),
-      ]);
-      const currentTagSet = new Set(currentTags.map((tag) => tag.toLowerCase()));
-      const currentGroupId = await tagService.matchGroupForTags(currentTags);
-      const currentGroup = groups.find((group) => group.id === currentGroupId);
-      const currentGroupName = currentGroup?.name || uiText('\u9ed8\u8ba4', 'Default');
-
-      sub.addItem((item) => {
-        item
-          .setTitle(uiText(`\u5f53\u524d\u6807\u7b7e\u7ec4\uff1a${currentGroupName}`, `Current tag group: ${currentGroupName}`))
-          .setIcon('layers')
-          .setDisabled(true);
-      });
-
-      sub.addSeparator();
-
-      sub.addItem((item) => {
-        item
-          .setTitle(uiText('\u65b0\u5efa\u6807\u7b7e', 'Create new tag'))
-          .setIcon('plus')
-          .onClick(async () => {
-            const input = await showObsidianInput(plugin.app, uiText('\u8f93\u5165\u65b0\u7684\u6807\u7b7e\u540d', 'Enter a new tag name'), '', {
-              title: uiText('\u65b0\u5efa\u6807\u7b7e', 'Create tag'),
-              placeholder: uiText('\u4f8b\u5982\uff1a\u6982\u5ff5 / \u5f15\u6587 / \u95ee\u9898', 'e.g. concept / quote / problem'),
-              confirmText: uiText('\u521b\u5efa', 'Create')
-            });
-            if (input === null) return;
-
-            const [nextTag] = normalizeReadingPointTags([input]);
-            if (!nextTag) {
-              new Notice(uiText('\u6807\u7b7e\u540d\u4e0d\u80fd\u4e3a\u7a7a', 'Tag name cannot be empty'));
-              return;
-            }
-            if (currentTagSet.has(nextTag.toLowerCase())) {
-              new Notice(uiText(`\u6807\u7b7e\u5df2\u5b58\u5728\uff1a${nextTag}`, `Tag already exists: ${nextTag}`));
-              return;
-            }
-
-            const saved = await saveMaterialReadingPointTags(material, [...currentTags, nextTag]);
-            if (!saved) {
-              new Notice(uiText('\u4fdd\u5b58\u6807\u7b7e\u5931\u8d25', 'Failed to save tag'));
-              return;
-            }
-
-            new Notice(uiText(`\u5df2\u6dfb\u52a0\u6807\u7b7e\uff1a${nextTag}`, `Added tag: ${nextTag}`));
-            await recomputeAndRefreshSidebar('reading_point_tags_changed');
-          });
-      });
-
-      sub.addItem((item) => {
-        item.setTitle(uiText('\u6dfb\u52a0\u5df2\u6709\u6807\u7b7e', 'Add existing tag')).setIcon('tags');
-        const selectSub = (item as any).setSubmenu();
-        const sections = buildGroupedTagSections(knownTags, groups);
-
-        if (sections.length === 0) {
-          selectSub.addItem((subItem: any) => {
-            subItem.setTitle(uiText('\u6682\u65e0\u53ef\u6dfb\u52a0\u6807\u7b7e', 'No available tags')).setIcon('inbox').setDisabled(true);
-          });
-          return;
-        }
-
-        for (const section of sections) {
-          selectSub.addItem((sectionItem: any) => {
-            sectionItem.setTitle(section.label).setIcon(section.icon);
-            const sectionSub = sectionItem.setSubmenu();
-
-            for (const tag of section.tags) {
-              const exists = currentTagSet.has(tag.toLowerCase());
-              sectionSub.addItem((tagItem: any) => {
-                tagItem
-                  .setTitle(tag)
-                  .setIcon(exists ? 'check' : 'tag')
-                  .setChecked(exists)
-                  .setDisabled(exists)
-                  .onClick(async () => {
-                    const saved = await saveMaterialReadingPointTags(material, [...currentTags, tag]);
-                    if (!saved) {
-                      new Notice(uiText('\u4fdd\u5b58\u6807\u7b7e\u5931\u8d25', 'Failed to save tag'));
-                      return;
-                    }
-
-                    new Notice(uiText(`\u5df2\u6dfb\u52a0\u6807\u7b7e\uff1a${tag}`, `Added tag: ${tag}`));
-                    await recomputeAndRefreshSidebar('reading_point_tags_changed');
-                  });
-              });
-            }
-          });
-        }
-      });
-
-      sub.addItem((item) => {
-        item.setTitle(uiText('\u79fb\u9664\u6807\u7b7e', 'Remove tag')).setIcon('minus-circle');
-        const removeSub = (item as any).setSubmenu();
-
-        if (currentTags.length === 0) {
-          removeSub.addItem((subItem: any) => {
-            subItem.setTitle(uiText('\u6682\u65e0\u53ef\u79fb\u9664\u6807\u7b7e', 'No tags to remove')).setIcon('inbox').setDisabled(true);
-          });
-          return;
-        }
-
-        for (const tag of currentTags) {
-          removeSub.addItem((tagItem: any) => {
-            tagItem
-              .setTitle(tag)
-              .setIcon('x')
-              .onClick(async () => {
-                const saved = await saveMaterialReadingPointTags(
-                  material,
-                  currentTags.filter((currentTag) => currentTag.toLowerCase() !== tag.toLowerCase())
-                );
-                if (!saved) {
-                  new Notice(uiText('\u4fdd\u5b58\u6807\u7b7e\u5931\u8d25', 'Failed to save tag'));
-                  return;
-                }
-
-                new Notice(uiText(`\u5df2\u79fb\u9664\u6807\u7b7e\uff1a${tag}`, `Removed tag: ${tag}`));
-                await recomputeAndRefreshSidebar('reading_point_tags_changed');
-              });
-          });
-        }
-      });
-    } catch (error) {
-      logger.error('[IRCalendarSidebar] Failed to load reading tag submenu.', error);
-      sub.addItem((item) => {
-        item.setTitle(uiText('\u52a0\u8f7d\u6807\u7b7e\u5931\u8d25', 'Failed to load tags')).setIcon('alert-triangle').setDisabled(true);
-      });
-    }
-  }
-
   function showMaterialMenuAt(
     menuPosition: { x: number; y: number },
     popoverPosition: { x: number; y: number },
@@ -4854,17 +4688,6 @@
   ) {
     try {
       const menu = new Menu();
-
-      menu.addItem((item) => {
-        item
-          .setTitle(t('irSidebar.menu.view'))
-          .setIcon('eye')
-          .onClick(() => {
-            void openBlockInfo(material, popoverPosition);
-          });
-      });
-
-      menu.addSeparator();
 
       menu.addItem((item) => {
         item
@@ -4884,21 +4707,74 @@
           });
       });
 
+      menu.addSeparator();
+
+      menu.addItem((item) => {
+        item
+          .setTitle(t('irSidebar.menu.renameReadingPoint'))
+          .setIcon('pencil')
+          .onClick(() => {
+            openRenameReadingPoint(material);
+          });
+      });
+
+      menu.addItem((item) => {
+        item
+          .setTitle(t('irSidebar.menu.selectReadingPointTopic'))
+          .setIcon('layers');
+        const topicSubmenu = item.setSubmenu();
+        void populateReadingPointTopicSubmenu(
+          topicSubmenu,
+          plugin.app,
+          material,
+          refreshAfterReadingPointPropertyEdit
+        );
+      });
+
+      if (canEditReadingPointLink(material)) {
+        menu.addItem((item) => {
+          item
+            .setTitle(t('irSidebar.menu.editTraceLink'))
+            .setIcon('link')
+            .onClick(() => {
+              openEditReadingPointTraceLink(material);
+            });
+        });
+      }
+
+      menu.addItem((item) => {
+        item
+          .setTitle(t('irSidebar.menu.view'))
+          .setIcon('eye')
+          .onClick(() => {
+            void openBlockInfo(material, popoverPosition);
+          });
+      });
+
+      menu.addSeparator();
+
       if (
         PremiumFeatureGuard.getInstance().canUseFeature(PREMIUM_FEATURES.TAG_GROUPS)
         || shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.TAG_GROUPS)
       ) {
         menu.addItem((item) => {
           if (PremiumFeatureGuard.getInstance().canUseFeature(PREMIUM_FEATURES.TAG_GROUPS)) {
+            const tagsDisabled = material.sourceType === 'legacy-block';
             item
-              .setTitle(uiText('\u9605\u8bfb\u6807\u7b7e', 'Reading tags'))
-              .setIcon('hash');
-            const sub = (item as any).setSubmenu();
-            void loadReadingTagSubmenu(sub, material);
+              .setTitle(t('irSidebar.menu.editTags'))
+              .setIcon('hash')
+              .setDisabled(tagsDisabled)
+              .onClick(() => {
+                if (tagsDisabled) {
+                  new Notice(uiText('\u65e7\u7248\u5757\u9605\u8bfb\u70b9\u6682\u4e0d\u652f\u6301\u5728\u6b64\u7f16\u8f91\u6807\u7b7e\u3002', 'Legacy block reading points cannot edit tags here.'));
+                  return;
+                }
+                openEditReadingPointTags(material);
+              });
             return;
           }
           item
-            .setTitle(premiumMenuTitle(uiText('\u9605\u8bfb\u6807\u7b7e', 'Reading tags'), PREMIUM_FEATURES.TAG_GROUPS))
+            .setTitle(premiumMenuTitle(t('irSidebar.menu.editTags'), PREMIUM_FEATURES.TAG_GROUPS))
             .setIcon('hash')
             .onClick(() => {
               ensurePremiumFeature(PREMIUM_FEATURES.TAG_GROUPS);

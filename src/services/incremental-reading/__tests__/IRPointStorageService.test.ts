@@ -1468,4 +1468,58 @@ chunk body`,
 		expect(merged.points[0].userData.title).toBe("Other title");
 	});
 
+	it("merges trace and metadata resumeLink when preserveExisting is enabled", async () => {
+		const v2Paths = getV2Paths("");
+		const { app, files } = createMemoryApp();
+		const service = new IRPointStorageService(app);
+
+		await service.syncLegacyPoint({
+			id: "chunk-trace-1",
+			topicId: "topic-trace",
+			topicName: "Trace Topic",
+			title: "Reading Point",
+			status: "new",
+			sourceType: "ir-chunk",
+			sourcePath: "Notes/Source.md",
+			locatorType: "markdown-chunk",
+			locator: {
+				chunkId: "chunk-trace-1",
+				sourcePath: "Notes/Source.md",
+				resumeLink: "[[Notes/Source.md#^old-block]]",
+			},
+			metadata: {
+				resumeLink: "[[Notes/Source.md#^old-block]]",
+			},
+		});
+
+		await service.syncLegacyPoint(
+			{
+				id: "chunk-trace-1",
+				topicId: "topic-trace",
+				title: "Reading Point",
+				status: "new",
+				sourceType: "ir-chunk",
+				sourcePath: "Notes/Source.md",
+				locatorType: "markdown-chunk",
+				locator: {
+					chunkId: "chunk-trace-1",
+					sourcePath: "Notes/Source.md",
+					resumeLink: "[[Notes/Target.md#^new-block]]",
+				},
+				metadata: {
+					resumeLink: "[[Notes/Target.md#^new-block]]",
+				},
+				traceState: "verified",
+				traceConfidence: 1,
+				lastVerifiedAt: "2026-06-14T12:00:00.000Z",
+			},
+			{ preserveExisting: true }
+		);
+
+		const snapshot = await service.getPointSnapshotById("chunk-trace-1");
+		expect(snapshot?.point.metadata?.resumeLink).toBe("[[Notes/Target.md#^new-block]]");
+		expect(snapshot?.point.trace?.locator?.resumeLink).toBe("[[Notes/Target.md#^new-block]]");
+		expect(snapshot?.point.trace?.traceState).toBe("verified");
+	});
+
 });
