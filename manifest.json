@@ -1,7 +1,7 @@
 {
   "id": "weave-incremental-reading",
   "name": "Weave Incremental Reading",
-  "version": "0.5.9",
+  "version": "0.5.10",
   "minAppVersion": "1.8.7",
   "description": "Standalone incremental reading workflow with topics, reading points, calendar scheduling, and source tracing.",
   "author": "Rabbit (zhuzhige)",

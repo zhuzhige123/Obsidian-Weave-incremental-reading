@@ -6,46 +6,34 @@
 
 **A standalone Obsidian plugin for incremental reading queues, reading points, and resume scheduling**
 
-[![Obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A5%201.8.7-7c3aed?style=flat-square&logo=obsidian)](https://obsidian.md/)
-[![License](https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
-
 </div>
 
-Weave Incremental Reading (plugin id: `weave-incremental-reading`) turns scattered “read later” material into a durable queue of reading points with topics, calendar scheduling, and source navigation.
+Weave Incremental Reading (plugin id: `weave-incremental-reading`) helps you turn scattered “read later” material into a durable queue of reading points, organized by topics and advanced through calendar scheduling and source navigation.
 
 ---
 
 ## Core capabilities
 
-- Reading points and IRDeck topics
-- Incremental reading calendar
-- Scheduling and resume workflow
-- Source navigation back to original context
+- **Reading points and topics (IRDeck)**: capture selections or sources into `.irdeck` topics
+- **Incremental reading calendar**: review due, scheduled, and overdue items by date
+- **Scheduling and resume**: processing-flow and reading-list strategies with daily limits
+- **Source navigation**: return to the original context from a reading point
 
 ---
 
 ## Installation
 
-### Community directory (recommended)
+1. Download the latest assets from [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases).
+2. Create:
 
-Search for **Weave Incremental Reading** under **Settings → Community plugins**.
+   ```text
+   .obsidian/plugins/weave-incremental-reading/
+   ```
 
-### Manual install from Releases
+3. Copy `main.js`, `manifest.json`, and `styles.css` from the same release into that folder.
+4. Enable **Weave Incremental Reading** under **Settings → Community plugins**.
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases)
-2. Copy them into `.obsidian/plugins/weave-incremental-reading/`
-3. Enable the plugin
-
-### Build from source
-
-```bash
-git clone https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading.git
-cd Obsidian-Weave-incremental-reading
-npm install
-npm run build
-```
-
-Copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` into your vault plugin folder.
+BRAT users can track this repository for updates.
 
 ---
 
@@ -53,38 +41,37 @@ Copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` into your vault
 
 | Item | Requirement |
 |------|-------------|
-| Obsidian | **≥ 1.8.7** |
+| Obsidian | **≥ 1.8.7** (see `minAppVersion` in `manifest.json`) |
 | Platforms | Desktop and mobile |
 
 ---
 
-## Development
+## Ecosystem split
 
-```bash
-npm install
-npm run dev
-```
-
-Pre-release checks:
-
-```bash
-npm run lint:obsidian:community:errors
-npm run audit:obsidian-release
-npm run check
-npm run test
-npm run build
-```
+| Plugin | Responsibility |
+|--------|----------------|
+| **Weave Incremental Reading** | Incremental reading queue, topics, scheduling, resume |
+| **Weave main plugin** | Memory decks, question banks, AI card generation |
+| **EPUB reader plugin** | EPUB reading runtime |
 
 ---
 
-## License
+## Data and privacy
 
-Released under [GPL-3.0-or-later](LICENSE).
+- Reading data stays in your local vault by default
+- The plugin does not upload your note content
+- Cross-plugin cooperation happens only when you use related features
+
+---
+
+## Distribution
+
+This public repository distributes release artifacts for Obsidian. Runtime files are published via **GitHub Releases**; full TypeScript/Svelte development source is not maintained here.
+
+Report issues via [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues).
 
 ---
 
 ## Author
 
 **Rabbit (zhuzhige)** — [GitHub](https://github.com/zhuzhige123)
-
-Report issues via [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues).
