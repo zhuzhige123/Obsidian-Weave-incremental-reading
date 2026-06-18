@@ -1,5 +1,6 @@
 import { Notice, TFile, type App } from "obsidian";
 import { IRDeckSelectorModal } from "../../modals/IRDeckSelectorModal";
+import { i18n } from "../../utils/i18n";
 import { getTaskTopicId } from "../../utils/ir-topic-compat";
 import type { IRBlockMeta, IRChunkFileData } from "../../types/ir-types";
 import {
@@ -90,14 +91,14 @@ export class IRHostSharedService {
 		const headingMatch = firstNonEmptyLine.trim().match(/^#{1,6}\s+(.+)$/);
 		if (headingMatch?.[1]) {
 			return {
-				title: this.cleanIRReadingPointTitle(headingMatch[1]) || "未命名阅读点",
+				title: this.cleanIRReadingPointTitle(headingMatch[1]) || i18n.t("irMain.defaults.unnamedReadingPoint"),
 				titleDetected: true,
 			};
 		}
 
 		const cleanedLine = this.cleanIRReadingPointTitle(firstNonEmptyLine);
 		return {
-			title: cleanedLine.length > 80 ? `${cleanedLine.slice(0, 80).trim()}...` : cleanedLine || "未命名阅读点",
+			title: cleanedLine.length > 80 ? `${cleanedLine.slice(0, 80).trim()}...` : cleanedLine || i18n.t("irMain.defaults.unnamedReadingPoint"),
 			titleDetected: false,
 		};
 	}
@@ -228,7 +229,7 @@ export class IRHostSharedService {
 				.filter((deck) => !deck.archivedAt)
 				.sort((left, right) => left.name.localeCompare(right.name));
 			if (decks.length === 0) {
-				new Notice("暂无可用增量阅读专题", 3000);
+				new Notice(i18n.t("irServiceNotices.host.noDecksAvailable"), 3000);
 				return null;
 			}
 
@@ -265,7 +266,7 @@ export class IRHostSharedService {
 			});
 		} catch (error) {
 			logger.error("[IRHostSharedService] 打开专题选择失败:", error);
-			new Notice("打开增量阅读专题列表失败", 3000);
+			new Notice(i18n.t("irServiceNotices.host.openDeckListFailed"), 3000);
 			return null;
 		}
 	}
@@ -277,13 +278,13 @@ export class IRHostSharedService {
 	): Promise<void> {
 		const sourceFile = this.app.vault.getAbstractFileByPath(String(options.filePath || "").trim());
 		if (!(sourceFile instanceof TFile) || sourceFile.extension !== "epub") {
-			new Notice("未找到对应的 EPUB 文件", 3000);
+			new Notice(i18n.t("irServiceNotices.host.epubFileNotFound"), 3000);
 			return;
 		}
 
 		const normalizedHref = this.normalizeEpubBookmarkHref(options.tocHref);
 		if (!normalizedHref) {
-			new Notice("未能读取章节定位信息", 3000);
+			new Notice(i18n.t("irServiceNotices.host.epubChapterLocationFailed"), 3000);
 			return;
 		}
 
@@ -307,7 +308,7 @@ export class IRHostSharedService {
 				this.normalizeEpubBookmarkHref(task.tocHref) === normalizedHref
 		);
 		if (duplicateTask) {
-			new Notice(`章节“${title}”已存在于专题“${picked.name}”中`, 3500);
+			new Notice(i18n.t("irServiceNotices.host.chapterAlreadyInDeck", { title, deckName: picked.name }), 3500);
 			return;
 		}
 
@@ -327,7 +328,7 @@ export class IRHostSharedService {
 		await recomputeAndBroadcastIRData(this.app, "import_materials", {
 			deckIds: [picked.id],
 		});
-		new Notice(`已将“${title}”添加到专题“${picked.name}”`, 3500);
+		new Notice(i18n.t("irServiceNotices.host.chapterAddedToDeck", { title, deckName: picked.name }), 3500);
 	}
 
 	async markEpubResumePointFromReader(
@@ -337,7 +338,7 @@ export class IRHostSharedService {
 		const normalizedFilePath = String(options.filePath || "").trim();
 		const normalizedCfi = String(options.cfi || "").trim();
 		if (!normalizedFilePath || !normalizedCfi) {
-			new Notice("没有可用的阅读位置", 3000);
+			new Notice(i18n.t("irServiceNotices.host.noReadingPosition"), 3000);
 			return;
 		}
 
@@ -349,7 +350,7 @@ export class IRHostSharedService {
 			  )
 			: await service.getTasksByEpub(normalizedFilePath);
 		if (tasks.length === 0) {
-			new Notice("未找到此 EPUB 的 IR 任务", 3000);
+			new Notice(i18n.t("irServiceNotices.host.epubTaskNotFound"), 3000);
 			return;
 		}
 
@@ -367,7 +368,11 @@ export class IRHostSharedService {
 			}) ?? tasks[0];
 
 		await service.setResumePoint(matchedTask.id, normalizedCfi);
-		new Notice(`续读点已保存：${String(options.chapterTitle || "").trim() || matchedTask.title}`);
+		new Notice(
+			i18n.t("irServiceNotices.host.resumeSaved", {
+				title: String(options.chapterTitle || "").trim() || matchedTask.title,
+			})
+		);
 	}
 
 	async ensureExternalDocumentChunkScheduled(

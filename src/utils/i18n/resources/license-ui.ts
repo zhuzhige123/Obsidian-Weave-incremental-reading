@@ -30,6 +30,9 @@ export const licenseUiTranslationOverrides: Record<SupportedLanguage, Translatio
 					resetConfirm: "确定要重置许可证吗？这将清除当前的激活状态。",
 					resetConfirmTitle: "确认重置",
 					resetSuccess: "许可证已重置",
+					inheritedDisabled: "已关闭主插件 Weave 授权继承。",
+					standaloneDescription:
+						"当前版本现有功能已免费开放。这里保留独立增量阅读激活码与主插件 Weave 授权继承能力，供后续新增高级功能继续使用。",
 					verifyAction: "许可证验证",
 					verifyFailed: "许可证验证失败",
 					verifyFailedWithReason: "许可证验证失败：{reason}",
@@ -67,6 +70,9 @@ export const licenseUiTranslationOverrides: Record<SupportedLanguage, Translatio
 					resetConfirm: "Reset the license? This will clear the current activation state.",
 					resetConfirmTitle: "Confirm reset",
 					resetSuccess: "License reset",
+					inheritedDisabled: "Weave main-plugin license inheritance has been turned off.",
+					standaloneDescription:
+						"Current features are free in this release. Standalone incremental-reading activation and Weave license inheritance remain available for future premium features.",
 					verifyAction: "License verification",
 					verifyFailed: "License verification failed",
 					verifyFailedWithReason: "License verification failed: {reason}",

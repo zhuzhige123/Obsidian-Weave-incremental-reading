@@ -2,6 +2,7 @@ import type { Menu, Plugin, View } from "obsidian";
 import { OBSIDIAN_WEB_VIEWER_VIEW_TYPE } from "../obsidian/obsidian-open-web-url";
 import { getWebViewerPageContextFromView } from "../obsidian/web-viewer-context";
 import { PREMIUM_FEATURES } from "../premium/PremiumFeatureGuard";
+import { i18n } from "../../utils/i18n";
 import { logger } from "../../utils/logger";
 
 export interface WebViewerIrMenuHost {
@@ -57,13 +58,13 @@ export function registerWebViewerPaneMenuPatch(
 				menu.addSeparator();
 				menu.addItem((item) => {
 					item
-						.setTitle("添加到增量阅读")
+						.setTitle(i18n.t("irCommands.addToIr"))
 						.setIcon("book-plus")
 						.onClick(() => {
 							if (
 								!host.ensurePremiumFeatureAccess(
 									PREMIUM_FEATURES.INCREMENTAL_READING,
-									"增量阅读"
+									i18n.t("irCommands.defaultIrName")
 								)
 							) {
 								return;

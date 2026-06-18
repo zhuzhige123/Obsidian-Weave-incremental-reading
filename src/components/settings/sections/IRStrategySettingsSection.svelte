@@ -8,9 +8,14 @@
   interface Props {
     settings: { incrementalReading?: IncrementalReadingSettings };
     strategyOptions: StrategyOption[];
-    handleStrategyDropdownChange: (value: string) => void;
-    handleTimeBudgetChange: (event: Event) => void;
-    handleMaxAppearancesChange: (event: Event) => void;
+  handleStrategyDropdownChange: (value: string) => void;
+  handleTimeBudgetChange: (event: Event) => void;
+  handleFlowStretchChange: (event: Event) => void;
+  handleLoadBasedDeferChange: (event: Event) => void;
+  handleDailyReadingPointCapChange: (event: Event) => void;
+  handleHorizonSmoothingChange: (event: Event) => void;
+  handleHorizonSpreadDaysChange: (event: Event) => void;
+  handleMaxAppearancesChange: (event: Event) => void;
     showSection?: boolean;
     strategyTitle?: string;
     strategyLabel?: string;
@@ -23,6 +28,11 @@
     strategyOptions,
     handleStrategyDropdownChange,
     handleTimeBudgetChange,
+    handleFlowStretchChange,
+    handleLoadBasedDeferChange,
+    handleDailyReadingPointCapChange,
+    handleHorizonSmoothingChange,
+    handleHorizonSpreadDaysChange,
     handleMaxAppearancesChange,
     showSection = true,
     strategyTitle,
@@ -78,6 +88,100 @@
           oninput={handleTimeBudgetChange}
         />
         <span class="slider-value">{settings.incrementalReading?.dailyTimeBudgetMinutes ?? 40}{t('irSettings.unitMinutes')}</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="label-with-desc">
+        <label for="irFlowStretch">{t('irSettings.flowStretchLabel')}</label>
+        <p class="desc">{t('irSettings.flowStretchDesc')}</p>
+      </div>
+      <div class="slider-container">
+        <input
+          id="irFlowStretch"
+          type="range"
+          min="0"
+          max="40"
+          step="5"
+          value={settings.incrementalReading?.flowStretchPercent ?? 15}
+          class="modern-slider"
+          oninput={handleFlowStretchChange}
+          disabled={settings.incrementalReading?.enableLoadBasedDefer === false}
+        />
+        <span class="slider-value">{settings.incrementalReading?.flowStretchPercent ?? 15}%</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="label-with-desc">
+        <label for="irEnableLoadDefer">{t('irSettings.enableLoadDeferLabel')}</label>
+        <p class="desc">{t('irSettings.enableLoadDeferDesc')}</p>
+      </div>
+      <label class="modern-switch">
+        <input
+          id="irEnableLoadDefer"
+          type="checkbox"
+          checked={settings.incrementalReading?.enableLoadBasedDefer !== false}
+          onchange={handleLoadBasedDeferChange}
+        />
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <div class="row">
+      <div class="label-with-desc">
+        <label for="irDailyReadingPointCap">{t('irSettings.dailyReadingPointCapLabel')}</label>
+        <p class="desc">{t('irSettings.dailyReadingPointCapDesc')}</p>
+      </div>
+      <div class="slider-container">
+        <input
+          id="irDailyReadingPointCap"
+          type="range"
+          min="5"
+          max="40"
+          step="1"
+          value={settings.incrementalReading?.dailyReadingPointCap ?? 15}
+          class="modern-slider"
+          oninput={handleDailyReadingPointCapChange}
+        />
+        <span class="slider-value">{settings.incrementalReading?.dailyReadingPointCap ?? 15}{t('irSettings.unitItems')}</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="label-with-desc">
+        <label for="irEnableHorizonSmoothing">{t('irSettings.enableHorizonSmoothingLabel')}</label>
+        <p class="desc">{t('irSettings.enableHorizonSmoothingDesc')}</p>
+      </div>
+      <label class="modern-switch">
+        <input
+          id="irEnableHorizonSmoothing"
+          type="checkbox"
+          checked={settings.incrementalReading?.enableHorizonSmoothing !== false}
+          onchange={handleHorizonSmoothingChange}
+        />
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <div class="row">
+      <div class="label-with-desc">
+        <label for="irHorizonSpreadDays">{t('irSettings.horizonSpreadDaysLabel')}</label>
+        <p class="desc">{t('irSettings.horizonSpreadDaysDesc')}</p>
+      </div>
+      <div class="slider-container">
+        <input
+          id="irHorizonSpreadDays"
+          type="range"
+          min="5"
+          max="14"
+          step="1"
+          value={settings.incrementalReading?.horizonSpreadDays ?? 7}
+          class="modern-slider"
+          oninput={handleHorizonSpreadDaysChange}
+          disabled={settings.incrementalReading?.enableHorizonSmoothing === false}
+        />
+        <span class="slider-value">{settings.incrementalReading?.horizonSpreadDays ?? 7}{t('irSettings.unitDays')}</span>
       </div>
     </div>
 

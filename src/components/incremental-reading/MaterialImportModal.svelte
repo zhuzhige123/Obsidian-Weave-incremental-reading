@@ -51,6 +51,7 @@
   import { getPdfOutlineForFile } from '../../utils/pdf-outline';
   import { PREMIUM_FEATURES } from '../../services/premium/PremiumFeatureGuard';
   import { ensureIRPremiumFeature } from '../../services/premium/ir-premium';
+  import { tr, i18n } from '../../utils/i18n';
 
   interface Props {
     plugin: WeavePlugin;
@@ -140,7 +141,7 @@
           const created = await pointWriteService.createPdfPoint({
             deckId: selectedDeckId,
             pdfPath,
-            title: block.title || 'PDF',
+            title: block.title || t('irImport.preview.defaultPdfTitle'),
             link: linkText,
             priorityUi: 5,
             sourceSequenceGroup: sequenceMeta?.sourceSequenceGroup,
@@ -166,7 +167,7 @@
           existingKeys.add(linkText);
           success++;
         } catch (e) {
-          const msg = e instanceof Error ? e.message : '未知错误';
+          const msg = e instanceof Error ? e.message : i18n.t('irImport.notices.unknownError');
           errors.push({ path: pdfPath, error: msg });
         }
       }
@@ -174,7 +175,9 @@
       await finalizeImport({ success, skipped, errors });
     } catch (error) {
       logger.error('[MaterialImportModal] PDF 书签任务导入失败:', error);
-      new Notice(`导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      new Notice(i18n.t('irImport.notices.importFailed', {
+        message: error instanceof Error ? error.message : i18n.t('irImport.notices.unknownError')
+      }));
     } finally {
       importing = false;
     }
@@ -187,6 +190,12 @@
     onClose,
     onImportComplete
   }: Props = $props();
+
+  let t = $derived($tr);
+
+  function importErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : t('irImport.notices.unknownError');
+  }
 
   async function finalizeImport(result: BatchImportResult): Promise<void> {
     if (result.success > 0) {
@@ -390,7 +399,7 @@
     fallbackEstimator: (block: ContentBlock) => number
   ): Promise<IRLoadInfo> {
     if (!selectedDeckId) {
-      throw new Error('[MaterialImportModal] 未选择专题，无法生成导入负载信息');
+      throw new Error(t('irImport.errors.noDeckForLoadInfo'));
     }
 
     const summary = await getProjectedScheduleSummary(plugin.app, {
@@ -420,11 +429,11 @@
   
   const modalTitle = $derived.by(() => {
     switch (currentStep) {
-      case 'select': return '导入阅读材料';
-      case 'split-mode': return isPdfImportMode || isEpubImportMode ? '选择目录项' : '选择拆分方式';
-      case 'configure': return '配置拆分规则';
-      case 'preview': return isPdfImportMode ? '确认导入 PDF 材料' : isEpubImportMode ? '确认导入 EPUB 材料' : '预览拆分结果';
-      default: return '导入阅读材料';
+      case 'select': return t('irImport.title.importMaterials');
+      case 'split-mode': return isPdfImportMode || isEpubImportMode ? t('irImport.title.selectOutlineItems') : t('irImport.title.selectSplitMode');
+      case 'configure': return t('irImport.title.configureSplitRules');
+      case 'preview': return isPdfImportMode ? t('irImport.title.confirmPdfImport') : isEpubImportMode ? t('irImport.title.confirmEpubImport') : t('irImport.title.previewSplitResults');
+      default: return t('irImport.title.importMaterials');
     }
   });
   
@@ -441,11 +450,11 @@
   );
 
   function getOutlineUnitLabel(): string {
-    return isPdfImportMode ? '书签' : '章节';
+    return isPdfImportMode ? t('irImport.outline.bookmark') : t('irImport.outline.chapter');
   }
 
   function getOutlineStepTitle(): string {
-    return isPdfImportMode ? 'PDF 目录选择' : 'EPUB 目录选择';
+    return isPdfImportMode ? t('irImport.outline.pdfSelection') : t('irImport.outline.epubSelection');
   }
 
   function buildOutlineDisplayTitle(item: OutlineSelectionItem): string {
@@ -986,7 +995,7 @@
 
   async function showMarkdownImportFolderMenu(): Promise<void> {
     const picker = new VaultFolderSuggestModal(plugin.app, {
-      placeholder: '选择 MD 拆分文件导入路径...'
+      placeholder: t('irImport.mdPath.folderPickerPlaceholder')
     });
     const folderPath = await picker.openAndSelect();
     if (!folderPath) {
@@ -1002,7 +1011,7 @@
 
   function getMarkdownImportFolderLabel(): string {
     if (!markdownImportFolder || markdownImportFolder === '/') {
-      return '/（Vault 根目录）';
+      return t('irImport.mdPath.vaultRoot');
     }
     return markdownImportFolder;
   }
@@ -1033,16 +1042,16 @@
   }
 
   function buildSourceTraceBacklink(file: TFile): string {
-    return `[[${file.path}|溯源完整源文档]]`;
+    return `[[${file.path}|${t('irImport.sourceBacklink.linkLabel')}]]`;
   }
 
   function getWholeFileImportModeLabel(): string {
-    return wholeFileImportMode === 'reference' ? '直接引用原文件' : '生成副本并导入';
+    return wholeFileImportMode === 'reference' ? t('irImport.importMode.reference') : t('irImport.importMode.copy');
   }
 
   function getInitialImportOrderingLabel(): string {
     const option = INITIAL_IMPORT_ORDERING_OPTIONS.find(o => o.value === initialImportOrderingMode);
-    return option?.label || '正序分散';
+    return option ? t(option.labelKey) : t('irImport.scheduling.ordering.preserveSourceOrder');
   }
 
   async function goToSplitModeStep(): Promise<void> {
@@ -1064,7 +1073,7 @@
     const hasEpub = extensions.has('epub');
     const typeCount = (hasMarkdown ? 1 : 0) + (hasPdf ? 1 : 0) + (hasEpub ? 1 : 0);
     if (typeCount > 1) {
-      new Notice('暂不支持混合导入（请分别导入 Markdown、PDF 或 EPUB）');
+      new Notice(t('irImport.notices.mixedImportNotSupported'));
       return;
     }
 
@@ -1161,7 +1170,7 @@
       currentStep = 'split-mode';
     } catch (error) {
       logger.error('[MaterialImportModal] 解析 PDF 目录失败:', error);
-      new Notice(`解析 PDF 目录失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      new Notice(t('irImport.notices.parsePdfOutlineFailed', { message: importErrorMessage(error) }));
     } finally {
       loadingOutline = false;
       importing = false;
@@ -1212,7 +1221,7 @@
   function handleOutlineSelectionConfirm(): void {
     const selectedItems = outlineVisibleItems.filter((item) => outlineSelectedIds.has(item.id));
     if (selectedItems.length === 0) {
-      new Notice(`请至少选择一个${getOutlineUnitLabel()}`);
+      new Notice(t('irImport.notices.selectAtLeastOne', { unit: getOutlineUnitLabel() }));
       return;
     }
 
@@ -1244,7 +1253,7 @@
     const materialStorage = plugin.readingMaterialStorage;
 
     if (!materialManager || !materialStorage) {
-      throw new Error('增量阅读材料服务尚未初始化');
+      throw new Error(t('irImport.errors.materialServiceNotInit'));
     }
 
     await materialStorage.initialize();
@@ -1261,7 +1270,7 @@
     await services.init();
     const storage = services.storageService;
     if (!storage) {
-      throw new Error('增量阅读存储服务尚未初始化');
+      throw new Error(t('irImport.errors.storageServiceNotInit'));
     }
 
     const chunks = await storage.getAllChunkData();
@@ -1303,7 +1312,7 @@
   ): Promise<{ successCount: number; errorCount: number; chunkCount: number }> {
     const selectedDeck = availableDecks.find(d => d.id === selectedDeckId);
     if (!selectedDeckId || !selectedDeck) {
-      throw new Error('未选择专题');
+      throw new Error(t('irImport.errors.noDeckSelected'));
     }
 
     const { materialManager } = await ensureMdMaterialServices();
@@ -1333,7 +1342,7 @@
         fallbackCursor += blocksForFile.length;
 
         if (blocksForFile.length === 0) {
-          throw new Error('没有可导入的拆分内容');
+          throw new Error(t('irImport.errors.noSplitContent'));
         }
 
         const splitBlocks = blocksForFile.map((block) => {
@@ -1385,7 +1394,7 @@
       } catch (error) {
         errorCount++;
         logger.error(`[MaterialImportModal] Markdown 拆分导入失败: ${file.path}`, error);
-        new Notice(`导入失败: ${file.basename} - ${error instanceof Error ? error.message : '未知错误'}`);
+        new Notice(t('irImport.notices.importFailedWithFile', { file: file.basename, message: importErrorMessage(error) }));
       }
     }
 
@@ -1398,7 +1407,7 @@
   ): Promise<{ successCount: number; errorCount: number; chunkCount: number }> {
     const selectedDeck = availableDecks.find(d => d.id === selectedDeckId);
     if (!selectedDeckId || !selectedDeck) {
-      throw new Error('未选择专题');
+      throw new Error(t('irImport.errors.noDeckSelected'));
     }
 
     const { materialManager } = await ensureMdMaterialServices();
@@ -1450,7 +1459,7 @@
       } catch (error) {
         errorCount++;
         logger.error(`[MaterialImportModal] Markdown 直引导入失败: ${file.path}`, error);
-        new Notice(`导入失败: ${file.basename} - ${error instanceof Error ? error.message : '未知错误'}`);
+        new Notice(t('irImport.notices.importFailedWithFile', { file: file.basename, message: importErrorMessage(error) }));
       }
     }
 
@@ -1463,7 +1472,7 @@
   ): Promise<{ successCount: number; errorCount: number; chunkCount: number }> {
     const selectedDeck = availableDecks.find(d => d.id === selectedDeckId);
     if (!selectedDeckId || !selectedDeck) {
-      throw new Error('未选择专题');
+      throw new Error(t('irImport.errors.noDeckSelected'));
     }
 
     const { materialManager } = await ensureMdMaterialServices();
@@ -1519,7 +1528,7 @@
       } catch (error) {
         errorCount++;
         logger.error(`[MaterialImportModal] Markdown 副本导入失败: ${file.path}`, error);
-        new Notice(`导入失败: ${file.basename} - ${error instanceof Error ? error.message : '未知错误'}`);
+        new Notice(t('irImport.notices.importFailedWithFile', { file: file.basename, message: importErrorMessage(error) }));
       }
     }
 
@@ -1761,12 +1770,12 @@
       const skipped = selected.length - newItems.length;
 
       importProgress = { current: contentBlocks.length, total: contentBlocks.length };
-      new Notice(`EPUB 导入完成: ${success} 个任务创建, ${skipped} 个已跳过`);
+      new Notice(t('irImport.notices.epubImportComplete', { success, skipped }));
 
       await finalizeImport({ success, skipped, errors: [] });
     } catch (error) {
       logger.error('[MaterialImportModal] EPUB 书签任务导入失败:', error);
-      new Notice(`导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      new Notice(t('irImport.notices.importFailed', { message: importErrorMessage(error) }));
     } finally {
       importing = false;
     }
@@ -1871,7 +1880,7 @@
       await finalizeImport({
         success: result.successCount,
         skipped: 0,
-        errors: result.errorCount > 0 ? [{ path: '', error: `${result.errorCount} 个文件导入失败` }] : []
+        errors: result.errorCount > 0 ? [{ path: '', error: t('irImport.notices.batchImportFailedCount', { count: result.errorCount }) }] : []
       });
     } catch (error) {
       logger.error('[MaterialImportModal] 批量导入失败:', error);
@@ -1901,7 +1910,7 @@
       await finalizeImport({
         success: result.successCount,
         skipped: 0,
-        errors: result.errorCount > 0 ? [{ path: selectedFilePath || '', error: '导入失败' }] : []
+        errors: result.errorCount > 0 ? [{ path: selectedFilePath || '', error: t('irImport.notices.importFailedGeneric') }] : []
       });
     } catch (error) {
       logger.error('[MaterialImportModal] 导入失败:', error);
@@ -1914,22 +1923,28 @@
 
   // Obsidian Menu API 实现
   const STRATEGY_OPTIONS = [
-    { value: 'even', label: '均分' },
-    { value: 'balanced', label: '均衡' },
-    { value: 'front-loaded', label: '尽快' }
+    { value: 'even', labelKey: 'irImport.scheduling.strategies.even' },
+    { value: 'balanced', labelKey: 'irImport.scheduling.strategies.balanced' },
+    { value: 'front-loaded', labelKey: 'irImport.scheduling.strategies.frontLoaded' }
   ] as const;
   const INITIAL_IMPORT_ORDERING_OPTIONS = [
-    { value: 'preserve-source-order', label: '正序分散' },
-    { value: 'pure-scheduling', label: '按调度排序' }
+    { value: 'preserve-source-order', labelKey: 'irImport.scheduling.ordering.preserveSourceOrder' },
+    { value: 'pure-scheduling', labelKey: 'irImport.scheduling.ordering.pureScheduling' }
   ] as const;
+  const SCHEDULING_PRESET_KEYS: Record<string, 'week' | 'twoWeeks' | 'month'> = {
+    week: 'week',
+    twoWeeks: 'twoWeeks',
+    month: 'month',
+  };
 
   function showSchedulingDaysMenu(evt: MouseEvent) {
     const menu = new Menu();
     
     Object.entries(SCHEDULING_PRESETS).forEach(([key, preset]) => {
+      const presetKey = SCHEDULING_PRESET_KEYS[key];
       menu.addItem((item) => {
         item
-          .setTitle(preset.label)
+          .setTitle(presetKey ? t(`irImport.scheduling.presets.${presetKey}`) : preset.label)
           .setChecked(!useCustomDays && schedulingConfig.distributionDays === preset.days)
           .onClick(() => {
             useCustomDays = false;
@@ -1940,7 +1955,7 @@
     
     menu.addItem((item) => {
       item
-        .setTitle('自定义')
+        .setTitle(t('irImport.scheduling.custom'))
         .setChecked(useCustomDays)
         .onClick(() => {
           useCustomDays = true;
@@ -1957,7 +1972,7 @@
     STRATEGY_OPTIONS.forEach(option => {
       menu.addItem((item) => {
         item
-          .setTitle(option.label)
+          .setTitle(t(option.labelKey))
           .setChecked(schedulingConfig.strategy === option.value)
           .onClick(() => {
             schedulingConfig.strategy = option.value;
@@ -1974,7 +1989,7 @@
     INITIAL_IMPORT_ORDERING_OPTIONS.forEach(option => {
       menu.addItem((item) => {
         item
-          .setTitle(option.label)
+          .setTitle(t(option.labelKey))
           .setChecked(initialImportOrderingMode === option.value)
           .onClick(() => {
             initialImportOrderingMode = option.value;
@@ -1990,7 +2005,7 @@
 
     menu.addItem((item) => {
       item
-        .setTitle('直接引用原文件')
+        .setTitle(t('irImport.importMode.reference'))
         .setChecked(wholeFileImportMode === 'reference')
         .onClick(() => {
           wholeFileImportMode = 'reference';
@@ -1999,7 +2014,7 @@
 
     menu.addItem((item) => {
       item
-        .setTitle('生成副本并导入')
+        .setTitle(t('irImport.importMode.copy'))
         .setChecked(wholeFileImportMode === 'copy')
         .onClick(() => {
           wholeFileImportMode = 'copy';
@@ -2027,7 +2042,7 @@
     
     menu.addItem((item) => {
       item
-        .setTitle('新建专题')
+        .setTitle(t('irImport.deck.newDeck'))
         .setIcon('plus')
         .onClick(() => {
           showNewDeckInput = true;
@@ -2038,19 +2053,25 @@
   }
 
   function getSchedulingDaysLabel(): string {
-    if (useCustomDays) return `${customDaysValue}天`;
-    const preset = Object.values(SCHEDULING_PRESETS).find(p => p.days === schedulingConfig.distributionDays);
-    return preset?.label || `${schedulingConfig.distributionDays}天`;
+    if (useCustomDays) return t('irImport.scheduling.daysSuffix', { count: customDaysValue });
+    const preset = Object.entries(SCHEDULING_PRESETS).find(([, value]) => value.days === schedulingConfig.distributionDays);
+    if (preset) {
+      const presetKey = SCHEDULING_PRESET_KEYS[preset[0]];
+      if (presetKey) {
+        return t(`irImport.scheduling.presets.${presetKey}`);
+      }
+    }
+    return t('irImport.scheduling.daysSuffix', { count: schedulingConfig.distributionDays });
   }
 
   function getStrategyLabel(): string {
     const option = STRATEGY_OPTIONS.find(o => o.value === schedulingConfig.strategy);
-    return option?.label || '均衡';
+    return option ? t(option.labelKey) : t('irImport.scheduling.strategies.balanced');
   }
 
   function getSelectedDeckLabel(): string {
     const deck = availableDecks.find(d => d.id === selectedDeckId);
-    return deck ? `${deck.icon} ${deck.name}` : '选择专题';
+    return deck ? `${deck.icon} ${deck.name}` : t('irImport.deck.selectDeck');
   }
   
   /**
@@ -2071,7 +2092,7 @@
 
       const tagGroupService = irTagGroupService;
       if (!tagGroupService) {
-        throw new Error('[MaterialImportModal] IRTagGroupService 初始化失败');
+        throw new Error(t('irImport.errors.tagGroupInitFailed'));
       }
       
       logger.info(`[MaterialImportModal] 开始文件化块导入: ${filePaths.length} 个文件, 牌组: ${selectedDeck?.name || '未分配'}`);
@@ -2114,18 +2135,18 @@
       if (nonMdFilePaths.length === 0) {
         logger.info(`[MaterialImportModal] MD 源文档直引导入完成: 成功 ${successCount}, 失败 ${errorCount}`);
         if (successCount > 0) {
-          new Notice(`导入完成: ${successCount} 个 Markdown 文档已接入增量阅读`);
+          new Notice(t('irImport.notices.importCompleteMd', { count: successCount }));
         }
         return { successCount, errorCount, chunkCount: 0 };
       }
 
       errorCount += nonMdFilePaths.length;
       logger.warn('[MaterialImportModal] 旧文件化块导入已停用，本次跳过非 Markdown 文件:', nonMdFilePaths);
-      new Notice('旧文件化块导入已停用：PDF/EPUB 等文件不再拆成 raw/index/chunk，请改用正文阅读点或等待新模型重做。', 5000);
+      new Notice(t('irImport.notices.legacyBlockImportDisabled'), 5000);
       return { successCount, errorCount, chunkCount: 0 };
     } catch (error) {
       logger.error('[MaterialImportModal] 文件化块导入失败:', error);
-      new Notice(`导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      new Notice(t('irImport.notices.importFailed', { message: importErrorMessage(error) }));
       return { successCount: 0, errorCount: filePaths.length, chunkCount: 0 };
     }
   }
@@ -2251,8 +2272,8 @@
     }
 
     new Setting(host)
-      .setName('添加完整源文档溯源双链')
-      .setDesc('启用后，在拆分生成的 Markdown 文件末尾追加指向原始完整源文档的双链。')
+      .setName(t('irImport.sourceBacklink.name'))
+      .setDesc(t('irImport.sourceBacklink.desc'))
       .addToggle((toggle) => {
         toggle
           .setValue(appendSourceDocumentBacklinkOnSplitImport)
@@ -2282,7 +2303,7 @@
         const groupId = await service.matchGroupForDocument(firstPath, true);
         const allGroups = await service.getAllGroups();
         const matched = allGroups.find((g: any) => g.id === groupId);
-        previewTagGroupName = matched?.name || (groupId === 'default' ? '默认' : groupId);
+        previewTagGroupName = matched?.name || (groupId === 'default' ? t('irImport.tagGroup.default') : groupId);
       } else {
         previewTagGroupName = '';
       }
@@ -2304,17 +2325,17 @@
       <div class="step-indicator">
         <div class="step" class:completed={true} class:active={false}>
           <span class="step-num">1</span>
-          <span class="step-label">选择</span>
+          <span class="step-label">{t('irImport.steps.select')}</span>
         </div>
         <div class="step-line"></div>
         <div class="step" class:completed={currentStep === 'preview'} class:active={currentStep === 'split-mode' || currentStep === 'configure'}>
           <span class="step-num">2</span>
-          <span class="step-label">{isPdfImportMode || isEpubImportMode ? '目录' : '拆分'}</span>
+          <span class="step-label">{isPdfImportMode || isEpubImportMode ? t('irImport.steps.outline') : t('irImport.steps.split')}</span>
         </div>
         <div class="step-line"></div>
         <div class="step" class:active={currentStep === 'preview'}>
           <span class="step-num">3</span>
-          <span class="step-label">确认</span>
+          <span class="step-label">{t('irImport.steps.confirm')}</span>
         </div>
       </div>
     {/if}
@@ -2325,7 +2346,7 @@
           <ObsidianIcon name="search" size={16} />
           <input 
             type="text" 
-            placeholder="搜索文件..." 
+            placeholder={t('irImport.search.placeholder')} 
             bind:value={searchQuery}
             class="search-input"
           />
@@ -2338,7 +2359,7 @@
 
         <div class="toolbar">
           <span class="info-text">
-            已选择 <strong>{selectedCount}</strong> 个文件
+            {t('irImport.selection.selectedFiles', { count: selectedCount })}
           </span>
         </div>
 
@@ -2346,8 +2367,8 @@
           {#if filteredTreeData.length === 0}
             <div class="empty-state">
               <ObsidianIcon name={searchQuery ? 'search-x' : 'file-question'} size={32} />
-              <p class="empty-text">{searchQuery ? '未找到匹配的文件' : '没有可导入的文件'}</p>
-              <p class="empty-hint-text">{searchQuery ? '请尝试其他关键词' : 'Vault 中没有 Markdown / PDF / EPUB 文件'}</p>
+              <p class="empty-text">{searchQuery ? t('irImport.empty.noMatch') : t('irImport.empty.noFiles')}</p>
+              <p class="empty-hint-text">{searchQuery ? t('irImport.empty.noMatchHint') : t('irImport.empty.noFilesHint')}</p>
             </div>
           {:else}
             {#each filteredTreeData as node (node.path)}
@@ -2365,17 +2386,17 @@
             </div>
             <span class="progress-text">
               {#if isPdfImportMode}
-                正在解析 PDF 目录...
+                {t('irImport.progress.parsingPdfOutline')}
               {:else if isEpubImportMode}
-                正在解析 EPUB 目录...
+                {t('irImport.progress.parsingEpubOutline')}
               {:else}
-                正在导入 {importProgress.current}/{importProgress.total}
+                {t('irImport.progress.importing', { current: importProgress.current, total: importProgress.total })}
               {/if}
             </span>
           </div>
         {:else}
           <button class="btn-primary" onclick={goToSplitModeStep} disabled={selectedCount === 0}>
-            下一步 ({selectedCount})
+            {t('irImport.buttons.nextWithCount', { count: selectedCount })}
             <ObsidianIcon name="arrow-right" size={14} />
           </button>
         {/if}
@@ -2384,31 +2405,31 @@
       <div class="step-content step-content-framed">
         <div class="section-header">
           <h4 class="section-title">{getOutlineStepTitle()}</h4>
-          <span class="badge">{visibleOutlineCount} 个{getOutlineUnitLabel()}</span>
+          <span class="badge">{t('irImport.outline.countBadge', { count: visibleOutlineCount, unit: getOutlineUnitLabel() })}</span>
         </div>
 
         <div class="step-body">
           {#if loadingOutline}
             <div class="empty-state step-fill-state">
-              <p class="empty-text">正在解析{isPdfImportMode ? ' PDF' : ' EPUB'}目录...</p>
+              <p class="empty-text">{isPdfImportMode ? t('irImport.outline.parsingPdf') : t('irImport.outline.parsingEpub')}</p>
             </div>
           {:else if outlineAllItems.length === 0}
             <div class="empty-state step-fill-state">
               <ObsidianIcon name="file-question" size={32} />
-              <p class="empty-text">未获取到{isPdfImportMode ? ' PDF' : ' EPUB'}目录</p>
-              <p class="empty-hint-text">{isPdfImportMode ? '该 PDF 可能没有嵌入目录信息' : '该 EPUB 可能没有嵌入目录信息'}</p>
+              <p class="empty-text">{isPdfImportMode ? t('irImport.outline.noOutlinePdf') : t('irImport.outline.noOutlineEpub')}</p>
+              <p class="empty-hint-text">{isPdfImportMode ? t('irImport.outline.noOutlinePdfHint') : t('irImport.outline.noOutlineEpubHint')}</p>
             </div>
           {:else if outlineSelectedLevels.length === 0}
             <div class="empty-state step-fill-state">
               <ObsidianIcon name="list" size={32} />
-              <p class="empty-text">请至少选择一个目录层级</p>
-              <p class="empty-hint-text">勾选上方层级按钮后再选择要导入的章节</p>
+              <p class="empty-text">{t('irImport.outline.selectLevel')}</p>
+              <p class="empty-hint-text">{t('irImport.outline.selectLevelHint')}</p>
             </div>
           {:else}
             <div class="outline-stage">
               <div class="outline-selection-toolbar">
                 <div class="config-group">
-                  <span class="option-label">层级:</span>
+                  <span class="option-label">{t('irImport.outline.levelLabel')}</span>
                   <div class="checkbox-group">
                     {#each outlineAvailableLevels as level}
                       <button
@@ -2422,13 +2443,13 @@
                   </div>
                   <div class="outline-toolbar-actions">
                     <button class="clickable-icon btn-secondary btn-compact" onclick={selectAllVisibleOutlineItems} disabled={outlineVisibleItems.length === 0 || allVisibleOutlineSelected}>
-                      全选
+                      {t('irImport.outline.selectAll')}
                     </button>
                     <button class="clickable-icon btn-secondary btn-compact" onclick={clearVisibleOutlineItems} disabled={selectedOutlineCount === 0}>
-                      全不选
+                      {t('irImport.outline.selectNone')}
                     </button>
                   </div>
-                  <span class="info-text" style="margin-left: auto;">{selectedOutlineCount}/{visibleOutlineCount} 已选</span>
+                  <span class="info-text" style="margin-left: auto;">{t('irImport.outline.selectedCount', { selected: selectedOutlineCount, visible: visibleOutlineCount })}</span>
                 </div>
               </div>
 
@@ -2466,10 +2487,10 @@
       <footer class="modal-footer modal-footer-row">
         <button class="clickable-icon btn-secondary btn-compact" onclick={goBack}>
           <ObsidianIcon name="arrow-left" size={14} />
-          上一步
+          {t('irImport.buttons.back')}
         </button>
         <button class="btn-primary btn-compact" onclick={handleOutlineSelectionConfirm} disabled={selectedOutlineCount === 0}>
-          下一步 ({selectedOutlineCount})
+          {t('irImport.buttons.nextWithCount', { count: selectedOutlineCount })}
           <ObsidianIcon name="arrow-right" size={14} />
         </button>
       </footer>
@@ -2477,18 +2498,18 @@
     {:else if currentStep === 'configure'}
       <div class="step-content">
         <div class="section-header">
-          <h4 class="section-title">配置拆分规则</h4>
+          <h4 class="section-title">{t('irImport.configure.sectionTitle')}</h4>
         </div>
 
         <div class="config-form">
           <div class="config-group">
             <label class="config-toggle">
               <input type="checkbox" bind:checked={ruleSplitConfig.enableWholeFile} />
-              <span class="toggle-label">整个文件作为一个块</span>
+              <span class="toggle-label">{t('irImport.configure.wholeFile')}</span>
             </label>
             {#if ruleSplitConfig.enableWholeFile}
               <div class="config-options">
-                <span class="option-hint">每个文件将作为一个完整的内容块，不进行拆分</span>
+                <span class="option-hint">{t('irImport.configure.wholeFileHint')}</span>
               </div>
             {/if}
           </div>
@@ -2496,11 +2517,11 @@
           <div class="config-group">
             <label class="config-toggle">
               <input type="checkbox" bind:checked={ruleSplitConfig.enableHeadingSplit} disabled={ruleSplitConfig.enableWholeFile} />
-              <span class="toggle-label">按标题拆分</span>
+              <span class="toggle-label">{t('irImport.configure.headingSplit')}</span>
             </label>
             {#if ruleSplitConfig.enableHeadingSplit}
               <div class="config-options">
-                <span class="option-label">标题级别:</span>
+                <span class="option-label">{t('irImport.configure.headingLevels')}</span>
                 <div class="checkbox-group">
                   {#each [1, 2, 3, 4, 5, 6] as level}
                     <label class="checkbox-item">
@@ -2526,11 +2547,11 @@
           <div class="config-group">
             <label class="config-toggle">
               <input type="checkbox" bind:checked={ruleSplitConfig.enableBlankLineSplit} disabled={ruleSplitConfig.enableWholeFile} />
-              <span class="toggle-label">按空行拆分</span>
+              <span class="toggle-label">{t('irImport.configure.blankLineSplit')}</span>
             </label>
             {#if ruleSplitConfig.enableBlankLineSplit}
               <div class="config-options">
-                <span class="option-label">连续空行数:</span>
+                <span class="option-label">{t('irImport.configure.blankLineCount')}</span>
                 <input type="number" class="input-number" min="1" max="10" bind:value={ruleSplitConfig.blankLineCount} />
               </div>
             {/if}
@@ -2539,12 +2560,12 @@
           <div class="config-group">
             <label class="config-toggle">
               <input type="checkbox" bind:checked={ruleSplitConfig.enableSymbolSplit} disabled={ruleSplitConfig.enableWholeFile} />
-              <span class="toggle-label">按符号拆分</span>
+              <span class="toggle-label">{t('irImport.configure.symbolSplit')}</span>
             </label>
             {#if ruleSplitConfig.enableSymbolSplit}
               <div class="config-options">
-                <span class="option-label">分隔符:</span>
-                <input type="text" class="input-text" bind:value={ruleSplitConfig.splitSymbol} placeholder="例如: ---" />
+                <span class="option-label">{t('irImport.configure.splitSymbol')}</span>
+                <input type="text" class="input-text" bind:value={ruleSplitConfig.splitSymbol} placeholder={t('irImport.configure.splitSymbolPlaceholder')} />
               </div>
             {/if}
           </div>
@@ -2552,20 +2573,20 @@
           <div class="config-group">
             <label class="config-toggle">
               <input type="checkbox" bind:checked={ruleSplitConfig.filterEmptyBlocks} />
-              <span class="toggle-label">过滤空内容块</span>
+              <span class="toggle-label">{t('irImport.configure.filterEmpty')}</span>
             </label>
           </div>
 
           <div class="config-group">
             <label class="config-toggle">
               <input type="checkbox" bind:checked={ruleSplitConfig.preserveHeadingAsTitle} />
-              <span class="toggle-label">保留标题作为内容块标题</span>
+              <span class="toggle-label">{t('irImport.configure.preserveHeading')}</span>
             </label>
           </div>
 
           <div class="config-group">
             <div class="config-options">
-              <span class="option-label">最小字符数:</span>
+              <span class="option-label">{t('irImport.configure.minCharCount')}</span>
               <input type="number" class="input-number" min="0" max="1000" bind:value={ruleSplitConfig.minBlockCharCount} />
             </div>
           </div>
@@ -2575,10 +2596,10 @@
       <footer class="modal-footer modal-footer-row">
         <button class="clickable-icon btn-secondary btn-compact" onclick={goBack}>
           <ObsidianIcon name="arrow-left" size={14} />
-          上一步
+          {t('irImport.buttons.back')}
         </button>
         <button class="btn-primary btn-compact" onclick={handleRuleConfigConfirm}>
-          下一步
+          {t('irImport.buttons.next')}
           <ObsidianIcon name="arrow-right" size={14} />
         </button>
       </footer>
@@ -2587,21 +2608,21 @@
       <div class="step-content preview-step">
         {#if isPdfImportMode}
           <div class="section-header">
-            <h4 class="section-title">PDF 目录预览</h4>
-            <span class="badge">{contentBlocks.length} 个书签</span>
+            <h4 class="section-title">{t('irImport.preview.pdfOutline')}</h4>
+            <span class="badge">{t('irImport.preview.bookmarkCount', { count: contentBlocks.length })}</span>
           </div>
           <div class="pdf-outline-list">
             {#if contentBlocks.length === 0}
               <div class="empty-state">
                 <ObsidianIcon name="file-question" size={32} />
-                <p class="empty-text">未获取到 PDF 目录</p>
-                <p class="empty-hint-text">该 PDF 可能没有嵌入目录信息</p>
+                <p class="empty-text">{t('irImport.preview.noPdfOutline')}</p>
+                <p class="empty-hint-text">{t('irImport.preview.noPdfOutlineHint')}</p>
               </div>
             {:else}
               {#each contentBlocks as block, i}
                 <div class="outline-item">
                   <span class="outline-index">{i + 1}</span>
-                  <span class="outline-title">{block.title || 'PDF'}</span>
+                  <span class="outline-title">{block.title || t('irImport.preview.defaultPdfTitle')}</span>
                   {#if (block as any).pdfPageNumber}
                     <span class="outline-page">p.{(block as any).pdfPageNumber}</span>
                   {/if}
@@ -2611,14 +2632,14 @@
           </div>
         {:else if isEpubImportMode}
           <div class="section-header">
-            <h4 class="section-title">EPUB 章节预览</h4>
-            <span class="badge">{contentBlocks.length} 个章节</span>
+            <h4 class="section-title">{t('irImport.preview.epubChapters')}</h4>
+            <span class="badge">{t('irImport.preview.chapterCount', { count: contentBlocks.length })}</span>
           </div>
           <div class="pdf-outline-list">
             {#each contentBlocks as block, i}
               <div class="outline-item">
                 <span class="outline-index">{i + 1}</span>
-                <span class="outline-title">{block.title || 'EPUB'}</span>
+                <span class="outline-title">{block.title || t('irImport.preview.defaultEpubTitle')}</span>
               </div>
             {/each}
           </div>
@@ -2633,7 +2654,7 @@
             <button class="clickable-icon btn-icon" onclick={() => previewIndex = Math.min(contentBlocks.length - 1, previewIndex + 1)} disabled={previewIndex === contentBlocks.length - 1}>
               <ObsidianIcon name="chevron-right" size={18} />
             </button>
-            <span class="preview-count">共 {contentBlocks.length} 个内容块</span>
+            <span class="preview-count">{t('irImport.preview.totalBlocks', { count: contentBlocks.length })}</span>
             {#if previewTagGroupName}
               <span class="preview-tag-group">
                 <ObsidianIcon name="tag" size={12} />
@@ -2650,7 +2671,7 @@
                     <div class="card-meta-badges">
                       <span class="meta-badge">
                         <ObsidianIcon name="type" size={12} />
-                        {contentBlocks[previewIndex]?.charCount || 0} 字
+                        {t('irImport.preview.charCount', { count: contentBlocks[previewIndex]?.charCount || 0 })}
                       </span>
                       <span class="meta-badge">
                         <ObsidianIcon name="hash" size={12} />
@@ -2674,13 +2695,12 @@
       <footer class="modal-footer modal-footer-preview">
         <button class="clickable-icon btn-secondary btn-compact" onclick={goBack}>
           <ObsidianIcon name="arrow-left" size={14} />
-          上一步
+          {t('irImport.buttons.back')}
         </button>
         
-        <!-- 时间分散选择器 -->
         <div class="scheduling-selector">
             <div class="selector-row">
-              <span class="selector-label">分散到:</span>
+              <span class="selector-label">{t('irImport.scheduling.distributeTo')}</span>
               <button class="clickable-icon menu-trigger" onclick={showSchedulingDaysMenu}>
                 {getSchedulingDaysLabel()}
                 <ObsidianIcon name="chevron-down" size={12} />
@@ -2691,7 +2711,7 @@
                   class="custom-days-input" 
                   min="1" 
                   max="90"
-                  placeholder="天数"
+                  placeholder={t('irImport.scheduling.customDaysPlaceholder')}
                   value={customDaysValue}
                   oninput={(e) => {
                     customDaysValue = parseInt(e.currentTarget.value) || 14;
@@ -2704,7 +2724,7 @@
                 <ObsidianIcon name="chevron-down" size={12} />
               </button>
               {#if shouldShowInitialImportOrderingSelector()}
-                <span class="selector-label">首次导入:</span>
+                <span class="selector-label">{t('irImport.scheduling.firstImport')}</span>
                 <button class="clickable-icon menu-trigger" onclick={showInitialImportOrderingMenu}>
                   <span class="clickable-icon menu-trigger-text">{getInitialImportOrderingLabel()}</span>
                   <ObsidianIcon name="chevron-down" size={12} />
@@ -2718,7 +2738,7 @@
                     calculateSchedulingImpact();
                   }
                 }} 
-                title="查看分散详情"
+                title={t('irImport.scheduling.viewDetailsTitle')}
               >
                 <ObsidianIcon name="info" size={14} />
               </button>
@@ -2728,14 +2748,14 @@
                 {#if schedulingImpact}
                   <span class="impact-item">
                     <ObsidianIcon name="alert-triangle" size={12} />
-                    超载天数: <strong>{schedulingImpact.overloadedDays}</strong>
+                    {t('irImport.scheduling.overloadedDays')} <strong>{schedulingImpact.overloadedDays}</strong>
                   </span>
                   <span class="impact-item">
                     <ObsidianIcon name="trending-up" size={12} />
-                    峰值负载: <strong>{Math.round(schedulingImpact.peakLoadRate * 100)}%</strong>
+                    {t('irImport.scheduling.peakLoad')} <strong>{Math.round(schedulingImpact.peakLoadRate * 100)}%</strong>
                   </span>
                 {:else}
-                  <span class="impact-item">正在计算分散影响...</span>
+                  <span class="impact-item">{t('irImport.scheduling.calculating')}</span>
                 {/if}
               </div>
             {/if}
@@ -2744,13 +2764,13 @@
           
           <!-- 牌组选择器 -->
         <div class="deck-selector">
-            <span class="selector-label">专题:</span>
+            <span class="selector-label">{t('irImport.deck.label')}</span>
             {#if showNewDeckInput}
               <div class="new-deck-input">
                 <input
                   type="text"
                   class="input-text deck-name-input"
-                  placeholder="输入专题名称..."
+                  placeholder={t('irImport.deck.namePlaceholder')}
                   bind:value={newDeckName}
                   onkeydown={(e) => e.key === 'Enter' && handleCreateNewDeck()}
                 />
@@ -2771,7 +2791,7 @@
 
         {#if shouldShowWholeFileImportModeSelector()}
           <div class="deck-selector markdown-import-mode-selector">
-            <span class="selector-label">导入方式:</span>
+            <span class="selector-label">{t('irImport.importMode.label')}</span>
             <button class="clickable-icon menu-trigger folder-trigger" onclick={showWholeFileImportModeMenu}>
               <span class="clickable-icon menu-trigger-text">{getWholeFileImportModeLabel()}</span>
               <ObsidianIcon name="chevron-down" size={12} />
@@ -2781,7 +2801,7 @@
 
         {#if shouldShowMarkdownImportFolderSelector()}
           <div class="deck-selector markdown-folder-selector">
-            <span class="selector-label">MD 路径:</span>
+            <span class="selector-label">{t('irImport.mdPath.label')}</span>
             <button
               class="clickable-icon menu-trigger folder-trigger"
               onclick={showMarkdownImportFolderMenu}
@@ -2800,13 +2820,13 @@
         <div class="footer-actions">
           <button class="clickable-icon btn-secondary btn-compact btn-back-mobile" onclick={goBack}>
             <ObsidianIcon name="arrow-left" size={14} />
-            上一步
+            {t('irImport.buttons.back')}
           </button>
           <button class="btn-primary btn-compact" onclick={isMultiFileMode ? handleBatchImport : handleSingleFileImport} disabled={contentBlocks.length === 0 || importing || !selectedDeckId}>
             {#if importing}
-              导入中...
+              {t('irImport.buttons.importing')}
             {:else}
-              确认导入
+              {t('irImport.buttons.confirmImport')}
               <ObsidianIcon name="check" size={14} />
             {/if}
           </button>

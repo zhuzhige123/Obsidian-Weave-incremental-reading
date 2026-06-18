@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { logger } from "../../utils/logger";
 import { getSharedIRCalendarDayIndexService } from "./IRCalendarDayIndexService";
+import { getSharedIRDueDateIndexService } from "./IRDueDateIndexService";
 import { derivePriorityDateKeysFromSchedule, mergePriorityDateKeys } from "./IRCalendarProjectionUtils";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
 import { buildScheduleItemFromProjectedItem } from "./IRCalendarScheduleItem";
@@ -8,6 +9,7 @@ import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import { buildScheduleFingerprintFromWorkspace } from "./IRScheduleFingerprint";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
+import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
 import {
 	getSharedIRScheduleKernel,
 	IRScheduleKernel,
@@ -63,7 +65,7 @@ function resolveInvalidationScope(
 	if (options?.priorityDateKeys && options.priorityDateKeys.length > 0) {
 		return "calendar";
 	}
-	return "full";
+	return "projection";
 }
 
 function dispatchIRDataUpdatedEvent(detail: UpdatedEventDetail): UpdatedEventDetail {
@@ -98,12 +100,20 @@ export function broadcastIRDataUpdated(
 		}
 	}
 
-	return dispatchIRDataUpdatedEvent({
+	const detail = dispatchIRDataUpdatedEvent({
 		reason: options?.reason ?? "ui_refresh",
 		generatedAt: options?.generatedAt ?? Date.now(),
 		deckIds: options?.deckIds,
 		priorityDateKeys: priorityDateKeys.length > 0 ? priorityDateKeys : options?.priorityDateKeys,
 	});
+	if (scope === "calendar" && priorityDateKeys.length > 0) {
+		notifyProjectionPatch(app, {
+			priorityDateKeys,
+			deckIds: options?.deckIds,
+			reason: options?.reason,
+		});
+	}
+	return detail;
 }
 
 export function getLocalTodayDateKey(): string {
@@ -148,37 +158,135 @@ export async function flushCalendarProjectionWrites(app: App): Promise<void> {
 	await getSharedIRCalendarDayIndexService(app).flushPendingWrites();
 }
 
+/**
+ * 仅更新优先级时使用：刷新工作区快照，但不重算计划日程。
+ * 对齐 SuperMemo：改优先级只影响队列顺序，不改变 nextRepDate / 完成状态。
+ */
+export function broadcastPriorityChangeUpdate(
+	app: App,
+	options?: {
+		deckIds?: string[];
+		priorityDateKeys?: string[];
+	}
+): UpdatedEventDetail {
+	getSharedIRWorkspaceSnapshotService(app).invalidate();
+	return broadcastIRDataUpdated(app, {
+		reason: "change_priority",
+		deckIds: options?.deckIds,
+		priorityDateKeys: mergePriorityDateKeys(options?.priorityDateKeys, [getLocalTodayDateKey()]),
+		invalidateScheduleCache: false,
+		invalidationScope: "none",
+	});
+}
+
+/** 即使带 priorityDateKeys 也必须全库 invalidation 的重算原因。 */
+const FULL_INVALIDATION_RECOMPUTE_REASONS = new Set<ScheduleRecomputeReason>([
+	"import_materials",
+	"settings_changed",
+	"tag_group_changed",
+	"metadata_renamed",
+	"metadata_deleted",
+	"ui_refresh",
+]);
+
+export function shouldUseDeckScopedScheduleRefresh(
+	reason: ScheduleRecomputeReason,
+	options?: Pick<RecomputeOptions, "deckIds" | "priorityDateKeys">
+): boolean {
+	if (!options?.deckIds?.length || !options?.priorityDateKeys?.length) {
+		return false;
+	}
+	return !FULL_INVALIDATION_RECOMPUTE_REASONS.has(reason);
+}
+
+/** ir-data-updated 可由 runtime.notify 单独驱动的局部刷新（避免 Sidebar 双重重载）。 */
+export function isProjectionPrimaryDataUpdate(detail?: UpdatedEventDetail): boolean {
+	if (!detail?.priorityDateKeys?.length || !detail.deckIds?.length) {
+		return false;
+	}
+	if (detail.reason === "change_priority") {
+		return false;
+	}
+	return !FULL_INVALIDATION_RECOMPUTE_REASONS.has(detail.reason);
+}
+
+function notifyProjectionPatch(
+	app: App,
+	patch: {
+		priorityDateKeys?: string[];
+		deckIds?: string[];
+		reason?: string;
+	}
+): void {
+	getSharedIRProjectionRuntime(app).notify(patch);
+}
+
 export async function recomputeAndBroadcastIRData(
 	app: App,
 	reason: ScheduleRecomputeReason,
 	options?: RecomputeOptions
 ): Promise<UpdatedEventDetail> {
 	try {
-		getSharedIRWorkspaceSnapshotService(app).invalidate();
-		getSharedIRScheduleIndexService(app).invalidate();
-		getSharedIRCalendarQueryService(app).invalidate();
-		const kernel = getKernel(app);
-		kernel.invalidateScheduleCache();
-		const schedule = await kernel.recomputeScheduleForDeck(reason, options);
+		const scopedRefresh = shouldUseDeckScopedScheduleRefresh(reason, options);
 		const priorityDateKeys =
 			options?.priorityDateKeys && options.priorityDateKeys.length > 0
 				? mergePriorityDateKeys(options.priorityDateKeys, [getLocalTodayDateKey()])
-				: derivePriorityDateKeysFromSchedule(schedule, {
-						anchorDateKey: getLocalTodayDateKey(),
-					});
+				: undefined;
 
-		await syncCalendarProjectionFromPlannedSchedule(app, schedule, {
-			deckIds: schedule.deckIds,
-			priorityDateKeys,
-		});
+		if (scopedRefresh) {
+			getSharedIRCalendarQueryService(app).invalidate({
+				priorityDateKeys,
+			});
+			getSharedIRScheduleIndexService(app).invalidate();
+		} else {
+			getSharedIRWorkspaceSnapshotService(app).invalidate();
+			getSharedIRScheduleIndexService(app).invalidate();
+			getSharedIRCalendarQueryService(app).invalidate();
+			await getSharedIRDueDateIndexService(app).invalidateAsync();
+		}
+
+		const kernel = getKernel(app);
+		kernel.invalidateScheduleCache();
+		const schedule = await kernel.recomputeScheduleForDeck(reason, options);
+		const resolvedPriorityDateKeys =
+			priorityDateKeys ??
+			derivePriorityDateKeysFromSchedule(schedule, {
+				anchorDateKey: getLocalTodayDateKey(),
+			});
+
+		const l1PatchedSet = new Set(
+			(options?.l1PatchedDateKeys || [])
+				.map((key) => String(key || "").trim())
+				.filter(Boolean)
+		);
+		const projectionDateKeys = resolvedPriorityDateKeys.filter((key) => !l1PatchedSet.has(key));
+
+		if (projectionDateKeys.length > 0) {
+			await syncCalendarProjectionFromPlannedSchedule(app, schedule, {
+				deckIds: schedule.deckIds,
+				priorityDateKeys: projectionDateKeys,
+			});
+		}
+
+		if (scopedRefresh) {
+			getSharedIRWorkspaceSnapshotService(app).invalidate();
+		}
 
 		const detail: UpdatedEventDetail = {
 			reason,
 			generatedAt: schedule.generatedAt,
 			deckIds: schedule.deckIds,
-			priorityDateKeys,
+			priorityDateKeys: resolvedPriorityDateKeys,
 		};
-		return dispatchIRDataUpdatedEvent(detail);
+		dispatchIRDataUpdatedEvent(detail);
+		if (scopedRefresh) {
+			notifyProjectionPatch(app, {
+				priorityDateKeys: resolvedPriorityDateKeys,
+				deckIds: schedule.deckIds,
+				reason,
+			});
+		}
+		return detail;
 	} catch (error) {
 		getSharedIRWorkspaceSnapshotService(app).invalidate();
 		logger.error("[IRScheduleRefreshService] 重排并广播失败:", { reason, options, error });

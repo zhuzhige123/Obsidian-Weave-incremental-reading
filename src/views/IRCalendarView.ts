@@ -11,6 +11,7 @@ import { PREMIUM_FEATURES, PremiumFeatureGuard } from "../services/premium/Premi
 import { getDefaultIRPremiumFeaturePreviewId, requestIRPremiumFeaturePreview } from "../services/premium/ir-premium";
 import { getIncrementalReadingPlugin, IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
 import { logger } from "../utils/logger";
+import { i18n } from "../utils/i18n";
 import { getViewSurfaceTokens } from "../utils/view-location-utils";
 
 export const VIEW_TYPE_IR_CALENDAR = IR_RUNTIME.viewTypes.calendar;
@@ -50,7 +51,7 @@ export class IRCalendarView extends ItemView {
 	 * 获取视图显示名称
 	 */
 	getDisplayText(): string {
-		return this.focusDeckName || "增量阅读日历";
+		return this.focusDeckName || i18n.t("irViews.calendar.defaultTitle");
 	}
 
 	/**
@@ -107,7 +108,7 @@ export class IRCalendarView extends ItemView {
 		// 显示加载占位符
 		contentEl.createDiv({
 			cls: "weave-calendar-loading",
-			text: "正在加载日历...",
+			text: i18n.t("irViews.calendar.loading"),
 		});
 
 		// 异步加载组件
@@ -156,7 +157,7 @@ export class IRCalendarView extends ItemView {
 
 		contentEl.createDiv({
 			cls: "weave-calendar-loading",
-			text: "正在加载日历...",
+			text: i18n.t("irViews.calendar.loading"),
 		});
 		await this.loadComponentAsync();
 	}
@@ -164,7 +165,7 @@ export class IRCalendarView extends ItemView {
 	private renderPremiumLock(container: HTMLElement): void {
 		container.createDiv({
 			cls: "weave-calendar-loading",
-			text: "正在加载功能说明...",
+			text: i18n.t("irViews.calendar.loadingFeatureHelp"),
 		});
 		requestIRPremiumFeaturePreview(
 			this.app,
@@ -211,7 +212,7 @@ export class IRCalendarView extends ItemView {
 			this.contentEl.empty();
 			this.contentEl.createDiv({
 				cls: "error",
-				text: "日历加载失败",
+				text: i18n.t("irViews.calendar.loadFailed"),
 			});
 		}
 	}

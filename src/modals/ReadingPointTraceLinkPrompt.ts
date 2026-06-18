@@ -9,6 +9,7 @@ import { buildSaveInputFromDraft } from "../services/incremental-reading/reading
 import type { IRReadingPointEditDraft, IRReadingPointEditSaveResult } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
 import { resolveReadingPointSaveErrorMessage } from "../services/incremental-reading/reading-point-edit/reading-point-modal-utils";
 import { showObsidianConfirm } from "../utils/obsidian-confirm";
+import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 
 export interface ReadingPointTraceLinkPromptOptions {
@@ -30,7 +31,7 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 	}
 
 	onOpen(): void {
-		this.setTitle("编辑溯源链接");
+		this.setTitle(i18n.t("irModals.readingPointTraceLink.title"));
 		this.modalEl.addClass("weave-reading-point-trace-link-prompt");
 
 		const panelHost = this.contentEl.createDiv({ cls: "weave-reading-point-trace-link-panel-host" });
@@ -46,12 +47,12 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 		});
 
 		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
-		const cancelButton = buttonRow.createEl("button", { text: "取消" });
+		const cancelButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.cancel") });
 		cancelButton.onclick = () => {
 			void this.requestClose();
 		};
 
-		const saveButton = buttonRow.createEl("button", { text: "保存", cls: "mod-cta" });
+		const saveButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.save"), cls: "mod-cta" });
 		saveButton.onclick = () => {
 			void this.submit();
 		};
@@ -62,10 +63,10 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 			this.forceClose();
 			return;
 		}
-		const confirmed = await showObsidianConfirm(this.app, "有未保存的更改，确定要关闭吗？", {
-			title: "放弃更改",
-			confirmText: "关闭",
-			cancelText: "继续编辑",
+		const confirmed = await showObsidianConfirm(this.app, i18n.t("irModals.common.discardChangesMessage"), {
+			title: i18n.t("irModals.common.discardChangesTitle"),
+			confirmText: i18n.t("irModals.common.close"),
+			cancelText: i18n.t("irModals.common.continueEditing"),
 			confirmClass: "mod-warning",
 		});
 		if (confirmed) {
@@ -84,7 +85,7 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 		}
 
 		if (!this.panelState.canSubmit) {
-			new Notice("请先修正定位链接", 2500);
+			new Notice(i18n.t("irModals.readingPointTraceLink.fixLinkFirst"), 2500);
 			return;
 		}
 
@@ -104,7 +105,7 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 			);
 
 			if (result.changed) {
-				new Notice("溯源链接已更新", 2500);
+				new Notice(i18n.t("irModals.readingPointTraceLink.linkUpdated"), 2500);
 			}
 			this.options.onSaved?.(result);
 			this.forceClose();

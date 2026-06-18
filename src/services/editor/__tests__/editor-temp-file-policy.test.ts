@@ -23,8 +23,8 @@ describe('editor-temp-file-policy', () => {
       vault: { configDir: 'custom-config' },
     } as any;
 
-    expect(getPluginEditorTempDir(defaultApp)).toBe('.obsidian/plugins/weave/cache/editor-temp');
-    expect(getPluginEditorTempDir(customApp)).toBe('custom-config/plugins/weave/cache/editor-temp');
+    expect(getPluginEditorTempDir(defaultApp)).toBe('.obsidian/plugins/weave-incremental-reading/cache/editor-temp');
+    expect(getPluginEditorTempDir(customApp)).toBe('custom-config/plugins/weave-incremental-reading/cache/editor-temp');
     expect(getVaultEditorTempDir(defaultApp)).toBe('weave/editor');
     expect(resolveDetachedEditorTempFolder(defaultApp)).toBe('weave/editor');
     expect(resolveDetachedEditorTempFolder(defaultApp, 'notes/ch1/source.md')).toBe('notes/ch1');
@@ -58,7 +58,7 @@ describe('editor-temp-file-policy', () => {
     expect(
       isPluginCacheModalEditorPermanentFilePath(
         app,
-        '.obsidian/plugins/weave/cache/editor-temp/modal-editor-permanent-2.md',
+        '.obsidian/plugins/weave-incremental-reading/cache/editor-temp/modal-editor-permanent-2.md',
       ),
     ).toBe(true);
     expect(isLegacyModalEditorPermanentFilePath('weave/editor/modal-editor-permanent.md')).toBe(

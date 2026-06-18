@@ -84,8 +84,82 @@ describe('FloatingMenu', () => {
       expect(document.body.querySelector('.floating-menu')).toBeInTheDocument();
     });
 
-    await fireEvent.mouseDown(document.body);
+    await fireEvent.click(document.body);
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onClose when clicking inside the menu', async () => {
+    const onClose = vi.fn();
+
+    render(FloatingMenu, {
+      props: {
+        show: true,
+        anchor,
+        onClose,
+        children: createRawSnippet(() => ({
+          render: () => '<button type="button" class="menu-action">Apply</button>',
+          setup: () => {}
+        }))
+      }
+    });
+
+    await waitFor(() => {
+      expect(document.body.querySelector('.floating-menu')).toBeInTheDocument();
+    });
+
+    const menuAction = document.body.querySelector('.menu-action') as HTMLButtonElement;
+    await fireEvent.click(menuAction);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps a single portaled menu node after rerender', async () => {
+    const { rerender } = render(FloatingMenu, {
+      props: {
+        show: true,
+        anchor,
+        children: createTextSnippet('Version 1')
+      }
+    });
+
+    await waitFor(() => {
+      expect(document.body.querySelectorAll('.floating-menu')).toHaveLength(1);
+    });
+
+    const firstMenu = document.body.querySelector('.floating-menu') as HTMLElement;
+    expect(firstMenu.textContent).toContain('Version 1');
+
+    await rerender({
+      show: true,
+      anchor,
+      children: createTextSnippet('Version 2')
+    });
+
+    await waitFor(() => {
+      expect(document.body.querySelectorAll('.floating-menu')).toHaveLength(1);
+    });
+
+    const secondMenu = document.body.querySelector('.floating-menu') as HTMLElement;
+    expect(secondMenu).toBe(firstMenu);
+    expect(secondMenu.textContent).toContain('Version 2');
+  });
+
+  it('can render without portaling to body', async () => {
+    const { container } = render(FloatingMenu, {
+      props: {
+        show: true,
+        anchor,
+        portal: false,
+        children: createTextSnippet('Inline menu')
+      }
+    });
+
+    await waitFor(() => {
+      expect(container.querySelector('.floating-menu')).toBeInTheDocument();
+    });
+
+    const menu = container.querySelector('.floating-menu') as HTMLElement;
+    expect(menu.parentElement).not.toBe(document.body);
   });
 });

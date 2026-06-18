@@ -30,6 +30,8 @@
     ariaLabelledby?: string;
     /** 自定义class */
     class?: string;
+    /** 是否 portal 到 body；交互型菜单在部分宿主下可关闭以避免事件丢失 */
+    portal?: boolean;
     /** 子内容 */
     children?: any;
   }
@@ -43,6 +45,7 @@
     role = 'menu',
     ariaLabelledby,
     class: customClass = '',
+    portal = true,
     children
   }: Props = $props();
 
@@ -53,6 +56,26 @@
   let position = $state({ top: 0, left: 0 });
   let cleanupAutoUpdate: (() => void) | null = null;
   let positionRunId = 0;
+
+  /**
+   * Svelte action：将菜单 portal 到 body，并在销毁时回收节点。
+   * 禁止在 $effect 中手动 appendChild——那会与 Svelte 5 reconcile 冲突，导致可见菜单丢失事件绑定。
+   */
+  function portalToBody(node: HTMLElement, enabled: boolean = true) {
+    if (!enabled || typeof document === 'undefined' || !document.body) {
+      return {};
+    }
+
+    document.body.appendChild(node);
+
+    return {
+      destroy() {
+        if (node.isConnected) {
+          node.remove();
+        }
+      }
+    };
+  }
 
   /**
    * 更新菜单位置
@@ -83,12 +106,6 @@
     }
   }
 
-  function mountToBody() {
-    if (!menuElement || typeof document === 'undefined') return;
-    if (menuElement.parentNode === document.body) return;
-    document.body.appendChild(menuElement);
-  }
-
   function stopAutoPositioning() {
     if (!cleanupAutoUpdate) return;
     cleanupAutoUpdate();
@@ -100,7 +117,6 @@
 
     if (runId !== positionRunId || !show || !anchor || !menuElement) return;
 
-    mountToBody();
     await updatePosition();
 
     window.requestAnimationFrame(() => {
@@ -115,19 +131,37 @@
   }
 
   /**
-   * 处理点击外部关闭
-   * 排除 Obsidian 原生 Menu（ObsidianDropdown 使用），其 DOM 渲染在 body 下而非 FloatingMenu 内部
+   * 判断事件是否发生在菜单或锚点内部。
+   * 使用 composedPath，避免 portal 到 body 后 contains 偶发失效。
+   */
+  function isEventInsideMenuOrAnchor(event: Event): boolean {
+    if (!menuElement) return false;
+
+    const path = typeof event.composedPath === 'function'
+      ? event.composedPath() as EventTarget[]
+      : [];
+    if (path.length > 0) {
+      return path.includes(menuElement) || (anchor != null && path.includes(anchor));
+    }
+
+    const target = event.target as Node | null;
+    if (!target) return false;
+    return menuElement.contains(target) || Boolean(anchor?.contains(target));
+  }
+
+  /**
+   * 处理点击外部关闭。
+   * 必须使用 click 而非 mousedown/pointerdown：否则会在菜单项激活前销毁菜单。
+   * 排除 Obsidian 原生 Menu（ObsidianDropdown 使用），其 DOM 渲染在 body 下而非 FloatingMenu 内部。
    */
   function handleClickOutside(event: MouseEvent) {
     if (!show || !menuElement) return;
 
-    const target = event.target as Node;
-    if (menuElement.contains(target) || anchor?.contains(target)) {
+    if (isEventInsideMenuOrAnchor(event)) {
       return;
     }
 
-    // Obsidian 原生 Menu 的 DOM 在 body 下，不在 FloatingMenu 内部
-    // 点击 Menu 菜单项时不应关闭 FloatingMenu
+    const target = event.target;
     if (target instanceof Element && target.closest('.menu')) {
       return;
     }
@@ -138,7 +172,6 @@
   function handleKeydown(_event: KeyboardEvent) {
   }
 
-  // 监听 show 和 anchor 变化，更新位置
   $effect(() => {
     const isVisible = show;
     const anchorElement = anchor;
@@ -161,16 +194,13 @@
     };
   });
 
-  // 监听点击外部和键盘事件
   onMount(() => {
-    // 添加全局事件监听
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleKeydown);
   });
 
   onDestroy(() => {
-    // 清理事件监听
-    document.removeEventListener('mousedown', handleClickOutside);
+    document.removeEventListener('click', handleClickOutside);
     document.removeEventListener('keydown', handleKeydown);
     stopAutoPositioning();
   });
@@ -179,6 +209,7 @@
 {#if show}
   <div
     bind:this={menuElement}
+    use:portalToBody={portal}
     class="floating-menu {customClass}"
     style="top: {position.top}px; left: {position.left}px;"
     role={role}
@@ -199,13 +230,13 @@
     box-shadow: 
       0 8px 24px rgba(0, 0, 0, 0.12),
       0 2px 8px rgba(0, 0, 0, 0.08);
-    z-index: var(--weave-z-menu, 1200); /* Portal 到 body 时也要有可用的全局回退层级 */
+    z-index: var(--weave-z-menu, 1200);
     min-width: 180px;
     max-width: 400px;
     width: max-content;
     backdrop-filter: blur(8px);
+    pointer-events: auto;
     
-    /* 动画 */
     animation: slideInFade 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     transform-origin: top left;
   }
@@ -221,8 +252,8 @@
     }
   }
 
-  /* 全局样式：确保 portal 到 body 的菜单不受父容器影响 */
   :global(body > .floating-menu) {
     position: fixed !important;
+    pointer-events: auto;
   }
 </style>

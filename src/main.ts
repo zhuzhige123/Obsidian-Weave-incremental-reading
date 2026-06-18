@@ -12,6 +12,7 @@ import { resolveIRImportFolder } from "./config/paths";
 import type { SelectionToIRSubmitPayload } from "./modals/SelectionToIRModal";
 import type { WebPageToIRSubmitPayload } from "./modals/WebPageToIRModal";
 import { registerExtensionsSafely } from "./utils/register-extensions-safely";
+import { isIRDeckFilePath } from "./utils/ir-internal-data-path";
 import {
 	registerEpubHost,
 	unregisterEpubHost,
@@ -32,6 +33,8 @@ import {
 } from "./services/incremental-reading/IRReadableMarkdownPathResolver";
 import { recomputeAndBroadcastIRData } from "./services/incremental-reading/IRScheduleRefreshService";
 import { scheduleIRWorkspaceWarmup } from "./services/incremental-reading/IRWorkspaceWarmup";
+import { getSharedIRProjectionRuntime } from "./services/incremental-reading/IRProjectionRuntime";
+import { getSharedIRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
 import { IRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
 import { IRStorageService } from "./services/incremental-reading/IRStorageService";
 import { createAnchorManager } from "./services/incremental-reading/AnchorManager";
@@ -92,7 +95,7 @@ import type {
 } from "./types/plugin-settings.d";
 import { markServiceReady } from "./utils/service-ready-event";
 import { createYAMLFrontmatterManager } from "./utils/yaml-frontmatter-utils";
-import { initI18n, syncI18nWithObsidianLanguage } from "./utils/i18n";
+import { initI18n, syncI18nWithObsidianLanguage, applyPluginUiLanguagePreference, i18n, normalizePluginUiLanguagePreference, type PluginUiLanguagePreference } from "./utils/i18n";
 import { logger } from "./utils/logger";
 import { createContentWithMetadata } from "./utils/yaml-utils";
 import { IRCalendarView, VIEW_TYPE_IR_CALENDAR } from "./views/IRCalendarView";
@@ -128,6 +131,7 @@ type StandaloneIRSettings = {
 	licenseState: LicenseStore;
 	allowInheritedLicenses: boolean;
 	showPremiumFeaturesPreview?: boolean;
+	uiLanguage?: PluginUiLanguagePreference;
 	deckCardStyle?: string;
 	editorModalSize?: {
 		rememberLastSize?: boolean;
@@ -166,9 +170,10 @@ const DEFAULT_STANDALONE_IR_SETTINGS: StandaloneIRSettings = {
 	licenseState: DEFAULT_LICENSE_STORE,
 	allowInheritedLicenses: true,
 	showPremiumFeaturesPreview: false,
+	uiLanguage: "auto",
 };
 
-const DEFAULT_DECK_NAME = "默认专题";
+const DEFAULT_DECK_NAME = () => i18n.t("irCommands.defaultDeckName");
 
 export default class StandaloneIncrementalReadingPlugin
 	extends Plugin
@@ -208,6 +213,7 @@ export default class StandaloneIncrementalReadingPlugin
 		});
 
 		await this.loadSettings();
+		applyPluginUiLanguagePreference(this.settings.uiLanguage);
 		licenseManager.initializeCloud(this.app);
 		this.dataStorage = {};
 		markServiceReady("dataStorage");
@@ -246,13 +252,13 @@ export default class StandaloneIncrementalReadingPlugin
 			}
 		);
 
-		this.addRibbonIcon("calendar", "打开增量阅读日历", () => {
+		this.addRibbonIcon("calendar", i18n.t("irCommands.openCalendar"), () => {
 			void this.activateIRCalendarView();
 		});
 
 		this.addCommand({
 			id: "open-ir-calendar",
-			name: "打开增量阅读日历",
+			name: i18n.t("irCommands.openCalendar"),
 			callback: () => {
 				void this.activateIRCalendarView();
 			},
@@ -260,7 +266,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.addCommand({
 			id: "open-active-irdeck",
-			name: "打开当前 IRDeck",
+			name: i18n.t("irCommands.openActiveIrdeck"),
 			checkCallback: (checking) => {
 				const activeFile = this.app.workspace.getActiveFile();
 				const canOpen = activeFile instanceof TFile && activeFile.extension === "irdeck";
@@ -273,7 +279,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.addCommand({
 			id: "create-ir-reading-point-from-selection",
-			name: "从当前选区创建增量阅读点",
+			name: i18n.t("irCommands.createFromSelection"),
 			callback: () => {
 				void this.runSelectionToIRQuickCreate(this.getSelectionContextForIRQuickCreate());
 			},
@@ -281,7 +287,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.addCommand({
 			id: "create-ir-reading-point-from-web-page",
-			name: "从当前网页添加到增量阅读",
+			name: i18n.t("irCommands.createFromWebPage"),
 			checkCallback: (checking) => {
 				const pageContext = getActiveWebViewerPageContext(this.app);
 				if (!checking && pageContext) {
@@ -296,11 +302,11 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.addCommand({
 			id: "open-ir-paragraph-workbench",
-			name: "打开增量阅读段落工作台",
+			name: i18n.t("irCommands.openParagraphWorkbench"),
 			callback: () => {
 				const activeFile = this.app.workspace.getActiveFile();
 				if (!(activeFile instanceof TFile)) {
-					new Notice("请先打开 Markdown、Canvas 或 EPUB 文件");
+					new Notice(i18n.t("irNotices.openSupportedFileFirst"));
 					return;
 				}
 				const sourceType = activeFile.extension === "canvas"
@@ -317,7 +323,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.addCommand({
 			id: "sync-subscribed-folders",
-			name: "更新订阅文件夹",
+			name: i18n.t("irCommands.updateFolderSubscription"),
 			callback: () => {
 				void this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "manual" });
 			},
@@ -325,7 +331,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.addCommand({
 			id: "add-ir-reading-target",
-			name: "添加阅读目标到增量阅读",
+			name: i18n.t("irCommands.addReadingTarget"),
 			callback: () => {
 				void this.runAddReadingTargetQuickCreate();
 			},
@@ -333,6 +339,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		// 注册完视图与命令后即可恢复 UI；重 I/O 与索引任务放到后台，避免拖慢 Obsidian 启动计时。
 		markServiceReady("allCoreServices");
+		void getSharedIRProjectionRuntime(this.app).preloadColdStartCaches();
 		scheduleIRWorkspaceWarmup(this.app);
 		this.deferredStartupPromise = this.runDeferredStartupTasks();
 	}
@@ -345,6 +352,7 @@ export default class StandaloneIncrementalReadingPlugin
 		try {
 			await this.initializeReadingMaterialServices();
 			await this.ensureDefaultIRDeckExists();
+			void getSharedIRPointStorageService(this.app).ensureRuntimeBaseline();
 			void this.refreshIRDeckIndexFromVault({ trigger: "startup", recompute: false });
 			void this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "startup" });
 		} catch (error) {
@@ -492,6 +500,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 	async saveSettings(): Promise<void> {
 		this.settings = this.normalizeSettings(this.settings);
+		applyPluginUiLanguagePreference(this.settings.uiLanguage);
 		this.syncLicenseSettings();
 		this.irCalendarSidebarSettingsCache = this.normalizeIRCalendarSidebarSettings(
 			this.settings.incrementalReading.calendarSidebar
@@ -639,7 +648,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		if (scanResult.activeRuleCount === 0) {
 			if (trigger === "manual") {
-				new Notice("尚未配置可用的订阅文件夹规则，或所选专题已不存在", 3000);
+				new Notice(i18n.t("irNotices.noFolderSubscriptionRules"), 3000);
 			}
 			return 0;
 		}
@@ -651,12 +660,21 @@ export default class StandaloneIncrementalReadingPlugin
 				const confirmed = await showObsidianConfirm(
 					this.app,
 					pendingRules.length <= 1
-						? `检测到订阅文件夹中有 ${scanResult.pendingCount} 个待新增阅读材料，超过当前阈值 ${threshold}。\n文件夹：${pendingRules[0]?.folderPath || ""}\n专题：${pendingRules[0]?.deckName || pendingRules[0]?.deckId || ""}\n\n确认后再批量新增。`
-						: `检测到 ${pendingRules.length} 条订阅规则下共有 ${scanResult.pendingCount} 个待新增阅读材料，超过当前阈值 ${threshold}。\n\n确认后再批量新增。`,
+						? i18n.t("irMain.confirm.folderSubscriptionBatchSingleRule", {
+								pendingCount: scanResult.pendingCount,
+								threshold,
+								folderPath: pendingRules[0]?.folderPath || "",
+								deckName: pendingRules[0]?.deckName || pendingRules[0]?.deckId || "",
+							})
+						: i18n.t("irMain.confirm.folderSubscriptionBatchMultipleRules", {
+								ruleCount: pendingRules.length,
+								pendingCount: scanResult.pendingCount,
+								threshold,
+							}),
 					{
-						title: "确认批量新增阅读材料",
-						confirmText: "确认新增",
-						cancelText: "取消",
+						title: i18n.t("irMain.confirm.folderSubscriptionBatchTitle"),
+						confirmText: i18n.t("irMain.confirm.folderSubscriptionBatchConfirm"),
+						cancelText: i18n.t("irMain.dialog.cancel"),
 						confirmClass: "mod-warning",
 					}
 				);
@@ -667,12 +685,19 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 
 		const pinToToday = folderSubscription?.initialScheduleMode !== "scheduled";
+		const irSettings = this.getIncrementalReadingSettings();
+		const todayStart = this.getIncrementalReadingTodayStart();
 		const applyResult = await applyIncrementalReadingFolderSubscriptionCandidates({
 			candidates: scanResult.candidates.map((candidate) => ({
 				...candidate,
 				deckName: candidate.deckName || deckNameById[String(candidate.rule.deckId || "").trim()] || "",
 			})),
 			pinToToday,
+			initialScheduleSpread: {
+				enabled: irSettings.enableHorizonSmoothing !== false,
+				horizonDays: Number(irSettings.horizonSpreadDays) || 7,
+				anchorMs: todayStart.getTime(),
+			},
 			getOrCreateMaterial: async (file, options) => {
 				const material = await this.readingMaterialManager.ensureMaterialForFolderSubscription(file, {
 					...options,
@@ -707,7 +732,12 @@ export default class StandaloneIncrementalReadingPlugin
 
 		if (trigger === "manual") {
 			new Notice(
-				`订阅文件夹更新完成：扫描 ${scanResult.scannedMarkdownCount} 个 Markdown 文件，新增 ${added}，更新 ${updated}，跳过 ${unchanged}`,
+				i18n.t("irNotices.folderSyncDone", {
+					scanned: scanResult.scannedMarkdownCount,
+					added,
+					updated,
+					unchanged,
+				}),
 				4500
 			);
 			const { IRFolderSubscriptionSyncResultModal } = await import(
@@ -720,7 +750,7 @@ export default class StandaloneIncrementalReadingPlugin
 				applyResult,
 			}).open();
 		} else if (added > 0) {
-			new Notice(`订阅文件夹已自动同步：新增 ${added}`, 3500);
+			new Notice(i18n.t("irNotices.folderSyncAutoAdded", { added }), 3500);
 		}
 
 		return changedCount;
@@ -908,13 +938,13 @@ export default class StandaloneIncrementalReadingPlugin
 	}): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(String(options.filePath || "").trim());
 		if (!(file instanceof TFile)) {
-			new Notice("未找到对应的源文件，无法创建阅读点", 3000);
+			new Notice(i18n.t("irNotices.sourceFileNotFound"), 3000);
 			return;
 		}
 
 		const selectedText = String(options.selectedText || "").trim();
 		if (!selectedText) {
-			new Notice("请先选中文本后再创建阅读点", 3000);
+			new Notice(i18n.t("irNotices.selectTextFirst"), 3000);
 			return;
 		}
 
@@ -954,6 +984,7 @@ export default class StandaloneIncrementalReadingPlugin
 	): StandaloneIRSettings {
 		const weaveParentFolder = String(input.weaveParentFolder || "").trim();
 		const showPremiumFeaturesPreview = input.showPremiumFeaturesPreview === true;
+		const uiLanguage = normalizePluginUiLanguagePreference(input.uiLanguage);
 		const licenseState = normalizeLicenseStore(input.license, input.licenseState);
 		return {
 			weaveParentFolder,
@@ -965,6 +996,7 @@ export default class StandaloneIncrementalReadingPlugin
 			licenseState,
 			allowInheritedLicenses: input.allowInheritedLicenses !== false,
 			showPremiumFeaturesPreview,
+			uiLanguage,
 			deckCardStyle: input.deckCardStyle,
 			editorModalSize: input.editorModalSize,
 		};
@@ -997,7 +1029,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 		const storage = new IRStorageService(this.app);
 		await storage.initialize();
-		const deck = createDefaultIRDeck(DEFAULT_DECK_NAME);
+		const deck = createDefaultIRDeck(DEFAULT_DECK_NAME());
 		deck.path = deck.id;
 		await storage.saveDeck(deck);
 		logger.info("[Standalone IR] 已创建默认专题", { deckId: deck.id, name: deck.name });
@@ -1017,7 +1049,7 @@ export default class StandaloneIncrementalReadingPlugin
 					}
 
 					menu.addItem((item) => {
-						item.setTitle("添加到增量阅读专题");
+						item.setTitle(i18n.t("irCommands.addToIrDeck"));
 						item.setIcon("book-plus");
 						const submenu = item.setSubmenu();
 						void this.buildCanvasIRDeckSubmenu(submenu, node);
@@ -1091,7 +1123,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 	private registerIRDeckVaultSync(): void {
 		const scheduleRefreshForPathChange = (nextPath?: string | null, previousPath?: string | null) => {
-			if (!this.isIRDeckPath(nextPath) && !this.isIRDeckPath(previousPath)) {
+			if (!isIRDeckFilePath(nextPath) && !isIRDeckFilePath(previousPath)) {
 				return;
 			}
 			this.scheduleIRDeckIndexRefresh();
@@ -1105,13 +1137,6 @@ export default class StandaloneIncrementalReadingPlugin
 				scheduleRefreshForPathChange(file?.path, oldPath)
 			)
 		);
-	}
-
-	private isIRDeckPath(path?: string | null): boolean {
-		return String(path || "")
-			.trim()
-			.toLowerCase()
-			.endsWith(".irdeck");
 	}
 
 	private scheduleIRDeckIndexRefresh(): void {
@@ -1496,7 +1521,7 @@ export default class StandaloneIncrementalReadingPlugin
 			const context = this.buildCanvasNodeIRPointContext(node);
 			if (!context) {
 				submenu.addItem((subItem) => {
-					subItem.setTitle("当前节点暂无可用内容").setDisabled(true);
+					subItem.setTitle(i18n.t("irCommands.canvasNodeNoContent")).setDisabled(true);
 				});
 				return;
 			}
@@ -1509,7 +1534,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 			if (decks.length === 0) {
 				submenu.addItem((subItem) => {
-					subItem.setTitle("暂无可用增量阅读专题").setDisabled(true);
+					subItem.setTitle(i18n.t("irCommands.noDecksAvailable")).setDisabled(true);
 				});
 				return;
 			}
@@ -1524,7 +1549,7 @@ export default class StandaloneIncrementalReadingPlugin
 		} catch (error) {
 			logger.error("[Standalone IR] 加载 Canvas 增量阅读专题列表失败:", error);
 			submenu.addItem((subItem) => {
-				subItem.setTitle("加载增量阅读专题失败").setDisabled(true);
+				subItem.setTitle(i18n.t("irCommands.loadDecksFailed")).setDisabled(true);
 			});
 		}
 	}
@@ -1544,7 +1569,7 @@ export default class StandaloneIncrementalReadingPlugin
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				"增量阅读是高级功能，请激活许可证后使用"
+				i18n.t("irCommands.premiumBlockedMessage")
 			)
 		) {
 			return;
@@ -1564,14 +1589,14 @@ export default class StandaloneIncrementalReadingPlugin
 			});
 			new Notice(
 				result === "created"
-					? `已添加到 Weave 增量阅读专题「${deckName}」`
+					? i18n.t("irNotices.canvasAddedToDeck", { deckName })
 					: result === "updated"
-						? `已更新到 Weave 增量阅读专题「${deckName}」`
-						: `该节点已存在于 Weave 增量阅读专题「${deckName}」`
+						? i18n.t("irNotices.canvasUpdatedInDeck", { deckName })
+						: i18n.t("irNotices.canvasAlreadyInDeck", { deckName })
 			);
 		} catch (error) {
 			logger.error("[Standalone IR] 添加 Canvas 节点到增量阅读失败:", error);
-			new Notice("添加到 Weave 增量阅读失败", 3000);
+			new Notice(i18n.t("irNotices.canvasAddFailed"), 3000);
 		}
 	}
 
@@ -1583,18 +1608,18 @@ export default class StandaloneIncrementalReadingPlugin
 		const url = String(context?.url || "").trim();
 		const selectedText = String(context?.selectedText || "").replace(/\r\n?/g, "\n").trim();
 		if (!url) {
-			new Notice("未获取到当前网页链接", 3000);
+			new Notice(i18n.t("irNotices.noWebUrl"), 3000);
 			return;
 		}
 		if (!selectedText) {
-			new Notice("请先选中网页文本后再添加", 3000);
+			new Notice(i18n.t("irNotices.selectWebTextFirst"), 3000);
 			return;
 		}
 
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				"增量阅读"
+				i18n.t("irCommands.defaultIrName")
 			)
 		) {
 			return;
@@ -1609,7 +1634,7 @@ export default class StandaloneIncrementalReadingPlugin
 				.sort((left, right) => left.name.localeCompare(right.name))
 				.map((deck) => ({ id: deck.id, name: deck.name }));
 			if (deckOptions.length === 0) {
-				new Notice("暂无可用增量阅读专题", 3000);
+				new Notice(i18n.t("irCommands.noDecksAvailable"), 3000);
 				return;
 			}
 
@@ -1626,21 +1651,21 @@ export default class StandaloneIncrementalReadingPlugin
 			}).open();
 		} catch (error) {
 			logger.error("[Standalone IR] 打开网页选区阅读点创建窗口失败:", error);
-			new Notice("打开添加窗口失败，请重试", 3000);
+			new Notice(i18n.t("irNotices.openAddModalFailed"), 3000);
 		}
 	}
 
 	async runWebPageToIRQuickCreate(context: { url: string; title: string }): Promise<void> {
 		const url = String(context?.url || "").trim();
 		if (!url) {
-			new Notice("未获取到当前网页链接", 3000);
+			new Notice(i18n.t("irNotices.noWebUrl"), 3000);
 			return;
 		}
 
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				"增量阅读"
+				i18n.t("irCommands.defaultIrName")
 			)
 		) {
 			return;
@@ -1649,7 +1674,7 @@ export default class StandaloneIncrementalReadingPlugin
 		try {
 			const preferredTitle = this.cleanIRReadingPointTitle(String(context.title || ""));
 			const draftTitle =
-				preferredTitle || deriveWebPageTitleFromUrl(url) || "网页阅读点";
+				preferredTitle || deriveWebPageTitleFromUrl(url) || i18n.t("irMain.defaults.webReadingPointTitle");
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
 			const deckOptions = Object.values(await storage.getAllDecks())
@@ -1657,7 +1682,7 @@ export default class StandaloneIncrementalReadingPlugin
 				.sort((left, right) => left.name.localeCompare(right.name))
 				.map((deck) => ({ id: deck.id, name: deck.name }));
 			if (deckOptions.length === 0) {
-				new Notice("暂无可用增量阅读专题", 3000);
+				new Notice(i18n.t("irCommands.noDecksAvailable"), 3000);
 				return;
 			}
 
@@ -1673,7 +1698,7 @@ export default class StandaloneIncrementalReadingPlugin
 			}).open();
 		} catch (error) {
 			logger.error("[Standalone IR] 打开网页阅读点创建窗口失败:", error);
-			new Notice("打开添加窗口失败，请重试", 3000);
+			new Notice(i18n.t("irNotices.openAddModalFailed"), 3000);
 		}
 	}
 
@@ -1686,7 +1711,7 @@ export default class StandaloneIncrementalReadingPlugin
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				"增量阅读"
+				i18n.t("irCommands.defaultIrName")
 			)
 		) {
 			return;
@@ -1705,13 +1730,13 @@ export default class StandaloneIncrementalReadingPlugin
 			}).open();
 		} catch (error) {
 			logger.error("[Standalone IR] 打开添加阅读目标窗口失败:", error);
-			new Notice("打开添加窗口失败，请重试", 3000);
+			new Notice(i18n.t("irNotices.openAddModalFailed"), 3000);
 		}
 	}
 
 	private async runSelectionToIRQuickCreate(context: IRQuickCreateContext | null): Promise<void> {
 		if (!context) {
-			new Notice("请先在 Markdown 文档中选中文本，或将光标放在有内容的行", 3000);
+			new Notice(i18n.t("irNotices.selectMarkdownTextOrLine"), 3000);
 			return;
 		}
 
@@ -1728,7 +1753,7 @@ export default class StandaloneIncrementalReadingPlugin
 				.sort((left, right) => left.name.localeCompare(right.name))
 				.map((deck) => ({ id: deck.id, name: deck.name }));
 			if (deckOptions.length === 0) {
-				new Notice("暂无可用增量阅读专题", 3000);
+				new Notice(i18n.t("irCommands.noDecksAvailable"), 3000);
 				return;
 			}
 			const preferredDeck = await this.resolvePreferredIRDeckForSelectionSource(context.file);
@@ -1749,7 +1774,7 @@ export default class StandaloneIncrementalReadingPlugin
 			}).open();
 		} catch (error) {
 			logger.error("[Standalone IR] 打开阅读点创建窗口失败:", error);
-			new Notice("打开阅读点创建窗口失败，请重试", 3000);
+			new Notice(i18n.t("irNotices.openCreateModalFailed"), 3000);
 		}
 	}
 
@@ -1785,7 +1810,7 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	private buildIRReadingPointContent(title: string, body: string, options?: { sourceLink?: string }): string {
-		const safeTitle = this.cleanIRReadingPointTitle(title) || "未命名阅读点";
+		const safeTitle = this.cleanIRReadingPointTitle(title) || i18n.t("irMain.defaults.unnamedReadingPoint");
 		const normalizedBody = String(body || "").replace(/\r\n?/g, "\n").trim();
 		const markdownBody = normalizedBody ? `# ${safeTitle}\n\n${normalizedBody}\n` : `# ${safeTitle}\n`;
 		const sourceLink = String(options?.sourceLink || "").trim();
@@ -1813,7 +1838,7 @@ export default class StandaloneIncrementalReadingPlugin
 			.replace(/\.+$/g, "")
 			.trim();
 		const truncated = cleaned.length > 120 ? cleaned.slice(0, 120).trim() : cleaned;
-		return truncated || `阅读点-${Date.now()}`;
+		return truncated || `${i18n.t("irMain.defaults.readingPointFilePrefix")}-${Date.now()}`;
 	}
 
 	private async generateUniqueIRReadingPointPath(folderPath: string, title: string): Promise<string> {
@@ -1879,13 +1904,13 @@ export default class StandaloneIncrementalReadingPlugin
 		const selectedText = String(options?.selectedText || "").replace(/\r\n?/g, "\n").trim();
 		const title = this.cleanIRReadingPointTitle(payload.title);
 		if (!title) {
-			new Notice("请输入阅读点名称", 3000);
+			new Notice(i18n.t("irNotices.enterReadingPointName"), 3000);
 			throw new Error("web-ir-missing-title");
 		}
 
 		const deckId = String(payload.deckId || "").trim();
 		if (!deckId) {
-			new Notice("请选择增量阅读专题", 3000);
+			new Notice(i18n.t("irNotices.selectIrDeck"), 3000);
 			throw new Error("web-ir-missing-deck");
 		}
 
@@ -1893,13 +1918,13 @@ export default class StandaloneIncrementalReadingPlugin
 		await storage.initialize();
 		const rawDeck = await storage.getDeckById(deckId);
 		if (!rawDeck || rawDeck.archivedAt) {
-			new Notice("所选专题不存在或已归档", 3000);
+			new Notice(i18n.t("irNotices.deckNotFoundOrArchived"), 3000);
 			throw new Error("web-ir-deck-missing");
 		}
 
 		const deck = {
 			id: deckId,
-			name: String(rawDeck.name || "").trim() || "增量阅读",
+			name: String(rawDeck.name || "").trim() || i18n.t("irCommands.defaultIrName"),
 		};
 		const folderPath =
 			this.normalizeSelectionQuickCreateFolderPath(
@@ -1927,14 +1952,14 @@ export default class StandaloneIncrementalReadingPlugin
 				deckIds: [deck.id],
 			});
 
-			new Notice(`已添加到增量阅读专题「${deck.name}」`, 3500);
+			new Notice(i18n.t("irNotices.addedToDeck", { deckName: deck.name }), 3500);
 		} catch (error) {
 			logger.error("[Standalone IR] 从网页创建阅读点失败:", error);
 			if (createdFile) {
-				new Notice("阅读点文件已创建，但加入增量阅读失败，请检查控制台日志", 4500);
+				new Notice(i18n.t("irNotices.fileCreatedButJoinFailed"), 4500);
 				return;
 			}
-			new Notice("添加失败，请重试", 3000);
+			new Notice(i18n.t("irNotices.addFailed"), 3000);
 			throw error;
 		}
 	}
@@ -1945,13 +1970,13 @@ export default class StandaloneIncrementalReadingPlugin
 	): Promise<void> {
 		const title = this.cleanIRReadingPointTitle(payload.title);
 		if (!title) {
-			new Notice("请输入阅读点标题", 3000);
+			new Notice(i18n.t("irNotices.enterReadingPointTitle"), 3000);
 			throw new Error("selection-ir-missing-title");
 		}
 
 		const deckId = String(payload.deckId || "").trim();
 		if (!deckId) {
-			new Notice("请选择增量阅读专题", 3000);
+			new Notice(i18n.t("irNotices.selectIrDeck"), 3000);
 			throw new Error("selection-ir-missing-deck");
 		}
 
@@ -1959,13 +1984,13 @@ export default class StandaloneIncrementalReadingPlugin
 		await storage.initialize();
 		const rawDeck = await storage.getDeckById(deckId);
 		if (!rawDeck || rawDeck.archivedAt) {
-			new Notice("所选专题不存在或已归档", 3000);
+			new Notice(i18n.t("irNotices.deckNotFoundOrArchived"), 3000);
 			throw new Error("selection-ir-deck-missing");
 		}
 
 		const deck = {
 			id: deckId,
-			name: String(rawDeck.name || "").trim() || "增量阅读",
+			name: String(rawDeck.name || "").trim() || i18n.t("irCommands.defaultIrName"),
 		};
 		const folderPath =
 			this.normalizeSelectionQuickCreateFolderPath(
@@ -2009,19 +2034,21 @@ export default class StandaloneIncrementalReadingPlugin
 				new Notice(successNotice, 3500);
 			} else if (shouldReplaceSourceSelection) {
 				new Notice(
-					sourceUpdated ? "阅读点已创建，并已替换源文档选区" : "阅读点已创建，但未能自动替换源文档选区",
+					sourceUpdated
+						? i18n.t("irNotices.pointCreatedWithReplace")
+						: i18n.t("irNotices.pointCreatedWithoutReplace"),
 					3500
 				);
 			} else {
-				new Notice("阅读点已创建", 2500);
+				new Notice(i18n.t("irNotices.pointCreated"), 2500);
 			}
 		} catch (error) {
 			logger.error("[Standalone IR] 创建阅读点失败:", error);
 			if (createdFile) {
-				new Notice("阅读点文件已创建，但加入增量阅读失败，请检查控制台日志", 4500);
+				new Notice(i18n.t("irNotices.fileCreatedButJoinFailed"), 4500);
 				return;
 			}
-			new Notice("创建阅读点失败，请重试", 3000);
+			new Notice(i18n.t("irNotices.createPointFailed"), 3000);
 			throw error;
 		}
 	}

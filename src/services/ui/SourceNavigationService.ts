@@ -1,4 +1,5 @@
 import { type App, type Editor, MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
+import { i18n } from "../../utils/i18n";
 import { readCanvasNodeData } from "../../types/canvas-menu-node";
 import {
 	type CanvasRuntimeNode,
@@ -192,7 +193,7 @@ export class SourceNavigationService {
 					return;
 				}
 
-				new Notice("已打开源文档，但未精确定位到溯源内容");
+				new Notice(i18n.t("irServiceNotices.sourceNav.openedButNotLocated"));
 			} catch (_e) {
 				/* ignore */
 			}

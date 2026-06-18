@@ -60,7 +60,10 @@ type ChunkScheduleUpdates = Partial<
 		| "doneReason"
 		| "doneAt"
 	>
->;
+> & {
+	/** 设为 null 表示清除用户手动固定日期。 */
+	manualSchedulePinnedDateKey?: string | null;
+};
 
 const TERMINAL_CHUNK_STATUSES = new Set<ChunkFileStatus>(["done", "archived", "removed"]);
 
@@ -112,7 +115,11 @@ export class IRChunkScheduleAdapter {
 	}
 
 	/** 更新单个块的调度字段，并同步回块文件。 */
-	async updateChunkSchedule(chunkId: string, updates: ChunkScheduleUpdates): Promise<void> {
+	async updateChunkSchedule(
+		chunkId: string,
+		updates: ChunkScheduleUpdates,
+		options?: { skipScheduleCacheInvalidate?: boolean }
+	): Promise<void> {
 		const chunk = await this.storage.getChunkData(chunkId);
 		if (!chunk) {
 			logger.warn(`[IRChunkScheduleAdapter] 块不存在: ${chunkId}`);
@@ -120,7 +127,9 @@ export class IRChunkScheduleAdapter {
 		}
 
 		this.applyChunkUpdates(chunk, updates);
-		await this.storage.saveChunkData(chunk);
+		await this.storage.saveChunkData(chunk, {
+			skipScheduleCacheInvalidate: options?.skipScheduleCacheInvalidate,
+		});
 		await this.syncChunkYamlFields(chunk, updates);
 
 		logger.debug(`[IRChunkScheduleAdapter] 更新块调度: ${chunkId}`);
@@ -184,7 +193,8 @@ export class IRChunkScheduleAdapter {
 	async recordChunkInteraction(
 		chunkId: string,
 		readingTimeSec: number,
-		actions: { extracts?: number; cardsCreated?: number; notesWritten?: number } = {}
+		actions: { extracts?: number; cardsCreated?: number; notesWritten?: number } = {},
+		options?: { skipScheduleCacheInvalidate?: boolean }
 	): Promise<void> {
 		const chunk = await this.storage.getChunkData(chunkId);
 		if (!chunk) return;
@@ -207,7 +217,9 @@ export class IRChunkScheduleAdapter {
 			chunk.stats.todayShownCount = 1;
 		}
 
-		await this.storage.saveChunkData(chunk);
+		await this.storage.saveChunkData(chunk, {
+			skipScheduleCacheInvalidate: options?.skipScheduleCacheInvalidate,
+		});
 	}
 
 	/** 在用户直接改 YAML 后，把变化同步回调度存储。 */
@@ -281,6 +293,15 @@ export class IRChunkScheduleAdapter {
 		if (updates.scheduleStatus !== undefined) chunk.scheduleStatus = updates.scheduleStatus;
 		if (updates.doneReason !== undefined) chunk.doneReason = updates.doneReason;
 		if (updates.doneAt !== undefined) chunk.doneAt = updates.doneAt;
+		if (updates.manualSchedulePinnedDateKey !== undefined) {
+			chunk.meta = { ...(chunk.meta || {}) };
+			const pinnedDateKey = String(updates.manualSchedulePinnedDateKey || "").trim();
+			if (pinnedDateKey) {
+				chunk.meta.manualSchedulePinnedDateKey = pinnedDateKey;
+			} else {
+				delete chunk.meta.manualSchedulePinnedDateKey;
+			}
+		}
 		chunk.updatedAt = Date.now();
 	}
 

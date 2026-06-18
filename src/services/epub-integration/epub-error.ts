@@ -11,6 +11,7 @@ export type EpubErrorCode =
 	| "invalid_cfi_target"
 	| "render_failed"
 	| "toc_load_failed"
+	| "reader_interop_unavailable"
 	| "unknown";
 
 export type EpubErrorOperation = "open" | "render" | "toc" | "navigate";
@@ -105,6 +106,9 @@ function resolveEpubErrorCode(
 	) {
 		return operation === "render" ? "render_failed" : "invalid_cfi_target";
 	}
+	if (normalizedMessage.includes("reader_interop_unavailable") || normalizedMessage.includes("epub-reader-plugin-required")) {
+		return "reader_interop_unavailable";
+	}
 	if (operation === "render") {
 		return "render_failed";
 	}
@@ -138,6 +142,10 @@ function buildUserMessage(code: EpubErrorCode, operation: EpubErrorOperation, ra
 			return "EPUB 阅读器渲染失败，请重试或切换阅读模式后再试";
 		case "toc_load_failed":
 			return "EPUB 目录加载失败，请稍后重试";
+		case "reader_interop_unavailable":
+			return rawMessage && rawMessage !== "未知错误"
+				? rawMessage
+				: "导入 EPUB 目录需要启用并更新 Weave EPUB 阅读器插件";
 		default:
 			return rawMessage && rawMessage !== "未知错误" ? `EPUB 处理失败：${rawMessage}` : "EPUB 处理失败";
 	}

@@ -42,18 +42,21 @@ export class TFolder {
 
 // Mock Vault class
 export class Vault {
-  getAbstractFileByPath = vi.fn();
-  getMarkdownFiles = vi.fn();
-  read = vi.fn();
-  modify = vi.fn();
-  create = vi.fn();
-  delete = vi.fn();
-  rename = vi.fn();
-  on = vi.fn();
-  off = vi.fn();
-  trigger = vi.fn();
+	adapter: FileSystemAdapter;
+	configDir = ".obsidian";
+	getAbstractFileByPath = vi.fn();
+	getMarkdownFiles = vi.fn();
+	read = vi.fn();
+	modify = vi.fn();
+	create = vi.fn();
+	delete = vi.fn();
+	rename = vi.fn();
+	on = vi.fn();
+	off = vi.fn();
+	trigger = vi.fn();
 
-  constructor() {
+	constructor() {
+		this.adapter = new FileSystemAdapter();
     this.getAbstractFileByPath.mockImplementation((path: string) => {
       if (path.endsWith('.md')) {
         return new TFile(path);
@@ -79,9 +82,19 @@ export class App {
   vault: Vault;
   workspace: any;
   metadataCache: any;
+  plugins: {
+    getPlugin: ReturnType<typeof vi.fn>;
+    enablePlugin: ReturnType<typeof vi.fn>;
+    disablePlugin: ReturnType<typeof vi.fn>;
+  };
 
   constructor() {
     this.vault = new Vault();
+    this.plugins = {
+      getPlugin: vi.fn(() => null),
+      enablePlugin: vi.fn(),
+      disablePlugin: vi.fn(),
+    };
     this.workspace = {
       getActiveFile: vi.fn(),
       getLeaf: vi.fn(),

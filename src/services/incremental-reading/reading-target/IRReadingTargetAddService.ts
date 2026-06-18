@@ -1,4 +1,5 @@
 import { Notice, TFile, normalizePath, type App } from "obsidian";
+import { i18n } from "../../../utils/i18n";
 import {
 	generateUniqueVaultFilePath,
 	resolveIRReadableMarkdownTargetFolder,
@@ -281,7 +282,7 @@ export class IRReadingTargetAddService {
 			if (target.validationError) {
 				throw new Error("reading-target-epub-invalid");
 			}
-			if (!target.epubCfi) {
+			if (!target.epubCfi && !target.epubTocHref) {
 				throw new Error("reading-target-epub-missing-cfi");
 			}
 
@@ -297,7 +298,16 @@ export class IRReadingTargetAddService {
 			const epubService = new IREpubBookmarkTaskService(this.app);
 			await epubService.initialize();
 			const existing = await epubService.getTasksByEpub(resolvedPath);
-			const duplicate = existing.find((task) => task.resumeCfi === target.epubCfi);
+			const duplicate = existing.find((task) => {
+				if (target.epubCfi && task.resumeCfi === target.epubCfi) {
+					return true;
+				}
+				return Boolean(
+					target.epubTocHref &&
+						task.tocHref === target.epubTocHref &&
+						task.title === title
+				);
+			});
 			if (duplicate) {
 				await storage.addBlocksToDeck(deckId, [duplicate.id]);
 				await applyPointSchedulePin(
@@ -307,7 +317,7 @@ export class IRReadingTargetAddService {
 					target.epubResumeLink || target.resumeLink
 				);
 				await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-				new Notice(`该 EPUB 定位已在专题「${deck.name}」中`, 3000);
+				new Notice(i18n.t("irServiceNotices.readingTarget.epubLocationExists", { deckName: deck.name }), 3000);
 				return { createdIds: [duplicate.id], kind: target.kind, deckName: deck.name };
 			}
 
@@ -322,7 +332,9 @@ export class IRReadingTargetAddService {
 				sourceSequenceLocked: true,
 				sourceSequenceAnchorDateKey: schedulePin.dateKey,
 			});
-			await epubService.setResumePoint(created.id, target.epubCfi);
+			if (target.epubCfi) {
+				await epubService.setResumePoint(created.id, target.epubCfi);
+			}
 			await attachBlockToDeck(storage, deckId, resolvedPath, created.id);
 			await applyPointSchedulePin(
 				this.app,
@@ -424,7 +436,7 @@ export class IRReadingTargetAddService {
 				await storage.addBlocksToDeck(deckId, [duplicate.id]);
 				await applyPointSchedulePin(this.app, duplicate.id, schedulePin, target.resumeLink);
 				await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-				new Notice(`该块引用已在专题「${deckName}」中`, 3000);
+				new Notice(i18n.t("irServiceNotices.readingTarget.blockRefExists", { deckName }), 3000);
 				return { createdIds: [duplicate.id], kind: target.kind, deckName };
 			}
 		}

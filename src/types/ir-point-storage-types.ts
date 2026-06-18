@@ -133,6 +133,8 @@ export interface IRPointFileIndexEntry {
 	file: string;
 	pointCount: number;
 	updatedAt: string;
+	/** Phase 2：文件内 pointId 列表，加速 O(1) 定位（与内存 pointIdLocationIndex 对账）。 */
+	pointIds?: string[];
 }
 
 export interface IRPointFileIndex {

@@ -16,6 +16,7 @@
     getDisplayedMaterialDateLabel,
     getScheduleItemDeckName,
     getMaterialExpandButtonLabel,
+    getReadingPointTypeIndicator,
     handleMaterialClick,
     openMaterial,
     toggleMaterialExpand,
@@ -34,8 +35,17 @@
     toggleReadingTimer,
     formatCompactTimerDuration,
     formatTimerDuration,
-    formatSiblingDueDate
+    formatSiblingDueDate,
+    batchSelectionMode,
+    isBatchSelected,
+    toggleBatchSelection
   }: IRCalendarMaterialListProps = $props();
+
+  function handleBatchCheckboxClick(event: MouseEvent, materialId: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleBatchSelection(materialId, event);
+  }
 
   function isAutoSubscribedNew(material: { autoSubscribedAt?: string; autoSubscribedBadgeUntil?: string }): boolean {
     const badgeUntil = Date.parse(String(material.autoSubscribedBadgeUntil || ''));
@@ -58,8 +68,21 @@
   {@const siblings = siblingCache.get(material.id) || []}
   {@const searchDateLabel = hasActiveSearch ? getDisplayedMaterialDateLabel(material.id, displayedMaterialDateKeys) : ''}
   {@const searchDeckLabel = hasActiveSearch ? getScheduleItemDeckName(material) : ''}
+  {@const isBatchSelectedItem = isBatchSelected(material.id)}
+  {@const typeIndicator = getReadingPointTypeIndicator(material)}
   <div class="reading-item-wrapper">
-    <div class="reading-item">
+    <div class="reading-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelectedItem}>
+      {#if batchSelectionMode}
+        <button
+          type="button"
+          class="batch-select-checkbox"
+          aria-label={t('irSidebar.batch.toggleSelection')}
+          aria-pressed={isBatchSelectedItem}
+          onclick={(event) => handleBatchCheckboxClick(event, material.id)}
+        >
+          <span class="checkbox-box" class:checked={isBatchSelectedItem} aria-hidden="true"></span>
+        </button>
+      {/if}
       {#if continuousReadingEnabled}
         <button
           type="button"
@@ -79,7 +102,7 @@
       <div class="reading-item-content">
         <button
           class="reading-item-main"
-          onclick={() => handleMaterialClick(material)}
+          onclick={(event) => handleMaterialClick(material, event)}
           oncontextmenu={(event) => handleMaterialContextMenu(event, event.currentTarget as unknown as HTMLElement, material)}
           onpointerdown={(event) => handleLongPressStart(event, event.currentTarget as unknown as HTMLElement, material)}
           onpointermove={handleLongPressMove}
@@ -88,13 +111,18 @@
         >
           <span class="item-rank" class:top={index < 3}>{index + 1}</span>
           <span class="item-text">
-            <span class="item-text-content">
-              <span class="item-title-row">
-                <span class="item-title" class:processed={processedChunkIds.has(material.id)}>{material.displayName || material.title || t('irSidebar.controls.untitled')}</span>
-                {#if isAutoSubscribedNew(material)}
-                  <span class="item-new-badge">{t('irSidebar.controls.newBadge')}</span>
-                {/if}
+            <span class="item-title-row">
+              <span class="item-title" class:processed={processedChunkIds.has(material.id)}>
+                <span class="item-title-text">{material.displayName || material.title || t('irSidebar.controls.untitled')}</span>
               </span>
+              {#if typeIndicator}
+                <span class="reading-point-type-icon" title={typeIndicator.label} aria-label={typeIndicator.label}>
+                  <ObsidianIcon name={typeIndicator.icon} size={12} />
+                </span>
+              {/if}
+              {#if isAutoSubscribedNew(material)}
+                <span class="item-new-badge">{t('irSidebar.controls.newBadge')}</span>
+              {/if}
               {#if hasActiveSearch && (searchDateLabel || searchDeckLabel)}
                 <span class="item-search-meta">
                   {#if searchDateLabel}
@@ -110,23 +138,25 @@
         </button>
       </div>
       <div class="reading-item-controls">
-        <button
-          class="schedule-checkbox"
-          aria-label={t('irSidebar.controls.schedule')}
-          onclick={(event) => openSchedulingMenu(event, material)}
-        >
-          <span class="checkbox-box" class:checked={processedChunkIds.has(material.id)} aria-hidden="true"></span>
-        </button>
-        {#if hasVisibleAssociatedNote(material)}
+        {#if !batchSelectionMode}
+          {#if hasVisibleAssociatedNote(material)}
+            <button
+              type="button"
+              class="associated-note-link"
+              aria-label={getAssociatedNoteActionLabel(material)}
+              title={getAssociatedNoteActionTooltip(material)}
+              oncontextmenu={(event) => handleMaterialContextMenu(event, event.currentTarget as HTMLElement, material)}
+              onclick={(event) => handleAssociatedNoteClick(event, material)}
+            >
+              <span>{t('irSidebar.associatedNote.badge')}</span>
+            </button>
+          {/if}
           <button
-            type="button"
-            class="associated-note-link"
-            aria-label={getAssociatedNoteActionLabel(material)}
-            title={getAssociatedNoteActionTooltip(material)}
-            oncontextmenu={(event) => handleMaterialContextMenu(event, event.currentTarget as HTMLElement, material)}
-            onclick={(event) => handleAssociatedNoteClick(event, material)}
+            class="schedule-checkbox"
+            aria-label={t('irSidebar.controls.schedule')}
+            onclick={(event) => openSchedulingMenu(event, material)}
           >
-            <span>{t('irSidebar.associatedNote.badge')}</span>
+            <span class="checkbox-box" class:checked={processedChunkIds.has(material.id)} aria-hidden="true"></span>
           </button>
         {/if}
         <button
@@ -162,13 +192,23 @@
           {@const siblingPriority = sibling.priority || 0}
           {@const siblingPriorityClass = siblingPriority >= 8 ? 'high' : siblingPriority >= 4 ? 'medium' : 'low'}
           {@const dueText = sibling.nextRepDate > 0 ? formatSiblingDueDate(sibling.nextRepDate) : t('irSidebar.controls.unscheduled')}
-          <div class="sibling-item">
+          {@const siblingTypeIndicator = getReadingPointTypeIndicator(sibling)}
+          <div class="sibling-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelected(sibling.id)}>
+            {#if batchSelectionMode}
+              <button
+                type="button"
+                class="batch-select-checkbox sibling-batch-select-checkbox"
+                aria-label={t('irSidebar.batch.toggleSelection')}
+                aria-pressed={isBatchSelected(sibling.id)}
+                onclick={(event) => handleBatchCheckboxClick(event, sibling.id)}
+              >
+                <span class="checkbox-box" class:checked={isBatchSelected(sibling.id)} aria-hidden="true"></span>
+              </button>
+            {/if}
             <div class="sibling-item-content">
               <button
                 class="sibling-item-main"
-                onclick={() => {
-                  void openMaterial(sibling);
-                }}
+                onclick={(event) => handleMaterialClick(sibling, event)}
                 oncontextmenu={(event) => handleMaterialContextMenu(event, event.currentTarget as unknown as HTMLElement, sibling)}
                 onpointerdown={(event) => handleLongPressStart(event, event.currentTarget as unknown as HTMLElement, sibling)}
                 onpointermove={handleLongPressMove}
@@ -177,7 +217,14 @@
                 title={sibling.title || sibling.id}
               >
                 <span class="sibling-title-row">
-                  <span class="sibling-title">{sibling.displayName || sibling.title || sibling.id}</span>
+                  <span class="sibling-title">
+                    <span class="sibling-title-text">{sibling.displayName || sibling.title || sibling.id}</span>
+                  </span>
+                  {#if siblingTypeIndicator}
+                    <span class="reading-point-type-icon" title={siblingTypeIndicator.label} aria-label={siblingTypeIndicator.label}>
+                      <ObsidianIcon name={siblingTypeIndicator.icon} size={11} />
+                    </span>
+                  {/if}
                   {#if isAutoSubscribedNew(sibling)}
                     <span class="item-new-badge">{t('irSidebar.controls.newBadge')}</span>
                   {/if}
@@ -186,23 +233,25 @@
               </button>
             </div>
             <div class="reading-item-controls">
-              <button
-                class="schedule-checkbox"
-                aria-label={t('irSidebar.controls.schedule')}
-                onclick={(event) => openSchedulingMenu(event, sibling)}
-              >
-                <span class="checkbox-box" class:checked={processedChunkIds.has(sibling.id)} aria-hidden="true"></span>
-              </button>
-              {#if hasVisibleAssociatedNote(sibling)}
+              {#if !batchSelectionMode}
+                {#if hasVisibleAssociatedNote(sibling)}
+                  <button
+                    type="button"
+                    class="associated-note-link sibling-associated-note-link"
+                    aria-label={getAssociatedNoteActionLabel(sibling)}
+                    title={getAssociatedNoteActionTooltip(sibling)}
+                    oncontextmenu={(event) => handleMaterialContextMenu(event, event.currentTarget as HTMLElement, sibling)}
+                    onclick={(event) => handleAssociatedNoteClick(event, sibling)}
+                  >
+                    <span>{t('irSidebar.associatedNote.badge')}</span>
+                  </button>
+                {/if}
                 <button
-                  type="button"
-                  class="associated-note-link sibling-associated-note-link"
-                  aria-label={getAssociatedNoteActionLabel(sibling)}
-                  title={getAssociatedNoteActionTooltip(sibling)}
-                  oncontextmenu={(event) => handleMaterialContextMenu(event, event.currentTarget as HTMLElement, sibling)}
-                  onclick={(event) => handleAssociatedNoteClick(event, sibling)}
+                  class="schedule-checkbox"
+                  aria-label={t('irSidebar.controls.schedule')}
+                  onclick={(event) => openSchedulingMenu(event, sibling)}
                 >
-                  <span>{t('irSidebar.associatedNote.badge')}</span>
+                  <span class="checkbox-box" class:checked={processedChunkIds.has(sibling.id)} aria-hidden="true"></span>
                 </button>
               {/if}
               <button
@@ -257,6 +306,46 @@
     width: 100%;
   }
 
+  .reading-item.batch-selected,
+  .sibling-item.batch-selected {
+    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-modifier-hover));
+    box-shadow: inset 2px 0 0 var(--interactive-accent);
+  }
+
+  .reading-item.batch-selection-mode,
+  .sibling-item.batch-selection-mode {
+    cursor: pointer;
+  }
+
+  .batch-select-checkbox {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    margin-right: 2px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .batch-select-checkbox:hover .checkbox-box,
+  .batch-select-checkbox:focus-visible .checkbox-box {
+    border-color: color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
+  }
+
+  .batch-select-checkbox:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .sibling-batch-select-checkbox {
+    margin-left: 8px;
+  }
+
   .reading-item:hover {
     background: var(--background-modifier-hover);
   }
@@ -297,27 +386,30 @@
     align-items: center;
   }
 
-  .item-text-content {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-    width: 100%;
-  }
-
   .item-title-row,
   .sibling-title-row {
     display: flex;
     align-items: center;
     gap: 6px;
     min-width: 0;
+    width: 100%;
+  }
+
+  .reading-point-type-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--text-faint);
+    opacity: 0.88;
   }
 
   .item-search-meta {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    flex-wrap: wrap;
+    flex-shrink: 0;
+    margin-left: auto;
     min-width: 0;
   }
 
@@ -512,14 +604,20 @@
   }
 
   .item-title {
+    display: flex;
+    align-items: baseline;
     flex: 1;
     font-size: 12px;
     font-weight: 500;
     color: var(--text-normal);
-    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .item-title-text {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    min-width: 0;
+    white-space: nowrap;
   }
 
   .item-title.processed {
@@ -665,13 +763,19 @@
   }
 
   .sibling-title {
+    display: flex;
+    align-items: baseline;
     flex: 1;
     font-size: 11px;
     color: var(--text-muted);
-    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .sibling-title-text {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    min-width: 0;
+    white-space: nowrap;
   }
 
   .sibling-due {

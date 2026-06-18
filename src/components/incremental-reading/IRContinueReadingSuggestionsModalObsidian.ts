@@ -14,7 +14,6 @@ export interface IRContinueReadingSuggestionModalItem {
 export interface IRContinueReadingSuggestionsModalObsidianOptions {
 	suggestions: IRContinueReadingSuggestionModalItem[];
 	suspendedItems?: IRContinueReadingSuggestionModalItem[];
-	isChineseUi?: boolean;
 	anchorElement?: HTMLElement | null;
 	onOpenSuggestion?: (id: string) => void | Promise<void>;
 	onAddSuggestion?: (id: string) => void | Promise<void>;
@@ -100,7 +99,6 @@ export class IRContinueReadingSuggestionsModalObsidian {
 			props: {
 				suggestions: this.options.suggestions,
 				suspendedItems: this.options.suspendedItems ?? [],
-				isChineseUi: this.options.isChineseUi !== false,
 				anchorElement: this.options.anchorElement ?? null,
 				onOpenSuggestion: (id: string) => this.options.onOpenSuggestion?.(id),
 				onAddSuggestion: (id: string) => this.options.onAddSuggestion?.(id),

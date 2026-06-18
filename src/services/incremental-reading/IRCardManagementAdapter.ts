@@ -1,4 +1,5 @@
 import { TFile, type App } from "obsidian";
+import { i18n } from "../../utils/i18n";
 import type { IRTraceSourceKind } from "./IRSourceTraceStats";
 import { detectTraceSourceKind } from "./IRSourceTraceStats";
 import { IRTagGroupService } from "./IRTagGroupService";
@@ -33,7 +34,7 @@ export function getIRSourceDocumentLabel(
 	sourceDocumentKey?: string
 ): string {
 	const raw = sourceFile || sourceDocumentKey || "";
-	if (!raw) return "未命名来源";
+	if (!raw) return i18n.t("irServiceNotices.defaults.unnamedSource");
 	const normalized = raw.replace(/\\/g, "/");
 	return normalized.split("/").pop() || normalized;
 }
@@ -46,7 +47,7 @@ export function getIRSourceSubunitLabel(
 		return "";
 	}
 	if (!value) {
-		return "未定位到目录书签";
+		return i18n.t("irServiceNotices.defaults.bookmarkNotLocated");
 	}
 	return value;
 }

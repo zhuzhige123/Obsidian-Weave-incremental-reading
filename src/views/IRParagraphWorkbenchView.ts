@@ -4,6 +4,7 @@ import type { WeavePlugin } from "../main";
 import { IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
 import type { ParagraphWorkbenchOpenInput } from "../services/incremental-reading/paragraph-workbench/types";
 import { logger } from "../utils/logger";
+import { i18n } from "../utils/i18n";
 import { getViewSurfaceTokens } from "../utils/view-location-utils";
 
 export const VIEW_TYPE_IR_PARAGRAPH_WORKBENCH = IR_RUNTIME.viewTypes.workbench;
@@ -31,7 +32,9 @@ export class IRParagraphWorkbenchView extends ItemView {
 
 	getDisplayText(): string {
 		const title = this.openInput?.topicName || this.openInput?.sourcePath?.split("/").pop();
-		return title ? `${title} · 段落阅读` : "增量阅读段落工作台";
+		return title
+			? `${title} · ${i18n.t("irViews.workbench.paragraphSuffix")}`
+			: i18n.t("irViews.workbench.defaultTitle");
 	}
 
 	getIcon(): string {
@@ -77,7 +80,7 @@ export class IRParagraphWorkbenchView extends ItemView {
 		this.applySurfaceContext();
 		contentEl.createDiv({
 			cls: "weave-calendar-loading",
-			text: "正在加载段落阅读工作台...",
+			text: i18n.t("irViews.workbench.loading"),
 		});
 		void this.loadComponentAsync();
 	}
@@ -127,7 +130,7 @@ export class IRParagraphWorkbenchView extends ItemView {
 			this.contentEl.empty();
 			this.contentEl.createDiv({
 				cls: "error",
-				text: "段落阅读工作台加载失败",
+				text: i18n.t("irViews.workbench.loadFailed"),
 			});
 		}
 	}

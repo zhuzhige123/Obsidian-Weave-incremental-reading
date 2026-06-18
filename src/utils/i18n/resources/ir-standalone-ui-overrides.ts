@@ -25,6 +25,7 @@ export const irStandaloneUiTranslationOverrides: Record<SupportedLanguage, Trans
 					attempts: "attempts: 搜索测试次数",
 					error: "error: 搜索错题等级",
 					state: "state: 搜索阅读状态",
+					readingPointType: "type: 搜索阅读点类型",
 				},
 				loadHistoryFailed: "加载搜索历史失败",
 				saveHistoryFailed: "保存搜索历史失败",
@@ -54,6 +55,7 @@ export const irStandaloneUiTranslationOverrides: Record<SupportedLanguage, Trans
 					deck: "专题",
 					priority: "优先级",
 					type: "题型",
+					readingPointType: "阅读点类型",
 				},
 				dateMenus: {
 					created: "创建日期筛选",
@@ -140,6 +142,7 @@ export const irStandaloneUiTranslationOverrides: Record<SupportedLanguage, Trans
 					attempts: "attempts: search attempt count",
 					error: "error: search error level",
 					state: "state: search reading state",
+					readingPointType: "type: search reading point type",
 				},
 				loadHistoryFailed: "Failed to load search history",
 				saveHistoryFailed: "Failed to save search history",
@@ -169,6 +172,7 @@ export const irStandaloneUiTranslationOverrides: Record<SupportedLanguage, Trans
 					deck: "Topic",
 					priority: "Priority",
 					type: "Question Type",
+					readingPointType: "Reading Point Type",
 				},
 				dateMenus: {
 					created: "Created date filter",

@@ -11,6 +11,48 @@ type MockAbortSignal = {
   removeEventListener: (...args: unknown[]) => void;
 };
 
+type CreateElementOptions = { cls?: string; text?: string };
+
+(globalThis as typeof globalThis & { activeDocument: Document }).activeDocument = document;
+
+if (!(HTMLElement.prototype as HTMLElement & { createDiv?: (options?: CreateElementOptions) => HTMLDivElement }).createDiv) {
+  (HTMLElement.prototype as HTMLElement & { createDiv: (options?: CreateElementOptions) => HTMLDivElement }).createDiv =
+    function createDiv(this: HTMLElement, options?: CreateElementOptions) {
+      const el = document.createElement('div');
+      if (options?.cls) el.className = options.cls;
+      if (typeof options?.text === 'string') el.textContent = options.text;
+      this.appendChild(el);
+      return el;
+    };
+}
+
+if (!(HTMLElement.prototype as HTMLElement & { createSpan?: (options?: CreateElementOptions) => HTMLSpanElement }).createSpan) {
+  (HTMLElement.prototype as HTMLElement & { createSpan: (options?: CreateElementOptions) => HTMLSpanElement }).createSpan =
+    function createSpan(this: HTMLElement, options?: CreateElementOptions) {
+      const el = document.createElement('span');
+      if (options?.cls) el.className = options.cls;
+      if (typeof options?.text === 'string') el.textContent = options.text;
+      this.appendChild(el);
+      return el;
+    };
+}
+
+if (!(HTMLElement.prototype as HTMLElement & { setCssProps?: (props: Record<string, string>) => void }).setCssProps) {
+  (HTMLElement.prototype as HTMLElement & { setCssProps: (props: Record<string, string>) => void }).setCssProps =
+    function setCssProps(this: HTMLElement, props: Record<string, string>) {
+      for (const [key, value] of Object.entries(props || {})) {
+        this.style.setProperty(key, value);
+      }
+    };
+}
+
+if (!(Element.prototype as Element & { instanceOf?: (type: abstract new (...args: never[]) => unknown) => boolean }).instanceOf) {
+  (Element.prototype as Element & { instanceOf: (type: abstract new (...args: never[]) => unknown) => boolean }).instanceOf =
+    function instanceOf(this: Element, type: abstract new (...args: never[]) => unknown) {
+      return this instanceof type;
+    };
+}
+
 if (!window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,

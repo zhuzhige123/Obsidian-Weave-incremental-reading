@@ -20,6 +20,12 @@ export interface IRCalendarDaySummary {
 	totalCount: number;
 }
 
+export interface IRCalendarDayIndexScopeManifest {
+	settingsFingerprint: string;
+	scheduleFingerprint: string;
+	savedAt: string;
+}
+
 export interface IRCalendarDayIndexScope {
 	settingsFingerprint: string;
 	scheduleFingerprint: string;
@@ -55,6 +61,17 @@ export class IRCalendarDayIndexService {
 
 	constructor(private readonly app: App) {}
 
+	/** 冷启动预读：将 day-index 载入内存，避免月历首屏重复读盘。 */
+	async warmDiskCache(): Promise<boolean> {
+		try {
+			await this.loadStore();
+			return this.storeLoaded;
+		} catch (error) {
+			logger.debug("[IRCalendarDayIndexService] warmDiskCache failed:", error);
+			return false;
+		}
+	}
+
 	async tryHydrateTier0(input: {
 		cacheKey: string;
 		settingsFingerprint: string;
@@ -84,17 +101,9 @@ export class IRCalendarDayIndexService {
 		}
 
 		const materialsByDate = new Map<string, ScheduleItem[]>();
-		let hasDisplayablePriorityDay = false;
 		for (const dateKey of priorityDateKeys) {
 			const items = (scope.slices[dateKey] || []).map((item) => this.hydrateScheduleItem(item));
 			materialsByDate.set(dateKey, items);
-			if (items.length > 0) {
-				hasDisplayablePriorityDay = true;
-			}
-		}
-
-		if (!hasDisplayablePriorityDay) {
-			return null;
 		}
 
 		const daySummaries = this.buildDaySummariesMap(scope);
@@ -320,6 +329,63 @@ export class IRCalendarDayIndexService {
 			this.writeDebounceTimer = null;
 		}
 		await this.flushScopeWrites();
+	}
+
+	/** 读取 scope 元数据（指纹、保存时间），不加载切片正文。 */
+	async peekScopeManifest(cacheKey: string): Promise<IRCalendarDayIndexScopeManifest | null> {
+		const normalizedCacheKey = String(cacheKey || "").trim();
+		if (!normalizedCacheKey) {
+			return null;
+		}
+		const scope = await this.readScope(normalizedCacheKey);
+		if (!scope) {
+			return null;
+		}
+		return {
+			settingsFingerprint: scope.settingsFingerprint,
+			scheduleFingerprint: scope.scheduleFingerprint,
+			savedAt: scope.savedAt,
+		};
+	}
+
+	/**
+	 * 判断投影是否已覆盖优先日期且指纹与当前调度一致。
+	 * 用于跳过后台 calendar-reconcile（原 enrich）全量查询。
+	 */
+	async hasFreshProjectionForPriorityDates(input: {
+		cacheKey: string;
+		settingsFingerprint: string;
+		scheduleFingerprint: string;
+		dateKeys: string[];
+	}): Promise<boolean> {
+		const cacheKey = String(input.cacheKey || "").trim();
+		const settingsFingerprint = String(input.settingsFingerprint || "").trim();
+		const scheduleFingerprint = String(input.scheduleFingerprint || "").trim();
+		const dateKeys = Array.from(
+			new Set(input.dateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+		);
+		if (!cacheKey || !settingsFingerprint || !scheduleFingerprint || dateKeys.length === 0) {
+			return false;
+		}
+
+		const scope = await this.readScope(cacheKey);
+		if (!scope) {
+			return false;
+		}
+		if (scope.settingsFingerprint !== settingsFingerprint) {
+			return false;
+		}
+		if (scope.scheduleFingerprint !== scheduleFingerprint) {
+			return false;
+		}
+
+		for (const dateKey of dateKeys) {
+			const slice = scope.slices[dateKey];
+			if (!Array.isArray(slice)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private createEmptyScope(input: {

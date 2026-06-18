@@ -294,9 +294,6 @@ export interface Card {
 
 		// 选择题专用统计（仅选择题类型有效）
 		choiceStats?: ChoiceQuestionStats;
-
-		// 题库测试统计，仅 test 类型卡片有效
-		testStats?: import("../types/question-bank-types").QuestionTestStats;
 	};
 
 	// ===== FSRS6个性化数据 =====
@@ -356,9 +353,6 @@ export interface Card {
 			name: string;
 			fields: string[];
 		};
-
-		// 题库题目元数据
-		questionMetadata?: import("../types/question-bank-types").QuestionMetadata;
 
 		// 回收信息
 		recycleInfo?: import("../utils/recycle-utils").RecycleInfo;

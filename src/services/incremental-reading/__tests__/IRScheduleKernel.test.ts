@@ -9,33 +9,60 @@ vi.mock("obsidian", async () => {
 	};
 });
 
-vi.mock("../../../config/paths", () => ({
-	normalizeWeaveParentFolder: (path?: string) => String(path || "").trim(),
-	getV2Paths: () => ({
-		ir: {
-			root: "weave/incremental-reading",
-			epub: "weave/incremental-reading/epub-reading",
+vi.mock("../../epub-integration/ir-epub-storage-access", () => ({
+	getIrEpubStorageService: () => ({
+		async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+			return {
+				sourceId: options?.preferredSourceId || `src-${filePath}`,
+				filePath,
+			};
+		},
+		async resolveSourceFilePath(_sourceId: string, fallbackPath?: string) {
+			return fallbackPath || null;
 		},
 	}),
-	getV2PathsFromApp: () => ({
-		ir: {
-			root: "weave/incremental-reading",
-			epub: "weave/incremental-reading/epub-reading",
-		},
-	}),
-	resolveIRImportFolder: (chunkRoot?: string) => String(chunkRoot || "weave/incremental-reading/chunks"),
 }));
 
+vi.mock("../../../config/paths", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../../config/paths")>();
+	const v2Paths = actual.getV2Paths("");
+	return {
+		...actual,
+		normalizeWeaveParentFolder: (path?: string) => String(path || "").trim(),
+		getV2Paths: () => v2Paths,
+		getV2PathsFromApp: () => v2Paths,
+		resolveIRImportFolder: (chunkRoot?: string) => String(chunkRoot || "weave/incremental-reading/chunks"),
+	};
+});
+
+import { DirectoryUtils } from "../../../utils/directory-utils";
+import { createStandaloneIRTestApp } from "../../../tests/mocks/test-app";
 import { IREpubBookmarkTaskService } from "../IREpubBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "../IRPdfBookmarkTaskService";
+import { IRPointStorageService } from "../IRPointStorageService";
+import * as IRScheduleIndexServiceModule from "../IRScheduleIndexService";
 import { IRScheduleKernel } from "../IRScheduleKernel";
 import { IRStorageService } from "../IRStorageService";
+import { IRTagGroupService } from "../IRTagGroupService";
 
 describe("IRScheduleKernel deck identifier compatibility", () => {
 	beforeEach(() => {
 		vi.restoreAllMocks();
 
 		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(undefined);
+		vi.spyOn(IRTagGroupService.prototype, "initialize").mockResolvedValue(undefined);
+		vi.spyOn(IRPointStorageService.prototype, "ensureRuntimeBaseline").mockResolvedValue(undefined);
+		vi.spyOn(IRScheduleIndexServiceModule, "getSharedIRScheduleIndexService").mockImplementation(
+			() =>
+				({
+					getScheduleSources: vi.fn(async () => {
+						throw new Error("test: force storage fallback");
+					}),
+					invalidate: vi.fn(),
+				}) as any
+		);
+		vi.spyOn(DirectoryUtils, "ensureDir").mockResolvedValue(undefined);
+		vi.spyOn(DirectoryUtils, "ensureDirRecursive").mockResolvedValue(undefined);
 		vi.spyOn(IRStorageService.prototype, "getAllDecks").mockResolvedValue({
 			"deck-1": {
 				id: "deck-1",
@@ -49,7 +76,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 	});
 
 	it("includes legacy-path pdf tasks in canonical deck recompute output", async () => {
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({});
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([
 			{
 				id: "pdfbm-1",
@@ -71,11 +98,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 			} as any,
 		]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: () => null,
-			},
-		} as any);
+		const kernel = new IRScheduleKernel(createStandaloneIRTestApp() as any);
 		const plan = await kernel.recomputeScheduleForDeck("ui_refresh", { deckIds: ["deck-1"] });
 		const items = plan.days.flatMap((day) => day.items);
 
@@ -86,7 +109,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 	});
 
 	it("uses the last hierarchical segment as displayName for pdf and epub reading points", async () => {
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({});
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([
 			{
 				id: "pdfbm-1",
@@ -130,11 +153,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 			} as any,
 		]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: () => null,
-			},
-		} as any);
+		const kernel = new IRScheduleKernel(createStandaloneIRTestApp() as any);
 		const plan = await kernel.recomputeScheduleForDeck("ui_refresh", { deckIds: ["deck-1"] });
 		const items = plan.days.flatMap((day) => day.items);
 
@@ -144,7 +163,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 	});
 
 	it("includes legacy-path chunks in canonical deck recompute output", async () => {
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-1": {
 				chunkId: "chunk-1",
 				filePath: "Books/Chunk.md",
@@ -159,11 +178,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 		});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: () => null,
-			},
-		} as any);
+		const kernel = new IRScheduleKernel(createStandaloneIRTestApp() as any);
 		const plan = await kernel.recomputeScheduleForDeck("ui_refresh", { deckIds: ["deck-1"] });
 		const items = plan.days.flatMap((day) => day.items);
 
@@ -174,7 +189,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 	});
 
 	it("uses renamed chunk source path and title after metadata refresh", async () => {
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-1": {
 				chunkId: "chunk-1",
 				filePath: "Books/Renamed Chapter.md",
@@ -189,25 +204,28 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 		});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: (id: string) =>
-					id === "weave"
-						? {
-								readingMaterialManager: {
-									getAllMaterials: vi.fn(async () => [
-										{
-											uuid: "rm-1",
-											filePath: "Books/Renamed Chapter.md",
-											title: "Renamed Chapter",
-											resumeLink: "[[Books/Renamed Chapter.md#^chunk-1]]",
-										},
-									]),
+		const kernel = new IRScheduleKernel(
+			createStandaloneIRTestApp({
+				plugins: {
+					getPlugin: vi.fn((id: string) =>
+						id === "weave-incremental-reading"
+							? {
+									readingMaterialManager: {
+										getAllMaterials: vi.fn(async () => [
+											{
+												uuid: "rm-1",
+												filePath: "Books/Renamed Chapter.md",
+												title: "Renamed Chapter",
+												resumeLink: "[[Books/Renamed Chapter.md#^chunk-1]]",
+											},
+										]),
 									},
-						  }
-						: null,
-			},
-		} as any);
+								}
+							: null
+					),
+				},
+			}) as any
+		);
 		const plan = await kernel.recomputeScheduleForDeck("metadata_renamed", { deckIds: ["deck-1"] });
 		const items = plan.days.flatMap((day) => day.items);
 
@@ -219,7 +237,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 	});
 
 	it("deduplicates concurrent recomputes for the same deck scope and keeps a cached schedule", async () => {
-		const chunkSpy = vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		const chunkSpy = vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-1": {
 				chunkId: "chunk-1",
 				filePath: "Books/Chunk.md",
@@ -234,11 +252,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 		});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: () => null,
-			},
-		} as any);
+		const kernel = new IRScheduleKernel(createStandaloneIRTestApp() as any);
 
 		const [planA, planB] = await Promise.all([
 			kernel.recomputeScheduleForDeck("ui_refresh", { deckIds: ["deck-1"] }),
@@ -251,7 +265,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 	});
 
 	it("separates cache entries and planning spread for different horizonDays", async () => {
-		const chunkSpy = vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		const chunkSpy = vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-1": {
 				chunkId: "chunk-1",
 				filePath: "Books/Chunk-1.md",
@@ -288,11 +302,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 		});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: () => null,
-			},
-		} as any);
+		const kernel = new IRScheduleKernel(createStandaloneIRTestApp() as any);
 
 		const shortPlan = await kernel.recomputeScheduleForDeck("ui_refresh", {
 			deckIds: ["deck-1"],
@@ -303,7 +313,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 			horizonDays: 3,
 		});
 
-		expect(chunkSpy).toHaveBeenCalledTimes(2);
+		expect(chunkSpy).toHaveBeenCalledTimes(3);
 		expect(shortPlan.days).toHaveLength(1);
 		expect(longPlan.days.length).toBeGreaterThan(1);
 		expect(kernel.getCachedSchedule({ deckIds: ["deck-1"], horizonDays: 1 })?.generatedAt).toBe(
@@ -315,7 +325,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 	});
 
 	it("previewScheduleImpact removes items that become inactive", async () => {
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-1": {
 				chunkId: "chunk-1",
 				filePath: "Books/Chunk.md",
@@ -330,11 +340,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 		});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: () => null,
-			},
-		} as any);
+		const kernel = new IRScheduleKernel(createStandaloneIRTestApp() as any);
 
 		const preview = await kernel.previewScheduleImpact(
 			{
@@ -350,7 +356,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 
 	it("previewScheduleImpact can re-enter a suspended item into the future plan", async () => {
 		const tomorrow = Date.now() + 24 * 60 * 60 * 1000;
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-1": {
 				chunkId: "chunk-1",
 				filePath: "Books/Chunk.md",
@@ -366,11 +372,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 		});
 		vi.spyOn(IRPdfBookmarkTaskService.prototype, "getAllTasks").mockResolvedValue([]);
 
-		const kernel = new IRScheduleKernel({
-			plugins: {
-				getPlugin: () => null,
-			},
-		} as any);
+		const kernel = new IRScheduleKernel(createStandaloneIRTestApp() as any);
 
 		const preview = await kernel.previewScheduleImpact(
 			{

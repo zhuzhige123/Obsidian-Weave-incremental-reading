@@ -6,10 +6,16 @@
   import StandaloneIRLicenseSettingsPanel from "./StandaloneIRLicenseSettingsPanel.svelte";
   import { VaultFolderSuggestModal } from "../../modals/VaultFolderSuggestModal";
   import { IRDataManagementModalObsidian } from "../incremental-reading/IRDataManagementModalObsidian";
-import {
-  PremiumFeatureGuard,
-  PREMIUM_FEATURES,
-} from "../../services/premium/PremiumFeatureGuard";
+  import {
+    PremiumFeatureGuard,
+    PREMIUM_FEATURES,
+  } from "../../services/premium/PremiumFeatureGuard";
+  import {
+    applyPluginUiLanguagePreference,
+    PLUGIN_UI_LANGUAGE_OPTIONS,
+    tr,
+    type PluginUiLanguagePreference,
+  } from "../../utils/i18n";
 
   interface Props {
     plugin: IncrementalReadingSettingsHost;
@@ -18,12 +24,20 @@ import {
   type StandaloneIRSettingsTabId = "basic" | "core-scheduling" | "advanced" | "license" | "about";
 
   let { plugin }: Props = $props();
+  let t = $derived($tr);
   let activeTab = $state<StandaloneIRSettingsTabId>("basic");
   let stateVersion = $state(0);
   let localDataFolderDraft = $state("");
   let lastFolderDraft = $state("");
   let weaveParentFolderDraft = $state("");
-let showPremiumFeaturesPreviewDraft = $state(false);
+  let showPremiumFeaturesPreviewDraft = $state(false);
+  let uiLanguageDraft = $state<PluginUiLanguagePreference>("auto");
+
+  const languageOptionLabels: Record<PluginUiLanguagePreference, () => string> = {
+    auto: () => t("irSettings.standalone.language.auto"),
+    "zh-CN": () => t("irSettings.standalone.language.zhCN"),
+    "en-US": () => t("irSettings.standalone.language.enUS"),
+  };
 
   function shouldShowPremiumFeatureEntry(featureId: string): boolean {
     return PremiumFeatureGuard.getInstance().shouldShowFeatureEntry(featureId, {
@@ -34,8 +48,8 @@ let showPremiumFeaturesPreviewDraft = $state(false);
   let tabs = $derived.by(() => {
     stateVersion;
     const baseTabs: Array<{ id: StandaloneIRSettingsTabId; label: string; icon: string }> = [
-      { id: "basic", label: "基础", icon: "" },
-      { id: "core-scheduling", label: "基础调度", icon: "" },
+      { id: "basic", label: t("irSettings.standalone.tabs.basic"), icon: "" },
+      { id: "core-scheduling", label: t("irSettings.standalone.tabs.coreScheduling"), icon: "" },
     ];
 
     const shouldShowAdvancedTab =
@@ -43,37 +57,42 @@ let showPremiumFeaturesPreviewDraft = $state(false);
       || shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.INTERLEAVE_LEARNING_SETTINGS)
       || shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.TAG_GROUPS);
     if (shouldShowAdvancedTab) {
-      baseTabs.push({ id: "advanced", label: "高级调度", icon: "" });
+      baseTabs.push({ id: "advanced", label: t("irSettings.standalone.tabs.advanced"), icon: "" });
     }
 
     baseTabs.push(
-      { id: "license", label: "授权", icon: "" },
-      { id: "about", label: "关于", icon: "" }
+      { id: "license", label: t("irSettings.standalone.tabs.license"), icon: "" },
+      { id: "about", label: t("irSettings.standalone.tabs.about"), icon: "" }
     );
     return baseTabs;
   });
 
   let pluginVersion = $derived.by(() => plugin.manifest?.version || "-");
   let pluginDisplayName = $derived.by(() => plugin.manifest?.name ?? "Weave Incremental Reading");
-  const supportedFormats = ["Markdown", "PDF 书签", "EPUB 来源回跳", "Canvas"];
-  const contactItems = [
+  let supportedFormats = $derived([
+    t("irSettings.standalone.supportedFormats.markdown"),
+    t("irSettings.standalone.supportedFormats.pdfBookmark"),
+    t("irSettings.standalone.supportedFormats.epubSource"),
+    t("irSettings.standalone.supportedFormats.canvas"),
+  ]);
+  let contactItems = $derived([
     {
-      label: "文档中心",
+      label: t("irSettings.standalone.about.contacts.docs"),
       href: "https://github.com/zhuzhige123/weave-incremental-reading/tree/main/docs",
     },
     {
-      label: "更新日志",
+      label: t("irSettings.standalone.about.contacts.changelog"),
       href: "https://github.com/zhuzhige123/weave-incremental-reading/blob/main/CHANGELOG.md",
     },
     {
-      label: "问题反馈",
+      label: t("irSettings.standalone.about.contacts.feedback"),
       href: "https://github.com/zhuzhige123/weave-incremental-reading/issues",
     },
     {
-      label: "联系作者",
+      label: t("irSettings.standalone.about.contacts.author"),
       href: "mailto:tutaoyuan8@outlook.com?subject=Weave%20Incremental%20Reading%20%E5%8F%8D%E9%A6%88",
     },
-  ];
+  ]);
   let incrementalReadingSettings = $derived.by(() => {
     stateVersion;
     return plugin.getIncrementalReadingSettings();
@@ -85,6 +104,7 @@ let showPremiumFeaturesPreviewDraft = $state(false);
     lastFolderDraft = incrementalReadingSettings.selectionQuickCreateLastFolder ?? "";
     weaveParentFolderDraft = plugin.settings.weaveParentFolder ?? "";
     showPremiumFeaturesPreviewDraft = plugin.settings.showPremiumFeaturesPreview ?? false;
+    uiLanguageDraft = plugin.settings.uiLanguage ?? "auto";
   });
 
   $effect(() => {
@@ -129,6 +149,14 @@ let showPremiumFeaturesPreviewDraft = $state(false);
   ): Promise<void> {
     updater(plugin.settings);
     await save();
+  }
+
+  async function commitUiLanguage(nextValue: PluginUiLanguagePreference): Promise<void> {
+    uiLanguageDraft = nextValue;
+    applyPluginUiLanguagePreference(nextValue);
+    await updateRootSettings((settings) => {
+      settings.uiLanguage = nextValue;
+    });
   }
 
   async function commitPremiumFeaturesPreviewEnabled(enabled: boolean): Promise<void> {
@@ -233,10 +261,36 @@ let showPremiumFeaturesPreviewDraft = $state(false);
     {#if activeTab === "basic"}
       <section class="standalone-ir-settings-section">
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
+          <div class="standalone-ir-settings-group-header">
+            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.language.title")}</h3>
+            <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.language.description")}</p>
+          </div>
+          <div class="standalone-ir-storage-row">
+            <div class="standalone-ir-storage-info">
+              <div class="standalone-ir-storage-name">{t("irSettings.standalone.language.title")}</div>
+            </div>
+            <div class="standalone-ir-storage-control">
+              <select
+                class="standalone-ir-language-select"
+                value={uiLanguageDraft}
+                onchange={(event) => {
+                  const nextValue = (event.currentTarget as HTMLSelectElement).value as PluginUiLanguagePreference;
+                  void commitUiLanguage(nextValue);
+                }}
+              >
+                {#each PLUGIN_UI_LANGUAGE_OPTIONS as option}
+                  <option value={option}>{languageOptionLabels[option]()}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
           <div class="standalone-ir-premium-preview-setting-row">
             <div class="standalone-ir-premium-preview-setting-copy">
-              <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">显示高级功能预览</h3>
-              <p class="standalone-ir-settings-group-description">开启后，基础设置页与阅读器中会显示锁定状态的高级功能入口；关闭后全部隐藏。</p>
+              <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.premiumPreview.title")}</h3>
+              <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.premiumPreview.description")}</p>
             </div>
             <label class="modern-switch">
               <input
@@ -253,19 +307,19 @@ let showPremiumFeaturesPreviewDraft = $state(false);
 
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
           <div class="standalone-ir-settings-group-header">
-            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">数据文件夹配置</h3>
-            <p class="standalone-ir-settings-group-description">集中配置本地数据目录、专题保存路径和阅读点默认位置，确保长期使用中的路径稳定与数据可维护性。</p>
+            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.dataFolders.title")}</h3>
+            <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.dataFolders.description")}</p>
           </div>
           <div class="standalone-ir-storage-list">
             <div class="standalone-ir-storage-row">
               <div class="standalone-ir-storage-info">
-                <div class="standalone-ir-storage-name">增量阅读本地数据文件夹</div>
-                <p class="standalone-ir-storage-desc">用于选择增量阅读数据在仓库中的本地目录；建议使用独立子目录，便于后续迁移与备份。</p>
+                <div class="standalone-ir-storage-name">{t("irSettings.standalone.dataFolders.localDataName")}</div>
+                <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.localDataDesc")}</p>
               </div>
               <div class="standalone-ir-storage-control">
                 <input
                   type="text"
-                  placeholder="例如：weave/incremental-reading/local-data"
+                  placeholder={t("irSettings.standalone.dataFolders.localDataPlaceholder")}
                   bind:value={localDataFolderDraft}
                   onblur={() => void commitLocalDataFolder()}
                   onkeydown={(event) => {
@@ -282,23 +336,23 @@ let showPremiumFeaturesPreviewDraft = $state(false);
                   type="button"
                   onclick={(event) => {
                     const target = event.currentTarget as HTMLElement | null;
-                    void chooseFolder(target, "选择增量阅读本地数据文件夹...", (value) => {
+                    void chooseFolder(target, t("irSettings.standalone.dataFolders.localDataPicker"), (value) => {
                       localDataFolderDraft = value;
                     }, commitLocalDataFolder);
                   }}
-                >选择</button>
+                >{t("irSettings.standalone.dataFolders.choose")}</button>
               </div>
             </div>
 
             <div class="standalone-ir-storage-row">
               <div class="standalone-ir-storage-info">
-                <div class="standalone-ir-storage-name">数据保存文件夹</div>
-                <p class="standalone-ir-storage-desc">用于设置专题 `.irdeck` 与关联数据的默认保存根目录；留空将使用默认 Weave 路径。</p>
+                <div class="standalone-ir-storage-name">{t("irSettings.standalone.dataFolders.saveFolderName")}</div>
+                <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.saveFolderDesc")}</p>
               </div>
               <div class="standalone-ir-storage-control">
                 <input
                   type="text"
-                  placeholder="例如：weave/incremental-reading"
+                  placeholder={t("irSettings.standalone.dataFolders.saveFolderPlaceholder")}
                   bind:value={weaveParentFolderDraft}
                   onblur={() => void commitWeaveParentFolder()}
                   onkeydown={(event) => {
@@ -315,23 +369,23 @@ let showPremiumFeaturesPreviewDraft = $state(false);
                   type="button"
                   onclick={(event) => {
                     const target = event.currentTarget as HTMLElement | null;
-                    void chooseFolder(target, "选择专题默认保存文件夹...", (value) => {
+                    void chooseFolder(target, t("irSettings.standalone.dataFolders.saveFolderPicker"), (value) => {
                       weaveParentFolderDraft = value;
                     }, commitWeaveParentFolder);
                   }}
-                >选择</button>
+                >{t("irSettings.standalone.dataFolders.choose")}</button>
               </div>
             </div>
 
             <div class="standalone-ir-storage-row">
               <div class="standalone-ir-storage-info">
-                <div class="standalone-ir-storage-name">阅读点默认保存文件夹</div>
-                <p class="standalone-ir-storage-desc">仅用于新建 Markdown 阅读点（MD 阅读点）的默认保存路径；留空则遵循 Obsidian 新建笔记位置。</p>
+                <div class="standalone-ir-storage-name">{t("irSettings.standalone.dataFolders.readingPointFolderName")}</div>
+                <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.readingPointFolderDesc")}</p>
               </div>
               <div class="standalone-ir-storage-control">
                 <input
                   type="text"
-                  placeholder="留空则使用 Obsidian 默认位置"
+                  placeholder={t("irSettings.standalone.dataFolders.readingPointPlaceholder")}
                   bind:value={lastFolderDraft}
                   onblur={() => void commitLastFolder()}
                   onkeydown={(event) => {
@@ -348,21 +402,21 @@ let showPremiumFeaturesPreviewDraft = $state(false);
                   type="button"
                   onclick={(event) => {
                     const target = event.currentTarget as HTMLElement | null;
-                    void chooseFolder(target, "选择阅读点默认保存文件夹...", (value) => {
+                    void chooseFolder(target, t("irSettings.standalone.dataFolders.readingPointPicker"), (value) => {
                       lastFolderDraft = value;
                     }, commitLastFolder);
                   }}
-                >选择</button>
+                >{t("irSettings.standalone.dataFolders.choose")}</button>
               </div>
             </div>
 
             <div class="standalone-ir-storage-row standalone-ir-storage-row--action">
               <div class="standalone-ir-storage-info">
-                <div class="standalone-ir-storage-name">增量阅读数据管理</div>
-                <p class="standalone-ir-storage-desc">整理库内 .irdeck 路径、比较重复专题差异、恢复或清理插件备份中的孤立专题文件。</p>
+                <div class="standalone-ir-storage-name">{t("irSettings.standalone.dataFolders.dataMgmtName")}</div>
+                <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.dataMgmtDesc")}</p>
               </div>
               <div class="standalone-ir-storage-control standalone-ir-storage-control--action-only">
-                <button type="button" onclick={openDataManagementModal}>打开数据管理</button>
+                <button type="button" onclick={openDataManagementModal}>{t("irSettings.standalone.dataFolders.openDataMgmt")}</button>
               </div>
             </div>
           </div>
@@ -389,36 +443,36 @@ let showPremiumFeaturesPreviewDraft = $state(false);
       <section class="standalone-ir-settings-section standalone-ir-settings-section--about">
         <div class="standalone-ir-settings-group">
           <div class="standalone-ir-settings-group-header">
-            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-cyan">插件信息</h3>
-            <p class="standalone-ir-settings-group-description">用于查看独立增量阅读插件当前版本、定位与核心支持能力。</p>
+            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-cyan">{t("irSettings.standalone.about.pluginInfoTitle")}</h3>
+            <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.about.pluginInfoDesc")}</p>
           </div>
 
           <div class="standalone-ir-about-overview-list">
-            <div class="standalone-ir-about-overview-section-label">插件基础信息</div>
+            <div class="standalone-ir-about-overview-section-label">{t("irSettings.standalone.about.basicInfoSection")}</div>
 
             <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">插件名称</div>
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.name")}</div>
               <div class="standalone-ir-about-overview-value">{pluginDisplayName}</div>
             </div>
 
             <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">当前版本</div>
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.version")}</div>
               <div class="standalone-ir-about-overview-value">v{pluginVersion}</div>
             </div>
 
             <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">产品定位</div>
-              <div class="standalone-ir-about-overview-value">独立增量阅读主控插件</div>
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.positioning")}</div>
+              <div class="standalone-ir-about-overview-value">{t("irSettings.standalone.about.positioningValue")}</div>
             </div>
 
             <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">协作关系</div>
-              <div class="standalone-ir-about-overview-value">可与 Weave 主插件、EPUB 阅读器协同</div>
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.collaboration")}</div>
+              <div class="standalone-ir-about-overview-value">{t("irSettings.standalone.about.collaborationValue")}</div>
             </div>
 
-            <div class="standalone-ir-about-overview-section-label standalone-ir-about-overview-section-label--separated">核心能力覆盖</div>
+            <div class="standalone-ir-about-overview-section-label standalone-ir-about-overview-section-label--separated">{t("irSettings.standalone.about.capabilitiesSection")}</div>
             <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">支持范围</div>
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.supportScope")}</div>
               <div class="standalone-ir-about-overview-value">{supportedFormats.join(" / ")}</div>
             </div>
           </div>
@@ -426,7 +480,7 @@ let showPremiumFeaturesPreviewDraft = $state(false);
 
         <div class="standalone-ir-settings-group">
           <div class="standalone-ir-settings-group-header">
-            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">联系与资源</h3>
+            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.about.contactsTitle")}</h3>
           </div>
 
           <div class="standalone-ir-about-links">
@@ -448,6 +502,11 @@ let showPremiumFeaturesPreviewDraft = $state(false);
 </div>
 
 <style>
+  .standalone-ir-storage-control select.standalone-ir-language-select {
+    min-width: 12rem;
+    max-width: 100%;
+  }
+
   .standalone-ir-settings-root {
     /* Semantic typography scale for this settings panel */
     --standalone-ir-font-size-title: var(--font-ui-medium, 1rem);

@@ -1,6 +1,7 @@
 import { App, FuzzySuggestModal, TFile, setIcon, type FuzzyMatch } from "obsidian";
 import { ensureSuggestModalTheme, markLatestSuggestionContainer } from "./suggestModalTheme";
 import { applyStyleProps } from "../utils/style-props";
+import { i18n } from "../utils/i18n";
 
 interface AnchorRect {
 	left: number;
@@ -65,15 +66,17 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 				? [
 						{
 							kind: "empty" as const,
-							label: options.emptySelectionLabel ?? "清空当前选择",
-							description: options.emptySelectionDescription ?? "不使用文件",
+							label: options.emptySelectionLabel ?? i18n.t("irModals.vaultFileSuggest.emptySelectionLabel"),
+							description:
+								options.emptySelectionDescription ??
+								i18n.t("irModals.vaultFileSuggest.emptySelectionDescription"),
 						},
 				  ]
 				: []),
 			...files.map((file) => ({ kind: "file" as const, file })),
 		];
 
-		this.setPlaceholder(options.placeholder ?? "选择文件...");
+		this.setPlaceholder(options.placeholder ?? i18n.t("irModals.vaultFileSuggest.placeholder"));
 	}
 
 	onOpen(): void {

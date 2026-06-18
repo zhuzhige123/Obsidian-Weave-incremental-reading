@@ -1,10 +1,11 @@
-import { App, TFile } from "obsidian";
+import { App, TFile, normalizePath } from "obsidian";
 import type { EpubHighlightStyle } from "./types";
 import { inflateRaw } from "pako";
 import { openEpubInPreferredLeaf } from "../../utils/epub-leaf-utils";
 import { logger } from "../../utils/logger";
 import { EPUB_RUNTIME } from "./epub-runtime";
 import { ensureEpubPremiumAccess } from "./epub-premium";
+import { getEpubReaderInteropHost } from "./epub-reader-interop";
 
 export interface EpubLinkParams {
 	filePath: string;
@@ -13,6 +14,8 @@ export interface EpubLinkParams {
 	chapter?: number;
 	sourceId?: string;
 	excerptId?: string;
+	/** EPUB package 内章节 href；与 cfi 二选一或同时存在（cfi 优先）。 */
+	tocHref?: string;
 }
 
 interface EpubLinkMarkupRange {
@@ -663,6 +666,58 @@ export class EpubLinkService {
 		return EpubLinkService.sanitizeWikilinkAlias(bookName) || "EPUB";
 	}
 
+	private static buildProtocolLinkAlias(filePath: string, chapterTitle?: string): string {
+		const bookName = EpubLinkService.buildDisplayAlias(filePath);
+		const chapter = EpubLinkService.sanitizeWikilinkAlias(chapterTitle || "");
+		if (!chapter) {
+			return bookName;
+		}
+		return EpubLinkService.sanitizeWikilinkAlias(
+			`${bookName} · ${EpubLinkService.truncateText(chapter, EpubLinkService.MAX_CHAPTER_LABEL_LENGTH)}`
+		);
+	}
+
+	buildObsidianProtocolHrefForChapter(
+		filePath: string,
+		tocHref: string,
+		options?: {
+			chapter?: number;
+			sourceId?: string;
+		}
+	): string {
+		const normalizedFile = normalizePath(String(filePath || "").trim());
+		const normalizedHref = String(tocHref || "").trim();
+		const params = new URLSearchParams();
+		if (normalizedFile) {
+			params.set("file", normalizedFile);
+		}
+		if (normalizedHref) {
+			params.set("href", normalizedHref);
+		}
+		if (options?.chapter !== undefined && Number.isFinite(options.chapter)) {
+			params.set("chapter", String(options.chapter));
+		}
+		if (options?.sourceId) {
+			params.set("sid", options.sourceId);
+		}
+		return `obsidian://${EPUB_RUNTIME.protocol.primaryName}?${params.toString()}`;
+	}
+
+	buildProtocolMarkdownLinkForChapter(
+		filePath: string,
+		tocHref: string,
+		chapterTitle?: string,
+		sourceId?: string,
+		chapterIndex?: number
+	): string {
+		const href = this.buildObsidianProtocolHrefForChapter(filePath, tocHref, {
+			chapter: chapterIndex,
+			sourceId,
+		});
+		const alias = EpubLinkService.buildProtocolLinkAlias(filePath, chapterTitle);
+		return `[${alias}](${href})`;
+	}
+
 	static formatQuotedExcerptText(text: string, style?: EpubHighlightStyle): string {
 		if (style !== "strikethrough") {
 			return text;
@@ -827,12 +882,18 @@ export class EpubLinkService {
 
 	static parseProtocolParams(params: Record<string, string>): EpubLinkParams | null {
 		const file = params.file;
-		const cfi = params.cfi;
+		const cfi = String(params.cfi || "").trim();
+		const href = String(params.href || params.tocHref || "").trim();
 		const text = params.text || "";
 		const chapter = params.chapter;
 		const sourceId = params.sid;
 
-		if ((!file && !sourceId) || !cfi) return null;
+		if (!file && !sourceId) {
+			return null;
+		}
+		if (!cfi && !href) {
+			return null;
+		}
 
 		return {
 			filePath: file || "",
@@ -840,6 +901,7 @@ export class EpubLinkService {
 			text,
 			chapter: chapter ? parseInt(chapter, 10) : undefined,
 			sourceId: sourceId || undefined,
+			tocHref: href || undefined,
 		};
 	}
 
@@ -935,9 +997,17 @@ export class EpubLinkService {
 			if (!resolvedFilePath) {
 				return;
 			}
+
+			const reader = getEpubReaderInteropHost(this.app);
+			if (typeof reader?.navigateToPublicationChapter === "function") {
+				await reader.navigateToPublicationChapter(resolvedFilePath, tocHref, {
+					sourceId,
+				});
+				return;
+			}
+
 			const targetLeaf = await openEpubInPreferredLeaf(this.app, resolvedFilePath, {
-				pendingHref: tocHref,
-				href: tocHref,
+				pendingLocate: { href: tocHref },
 			});
 			if (!targetLeaf) {
 				return;

@@ -151,7 +151,7 @@
   background-clip: text;
 }
 
-/* .weave-card 样式已移至 modern-components.css，避免重复定义 */
+/* 卡片工具类见 core/index.css 内联的 weave-btn / weave-tag 定义 */
 
 /* 保留 weave-divider，这是一个常用的工具类 */
 .weave-divider {

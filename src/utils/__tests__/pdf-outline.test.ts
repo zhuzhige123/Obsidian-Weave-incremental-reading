@@ -61,6 +61,9 @@ describe("pdf-outline", () => {
 			},
 			vault: {
 				readBinary: vi.fn(),
+				adapter: {
+					readBinary: vi.fn(),
+				},
 			},
 		};
 
@@ -73,7 +76,7 @@ describe("pdf-outline", () => {
 			{ title: "Section 1.1", pageNumber: 5, path: ["Chapter 1", "Section 1.1"] },
 			{ title: "Chapter 2", pageNumber: 10, path: ["Chapter 2"] },
 		]);
-		expect(app.vault.readBinary).not.toHaveBeenCalled();
+		expect(app.vault.adapter.readBinary).not.toHaveBeenCalled();
 	});
 
 	it("没有打开视图时会回退到 pdfjs 二进制解析", async () => {
@@ -99,7 +102,10 @@ describe("pdf-outline", () => {
 				getMostRecentLeaf: vi.fn().mockReturnValue(null),
 			},
 			vault: {
-				readBinary: vi.fn().mockResolvedValue(new ArrayBuffer(16)),
+				readBinary: vi.fn(),
+				adapter: {
+					readBinary: vi.fn().mockResolvedValue(new ArrayBuffer(16)),
+				},
 			},
 		};
 
@@ -108,7 +114,7 @@ describe("pdf-outline", () => {
 		});
 
 		expect(items).toEqual([{ title: "Preface", pageNumber: 3, path: ["Preface"] }]);
-		expect(app.vault.readBinary).toHaveBeenCalledTimes(1);
+		expect(app.vault.adapter.readBinary).toHaveBeenCalledTimes(1);
 		expect((window as any).pdfjsLib.getDocument).toHaveBeenCalledTimes(1);
 		expect(pdfDocumentDestroy).toHaveBeenCalledTimes(1);
 		expect(loadingTaskDestroy).toHaveBeenCalledTimes(1);

@@ -10,6 +10,7 @@ import { supportsPointLinkedNotes, supportsPointLinkedNotesForScheduleItem } fro
 import { readString } from "../../utils/unknown-record";
 import { resolveLegacyBlockResumeLink } from "./paragraph-workbench/paragraph-block-reference";
 import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
+import { basenameWithoutExtension } from "../../utils/ir-internal-data-path";
 import type { IRProjectedScheduleItem } from "./IRProjectedScheduleSummary";
 import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
 import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
@@ -48,12 +49,12 @@ export interface ScheduleItem {
 	sourceSequenceOrder?: number;
 	sourceSequenceLocked?: boolean;
 	sourceSequenceAnchorDateKey?: string;
+	manualSchedulePinnedDateKey?: string;
 }
 
 function extractChunkTitleFromFilePath(filePath: string, fallbackId?: string): string {
 	const fallback = String(fallbackId || "").trim();
-	const baseName = String(filePath || "").trim().split("/").pop() || fallback;
-	const stem = baseName.replace(/\.md$/i, "").trim();
+	const stem = basenameWithoutExtension(filePath, fallback);
 	const cleaned = stem.replace(/^\d+_/, "").trim();
 	return cleaned || stem || fallback || "Untitled";
 }
@@ -164,6 +165,7 @@ export function buildScheduleItemFromProjectedItem(item: IRProjectedScheduleItem
 		sourceSequenceOrder: item.sourceSequenceOrder,
 		sourceSequenceLocked: item.sourceSequenceLocked,
 		sourceSequenceAnchorDateKey: item.sourceSequenceAnchorDateKey,
+		manualSchedulePinnedDateKey: item.manualSchedulePinnedDateKey,
 	};
 }
 

@@ -4,9 +4,18 @@ import { isRecord } from "./unknown-record";
 import { vaultStorage } from "../utils/vault-local-storage";
 import { translations, translationOverrides } from "./i18n/resources";
 import type { I18nConfig, SupportedLanguage, TranslationKey } from "./i18n/types";
+import {
+	normalizePluginUiLanguagePreference,
+	type PluginUiLanguagePreference,
+} from "./i18n/plugin-ui-language";
 import { derived, get, writable } from "svelte/store";
 
 export type { I18nConfig, SupportedLanguage, TranslationKey } from "./i18n/types";
+export type { PluginUiLanguagePreference } from "./i18n/plugin-ui-language";
+export {
+	normalizePluginUiLanguagePreference,
+	PLUGIN_UI_LANGUAGE_OPTIONS,
+} from "./i18n/plugin-ui-language";
 
 function isTranslationBranch(value: string | TranslationKey | undefined): value is TranslationKey {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -179,11 +188,38 @@ function detectObsidianLanguage(): SupportedLanguage {
 // ============================================================================
 
 export const currentLanguage = writable<SupportedLanguage>(defaultConfig.defaultLanguage);
+let pluginUiLanguagePreference: PluginUiLanguagePreference = "auto";
 let lastDetectedLanguage: SupportedLanguage | null = null;
 let stableDetectionCount = 0;
 const REQUIRED_STABLE_DETECTIONS = 2;
 
+export function getPluginUiLanguagePreference(): PluginUiLanguagePreference {
+	return pluginUiLanguagePreference;
+}
+
+export function shouldFollowObsidianUiLanguage(): boolean {
+	return pluginUiLanguagePreference === "auto";
+}
+
+export function applyPluginUiLanguagePreference(
+	preference: PluginUiLanguagePreference | unknown
+): SupportedLanguage {
+	pluginUiLanguagePreference = normalizePluginUiLanguagePreference(preference);
+	const resolvedLanguage =
+		pluginUiLanguagePreference === "auto"
+			? detectObsidianLanguage()
+			: pluginUiLanguagePreference;
+	currentLanguage.set(resolvedLanguage);
+	lastDetectedLanguage = resolvedLanguage;
+	stableDetectionCount = REQUIRED_STABLE_DETECTIONS;
+	return resolvedLanguage;
+}
+
 export function syncI18nWithObsidianLanguage(): SupportedLanguage {
+	if (!shouldFollowObsidianUiLanguage()) {
+		return get(currentLanguage);
+	}
+
 	const detectedLang = detectObsidianLanguage();
 	if (lastDetectedLanguage === detectedLang) {
 		stableDetectionCount += 1;

@@ -1,4 +1,5 @@
 import { App, Modal } from "obsidian";
+import { i18n } from "./i18n";
 
 /**
  * Obsidian-native confirm/input dialogs.
@@ -18,9 +19,9 @@ export function showObsidianConfirm(
 	options: ConfirmOptions = {}
 ): Promise<boolean> {
 	const {
-		title = "确认",
-		confirmText = "确认",
-		cancelText = "取消",
+		title = i18n.t("irMain.dialog.confirm"),
+		confirmText = i18n.t("irMain.dialog.confirm"),
+		cancelText = i18n.t("irMain.dialog.cancel"),
 		confirmClass = "mod-warning",
 	} = options;
 
@@ -61,18 +62,23 @@ export function showDeleteConfirm(
 	itemName: string,
 	customMessage?: string
 ): Promise<boolean> {
-	const message = customMessage || `确定要删除 "${itemName}" 吗？`;
+	const message =
+		customMessage || i18n.t("irMain.dialog.deleteMessage", { itemName });
 	return showObsidianConfirm(app, message, {
-		title: "确认删除",
-		confirmText: "删除",
+		title: i18n.t("irMain.dialog.deleteTitle"),
+		confirmText: i18n.t("irMain.dialog.delete"),
 		confirmClass: "mod-warning",
 	});
 }
 
-export function showDangerConfirm(app: App, message: string, title = "警告"): Promise<boolean> {
+export function showDangerConfirm(
+	app: App,
+	message: string,
+	title = i18n.t("irMain.dialog.warning")
+): Promise<boolean> {
 	return showObsidianConfirm(app, message, {
 		title,
-		confirmText: "确认",
+		confirmText: i18n.t("irMain.dialog.confirm"),
 		confirmClass: "mod-warning",
 	});
 }
@@ -103,7 +109,12 @@ export function showObsidianChoice<T extends string>(
 	message: string,
 	options: ChoiceDialogOptions<T>
 ): Promise<T | null> {
-	const { title = "请选择", choices, cancelText = "取消", layout = "vertical" } = options;
+	const {
+		title = i18n.t("irMain.dialog.chooseTitle"),
+		choices,
+		cancelText = i18n.t("irMain.dialog.cancel"),
+		layout = "vertical",
+	} = options;
 
 	return new Promise((resolve) => {
 		const modal = new Modal(app);
@@ -181,7 +192,12 @@ export function showObsidianInput(
 	defaultValue = "",
 	options: InputOptions = {}
 ): Promise<string | null> {
-	const { title = "输入", placeholder = "", confirmText = "确认", cancelText = "取消" } = options;
+	const {
+		title = i18n.t("irMain.dialog.inputTitle"),
+		placeholder = "",
+		confirmText = i18n.t("irMain.dialog.confirm"),
+		cancelText = i18n.t("irMain.dialog.cancel"),
+	} = options;
 
 	return new Promise((resolve) => {
 		const modal = new Modal(app);

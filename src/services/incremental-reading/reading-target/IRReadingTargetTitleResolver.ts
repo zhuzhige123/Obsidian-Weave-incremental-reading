@@ -1,4 +1,5 @@
-import { TFile, normalizePath, type App } from "obsidian";
+import { normalizePath, TFile, type App } from "obsidian";
+import { i18n } from "../../../utils/i18n";
 import { deriveWebPageTitleFromUrl } from "../ir-web-reading-point";
 import type { ParsedReadingTarget } from "./IRReadingTargetTypes";
 
@@ -113,26 +114,26 @@ export async function resolveReadingTargetTitleDraft(
 		return { title: target.pdfPoints[0].title, titleDetected: true };
 	}
 
-	return { title: "未命名阅读点", titleDetected: false };
+	return { title: i18n.t("irSidebar.calendar.untitledPoint"), titleDetected: false };
 }
 
 export function getReadingTargetKindLabel(kind: ParsedReadingTarget["kind"]): string {
 	switch (kind) {
 		case "web":
-			return "网页链接";
+			return i18n.t("irAddTarget.kindLabels.web");
 		case "vault-block":
-			return "Vault 块引用";
+			return i18n.t("irAddTarget.kindLabels.vaultBlock");
 		case "vault-link":
-			return "标题锚点";
+			return i18n.t("irAddTarget.kindLabels.vaultLink");
 		case "vault-file":
-			return "Vault 文件";
+			return i18n.t("irAddTarget.kindLabels.vaultFile");
 		case "pdf":
-			return "PDF 定位";
+			return i18n.t("irAddTarget.kindLabels.pdf");
 		case "pdf-batch":
-			return "PDF++ 批量链接";
+			return i18n.t("irAddTarget.kindLabels.pdfBatch");
 		case "epub":
-			return "EPUB 阅读定位";
+			return i18n.t("irAddTarget.kindLabels.epub");
 		default:
-			return "未知类型";
+			return i18n.t("irAddTarget.kindLabels.unknown");
 	}
 }

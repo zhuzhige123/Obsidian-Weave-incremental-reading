@@ -1,4 +1,5 @@
 import { App, Modal, Setting } from "obsidian";
+import { i18n } from "../../utils/i18n";
 import { applyStyleProps } from "../../utils/style-props";
 
 export interface MissingSourceDocumentModalOptions {
@@ -40,14 +41,14 @@ class MissingSourceDocumentModal extends Modal {
 
 		if (this.options.onRemove) {
 			new Setting(contentEl)
-			.setName(this.options.removeButtonText || "移除该阅读点")
+			.setName(this.options.removeButtonText || i18n.t("irSidebar.calendar.removeThisPoint"))
 			.setDesc(
 				this.options.removeDescription ||
-					"如果该阅读点已经失效，可移除它并清理相关增量阅读调度数据。"
+					i18n.t("irSidebar.calendar.removeSourceMissingDesc")
 			)
 			.addButton((button) =>
 				button
-					.setButtonText(this.options.removeButtonText || "移除该阅读点")
+					.setButtonText(this.options.removeButtonText || i18n.t("irSidebar.calendar.removeThisPoint"))
 					.setWarning()
 					.onClick(() => {
 						void this.handleRemove();
@@ -64,7 +65,7 @@ class MissingSourceDocumentModal extends Modal {
 		});
 
 		const acknowledgeButton = actions.createEl("button", {
-			text: this.options.acknowledgeText || "知道了",
+			text: this.options.acknowledgeText || i18n.t("irSidebar.calendar.gotIt"),
 			cls: "mod-cta",
 		});
 		acknowledgeButton.addEventListener("click", () => {

@@ -39,6 +39,7 @@ describe('IRCalendarSearchInput', () => {
   it('resolves management.cardSearch labels from the translation catalog', () => {
     expect(t('management.cardSearch.searchOptions')).toBe('搜索选项');
     expect(t('management.cardSearch.options.deck')).toBe('deck: 匹配专题');
+    expect(t('management.cardSearch.options.readingPointType')).toBe('type: 搜索阅读点类型');
   });
 
   it('portals the search panel to body so sidebar overflow cannot clip it', async () => {

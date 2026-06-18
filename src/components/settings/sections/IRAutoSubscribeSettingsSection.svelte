@@ -67,7 +67,7 @@
   {#if showTitle}
     <div class="group-header">
       <h4 class="group-title with-accent-bar accent-blue">{titleText ?? t('irSettings.autoSubscribeTitle')}</h4>
-      <p class="group-description">监听仓库中的 Markdown 文件夹，将符合规则的新内容自动接入增量阅读流程并交由调度管理。</p>
+      <p class="group-description">{t('irSettings.autoSubscribeGroupDesc')}</p>
     </div>
   {/if}
 

@@ -13,6 +13,7 @@
     type TagSuggestionItem
   } from '../../utils/tag-suggest';
   import { IRPointTagService, normalizeReadingPointTags } from '../../services/incremental-reading/IRPointTagService';
+  import { tr } from '../../utils/i18n';
 
   interface Props {
     app: App;
@@ -21,6 +22,8 @@
   }
 
   let { app, tags = $bindable([]), disabled = false }: Props = $props();
+
+  let t = $derived($tr);
 
   let tagDraft = $state('');
   let tagInputEl = $state<HTMLInputElement | null>(null);
@@ -44,7 +47,7 @@
       return;
     }
     if (tags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
-      new Notice(`标签已存在：${formatTagSuggestionLabel(normalized)}`, 2200);
+      new Notice(t('irReadingPointEdit.tags.tagExists', { tag: formatTagSuggestionLabel(normalized) }), 2200);
       tagDraft = '';
       tagInputEl?.focus();
       return;
@@ -71,13 +74,14 @@
       return null;
     }
     const label = formatTagSuggestionLabel(normalized);
+    const createKeyword = t('irReadingPointEdit.tags.createKeyword');
     return {
       key: `create:${key}`,
       tag: normalized,
-      label: `新建 ${label}`,
+      label: t('irReadingPointEdit.tags.createPrefix', { label }),
       count: 0,
-      keywords: [normalized, label, '新建'],
-      searchText: `${normalized} ${label} 新建`.toLowerCase(),
+      keywords: [normalized, label, createKeyword],
+      searchText: `${normalized} ${label} ${createKeyword}`.toLowerCase(),
       isCreateSuggestion: true
     };
   }
@@ -163,7 +167,7 @@
         <button
           type="button"
           class="weave-deck-edit-tag-chip-remove"
-          aria-label={`移除标签 ${tag}`}
+          aria-label={t('irReadingPointEdit.tags.removeAriaLabel', { tag })}
           onclick={() => removeTagAt(index)}
         >
           ×
@@ -177,7 +181,7 @@
     type="text"
     bind:value={tagDraft}
     {disabled}
-    placeholder={tags.length === 0 ? '#标签，回车添加' : ''}
+    placeholder={tags.length === 0 ? t('irReadingPointEdit.tags.placeholder') : ''}
     onkeydown={handleTagKeydown}
   />
 </div>

@@ -180,7 +180,7 @@ describe("IRWorkspaceSnapshotService", () => {
 		vi.useRealTimers();
 	});
 
-	it("builds workspace snapshot and deck overview from migrated points first, with legacy fallback kept", async () => {
+	it("builds workspace snapshot without blocksRecord and overlays bookmark task fields from points", async () => {
 		const v2Paths = getV2Paths("");
 		const { app } = createMemoryApp({
 			[v2Paths.ir.legacyTopics]: JSON.stringify({
@@ -350,17 +350,15 @@ describe("IRWorkspaceSnapshotService", () => {
 			"pdfbm-legacy-only",
 		]);
 		expect(workspaceData.epubTasks.map((task) => task.id)).toEqual(["epubbm-1"]);
+		expect(workspaceData.blocksRecord).toEqual({});
 		expect(workspaceData.pdfTasks.find((task) => task.id === "pdfbm-1")).toMatchObject({
 			title: "新 PDF",
-			pdfPath: "Docs/New.pdf",
-			link: "obsidian://new-pdf",
 			status: "active",
 			priorityUi: 7,
 		});
 		expect(workspaceData.epubTasks[0]).toMatchObject({
 			title: "新 EPUB",
 			epubFilePath: "Books/New.epub",
-			tocHref: "chapter-1.xhtml",
 			status: "scheduled",
 			priorityUi: 6,
 		});

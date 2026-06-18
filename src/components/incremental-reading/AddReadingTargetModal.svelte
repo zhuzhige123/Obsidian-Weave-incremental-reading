@@ -32,6 +32,7 @@
     type ReadingTargetScheduleRecommendation
   } from '../../services/incremental-reading/reading-target/IRReadingTargetScheduleDate';
   import { logger } from '../../utils/logger';
+  import { tr } from '../../utils/i18n';
 
   interface Props {
     plugin: WeavePlugin;
@@ -67,6 +68,8 @@
     onClose,
     onAdded
   }: Props = $props();
+
+  let t = $derived($tr);
 
   let linkInput = $state(initialLink);
   let linkInputTouched = $state(Boolean(initialLink.trim()));
@@ -166,7 +169,7 @@
       }
     }
 
-    previewMarkdown = parsedTarget ? buildReadingTargetPreviewMarkdown(parsedTarget, title.trim() || '预览') : '';
+    previewMarkdown = parsedTarget ? buildReadingTargetPreviewMarkdown(parsedTarget, title.trim() || t('irAddTarget.previewFallback')) : '';
     previewSourcePath = parsedTarget?.sourceFilePath || contextPath;
 
     if (
@@ -187,7 +190,7 @@
   function handleTitleInputChange(): void {
     titleDetected = false;
     if (parsedTarget) {
-      previewMarkdown = buildReadingTargetPreviewMarkdown(parsedTarget, title.trim() || '预览');
+      previewMarkdown = buildReadingTargetPreviewMarkdown(parsedTarget, title.trim() || t('irAddTarget.previewFallback'));
     }
   }
 
@@ -204,7 +207,7 @@
   function useCurrentLocation(): void {
     const context = getCurrentEditorReadingTargetContext(plugin.app);
     if (!context) {
-      new Notice('请先在 Markdown 笔记中将光标放在目标段落', 3000);
+      new Notice(t('irAddTarget.notices.needMarkdownCursor'), 3000);
       return;
     }
     linkInput = context.sourceLink.replace(/^!/, '');
@@ -230,7 +233,7 @@
 
   function getDeckButtonLabel(): string {
     const deck = deckOptions.find((entry) => entry.id === selectedDeckId);
-    return deck ? `专题：${deck.name}` : '选择增量阅读专题';
+    return deck ? t('irAddTarget.deck.label', { name: deck.name }) : t('irAddTarget.deck.selectTopic');
   }
 
   function setScheduleMode(mode: ReadingTargetScheduleMode): void {
@@ -369,17 +372,17 @@
       await plugin.saveSettings();
 
       const count = result.createdIds.length;
-      new Notice(`已添加 ${count} 项到专题「${result.deckName}」`, 3500);
+      new Notice(t('irAddTarget.notices.added', { count, deckName: result.deckName }), 3500);
       onAdded?.();
       onClose();
     } catch (error) {
       logger.error('[AddReadingTargetModal] 添加失败', error);
       const message =
         error instanceof Error && error.message === 'reading-target-epub-unresolved'
-          ? '无法解析 EPUB 来源，请确认 weave-epub-reader 已启用且书籍仍在库中'
+          ? t('irAddTarget.notices.epubUnresolved')
           : error instanceof Error && error.message === 'reading-target-epub-missing-cfi'
-            ? 'EPUB 链接缺少 cfi 定位信息'
-            : '添加失败，请检查链接与专题设置';
+            ? t('irAddTarget.notices.epubMissingCfi')
+            : t('irAddTarget.notices.addFailed');
       new Notice(message, 3500);
     } finally {
       submitting = false;
@@ -399,12 +402,12 @@
   <div class="add-reading-target-body">
   <div class="add-reading-target-panel">
     <div class="panel-heading">
-      <span class="panel-title">链接或引用</span>
+      <span class="panel-title">{t('irAddTarget.panels.linkOrReference')}</span>
       <div class="panel-actions">
         {#if canUseCurrentLocation}
-          <button class="clickable-icon panel-action-btn" type="button" onclick={useCurrentLocation} title="添加当前位置">
+          <button class="clickable-icon panel-action-btn" type="button" onclick={useCurrentLocation} title={t('irAddTarget.actions.currentLocationTitle')}>
             <ObsidianIcon name="crosshair" size={14} />
-            <span>当前位置</span>
+            <span>{t('irAddTarget.actions.currentLocation')}</span>
           </button>
         {/if}
       </div>
@@ -414,26 +417,26 @@
       bind:value={linkInput}
       oninput={handleLinkInputChange}
       rows="3"
-      placeholder="粘贴 https://…、[[笔记#^块ID]] 或 ![[笔记#^块ID|标题]]"
+      placeholder={t('irAddTarget.placeholders.linkInput')}
     ></textarea>
     {#if parsedTarget && parsedTarget.kind !== 'unknown'}
       <div class="target-meta">
         <span class="target-kind">{kindLabel}</span>
         {#if parsedTarget.kind === 'pdf-batch' && parsedTarget.pdfPoints}
-          <span class="target-count">{parsedTarget.pdfPoints.length} 个 PDF 阅读点</span>
+          <span class="target-count">{t('irAddTarget.meta.pdfBatchCount', { count: parsedTarget.pdfPoints.length })}</span>
         {/if}
       </div>
     {/if}
     {#if validationMessage && linkInputTouched}
       <p class="field-error">{validationMessage}</p>
     {:else if !linkInput.trim()}
-      <p class="field-hint">支持网页 URL、Obsidian 双链或块引用。</p>
+      <p class="field-hint">{t('irAddTarget.hints.supportedFormats')}</p>
     {/if}
   </div>
 
   {#if previewMarkdown}
     <div class="add-reading-target-panel preview-panel">
-      <span class="panel-title">定位预览</span>
+      <span class="panel-title">{t('irAddTarget.panels.locationPreview')}</span>
       <div class="preview-surface">
         <MarkdownRenderer plugin={plugin} source={previewMarkdown} sourcePath={previewSourcePath} />
       </div>
@@ -442,17 +445,17 @@
 
   <div class="add-reading-target-panel">
     <label class="field-row">
-      <span class="panel-title">阅读点名称</span>
-      <input class="title-input" type="text" bind:value={title} oninput={handleTitleInputChange} placeholder="用于月历与队列显示" />
+      <span class="panel-title">{t('irAddTarget.panels.readingPointName')}</span>
+      <input class="title-input" type="text" bind:value={title} oninput={handleTitleInputChange} placeholder={t('irAddTarget.placeholders.titleInput')} />
     </label>
     <p class="field-hint">
-      {titleDetected ? '已从链接或上下文推断标题，可继续修改。' : '请确认阅读点名称。'}
+      {titleDetected ? t('irAddTarget.hints.titleDetected') : t('irAddTarget.hints.titleConfirm')}
     </p>
   </div>
 
   <div class="add-reading-target-panel">
-    <span class="panel-title">所属专题</span>
-    <p class="field-hint panel-intro">选择该阅读点要加入的增量阅读专题。</p>
+    <span class="panel-title">{t('irAddTarget.panels.topic')}</span>
+    <p class="field-hint panel-intro">{t('irAddTarget.hints.topicIntro')}</p>
     <button class="picker-button deck-picker-button" type="button" onclick={(event) => showDeckMenu(event)}>
       {getDeckButtonLabel()}
       <ObsidianIcon name="chevron-down" size={14} />
@@ -461,11 +464,11 @@
 
   <div class="add-reading-target-panel schedule-panel">
     <div class="schedule-header">
-      <span class="panel-title">首次阅读日</span>
-      <p class="field-hint schedule-explainer">只安排第一次何时读；读完后由算法自动排下次复习。</p>
+      <span class="panel-title">{t('irAddTarget.panels.firstReadDay')}</span>
+      <p class="field-hint schedule-explainer">{t('irAddTarget.hints.scheduleExplainer')}</p>
     </div>
 
-    <div class="schedule-mode-row" role="radiogroup" aria-label="首次阅读排期方式">
+    <div class="schedule-mode-row" role="radiogroup" aria-label={t('irAddTarget.schedule.modeAriaLabel')}>
       <label class="schedule-mode-option">
         <input
           type="radio"
@@ -474,7 +477,7 @@
           checked={scheduleMode === 'custom'}
           onchange={() => setScheduleMode('custom')}
         />
-        <span>我选日期</span>
+        <span>{t('irAddTarget.schedule.customDate')}</span>
       </label>
       <label class="schedule-mode-option">
         <input
@@ -484,7 +487,7 @@
           checked={scheduleMode === 'auto'}
           onchange={() => setScheduleMode('auto')}
         />
-        <span>系统推荐</span>
+        <span>{t('irAddTarget.schedule.autoRecommend')}</span>
       </label>
     </div>
 
@@ -494,7 +497,7 @@
           <button
             class="schedule-chip schedule-chip-button"
             type="button"
-            title="选择首次阅读日"
+            title={t('irAddTarget.schedule.pickDateTitle')}
             onclick={openScheduleDatePicker}
           >
             <ObsidianIcon name="calendar" size={14} />
@@ -506,11 +509,14 @@
             value={scheduleDateInputValue}
             onchange={handleScheduleDateInput}
             bind:this={scheduleDateInputEl}
-            aria-label="首次阅读日"
+            aria-label={t('irAddTarget.schedule.dateAriaLabel')}
           />
           {#if customDayLoad && (customDayLoad.itemCount > 0 || customDayLoad.totalEstimatedMinutes > 0)}
             <p class="field-hint custom-day-load-hint">
-              已排 {customDayLoad.itemCount} 项 · 约 {customDayLoad.totalEstimatedMinutes} 分钟
+              {t('irAddTarget.hints.customDayLoad', {
+                itemCount: customDayLoad.itemCount,
+                minutes: customDayLoad.totalEstimatedMinutes
+              })}
             </p>
           {/if}
         </div>
@@ -523,9 +529,9 @@
           <p class="auto-recommend-summary">{scheduleRecommendation.summary}</p>
         </div>
       {:else if schedulePlanningLoading}
-        <p class="field-hint schedule-loading-hint">正在计算推荐日期…</p>
+        <p class="field-hint schedule-loading-hint">{t('irAddTarget.hints.scheduleLoading')}</p>
       {:else}
-        <p class="field-hint schedule-fallback-hint">未能计算推荐日期，请改选「我选日期」。</p>
+        <p class="field-hint schedule-fallback-hint">{t('irAddTarget.hints.scheduleFallback')}</p>
       {/if}
     </div>
   </div>
@@ -535,13 +541,13 @@
       {#if parsedTarget.kind !== 'web' && parsedTarget.kind !== 'epub'}
         <label class="option-row">
           <input type="checkbox" bind:checked={createNote} />
-          <span>创建阅读笔记（默认仅加入队列，不复制正文）</span>
+          <span>{t('irAddTarget.options.createNote')}</span>
         </label>
       {/if}
       {#if parsedTarget.sourceFilePath}
         <label class="option-row">
           <input type="checkbox" bind:checked={appendSourceBacklink} />
-          <span>在源笔记末尾追加增量阅读标记</span>
+          <span>{t('irAddTarget.options.appendBacklink')}</span>
         </label>
       {/if}
     </div>
@@ -550,9 +556,9 @@
 </div>
 
 <div class="modal-footer" use:portalToTarget={footerEl}>
-  <button type="button" onclick={onClose}>取消</button>
+  <button type="button" onclick={onClose}>{t('irAddTarget.actions.cancel')}</button>
   <button type="button" class="mod-cta" disabled={!canSubmit} onclick={() => { void handleSubmit(); }}>
-    {submitting ? '添加中…' : '确认添加'}
+    {submitting ? t('irAddTarget.actions.adding') : t('irAddTarget.actions.confirmAdd')}
   </button>
 </div>
 

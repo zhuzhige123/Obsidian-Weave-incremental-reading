@@ -8,6 +8,10 @@ import {
 import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
 import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
+import {
+	basenameWithoutExtension,
+	isIRInternalScheduleSourcePath,
+} from "../../utils/ir-internal-data-path";
 import { logger } from "../../utils/logger";
 import {
 	type IRAssociatedNoteSignal,
@@ -21,6 +25,8 @@ import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
 import { type IRCognitiveProfile, IRCognitiveProfileService } from "./IRCognitiveProfileService";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
+import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
+import type { IRDailyLoadDayStats } from "./IRDailyLoadAllocator";
 import { IRPlanGeneratorService } from "./IRPlanGeneratorService";
 import { IRStorageService } from "./IRStorageService";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
@@ -31,6 +37,7 @@ import { readAdvancedScheduleSettingsSnapshot } from "../../utils/ir-plugin-host
 export type ScheduleRecomputeReason =
 	| "complete_block"
 	| "change_priority"
+	| "load_defer"
 	| "manual_reschedule"
 	| "postpone_block"
 	| "suspend_block"
@@ -52,6 +59,8 @@ export interface RecomputeOptions {
 	leanSchedule?: boolean;
 	/** 调度变更后优先刷新这些 dateKey（用于 UI 定向合并）。 */
 	priorityDateKeys?: string[];
+	/** L1 已 patch 的日期；L2 跳过对这些日的投影全量重写。 */
+	l1PatchedDateKeys?: string[];
 }
 
 export interface IRScheduleChangeSet {
@@ -104,14 +113,18 @@ export interface IRPlannedScheduleItem {
 	sourceSequenceOrder?: number;
 	sourceSequenceLocked?: boolean;
 	sourceSequenceAnchorDateKey?: string;
+	manualSchedulePinnedDateKey?: string;
 	explanation: IRScheduleExplanation;
 }
+
+export type { IRDailyLoadDayStats } from "./IRDailyLoadAllocator";
 
 export interface IRPlannedDay {
 	dateKey: string;
 	items: IRPlannedScheduleItem[];
 	totalEstimatedMinutes: number;
 	overloadLevel: "normal" | "warning" | "overloaded";
+	loadStats?: IRDailyLoadDayStats;
 }
 
 export interface IRPlannedSchedule {
@@ -146,12 +159,11 @@ function estimateMinutesFromStats(stats?: {
 	if (impressions > 0 && effectiveReadingTimeSec > 0) {
 		return Math.max(0.5, effectiveReadingTimeSec / impressions / 60);
 	}
-	return 2;
+	return 5;
 }
 
 function extractChunkTitle(filePath: string, fallback: string): string {
-	const base = filePath?.split("/").pop() || fallback;
-	const stem = String(base || "").replace(/\.md$/i, "").trim();
+	const stem = basenameWithoutExtension(filePath, fallback);
 	const cleaned = stem.replace(/^\d+_/, "").trim();
 	return cleaned || stem || String(fallback || "").trim() || "Untitled";
 }
@@ -169,11 +181,12 @@ function extractChunkTitleWithMeta(
 	return extractChunkTitle(filePath, fallback);
 }
 
-function readSequenceMeta(record: Record<string, unknown> | null | undefined): {
+export function readSequenceMeta(record: Record<string, unknown> | null | undefined): {
 	sourceSequenceGroup?: string;
 	sourceSequenceOrder?: number;
 	sourceSequenceLocked?: boolean;
 	sourceSequenceAnchorDateKey?: string;
+	manualSchedulePinnedDateKey?: string;
 } {
 	const sourceSequenceGroup =
 		typeof record?.sourceSequenceGroup === "string" && record.sourceSequenceGroup.trim()
@@ -189,11 +202,17 @@ function readSequenceMeta(record: Record<string, unknown> | null | undefined): {
 		typeof record?.sourceSequenceAnchorDateKey === "string" && record.sourceSequenceAnchorDateKey.trim()
 			? record.sourceSequenceAnchorDateKey.trim()
 			: undefined;
+	const manualSchedulePinnedDateKey =
+		typeof record?.manualSchedulePinnedDateKey === "string" &&
+		record.manualSchedulePinnedDateKey.trim()
+			? record.manualSchedulePinnedDateKey.trim()
+			: undefined;
 	return {
 		sourceSequenceGroup,
 		sourceSequenceOrder,
 		sourceSequenceLocked,
 		sourceSequenceAnchorDateKey,
+		manualSchedulePinnedDateKey,
 	};
 }
 
@@ -208,6 +227,7 @@ function buildExplanation(input: {
 	linkedCardCount?: number;
 	stats?: { impressions?: number };
 	nowMs: number;
+	manualSchedulePinnedDateKey?: string;
 }): IRScheduleExplanation {
 	const scoreBreakdown = new IRCognitiveProfileService().computeProfile(input);
 	const overdueDays =
@@ -215,7 +235,8 @@ function buildExplanation(input: {
 			? Math.max(1, Math.floor((input.nowMs - input.nextRepDate) / (24 * 60 * 60 * 1000)))
 			: 0;
 	const isOverdue = overdueDays > 0;
-	const hasManualSchedule = input.nextRepDate > 0;
+	const hasScheduledDate = input.nextRepDate > 0;
+	const hasManualSchedule = Boolean(input.manualSchedulePinnedDateKey);
 
 	let primaryReason = "按当前间隔进入计划";
 	if (isOverdue) {
@@ -224,7 +245,7 @@ function buildExplanation(input: {
 		primaryReason = "手动高优先级推动到前列";
 	} else if (input.scheduleStatus === "new") {
 		primaryReason = "新项目已进入待处理队列";
-	} else if (!hasManualSchedule) {
+	} else if (!hasScheduledDate) {
 		primaryReason = "尚未形成稳定排期，按今日待处理处理";
 	}
 
@@ -244,8 +265,11 @@ function buildExplanation(input: {
 			1
 		)} / 难度 ${scoreBreakdown.difficultyScore.toFixed(1)}`
 	);
-	if (hasManualSchedule) {
+	if (hasScheduledDate) {
 		secondaryReasons.push("已有明确复习日期");
+	}
+	if (hasManualSchedule) {
+		secondaryReasons.push("用户手动固定了复习日期");
 	}
 
 	return {
@@ -497,8 +521,32 @@ export class IRScheduleKernel {
 			dailyBudgetMinutes: planningSettings.dailyTimeBudgetMinutes ?? 45,
 			enableInterleaving: planningSettings.interleaveMode !== false,
 			maxConsecutiveSameTopic: planningSettings.maxConsecutiveSameTopic ?? 3,
+			flowStretchPercent: planningSettings.flowStretchPercent,
+			enableLoadBasedDefer: planningSettings.enableLoadBasedDefer,
+			maxEstimatedMinutesPerItem: planningSettings.maxEstimatedMinutesPerItem,
+			dailyReadingPointCap: planningSettings.dailyReadingPointCap,
+			dailyReadingPointStretchCap: planningSettings.dailyReadingPointStretchCap,
+			enableHorizonSmoothing: planningSettings.enableHorizonSmoothing,
+			interleaveProfile: planningSettings.interleaveProfile,
+			maxTopicSharePercent: planningSettings.maxTopicSharePercent,
 		});
-		const schedule = this.buildPlannedScheduleFromMap(generated.itemsByDate, canonicalDeckIds, reason);
+		if (
+			generated.loadDeferrals.length > 0 &&
+			(planningSettings.enableLoadBasedDefer !== false ||
+				planningSettings.enableHorizonSmoothing !== false) &&
+			reason !== "change_priority" &&
+			reason !== "load_defer"
+		) {
+			await applyLoadDeferralsFromPlan(this.app, generated.loadDeferrals, { reason });
+		}
+		const schedule: IRPlannedSchedule = {
+			generatedAt: Date.now(),
+			version: 1,
+			days: generated.days,
+			itemsByDate: generated.itemsByDate,
+			deckIds: canonicalDeckIds,
+			triggerReason: reason,
+		};
 		this.scheduleCache.set(cacheKey, schedule);
 		return schedule;
 	}
@@ -507,7 +555,10 @@ export class IRScheduleKernel {
 		changeSet: IRScheduleChangeSet,
 		options?: RecomputeOptions
 	): Promise<IRScheduleImpactPreview> {
-		const before = await this.recomputeScheduleForDeck("ui_refresh", options);
+		let before = this.getCachedSchedule(options);
+		if (!before) {
+			before = await this.recomputeScheduleForDeck("ui_refresh", options);
+		}
 		const flatItems = before.days
 			.flatMap((day) => day.items)
 			.map((item) => ({
@@ -582,6 +633,7 @@ export class IRScheduleKernel {
 			intervalDays,
 			linkedCardCount: target.linkedCardCount,
 			nowMs,
+			manualSchedulePinnedDateKey: target.manualSchedulePinnedDateKey,
 		});
 
 		const planningSettings = this.getPlanningSettingsSnapshot();
@@ -594,13 +646,24 @@ export class IRScheduleKernel {
 				dailyBudgetMinutes: planningSettings.dailyTimeBudgetMinutes ?? 45,
 				enableInterleaving: planningSettings.interleaveMode !== false,
 				maxConsecutiveSameTopic: planningSettings.maxConsecutiveSameTopic ?? 3,
+				flowStretchPercent: planningSettings.flowStretchPercent,
+				enableLoadBasedDefer: planningSettings.enableLoadBasedDefer,
+				maxEstimatedMinutesPerItem: planningSettings.maxEstimatedMinutesPerItem,
+				dailyReadingPointCap: planningSettings.dailyReadingPointCap,
+				dailyReadingPointStretchCap: planningSettings.dailyReadingPointStretchCap,
+				enableHorizonSmoothing: planningSettings.enableHorizonSmoothing,
+				interleaveProfile: planningSettings.interleaveProfile,
+				maxTopicSharePercent: planningSettings.maxTopicSharePercent,
 			}
 		);
-		const after = this.buildPlannedScheduleFromMap(
-			generated.itemsByDate,
-			before.deckIds,
-			"ui_refresh"
-		);
+		const after: IRPlannedSchedule = {
+			generatedAt: Date.now(),
+			version: 1,
+			days: generated.days,
+			itemsByDate: generated.itemsByDate,
+			deckIds: before.deckIds,
+			triggerReason: "ui_refresh",
+		};
 		return {
 			before,
 			after,
@@ -771,6 +834,9 @@ export class IRScheduleKernel {
 		const nextRepDate = Number(chunk.nextRepDate || 0);
 		const nextReviewDate = nextRepDate > 0 ? new Date(nextRepDate) : null;
 		const filePath = String(chunk.filePath || "");
+		if (isIRInternalScheduleSourcePath(filePath)) {
+			return null;
+		}
 		const chunkMeta = (chunk.meta || {}) as unknown as Record<string, unknown>;
 		const title = extractChunkTitleWithMeta(filePath, chunk.chunkId, chunkMeta);
 		const material = readingMaterialByPath.get(filePath);
@@ -828,6 +894,7 @@ export class IRScheduleKernel {
 				linkedCardCount: chunkAssociationSignals.linkedCardCount,
 				stats: chunk.stats,
 				nowMs,
+				manualSchedulePinnedDateKey: sequenceMeta.manualSchedulePinnedDateKey,
 			}),
 		};
 	}
@@ -894,6 +961,9 @@ export class IRScheduleKernel {
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
 			return null;
 		}
+		if (isIRInternalScheduleSourcePath(task.pdfPath)) {
+			return null;
+		}
 
 		const taskDeckIdentifier = getTaskTopicId(task);
 		const nextRepDate = Number(task.nextRepDate || 0);
@@ -944,6 +1014,7 @@ export class IRScheduleKernel {
 				linkedCardCount: associationMeta.linkedCardCount,
 				stats: task.stats,
 				nowMs,
+				manualSchedulePinnedDateKey: sequenceMeta.manualSchedulePinnedDateKey,
 			}),
 		};
 	}
@@ -958,6 +1029,9 @@ export class IRScheduleKernel {
 	): IRPlannedScheduleItem | null {
 		const scheduleStatus = String(task.status || "new");
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
+			return null;
+		}
+		if (isIRInternalScheduleSourcePath(task.epubFilePath)) {
 			return null;
 		}
 
@@ -1007,6 +1081,7 @@ export class IRScheduleKernel {
 				linkedCardCount: associationMeta.linkedCardCount,
 				stats: task.stats,
 				nowMs,
+				manualSchedulePinnedDateKey: sequenceMeta.manualSchedulePinnedDateKey,
 			}),
 		};
 	}
@@ -1018,7 +1093,7 @@ export class IRScheduleKernel {
 		nowMs: number,
 		canonicalByIdentifier: Map<string, string>
 	): Promise<IRPlannedScheduleItem | null> {
-		const chunks = (await this.storage.getAllChunkDataWithSync()) || {};
+		const chunks = (await this.storage.getAllChunkData()) || {};
 		const chunk =
 			(chunks[itemId] as IRChunkFileData | undefined) ||
 			(Object.values(chunks).find((entry) => entry?.chunkId === itemId));
@@ -1073,7 +1148,7 @@ export class IRScheduleKernel {
 		await this.pdfService.initialize();
 		await this.epubService.initialize();
 		return {
-			chunks: Object.values((await this.storage.getAllChunkDataWithSync()) || {}),
+			chunks: Object.values((await this.storage.getAllChunkData()) || {}),
 			pdfTasks: await this.pdfService.getAllTasks(),
 			epubTasks: await this.epubService.getAllTasks(),
 		};

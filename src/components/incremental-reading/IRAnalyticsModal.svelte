@@ -12,6 +12,7 @@
   import { createManagedChartRuntime } from '../../utils/chart-runtime';
   import type { EChartsOption } from '../../utils/echarts-loader';
   import { logger } from '../../utils/logger';
+  import { tr } from '../../utils/i18n';
 
   interface Props {
     plugin: AnkiObsidianPlugin;
@@ -26,15 +27,16 @@
 
   const isMobile = Platform.isMobile;
   const WHEEL_THROTTLE_MS = 180;
-  const quickRangeOptions = [
-    { value: 7, label: '最近 7 天' },
-    { value: 14, label: '最近 14 天' },
-    { value: 30, label: '最近 30 天' },
-    { value: 60, label: '最近 60 天' },
-    { value: 90, label: '最近 90 天' }
-  ];
 
   let { plugin }: Props = $props();
+  let t = $derived($tr);
+  let quickRangeOptions = $derived([
+    { value: 7, label: t('irAnalytics.range.last7') },
+    { value: 14, label: t('irAnalytics.range.last14') },
+    { value: 30, label: t('irAnalytics.range.last30') },
+    { value: 60, label: t('irAnalytics.range.last60') },
+    { value: 90, label: t('irAnalytics.range.last90') }
+  ]);
   let activeTab = $state<AnalyticsTab>('activity');
   let selectedDays = $state(30);
   let selectedMode = $state<IRAnalyticsMode>('overall');
@@ -81,7 +83,7 @@
     } catch (error) {
       if (requestId !== loadRequestId) return;
       logger.error('[IRAnalyticsModal] 加载分析数据失败:', error);
-      loadError = '分析数据加载失败';
+      loadError = t('irAnalytics.loadFailed');
       snapshot = null;
     } finally {
       if (requestId !== loadRequestId) return;
@@ -139,9 +141,9 @@
         splitLine: { lineStyle: { color: theme.splitLineColor, type: 'dashed' } }
       },
       series: [
-        { name: '累计材料', type: 'line', smooth: true, data: data.quantityTrend.map((point) => point.totalCount) },
-        { name: '活跃材料', type: 'line', smooth: true, areaStyle: { opacity: 0.12 }, data: data.quantityTrend.map((point) => point.activeCount) },
-        { name: '已退出主队列', type: 'line', smooth: true, data: data.quantityTrend.map((point) => point.closedCount) }
+        { name: t('irAnalytics.charts.totalMaterials'), type: 'line', smooth: true, data: data.quantityTrend.map((point) => point.totalCount) },
+        { name: t('irAnalytics.charts.activeMaterials'), type: 'line', smooth: true, areaStyle: { opacity: 0.12 }, data: data.quantityTrend.map((point) => point.activeCount) },
+        { name: t('irAnalytics.charts.closedMaterials'), type: 'line', smooth: true, data: data.quantityTrend.map((point) => point.closedCount) }
       ]
     };
   }
@@ -200,18 +202,18 @@
           const point = params.data as [number, number, number, string, number, number, number, number, number, number, number];
           return [
             `<strong>${point[3]}</strong>`,
-            `有效优先级: ${point[0]}`,
-            `调度紧迫度: ${point[1]}`,
-            `活跃项: ${point[4]} / 到期: ${point[5]} / 逾期: ${point[6]}`,
-            `阅读时长: ${point[7]} 小时`,
-            `制卡: ${point[8]} / 摘录: ${point[9]} / 笔记: ${point[10]}`
+            t('irAnalytics.charts.tooltip.effectivePriority', { value: point[0] }),
+            t('irAnalytics.charts.tooltip.schedulingUrgency', { value: point[1] }),
+            t('irAnalytics.charts.tooltip.counts', { active: point[4], due: point[5], overdue: point[6] }),
+            t('irAnalytics.charts.tooltip.readingHours', { hours: point[7] }),
+            t('irAnalytics.charts.tooltip.outcomes', { cards: point[8], extracts: point[9], notes: point[10] })
           ].join('<br>');
         }
       },
       grid: { left: isMobile ? 40 : 52, right: isMobile ? 10 : 20, top: 24, bottom: 44 },
       xAxis: {
         type: 'value',
-        name: '有效优先级',
+        name: t('irAnalytics.charts.effectivePriority'),
         min: 0,
         max: 10,
         nameTextStyle: { color: theme.subTextColor },
@@ -220,7 +222,7 @@
       },
       yAxis: {
         type: 'value',
-        name: '调度紧迫度',
+        name: t('irAnalytics.charts.schedulingUrgency'),
         min: 0,
         max: 10,
         nameTextStyle: { color: theme.subTextColor },
@@ -298,21 +300,21 @@
       yAxis: [
         {
           type: 'value',
-          name: '材料数',
+          name: t('irAnalytics.charts.itemCount'),
           nameTextStyle: { color: theme.subTextColor },
           axisLabel: { color: theme.subTextColor },
           splitLine: { lineStyle: { color: theme.splitLineColor, type: 'dashed' } }
         },
         {
           type: 'value',
-          name: '分钟',
+          name: t('irAnalytics.charts.minutes'),
           nameTextStyle: { color: theme.subTextColor },
           axisLabel: { color: theme.subTextColor }
         }
       ],
       series: [
         {
-          name: '计划材料数',
+          name: t('irAnalytics.charts.plannedItems'),
           type: 'bar',
           barMaxWidth: 34,
           data: data.forecast.map((point) => ({
@@ -329,7 +331,7 @@
           }))
         },
         {
-          name: '预计阅读分钟',
+          name: t('irAnalytics.charts.estimatedMinutes'),
           type: 'line',
           yAxisIndex: 1,
           smooth: true,
@@ -373,29 +375,45 @@
   }
 
   function getModeText(mode: IRAnalyticsMode): string {
-    if (mode === 'topic') return '专题';
-    if (mode === 'tag') return '标签';
-    return '总体';
+    if (mode === 'topic') return t('irAnalytics.modes.topic');
+    if (mode === 'tag') return t('irAnalytics.modes.tag');
+    return t('irAnalytics.modes.overall');
   }
 
   function getCurrentModeLabel(): string {
     const modeText = getModeText(selectedMode);
-    return isMobile ? modeText : `模式：${modeText}`;
+    return isMobile ? modeText : t('irAnalytics.modes.modePrefix', { mode: modeText });
   }
 
   function getCurrentSelectionLabel(): string {
-    if (selectedMode === 'overall') return isMobile ? '全部' : '总体模式无需二次筛选';
-    if (!snapshot?.sources.length) return selectedMode === 'topic' ? (isMobile ? '暂无专题' : '暂无可分析专题') : (isMobile ? '暂无标签' : '暂无可分析标签');
-    if (!selectedSelectionKey) return isMobile ? (selectedMode === 'topic' ? '选专题' : '选标签') : (selectedMode === 'topic' ? '请选择专题' : '请选择标签');
+    if (selectedMode === 'overall') {
+      return isMobile ? t('irAnalytics.modes.all') : t('irAnalytics.modes.overallNoFilter');
+    }
+    if (!snapshot?.sources.length) {
+      return selectedMode === 'topic'
+        ? (isMobile ? t('irAnalytics.modes.noTopicsShort') : t('irAnalytics.modes.noTopics'))
+        : (isMobile ? t('irAnalytics.modes.noTagsShort') : t('irAnalytics.modes.noTags'));
+    }
+    if (!selectedSelectionKey) {
+      return isMobile
+        ? (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopicShort') : t('irAnalytics.modes.pickTagShort'))
+        : (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopic') : t('irAnalytics.modes.pickTag'));
+    }
     const option = snapshot.sources.find((item) => item.key === selectedSelectionKey);
-    if (!option) return isMobile ? (selectedMode === 'topic' ? '选专题' : '选标签') : (selectedMode === 'topic' ? '请选择专题' : '请选择标签');
+    if (!option) {
+      return isMobile
+        ? (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopicShort') : t('irAnalytics.modes.pickTagShort'))
+        : (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopic') : t('irAnalytics.modes.pickTag'));
+    }
     if (isMobile) return selectedMode === 'topic' ? option.label : `#${option.label}`;
-    return selectedMode === 'topic' ? `专题：${option.label}` : `标签：#${option.label}`;
+    return selectedMode === 'topic'
+      ? t('irAnalytics.modes.topicPrefix', { label: option.label })
+      : t('irAnalytics.modes.tagPrefix', { label: option.label });
   }
 
   function getCurrentRangeLabel(): string {
-    if (isMobile) return `${selectedDays}天`;
-    return quickRangeOptions.find((option) => option.value === selectedDays)?.label ?? `${selectedDays} 天`;
+    if (isMobile) return t('irAnalytics.range.daysShort', { days: selectedDays });
+    return quickRangeOptions.find((option) => option.value === selectedDays)?.label ?? t('irAnalytics.range.daysLabel', { days: selectedDays });
   }
 
   function showModeMenu(event: MouseEvent): void {
@@ -422,13 +440,13 @@
     const menu = new Menu();
     const options = snapshot?.sources || [];
     if (!options.length) {
-      menu.addItem((item) => item.setTitle(selectedMode === 'topic' ? '暂无可分析专题' : '暂无可分析标签').setIcon('inbox'));
+      menu.addItem((item) => item.setTitle(selectedMode === 'topic' ? t('irAnalytics.modes.noTopics') : t('irAnalytics.modes.noTags')).setIcon('inbox'));
       menu.showAtMouseEvent(event);
       return;
     }
     menu.addItem((item) => {
       item
-        .setTitle(selectedMode === 'topic' ? '清空专题选择' : '清空标签选择')
+        .setTitle(selectedMode === 'topic' ? t('irAnalytics.menu.clearTopic') : t('irAnalytics.menu.clearTag'))
         .setIcon('rotate-ccw')
         .setChecked(!selectedSelectionKey)
         .onClick(() => {
@@ -440,7 +458,7 @@
     options.forEach((option) => {
       menu.addItem((item) => {
         item
-          .setTitle(`${option.label} · 活跃 ${option.activeCount} · 到期 ${option.dueCount}`)
+          .setTitle(t('irAnalytics.menu.sourceItem', { label: option.label, active: option.activeCount, due: option.dueCount }))
           .setIcon(selectedMode === 'topic' ? 'layers' : 'tag')
           .setChecked(selectedSelectionKey === option.key)
           .onClick(() => {
@@ -471,12 +489,21 @@
   }
 
   function getSelectionHintText(): string {
-    if (selectedMode === 'overall') return '总体模式会统计所有增量阅读点';
-    if (!snapshot?.sources.length) return selectedMode === 'topic' ? '当前没有可用于分析的专题' : '当前没有可用于分析的手工标签';
-    if (!selectedSelectionKey) return selectedMode === 'topic' ? '请选择一个专题后查看图表' : '请选择一个标签后查看图表';
+    if (selectedMode === 'overall') return t('irAnalytics.hints.overallStats');
+    if (!snapshot?.sources.length) {
+      return selectedMode === 'topic' ? t('irAnalytics.hints.noTopicsAvailable') : t('irAnalytics.hints.noTagsAvailable');
+    }
+    if (!selectedSelectionKey) {
+      return selectedMode === 'topic' ? t('irAnalytics.hints.pickTopicFirst') : t('irAnalytics.hints.pickTagFirst');
+    }
     const option = snapshot.sources.find((item) => item.key === selectedSelectionKey);
-    if (!option) return '当前选择已失效，请重新选择';
-    return `${option.subtitle} · 共 ${option.itemCount} 项，活跃 ${option.activeCount} 项，到期 ${option.dueCount} 项`;
+    if (!option) return t('irAnalytics.hints.selectionInvalid');
+    return t('irAnalytics.hints.selectionSummary', {
+      subtitle: option.subtitle,
+      items: option.itemCount,
+      active: option.activeCount,
+      due: option.dueCount
+    });
   }
 
   function formatMetric(value: number): string {
@@ -487,21 +514,30 @@
   function formatMonitoringText(): string {
     if (!snapshot?.monitoringSummary) return '';
     const summary = snapshot.monitoringSummary;
-    return `近7天日均已安排 ${summary.dailyScheduled} 项 · 日均完成 ${summary.dailyCompleted} 项 · 日均阅读 ${summary.dailyReadingMinutes} 分钟 · 决策闭环率 ${summary.linkedOutcomeRate}%`;
+    return t('irAnalytics.monitoring', {
+      scheduled: summary.dailyScheduled,
+      completed: summary.dailyCompleted,
+      minutes: summary.dailyReadingMinutes,
+      rate: summary.linkedOutcomeRate
+    });
   }
 
   function getOutcomeTooltip(kind: 'extracts' | 'cards' | 'notes'): string {
     if (!snapshot) return '';
-    if (kind === 'extracts') return `当前沉淀摘录数：${snapshot.overview.extracts}\n本期动作摘录：${snapshot.overview.actionExtracts}`;
-    if (kind === 'cards') return `当前沉淀记忆卡数：${snapshot.overview.cardsCreated}\n本期动作制卡：${snapshot.overview.actionCardsCreated}`;
-    return `当前关联 Markdown 笔记数：${snapshot.overview.notesWritten}\n本期动作写笔记：${snapshot.overview.actionNotesWritten}`;
+    if (kind === 'extracts') {
+      return t('irAnalytics.outcomes.extractsTooltip', { total: snapshot.overview.extracts, action: snapshot.overview.actionExtracts });
+    }
+    if (kind === 'cards') {
+      return t('irAnalytics.outcomes.cardsTooltip', { total: snapshot.overview.cardsCreated, action: snapshot.overview.actionCardsCreated });
+    }
+    return t('irAnalytics.outcomes.notesTooltip', { total: snapshot.overview.notesWritten, action: snapshot.overview.actionNotesWritten });
   }
 
   function getOutcomeActionText(kind: 'extracts' | 'cards' | 'notes'): string {
     if (!snapshot) return '';
-    if (kind === 'extracts') return `本期动作 ${snapshot.overview.actionExtracts}`;
-    if (kind === 'cards') return `本期动作 ${snapshot.overview.actionCardsCreated}`;
-    return `本期动作 ${snapshot.overview.actionNotesWritten}`;
+    if (kind === 'extracts') return t('irAnalytics.outcomes.actionPeriod', { count: snapshot.overview.actionExtracts });
+    if (kind === 'cards') return t('irAnalytics.outcomes.actionPeriod', { count: snapshot.overview.actionCardsCreated });
+    return t('irAnalytics.outcomes.actionPeriod', { count: snapshot.overview.actionNotesWritten });
   }
 
   function hasSelectionRequirementGap(): boolean {
@@ -509,15 +545,23 @@
   }
 
   function getEmptyStateMessage(): string {
-    if (selectedMode !== 'overall' && !snapshot?.sources.length) return selectedMode === 'topic' ? '当前还没有可分析的专题数据' : '当前还没有可分析的手工标签数据';
-    if (hasSelectionRequirementGap()) return selectedMode === 'topic' ? '先选择一个专题，再查看当前图表' : '先选择一个标签，再查看当前图表';
-    return '当前范围下暂时没有可展示数据';
+    if (selectedMode !== 'overall' && !snapshot?.sources.length) {
+      return selectedMode === 'topic' ? t('irAnalytics.empty.noTopicData') : t('irAnalytics.empty.noTagData');
+    }
+    if (hasSelectionRequirementGap()) {
+      return selectedMode === 'topic' ? t('irAnalytics.empty.pickTopic') : t('irAnalytics.empty.pickTag');
+    }
+    return t('irAnalytics.empty.noData');
   }
 
   function getEmptyStateDescription(): string {
-    if (selectedMode !== 'overall' && !snapshot?.sources.length) return selectedMode === 'topic' ? '等增量阅读点和专题建立关联后，这里就会显示对应图表。' : '等手工标签被用于增量阅读后，这里就会显示对应图表。';
-    if (hasSelectionRequirementGap()) return selectedMode === 'topic' ? '先在上方选择一个专题，下方内容区会显示对应的分析图表。' : '先在上方选择一个标签，下方内容区会显示对应的分析图表。';
-    return '可以试试切换时间范围或分析条件，看看是否有可展示的图表数据。';
+    if (selectedMode !== 'overall' && !snapshot?.sources.length) {
+      return selectedMode === 'topic' ? t('irAnalytics.empty.noTopicDataDesc') : t('irAnalytics.empty.noTagDataDesc');
+    }
+    if (hasSelectionRequirementGap()) {
+      return selectedMode === 'topic' ? t('irAnalytics.empty.pickTopicDesc') : t('irAnalytics.empty.pickTagDesc');
+    }
+    return t('irAnalytics.empty.tryOtherFilters');
   }
 
   $effect(() => {
@@ -545,18 +589,18 @@
 
 <div class="ir-analytics-modal">
   <div class="tabs-header weave-toolbar-tabs">
-    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'activity'} onclick={() => switchTab('activity')}>活跃趋势</button>
-    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'quantity'} onclick={() => switchTab('quantity')}>数量变化</button>
-    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'timing'} onclick={() => switchTab('timing')}>调度时机</button>
-    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'difficulty'} onclick={() => switchTab('difficulty')}>优先级矩阵</button>
-    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'forecast'} onclick={() => switchTab('forecast')}>未来负荷</button>
+    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'activity'} onclick={() => switchTab('activity')}>{t('irAnalytics.tabs.activity')}</button>
+    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'quantity'} onclick={() => switchTab('quantity')}>{t('irAnalytics.tabs.quantity')}</button>
+    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'timing'} onclick={() => switchTab('timing')}>{t('irAnalytics.tabs.timing')}</button>
+    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'difficulty'} onclick={() => switchTab('difficulty')}>{t('irAnalytics.tabs.difficulty')}</button>
+    <button type="button" class="clickable-icon tab-btn weave-toolbar-tab" class:active={activeTab === 'forecast'} onclick={() => switchTab('forecast')}>{t('irAnalytics.tabs.forecast')}</button>
   </div>
 
   <div class="toolbar">
     <div class="toolbar-row">
       <label class="control-wrap">
         {#if !isMobile}
-          <span class="toolbar-label">分析模式</span>
+          <span class="toolbar-label">{t('irAnalytics.toolbar.mode')}</span>
         {/if}
         <button type="button" class="clickable-icon menu-trigger" onclick={(event) => showModeMenu(event)}>
           <span class="menu-text">{getCurrentModeLabel()}</span>
@@ -565,7 +609,7 @@
       </label>
       <label class="control-wrap control-wrap--selection">
         {#if !isMobile}
-          <span class="toolbar-label">条件选择</span>
+          <span class="toolbar-label">{t('irAnalytics.toolbar.selection')}</span>
         {/if}
         <button type="button" class="clickable-icon menu-trigger" onclick={(event) => showSelectionMenu(event)} disabled={selectedMode === 'overall'}>
           <span class="menu-text">{getCurrentSelectionLabel()}</span>
@@ -574,7 +618,7 @@
       </label>
       <label class="control-wrap control-wrap--range">
         {#if !isMobile}
-          <span class="toolbar-label">时间范围</span>
+          <span class="toolbar-label">{t('irAnalytics.toolbar.timeRange')}</span>
         {/if}
         <button type="button" class="clickable-icon menu-trigger" onclick={(event) => showRangeMenu(event)}>
           <span class="menu-text">{getCurrentRangeLabel()}</span>
@@ -593,7 +637,7 @@
     {#if isLoading}
       <div class="state-panel state-panel--loading">
         <ObsidianIcon name="loader" size={18} />
-        <span>正在生成分析图表…</span>
+        <span>{t('irAnalytics.loading')}</span>
       </div>
     {:else if loadError}
       <div class="state-panel state-panel--error">{loadError}</div>
@@ -604,25 +648,25 @@
             <span class="scope-title">{snapshot.scopeLabel}</span>
             <span class="scope-subtitle">
               {#if snapshot.scopeKey}
-                共 {snapshot.overview.totalItems} 项阅读点，当前活跃 {snapshot.overview.activeItems} 项
+                {t('irAnalytics.scope.summary', { total: snapshot.overview.totalItems, active: snapshot.overview.activeItems })}
               {:else if selectedMode !== 'overall'}
                 {getEmptyStateMessage()}
               {:else}
-                当前汇总全部增量阅读点
+                {t('irAnalytics.scope.allPoints')}
               {/if}
             </span>
           </div>
 
           <div class="overview-grid">
-            <div class="overview-card"><div class="overview-label">总材料</div><div class="overview-value">{snapshot.overview.totalItems}</div></div>
-            <div class="overview-card"><div class="overview-label">活跃材料</div><div class="overview-value">{snapshot.overview.activeItems}</div></div>
-            <div class="overview-card"><div class="overview-label">今日到期</div><div class="overview-value">{snapshot.overview.dueToday}</div></div>
-            <div class="overview-card"><div class="overview-label">逾期项</div><div class="overview-value">{snapshot.overview.overdueItems}</div></div>
-            <div class="overview-card"><div class="overview-label">阅读小时</div><div class="overview-value">{formatMetric(snapshot.overview.totalReadingHours)}</div></div>
-            <div class="overview-card"><div class="overview-label">平均优先级</div><div class="overview-value">P{formatMetric(snapshot.overview.avgPriority)}</div></div>
-            <div class="overview-card" title={getOutcomeTooltip('extracts')}><div class="overview-label">摘录</div><div class="overview-value">{snapshot.overview.extracts}</div><div class="overview-meta">{getOutcomeActionText('extracts')}</div></div>
-            <div class="overview-card" title={getOutcomeTooltip('cards')}><div class="overview-label">制卡</div><div class="overview-value">{snapshot.overview.cardsCreated}</div><div class="overview-meta">{getOutcomeActionText('cards')}</div></div>
-            <div class="overview-card" title={getOutcomeTooltip('notes')}><div class="overview-label">笔记</div><div class="overview-value">{snapshot.overview.notesWritten}</div><div class="overview-meta">{getOutcomeActionText('notes')}</div></div>
+            <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.totalItems')}</div><div class="overview-value">{snapshot.overview.totalItems}</div></div>
+            <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.activeItems')}</div><div class="overview-value">{snapshot.overview.activeItems}</div></div>
+            <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.dueToday')}</div><div class="overview-value">{snapshot.overview.dueToday}</div></div>
+            <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.overdueItems')}</div><div class="overview-value">{snapshot.overview.overdueItems}</div></div>
+            <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.readingHours')}</div><div class="overview-value">{formatMetric(snapshot.overview.totalReadingHours)}</div></div>
+            <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.avgPriority')}</div><div class="overview-value">P{formatMetric(snapshot.overview.avgPriority)}</div></div>
+            <div class="overview-card" title={getOutcomeTooltip('extracts')}><div class="overview-label">{t('irAnalytics.overview.extracts')}</div><div class="overview-value">{snapshot.overview.extracts}</div><div class="overview-meta">{getOutcomeActionText('extracts')}</div></div>
+            <div class="overview-card" title={getOutcomeTooltip('cards')}><div class="overview-label">{t('irAnalytics.overview.cards')}</div><div class="overview-value">{snapshot.overview.cardsCreated}</div><div class="overview-meta">{getOutcomeActionText('cards')}</div></div>
+            <div class="overview-card" title={getOutcomeTooltip('notes')}><div class="overview-label">{t('irAnalytics.overview.notes')}</div><div class="overview-value">{snapshot.overview.notesWritten}</div><div class="overview-meta">{getOutcomeActionText('notes')}</div></div>
           </div>
         </div>
       {:else}

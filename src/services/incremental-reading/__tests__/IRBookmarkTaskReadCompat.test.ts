@@ -1,7 +1,7 @@
 import { getV2Paths } from "../../../config/paths";
 import { IREpubBookmarkTaskService } from "../IREpubBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "../IRPdfBookmarkTaskService";
-import { IRPointStorageService } from "../IRPointStorageService";
+import { getSharedIRPointStorageService, IRPointStorageService } from "../IRPointStorageService";
 
 vi.mock("obsidian", async () => {
 	const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
@@ -39,7 +39,7 @@ function parentPath(path: string): string {
 
 function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs: string[] = []) {
 	const files = new Map<string, string>();
-	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave"]);
+	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave-incremental-reading"]);
 
 	const ensureDir = (dir: string) => {
 		const normalized = normalizeTestPath(dir);
@@ -217,7 +217,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 			}),
 		});
 
-		const pointStorage = new IRPointStorageService(app);
+		const pointStorage = getSharedIRPointStorageService(app);
 		await pointStorage.syncLegacyPoint({
 			id: "pdfbm-1",
 			topicId: "topic-1",
@@ -250,6 +250,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 				lastInteractionAt: 1713348000000,
 			},
 		});
+		vi.spyOn(pointStorage, "ensureRuntimeBaseline").mockResolvedValue(undefined);
 
 		const service = new IRPdfBookmarkTaskService(app);
 		const task = await service.getTask("pdfbm-1");
@@ -277,7 +278,8 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 				cardsCreated: 1,
 			}),
 		});
-		expect(allTasks.map((entry) => entry.id).sort()).toEqual(["pdfbm-1", "pdfbm-legacy-only"]);
+		expect(allTasks.map((entry) => entry.id).sort()).toEqual(["pdfbm-1"]);
+		expect(await service.getTask("pdfbm-legacy-only")).toBeNull();
 	});
 
 	it("PDF task service can delete point-only migrated tasks even when legacy store is missing", async () => {
@@ -290,7 +292,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 			}),
 		});
 
-		const pointStorage = new IRPointStorageService(app);
+		const pointStorage = getSharedIRPointStorageService(app);
 		await pointStorage.syncLegacyPoint({
 			id: "pdfbm-point-only",
 			topicId: "topic-1",
@@ -333,7 +335,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 			}),
 		});
 
-		const pointStorage = new IRPointStorageService(app);
+		const pointStorage = getSharedIRPointStorageService(app);
 		await pointStorage.syncLegacyPoint({
 			id: "pdfbm-point-update",
 			topicId: "topic-1",
@@ -430,7 +432,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 			}),
 		});
 
-		const pointStorage = new IRPointStorageService(app);
+		const pointStorage = getSharedIRPointStorageService(app);
 		await pointStorage.syncLegacyPoint({
 			id: "epubbm-1",
 			topicId: "topic-2",
@@ -461,6 +463,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 				lastInteractionAt: 1713348000000,
 			},
 		});
+		vi.spyOn(pointStorage, "ensureRuntimeBaseline").mockResolvedValue(undefined);
 
 		const service = new IREpubBookmarkTaskService(app);
 		const task = await service.getTask("epubbm-1");
@@ -500,7 +503,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 			}),
 		});
 
-		const pointStorage = new IRPointStorageService(app);
+		const pointStorage = getSharedIRPointStorageService(app);
 		await pointStorage.syncLegacyPoint({
 			id: "epubbm-point-only",
 			topicId: "topic-2",
@@ -545,7 +548,7 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 			}),
 		});
 
-		const pointStorage = new IRPointStorageService(app);
+		const pointStorage = getSharedIRPointStorageService(app);
 		await pointStorage.syncLegacyPoint({
 			id: "epubbm-point-resume",
 			topicId: "topic-2",

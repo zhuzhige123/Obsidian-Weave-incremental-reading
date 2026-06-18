@@ -1,6 +1,7 @@
 import { App, Component, MarkdownView, Platform, Scope, TFile, WorkspaceLeaf } from "obsidian";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
+import { i18n } from "../../utils/i18n";
 import EditorContextManager from "./EditorContextManager";
 import {
 	buildDetachedEditorTempFilePath,
@@ -244,7 +245,7 @@ export class DetachedLeafEditor extends Component {
 		} catch (error) {
 			logger.error("[DetachedLeafEditor] 初始化失败:", error);
 			// 显示错误信息
-			this.containerEl.createDiv({ text: "编辑器初始化失败", cls: "error-message" });
+			this.containerEl.createDiv({ text: i18n.t("irServiceNotices.editor.initFailed"), cls: "error-message" });
 		} finally {
 			if (this.readyResolve) {
 				try {

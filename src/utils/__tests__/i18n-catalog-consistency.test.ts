@@ -17,6 +17,20 @@ const GUARDED_PREFIXES = [
   'study.priority.',
   'study.noCardsModal.',
   'cards.kanban.',
+  'irDataMgmt.',
+  'irBlockInfo.',
+  'irSettings.standalone.',
+  'irCommands.',
+  'irViews.',
+  'irNotices.',
+  'irMain.',
+  'irModals.',
+  'irImport.',
+  'irAddTarget.',
+  'irAddReadingPoint.',
+  'irReadingPointEdit.',
+  'irServiceNotices.',
+  'irSidebar.',
 ];
 
 function collectSourceFiles(dirPath: string): string[] {

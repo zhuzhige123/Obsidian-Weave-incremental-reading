@@ -36,6 +36,14 @@
 .weave-ir-data-management-modal {
   --weave-obsidian-modal-width: min(960px, 92vw);
   --weave-obsidian-modal-max-width: 960px;
+  --weave-obsidian-modal-height: 78vh;
+  --weave-obsidian-modal-max-height: 78vh;
+}
+
+.weave-ir-data-management-modal-content {
+  --weave-obsidian-modal-content-padding: 0 var(--size-4-4) var(--size-4-4);
+  --weave-obsidian-modal-content-min-height: 0;
+  --weave-obsidian-modal-content-overflow: auto;
 }
 
 .weave-ir-analytics-modal {
@@ -63,13 +71,6 @@
 
 .weave-create-deck-modal-content {
   --weave-obsidian-modal-content-overflow: auto;
-}
-
-.weave-data-management-modal {
-  --weave-obsidian-modal-width: 88vw;
-  --weave-obsidian-modal-max-width: 960px;
-  --weave-obsidian-modal-height: 78vh;
-  --weave-obsidian-modal-max-height: 78vh;
 }
 
 .weave-deck-analytics-modal {

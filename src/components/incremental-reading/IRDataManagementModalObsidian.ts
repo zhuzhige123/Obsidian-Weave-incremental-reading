@@ -4,6 +4,8 @@ import type WeavePlugin from "../../main";
 import { configureWeaveObsidianModalLayout } from "../../utils/obsidian-modal-layout";
 import IRDataManagementModal from "./IRDataManagementModal.svelte";
 
+import { i18n } from "../../utils/i18n";
+
 export interface IRDataManagementModalObsidianOptions {
 	plugin: WeavePlugin;
 	onClose?: () => void;
@@ -19,17 +21,16 @@ export class IRDataManagementModalObsidian extends Modal {
 	}
 
 	onOpen() {
-		this.setTitle("增量阅读数据管理");
+		this.setTitle(i18n.t("irDataMgmt.title"));
 		configureWeaveObsidianModalLayout(this, {
 			modalClass: "weave-ir-data-management-modal",
 			contentClass: "weave-ir-data-management-modal-content",
 		});
 
-		this.component = mount(IRDataManagementModal, {
+        this.component = mount(IRDataManagementModal, {
 			target: this.contentEl,
 			props: {
 				plugin: this.options.plugin,
-				onClose: () => this.close(),
 			},
 		});
 	}

@@ -114,4 +114,48 @@ describe("IRDeckDataManagementService helpers", () => {
 			String(IR_POINT_STORAGE_VERSION)
 		);
 	});
+
+	it("refuses to recover backup orphan when target path already exists", async () => {
+		const backupPath = "plugins/weave-incremental-reading/backups/Topic.irdeck";
+		const targetDir = "weave/incremental-reading/points";
+		const existingTarget = `${targetDir}/Topic.irdeck`;
+		const files = new Map<string, string>([
+			[
+				backupPath,
+				JSON.stringify({
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					topicId: "topic-recover",
+					topicName: "Topic",
+					points: [{ id: "p1", source: { path: "note.md" } }],
+				}),
+			],
+		]);
+		const adapter = {
+			exists: vi.fn(async (path: string) => files.has(path) || path === existingTarget || path === targetDir),
+			read: vi.fn(async (path: string) => files.get(path) || ""),
+			write: vi.fn(async (path: string, content: string) => {
+				files.set(path, content);
+			}),
+			mkdir: vi.fn(async () => undefined),
+		};
+		const service = new IRDeckDataManagementService({
+			vault: { adapter },
+		} as any);
+
+		await expect(
+			service.recoverBackupOrphan(
+				{
+					absolutePath: backupPath,
+					topicId: "topic-recover",
+					topicName: "Topic",
+					pointCount: 1,
+					updatedAt: "2026-05-20T00:00:00.000Z",
+					backupRoot: "plugins/weave-incremental-reading/backups",
+					relativePath: "Topic.irdeck",
+				},
+				targetDir
+			)
+		).rejects.toThrow("库内已存在同名专题文件");
+		expect(adapter.write).not.toHaveBeenCalled();
+	});
 });

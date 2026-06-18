@@ -115,7 +115,7 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 		vi.restoreAllMocks();
 		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(undefined);
 		vi.spyOn(IRStorageService.prototype, "getAllSources").mockResolvedValue({});
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({});
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({});
 		vi.spyOn(IRStorageService.prototype, "getAllBlocks").mockResolvedValue({});
 		vi.spyOn(IRStorageService.prototype, "getHistory").mockResolvedValue({ sessions: [] } as any);
 		vi.spyOn(IRStorageService.prototype, "getAllDecks").mockResolvedValue({
@@ -232,7 +232,7 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 				title: "Chunk Source",
 			} as any,
 		});
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-analytics-1": {
 				chunkId: "chunk-analytics-1",
 				sourceId: "src-1",
@@ -304,7 +304,7 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 				title: "Chunk Source",
 			} as any,
 		});
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-analytics-2": {
 				chunkId: "chunk-analytics-2",
 				sourceId: "src-1",

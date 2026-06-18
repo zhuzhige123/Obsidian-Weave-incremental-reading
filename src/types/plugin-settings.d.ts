@@ -322,6 +322,7 @@ export interface IRCalendarSidebarSettings {
   showSchedulingPreview?: boolean;
   calendarViewMode?: 'full' | 'two-row';
   showMaterialTimers?: boolean;
+  showReadingPointTypeLabels?: boolean;
   backgroundWall?: {
     imagePath?: string;
     fadePercent?: number;
@@ -456,6 +457,61 @@ export interface IncrementalReadingSettings {
    * 范围: 10-120, 默认: 40
    */
   dailyTimeBudgetMinutes?: number;
+
+  /**
+   * 心流 stretch 百分比：超出合理负载后仍保留在今天的比例上限
+   * C = dailyTimeBudgetMinutes × (1 + flowStretchPercent / 100)
+   * 范围: 0-40, 默认: 15
+   */
+  flowStretchPercent?: number;
+
+  /**
+   * 是否启用基于负载的自动顺延（超出 stretch 上限的低优先级项推到次日）
+   * @default true
+   */
+  enableLoadBasedDefer?: boolean;
+
+  /**
+   * 单条阅读点计入日负载的时长上限（分钟）
+   * 范围: 5-30, 默认: 18
+   */
+  maxEstimatedMinutesPerItem?: number;
+
+  /**
+   * 每日阅读点上限（条数）
+   * 范围: 5-40, 默认: 15
+   */
+  dailyReadingPointCap?: number;
+
+  /**
+   * 每日阅读点 stretch 上限（条数）
+   * 默认: 17
+   */
+  dailyReadingPointStretchCap?: number;
+
+  /**
+   * 跨日平滑窗口（天）
+   * 范围: 5-14, 默认: 7
+   */
+  horizonSpreadDays?: number;
+
+  /**
+   * 是否启用跨日平滑分配
+   * @default true
+   */
+  enableHorizonSmoothing?: boolean;
+
+  /**
+   * 交错阅读配置
+   * @default 'related-soft'
+   */
+  interleaveProfile?: 'off' | 'soft' | 'related-soft';
+
+  /**
+   * 单主题当日时间占比上限（%）
+   * @default 60
+   */
+  maxTopicSharePercent?: number;
   
   /**
    * 同一内容块每日最大出现次数
@@ -532,6 +588,15 @@ export const DEFAULT_IR_SETTINGS: IncrementalReadingSettings = {
   // v3.0 新增
   scheduleStrategy: 'processing',
   dailyTimeBudgetMinutes: 40,
+  flowStretchPercent: 15,
+  enableLoadBasedDefer: true,
+  maxEstimatedMinutesPerItem: 18,
+  dailyReadingPointCap: 15,
+  dailyReadingPointStretchCap: 17,
+  horizonSpreadDays: 7,
+  enableHorizonSmoothing: true,
+  interleaveProfile: 'related-soft',
+  maxTopicSharePercent: 60,
   maxAppearancesPerDay: 2,
   enableTagGroupPrior: true,
   agingStrength: 'low',
@@ -550,6 +615,7 @@ export const DEFAULT_IR_SETTINGS: IncrementalReadingSettings = {
     showSchedulingPreview: false,
     calendarViewMode: 'full',
     showMaterialTimers: true,
+    showReadingPointTypeLabels: false,
     backgroundWall: {
       imagePath: '',
       fadePercent: 72

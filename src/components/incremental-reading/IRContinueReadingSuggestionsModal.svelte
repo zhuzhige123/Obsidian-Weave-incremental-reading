@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
   import ObsidianIcon from '../ui/ObsidianIcon.svelte';
+  import { tr } from '../../utils/i18n';
 
   export interface IRContinueReadingSuggestionModalItem {
     id: string;
@@ -16,7 +17,6 @@
   interface Props {
     suggestions?: IRContinueReadingSuggestionModalItem[];
     suspendedItems?: IRContinueReadingSuggestionModalItem[];
-    isChineseUi?: boolean;
     anchorElement?: HTMLElement | null;
     onOpenSuggestion?: (id: string) => void | Promise<void>;
     onAddSuggestion?: (id: string) => void | Promise<void>;
@@ -26,7 +26,6 @@
   let {
     suggestions = [],
     suspendedItems = [],
-    isChineseUi = true,
     anchorElement = null,
     onOpenSuggestion,
     onAddSuggestion,
@@ -40,13 +39,11 @@
   let top = $state(-9999);
   let maxHeightPx = $state(560);
 
+  const t = $derived($tr);
+
   const visibleItems = $derived(activeTab === 'suggested' ? suggestions : suspendedItems);
   const suggestedCount = $derived(suggestions.length);
   const suspendedCount = $derived(suspendedItems.length);
-
-  function uiText(zh: string, en: string): string {
-    return isChineseUi ? zh : en;
-  }
 
   function isBusy(id: string): boolean {
     return busySuggestionId === id;
@@ -62,22 +59,16 @@
 
   function getCurrentCopy(): string {
     if (activeTab === 'suspended') {
-      return uiText(
-        '这些阅读点当前处于搁置状态。点击右侧加号后，会恢复到今天并自动清理搁置标记。',
-        'These reading points are suspended right now. Press + to restore them to today and clear suspended markers.'
-      );
+      return t('irSidebar.continueReading.copySuspended');
     }
 
-    return uiText(
-      '今天的计划已经完成。如果你还想继续读，可以从下面这些最合适的阅读点继续推进。',
-      'Today is complete. If you want to keep going, these are the best next reading points.'
-    );
+    return t('irSidebar.continueReading.copySuggested');
   }
 
   function getAddButtonLabel(item: IRContinueReadingSuggestionModalItem): string {
     return item.kind === 'suspended'
-      ? uiText(`恢复 ${item.title} 到今天`, `Restore ${item.title} to today`)
-      : uiText(`把 ${item.title} 加到今天`, `Add ${item.title} to today`);
+      ? t('irSidebar.continueReading.restoreToToday', { title: item.title })
+      : t('irSidebar.continueReading.addToToday', { title: item.title });
   }
 
   async function handleOpenSuggestion(id: string): Promise<void> {
@@ -199,14 +190,14 @@
   class="weave-ir-continue-reading-modal-shell"
   role="dialog"
   aria-modal="false"
-  aria-label={uiText('继续阅读建议', 'Continue reading suggestions')}
+  aria-label={t('irSidebar.continueReading.dialogAriaLabel')}
   bind:this={modalEl}
   style={`left: ${left}px; top: ${top}px; max-height: ${maxHeightPx}px;`}
 >
   <div class="weave-ir-continue-reading-modal__header">
     <div class="weave-ir-continue-reading-modal__header-copy">
       <span class="weave-ir-continue-reading-modal__kicker">
-        {uiText('继续阅读建议', 'Continue Reading')}
+        {t('irSidebar.continueReading.kicker')}
       </span>
       <p class="weave-ir-continue-reading-modal__copy">
         {getCurrentCopy()}
@@ -216,8 +207,8 @@
     <button
       type="button"
       class="clickable-icon weave-ir-continue-reading-modal__close"
-      aria-label={uiText('关闭继续阅读建议', 'Close continue reading suggestions')}
-      title={uiText('关闭', 'Close')}
+      aria-label={t('irSidebar.continueReading.closeAriaLabel')}
+      title={t('irSidebar.continueReading.close')}
       onclick={handleClose}
     >
       <ObsidianIcon name="x" size={16} />
@@ -234,7 +225,7 @@
       disabled={isTabDisabled('suggested')}
       onclick={() => { activeTab = 'suggested'; }}
     >
-      <span>{uiText('继续阅读', 'Suggested')}</span>
+      <span>{t('irSidebar.continueReading.tabSuggested')}</span>
       <span class="weave-ir-continue-reading-modal__tab-count">{suggestedCount}</span>
     </button>
 
@@ -247,7 +238,7 @@
       disabled={isTabDisabled('suspended')}
       onclick={() => { activeTab = 'suspended'; }}
     >
-      <span>{uiText('已搁置', 'Suspended')}</span>
+      <span>{t('irSidebar.continueReading.tabSuspended')}</span>
       <span class="weave-ir-continue-reading-modal__tab-count">{suspendedCount}</span>
     </button>
   </div>
@@ -305,8 +296,8 @@
       <ObsidianIcon name="inbox" size={18} />
       <span>
         {activeTab === 'suspended'
-          ? uiText('当前没有可恢复的搁置阅读点。', 'No suspended reading points to restore right now.')
-          : uiText('当前没有可推荐的继续阅读项。', 'No follow-up suggestions right now.')}
+          ? t('irSidebar.continueReading.emptySuspended')
+          : t('irSidebar.continueReading.emptySuggested')}
       </span>
     </div>
   {/if}

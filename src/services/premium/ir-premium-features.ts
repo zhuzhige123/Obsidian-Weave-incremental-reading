@@ -1,5 +1,6 @@
 /**
- * 独立增量阅读插件使用的高级功能定义（不含主插件记忆卡/题库能力）。
+ * Premium feature IDs for the standalone incremental-reading plugin.
+ * User-facing names/descriptions are resolved via i18n (`ir.premium.*` in incremental-reading.ts).
  */
 export const IR_PREMIUM_FEATURES = {
 	INCREMENTAL_READING: "incremental-reading",
@@ -21,53 +22,53 @@ export const IR_FEATURE_METADATA: Record<
 	{ name: string; description: string; icon?: string }
 > = {
 	[IR_PREMIUM_FEATURES.INCREMENTAL_READING]: {
-		name: "渐进性阅读",
-		description: "支持增量阅读工作流",
+		name: "Incremental reading",
+		description: "Incremental reading workflow",
 		icon: "book-reader",
 	},
 	[IR_PREMIUM_FEATURES.IMPORT_EXTERNAL_READING_POINTS]: {
-		name: "导入 PDF/EPUB 阅读点",
-		description: "从 PDF 与 EPUB 导入章节阅读点",
+		name: "Import PDF/EPUB reading points",
+		description: "Import chapter reading points from PDF and EPUB",
 		icon: "file-plus-2",
 	},
 	[IR_PREMIUM_FEATURES.ASSOCIATED_NOTES]: {
-		name: "关联笔记",
-		description: "为阅读点关联、创建并管理笔记",
+		name: "Linked notes",
+		description: "Link, create, and manage notes for reading points",
 		icon: "link",
 	},
 	[IR_PREMIUM_FEATURES.TAG_GROUPS]: {
-		name: "标签组",
-		description: "启用标签组策略与标签组管理能力",
+		name: "Tag groups",
+		description: "Enable tag-group policies and management",
 		icon: "tags",
 	},
 	[IR_PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS]: {
-		name: "调度策略设置",
-		description: "配置加工流/阅读清单与调度策略参数",
+		name: "Scheduling strategy settings",
+		description: "Configure processing-flow / reading-list and scheduling parameters",
 		icon: "calendar-cog",
 	},
 	[IR_PREMIUM_FEATURES.INTERLEAVE_LEARNING_SETTINGS]: {
-		name: "交错学习",
-		description: "配置交错学习与同主题连续上限",
+		name: "Interleaved learning",
+		description: "Configure interleaving and same-topic consecutive limits",
 		icon: "shuffle",
 	},
 	[IR_PREMIUM_FEATURES.ANALYTICS_VIEW]: {
-		name: "统计分析视图",
-		description: "查看增量阅读分析统计数据",
+		name: "Analytics view",
+		description: "View incremental-reading analytics and statistics",
 		icon: "bar-chart-2",
 	},
 	[IR_PREMIUM_FEATURES.FOLDER_SUBSCRIPTION]: {
-		name: "订阅文件夹",
-		description: "自动扫描并同步订阅文件夹中的 Markdown",
+		name: "Folder subscription",
+		description: "Automatically scan and sync Markdown in subscribed folders",
 		icon: "folder-sync",
 	},
 	[IR_PREMIUM_FEATURES.READING_TIMER]: {
-		name: "阅读计时器",
-		description: "使用阅读计时与会话累计时长",
+		name: "Reading timer",
+		description: "Track reading sessions and cumulative duration",
 		icon: "timer",
 	},
 	[IR_PREMIUM_FEATURES.CALENDAR_BACKGROUND_WALL]: {
-		name: "日历背景墙",
-		description: "自定义日历背景墙图片与淡化参数",
+		name: "Calendar background wall",
+		description: "Customize calendar background image and fade settings",
 		icon: "image",
 	},
 };

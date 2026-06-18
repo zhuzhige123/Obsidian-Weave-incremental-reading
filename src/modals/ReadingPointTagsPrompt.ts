@@ -7,6 +7,7 @@ import type { IRReadingPointEditDraft } from "../services/incremental-reading/re
 import { normalizeReadingPointTags } from "../services/incremental-reading/IRPointTagService";
 import { resolveReadingPointSaveErrorMessage } from "../services/incremental-reading/reading-point-edit/reading-point-modal-utils";
 import { showObsidianConfirm } from "../utils/obsidian-confirm";
+import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 
 export interface ReadingPointTagsPromptOptions {
@@ -31,11 +32,11 @@ export class ReadingPointTagsPrompt extends Modal {
 
 	onOpen(): void {
 		const { draft } = this.options;
-		this.setTitle("编辑标签");
+		this.setTitle(i18n.t("irModals.readingPointTags.title"));
 		this.modalEl.addClass("weave-reading-point-tags-prompt");
 
 		const intro = this.contentEl.createDiv({ cls: "setting-item-description" });
-		intro.setText("输入 # 标签后按回车添加，点击 × 移除。可从建议列表快速选择。");
+		intro.setText(i18n.t("irModals.readingPointTags.intro"));
 
 		const panelHost = this.contentEl.createDiv({ cls: "weave-reading-point-tags-panel-host" });
 		this.component = mount(ReadingPointTagsPromptPanel, {
@@ -51,12 +52,12 @@ export class ReadingPointTagsPrompt extends Modal {
 		});
 
 		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
-		const cancelButton = buttonRow.createEl("button", { text: "取消" });
+		const cancelButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.cancel") });
 		cancelButton.onclick = () => {
 			void this.requestClose();
 		};
 
-		const saveButton = buttonRow.createEl("button", { text: "保存", cls: "mod-cta" });
+		const saveButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.save"), cls: "mod-cta" });
 		saveButton.disabled = !draft.canEditTags;
 		saveButton.onclick = () => {
 			void this.submit();
@@ -72,10 +73,10 @@ export class ReadingPointTagsPrompt extends Modal {
 			this.forceClose();
 			return;
 		}
-		const confirmed = await showObsidianConfirm(this.app, "有未保存的更改，确定要关闭吗？", {
-			title: "放弃更改",
-			confirmText: "关闭",
-			cancelText: "继续编辑",
+		const confirmed = await showObsidianConfirm(this.app, i18n.t("irModals.common.discardChangesMessage"), {
+			title: i18n.t("irModals.common.discardChangesTitle"),
+			confirmText: i18n.t("irModals.common.close"),
+			cancelText: i18n.t("irModals.common.continueEditing"),
 			confirmClass: "mod-warning",
 		});
 		if (confirmed) {
@@ -103,7 +104,7 @@ export class ReadingPointTagsPrompt extends Modal {
 			);
 
 			if (result.changed) {
-				new Notice("标签已更新", 2500);
+				new Notice(i18n.t("irModals.readingPointTags.tagsUpdated"), 2500);
 			}
 			this.options.onSaved?.();
 			this.forceClose();

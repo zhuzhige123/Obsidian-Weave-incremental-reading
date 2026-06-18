@@ -643,9 +643,8 @@ export class IRAnalyticsService {
 			};
 		}
 
-		const [decks, blocksMap, history] = await Promise.all([
+		const [decks, history] = await Promise.all([
 			this.storage.getAllDecks(),
-			this.storage.getAllBlocks(),
 			this.storage.getHistory(),
 		]);
 		const projectedSummary = await getProjectedScheduleSummary(this.app, {
@@ -653,7 +652,7 @@ export class IRAnalyticsService {
 			horizonDays: days,
 			seedData: {
 				decksRecord: decks,
-				blocksRecord: blocksMap,
+				blocksRecord: {},
 				history,
 			},
 		});
@@ -690,7 +689,6 @@ export class IRAnalyticsService {
 		const [
 			sourcesMap,
 			chunksMap,
-			blocksMap,
 			pdfTasks,
 			epubTasks,
 			history,
@@ -699,8 +697,7 @@ export class IRAnalyticsService {
 			readingMaterials,
 		] = await Promise.all([
 			this.storage.getAllSources(),
-			this.storage.getAllChunkDataWithSync(),
-			this.storage.getAllBlocks(),
+			this.storage.getAllChunkData(),
 			this.pdfService.getAllTasks(),
 			this.epubService.getAllTasks(),
 			this.storage.getHistory(),
@@ -712,7 +709,7 @@ export class IRAnalyticsService {
 			horizonDays: days,
 			seedData: {
 				decksRecord: decks,
-				blocksRecord: blocksMap,
+				blocksRecord: {},
 				history,
 			},
 		});
@@ -721,7 +718,7 @@ export class IRAnalyticsService {
 		const materialByPath = this.buildReadingMaterialByPath(readingMaterials);
 		const units = this.buildUnits({
 			sourcesMap,
-			legacyBlocks: Object.values(blocksMap || {}),
+			legacyBlocks: [],
 			chunks: Object.values(chunksMap || {}),
 			pdfTasks,
 			epubTasks,

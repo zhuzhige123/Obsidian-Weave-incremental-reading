@@ -5,12 +5,7 @@ import type { IRDeck } from "../../../types/ir-types";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import { IRStorageService } from "../IRStorageService";
 import { IRReadingPointEditService } from "./IRReadingPointEditService";
-import { buildSaveInputFromDraft } from "./IRReadingPointEditSaveBuilder";
 import { resolveReadingPointSaveErrorMessage } from "./reading-point-modal-utils";
-
-function uiText(zh: string, en: string): string {
-	return i18n.getCurrentLanguage() === "zh-CN" ? zh : en;
-}
 
 export async function populateReadingPointTopicSubmenu(
 	submenu: Menu,
@@ -24,7 +19,7 @@ export async function populateReadingPointTopicSubmenu(
 		if (!draft) {
 			submenu.addItem((item) => {
 				item
-					.setTitle(uiText("未找到该阅读点", "Reading point not found"))
+					.setTitle(i18n.t("irServiceNotices.topicSubmenu.pointNotFound"))
 					.setIcon("alert-triangle")
 					.setDisabled(true);
 			});
@@ -40,7 +35,7 @@ export async function populateReadingPointTopicSubmenu(
 		if (decks.length === 0) {
 			submenu.addItem((item) => {
 				item
-					.setTitle(uiText("暂无可用的增量阅读专题", "No incremental reading topics available"))
+					.setTitle(i18n.t("irServiceNotices.topicSubmenu.noTopics"))
 					.setIcon("inbox")
 					.setDisabled(true);
 			});
@@ -50,10 +45,9 @@ export async function populateReadingPointTopicSubmenu(
 		submenu.addItem((item) => {
 			item
 				.setTitle(
-					uiText(
-						`当前专题：${draft.deckName || draft.deckId}`,
-						`Current topic: ${draft.deckName || draft.deckId}`
-					)
+					i18n.t("irServiceNotices.topicSubmenu.currentTopic", {
+						topic: draft.deckName || draft.deckId,
+					})
 				)
 				.setDisabled(true);
 		});
@@ -67,12 +61,10 @@ export async function populateReadingPointTopicSubmenu(
 			submenu.addItem((item) => {
 				item.setTitle(deck.name).onClick(async () => {
 					try {
-						const result = await service.saveEdit(
-							buildSaveInputFromDraft(app, draft, { deckId: deck.id })
-						);
+						const result = await service.saveTopicChange(material, deck.id);
 						if (result.changed) {
 							new Notice(
-								uiText(`已移动到专题：${deck.name}`, `Moved to topic: ${deck.name}`),
+								i18n.t("irServiceNotices.topicSubmenu.movedToTopic", { deckName: deck.name }),
 								2500
 							);
 						}
@@ -88,7 +80,7 @@ export async function populateReadingPointTopicSubmenu(
 		logger.error("[readingPointTopicSubmenu] load failed", error);
 		submenu.addItem((item) => {
 			item
-				.setTitle(uiText("加载专题列表失败", "Failed to load topics"))
+				.setTitle(i18n.t("irServiceNotices.topicSubmenu.loadFailed"))
 				.setIcon("alert-triangle")
 				.setDisabled(true);
 		});

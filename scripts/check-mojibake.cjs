@@ -17,17 +17,19 @@ const includeExtensions = new Set([
 	".svelte",
 	".css",
 	".json",
-	".md"
+	".md",
 ]);
 
 const ignoredDirectories = new Set([
 	".git",
 	".desktop-hot-reload",
 	".mobile-hot-reload",
+	".obsidian-community-publish",
+	".obsidian-community-staging",
 	"dist",
 	"node_modules",
 	"backup-before-migration",
-	"coverage"
+	"coverage",
 ]);
 
 const suspiciousSequencePattern =
@@ -94,7 +96,7 @@ function scanFile(absolutePath) {
 			path: relativePath,
 			line: index + 1,
 			preview: line.trim().slice(0, 140),
-			hash: sha1(line.trim())
+			hash: sha1(line.trim()),
 		});
 	});
 
@@ -120,7 +122,7 @@ function aggregateHits(hits) {
 			hash: hit.hash,
 			count: 1,
 			firstLine: hit.line,
-			preview: hit.preview
+			preview: hit.preview,
 		});
 	}
 
@@ -158,7 +160,7 @@ function main() {
 		const baseline = {
 			version: 1,
 			generatedAt: new Date().toISOString(),
-			entries: aggregatedHits
+			entries: aggregatedHits,
 		};
 		fs.writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
 		console.log(`Wrote baseline with ${aggregatedHits.length} entries to ${path.basename(baselinePath)}.`);
@@ -178,7 +180,7 @@ function main() {
 			path: entry.path,
 			firstLine: entry.firstLine,
 			count: entry.count - baselineCount,
-			preview: entry.preview
+			preview: entry.preview,
 		});
 	}
 

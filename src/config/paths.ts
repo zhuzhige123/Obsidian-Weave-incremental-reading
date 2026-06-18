@@ -328,6 +328,7 @@ export function getPluginPathsById(
 				epubBacklinkHighlightsCache: `${irCacheRoot}/epub-backlink-highlights-cache.json`,
 				documentGroupMap: `${irCacheRoot}/document-group-map.json`,
 				pointFilesIndex: `${irCacheRoot}/point-files-index.json`,
+				dueDateIndex: `${irCacheRoot}/ir-due-date-index.json`,
 				syncState: `${irCacheRoot}/sync-state.json`,
 				readerArtifacts: `${irCacheRoot}/reader-artifacts`,
 			},

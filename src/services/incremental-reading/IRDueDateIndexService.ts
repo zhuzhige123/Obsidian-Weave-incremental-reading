@@ -1,0 +1,235 @@
+import type { App } from "obsidian";
+import { getPluginPaths } from "../../config/paths";
+import { DirectoryUtils } from "../../utils/directory-utils";
+import { logger } from "../../utils/logger";
+import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
+
+const DUE_DATE_INDEX_VERSION = "1.0.0";
+
+export interface IRDueDateIndexStore {
+	version: string;
+	updatedAt: string;
+	byDate: Record<string, string[]>;
+	byPointId: Record<string, string>;
+}
+
+export function formatDueDateKeyFromTimestamp(timestamp: number | undefined | null): string | null {
+	if (!timestamp || !Number.isFinite(timestamp) || timestamp <= 0) {
+		return null;
+	}
+	const date = new Date(timestamp);
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
+
+function createEmptyDueDateIndexStore(): IRDueDateIndexStore {
+	return {
+		version: DUE_DATE_INDEX_VERSION,
+		updatedAt: new Date(0).toISOString(),
+		byDate: {},
+		byPointId: {},
+	};
+}
+
+function normalizePointIdList(ids: string[] | undefined): string[] {
+	return Array.from(
+		new Set((ids || []).map((id) => String(id || "").trim()).filter(Boolean))
+	);
+}
+
+/**
+ * nextRepDate 倒排索引：dateKey → pointIds，持久化于插件 cache。
+ * 月历某日 due 查询 O(k) 而非全库扫描。
+ */
+export class IRDueDateIndexService {
+	private memoryStore: IRDueDateIndexStore | null = null;
+	private writeTimer: ReturnType<typeof setTimeout> | null = null;
+	private pendingWrite = false;
+
+	constructor(private readonly app: App) {}
+
+	invalidate(): void {
+		void this.invalidateAsync();
+	}
+
+	async invalidateAsync(): Promise<void> {
+		await this.flushPendingWrites();
+		this.memoryStore = null;
+		this.pendingWrite = false;
+	}
+
+	async getPointIdsForDate(dateKey: string): Promise<string[]> {
+		const normalizedKey = String(dateKey || "").trim();
+		if (!normalizedKey) {
+			return [];
+		}
+		const store = await this.ensureStore();
+		return [...(store.byDate[normalizedKey] || [])];
+	}
+
+	async updatePointDueDate(
+		pointId: string,
+		previousNextRepDate: number | undefined,
+		nextNextRepDate: number | undefined
+	): Promise<void> {
+		const normalizedId = String(pointId || "").trim();
+		if (!normalizedId) {
+			return;
+		}
+
+		const store = await this.ensureStore();
+		const previousKey =
+			formatDueDateKeyFromTimestamp(previousNextRepDate) || store.byPointId[normalizedId] || null;
+		const nextKey = formatDueDateKeyFromTimestamp(nextNextRepDate);
+
+		if (previousKey && previousKey !== nextKey) {
+			const previousList = normalizePointIdList(store.byDate[previousKey]).filter(
+				(id) => id !== normalizedId
+			);
+			if (previousList.length > 0) {
+				store.byDate[previousKey] = previousList;
+			} else {
+				delete store.byDate[previousKey];
+			}
+		}
+
+		if (nextKey) {
+			const nextList = normalizePointIdList(store.byDate[nextKey]);
+			if (!nextList.includes(normalizedId)) {
+				nextList.push(normalizedId);
+			}
+			store.byDate[nextKey] = nextList;
+			store.byPointId[normalizedId] = nextKey;
+		} else {
+			delete store.byPointId[normalizedId];
+		}
+
+		store.updatedAt = new Date().toISOString();
+		this.scheduleDebouncedWrite();
+	}
+
+	async rebuildFromScheduleIndex(): Promise<void> {
+		const index = await getSharedIRScheduleIndexService(this.app).getScheduleSources();
+		const byDate: Record<string, string[]> = {};
+		const byPointId: Record<string, string> = {};
+
+		const ingest = (pointId: string, nextRepDate: number | undefined) => {
+			const normalizedId = String(pointId || "").trim();
+			const dateKey = formatDueDateKeyFromTimestamp(nextRepDate);
+			if (!normalizedId || !dateKey) {
+				return;
+			}
+			const list = byDate[dateKey] || [];
+			if (!list.includes(normalizedId)) {
+				list.push(normalizedId);
+			}
+			byDate[dateKey] = list;
+			byPointId[normalizedId] = dateKey;
+		};
+
+		for (const chunk of index.chunks || []) {
+			ingest(String(chunk.chunkId || "").trim(), Number(chunk.nextRepDate || 0));
+		}
+		for (const task of index.pdfTasks || []) {
+			ingest(String(task.id || "").trim(), Number(task.nextRepDate || 0));
+		}
+		for (const task of index.epubTasks || []) {
+			ingest(String(task.id || "").trim(), Number(task.nextRepDate || 0));
+		}
+
+		this.memoryStore = {
+			version: DUE_DATE_INDEX_VERSION,
+			updatedAt: new Date().toISOString(),
+			byDate,
+			byPointId,
+		};
+		await this.flushPendingWrites();
+		logger.info("[IRDueDateIndexService] rebuilt due-date index", {
+			dateCount: Object.keys(byDate).length,
+			pointCount: Object.keys(byPointId).length,
+		});
+	}
+
+	async flushPendingWrites(): Promise<void> {
+		if (this.writeTimer) {
+			clearTimeout(this.writeTimer);
+			this.writeTimer = null;
+		}
+		if (!this.pendingWrite || !this.memoryStore) {
+			return;
+		}
+		this.pendingWrite = false;
+		await this.writeDiskStore(this.memoryStore);
+	}
+
+	private scheduleDebouncedWrite(): void {
+		this.pendingWrite = true;
+		if (this.writeTimer) {
+			clearTimeout(this.writeTimer);
+		}
+		this.writeTimer = setTimeout(() => {
+			void this.flushPendingWrites();
+		}, 400);
+	}
+
+	private getDiskPath(): string {
+		return getPluginPaths(this.app).cache.incrementalReading.dueDateIndex;
+	}
+
+	private async readDiskStore(): Promise<IRDueDateIndexStore | null> {
+		try {
+			const raw = await this.app.vault.adapter.read(this.getDiskPath());
+			const parsed = JSON.parse(raw) as Partial<IRDueDateIndexStore>;
+			if (parsed?.version !== DUE_DATE_INDEX_VERSION) {
+				return null;
+			}
+			return {
+				version: DUE_DATE_INDEX_VERSION,
+				updatedAt: String(parsed.updatedAt || new Date(0).toISOString()),
+				byDate:
+					parsed.byDate && typeof parsed.byDate === "object"
+						? (parsed.byDate as Record<string, string[]>)
+						: {},
+				byPointId:
+					parsed.byPointId && typeof parsed.byPointId === "object"
+						? (parsed.byPointId as Record<string, string>)
+						: {},
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	private async writeDiskStore(store: IRDueDateIndexStore): Promise<void> {
+		const diskPath = this.getDiskPath();
+		const adapter = this.app.vault.adapter;
+		await DirectoryUtils.ensureDirForFile(adapter, diskPath);
+		await adapter.write(diskPath, JSON.stringify(store, null, 2));
+	}
+
+	private async ensureStore(): Promise<IRDueDateIndexStore> {
+		if (this.memoryStore) {
+			return this.memoryStore;
+		}
+		const disk = await this.readDiskStore();
+		if (disk) {
+			this.memoryStore = disk;
+			return disk;
+		}
+		await this.rebuildFromScheduleIndex();
+		return this.memoryStore || createEmptyDueDateIndexStore();
+	}
+}
+
+const dueDateIndexByApp = new WeakMap<App, IRDueDateIndexService>();
+
+export function getSharedIRDueDateIndexService(app: App): IRDueDateIndexService {
+	let service = dueDateIndexByApp.get(app);
+	if (!service) {
+		service = new IRDueDateIndexService(app);
+		dueDateIndexByApp.set(app, service);
+	}
+	return service;
+}

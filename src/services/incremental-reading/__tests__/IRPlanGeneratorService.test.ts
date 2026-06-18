@@ -4,7 +4,10 @@ vi.mock("obsidian", async () => {
   );
   return {
     ...actual,
-    normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/{2,}/g, "/"),
+    normalizePath: (path: string) =>
+      String(path ?? "")
+        .replace(/\\/g, "/")
+        .replace(/\/{2,}/g, "/"),
   };
 });
 
@@ -27,6 +30,13 @@ vi.mock("../../../config/paths", () => ({
     cache: {
       incrementalReading: {
         scheduleIndex: "cache/incremental-reading/schedule-index.json",
+      },
+    },
+  }),
+  getPluginPathsById: () => ({
+    state: {
+      incrementalReading: {
+        epubReaderData: "weave/incremental-reading/epub-reader-data.json",
       },
     },
   }),
@@ -67,6 +77,11 @@ describe('IRPlanGeneratorService', () => {
   let planGenerator: IRPlanGeneratorService;
   let profileService: IRCognitiveProfileService;
 
+  const legacyPlanOptions = {
+    enableLoadBasedDefer: false,
+    enableHorizonSmoothing: false,
+  } as const;
+
   beforeEach(() => {
     vi.restoreAllMocks();
     profileService = new IRCognitiveProfileService();
@@ -95,6 +110,8 @@ describe('IRPlanGeneratorService', () => {
     tagGroupPriorityBias?: number;
     sourceSequenceLocked?: boolean;
     sourceSequenceAnchorDateKey?: string;
+    sourceSequenceGroup?: string;
+    hasManualSchedule?: boolean;
   }): IRPlannedScheduleItem {
     const nextReviewDate = createDate(input.dayOffset);
     const estimatedMinutes = input.estimatedMinutes ?? 5;
@@ -132,6 +149,7 @@ describe('IRPlanGeneratorService', () => {
       sourceType: 'chunk',
       sourceSequenceLocked: input.sourceSequenceLocked,
       sourceSequenceAnchorDateKey: input.sourceSequenceAnchorDateKey,
+      sourceSequenceGroup: input.sourceSequenceGroup,
       explanation: {
         primaryReason: 'test',
         secondaryReasons: [],
@@ -139,7 +157,7 @@ describe('IRPlanGeneratorService', () => {
         effectivePriority: input.priority,
         isOverdue: overdueDays > 0,
         overdueDays,
-        hasManualSchedule: true,
+        hasManualSchedule: input.hasManualSchedule ?? false,
         estimatedMinutes,
         scoreBreakdown: profile,
         compositeScore: profile.compositeScore,
@@ -160,6 +178,7 @@ describe('IRPlanGeneratorService', () => {
       {
         horizonDays: 3,
         dailyBudgetMinutes: 10,
+        ...legacyPlanOptions,
       }
     );
 
@@ -182,6 +201,7 @@ describe('IRPlanGeneratorService', () => {
         horizonDays: 2,
         dailyBudgetMinutes: 10,
         continuityBonus: 0.8,
+        ...legacyPlanOptions,
       }
     );
 
@@ -200,6 +220,7 @@ describe('IRPlanGeneratorService', () => {
         horizonDays: 4,
         dailyBudgetMinutes: 10,
         freezeWindowHours: 0,
+        ...legacyPlanOptions,
       }
     );
 
@@ -234,6 +255,7 @@ describe('IRPlanGeneratorService', () => {
       {
         horizonDays: 3,
         dailyBudgetMinutes: 10,
+        ...legacyPlanOptions,
       }
     );
 
@@ -268,6 +290,7 @@ describe('IRPlanGeneratorService', () => {
         horizonDays: 1,
         dailyBudgetMinutes: 15,
         enableInterleaving: false,
+        ...legacyPlanOptions,
       }
     );
 
@@ -349,6 +372,7 @@ describe('IRPlanGeneratorService', () => {
       {
         horizonDays: 4,
         dailyBudgetMinutes: 10,
+        ...legacyPlanOptions,
       }
     );
 
@@ -394,6 +418,9 @@ describe('IRPlanGeneratorService', () => {
     const kernel = new IRScheduleKernel({
       plugins: {
         getPlugin: () => null,
+      },
+      vault: {
+        adapter: {},
       },
     } as any);
     const normalPlan = await kernel.recomputeScheduleForDeck('ui_refresh', {
@@ -460,6 +487,9 @@ describe('IRPlanGeneratorService', () => {
       plugins: {
         getPlugin: () => null,
       },
+      vault: {
+        adapter: {},
+      },
     } as any);
     const normalPlan = await kernel.recomputeScheduleForDeck('ui_refresh', {
       deckIds: ['deck-1'],
@@ -491,6 +521,7 @@ describe('IRPlanGeneratorService', () => {
         continuityBonus: 0.8,
         enableInterleaving: true,
         maxConsecutiveSameTopic: 1,
+        ...legacyPlanOptions,
       }
     );
 
@@ -511,6 +542,7 @@ describe('IRPlanGeneratorService', () => {
         continuityBonus: 0.8,
         enableInterleaving: true,
         maxConsecutiveSameTopic: 1,
+        ...legacyPlanOptions,
       }
     );
 
@@ -519,5 +551,93 @@ describe('IRPlanGeneratorService', () => {
       expect.stringMatching(/^a-overdue-/),
       'b-today',
     ]);
+  });
+
+  test('启用负载顺延时按优先级保留 stretch 内项目并 defer 尾部', () => {
+    const today = createDate(0);
+    const tomorrow = createDate(1);
+    const todayKey = formatDateKey(today);
+    const tomorrowKey = formatDateKey(tomorrow);
+    const plan = planGenerator.generatePlan(
+      [
+        createItem({ id: 'high', dayOffset: 0, priority: 9, estimatedMinutes: 20, hasManualSchedule: false }),
+        createItem({ id: 'mid', dayOffset: 0, priority: 7, estimatedMinutes: 20, hasManualSchedule: false }),
+        createItem({ id: 'low', dayOffset: 0, priority: 3, estimatedMinutes: 20, hasManualSchedule: false }),
+      ],
+      {
+        horizonDays: 2,
+        dailyBudgetMinutes: 45,
+        flowStretchPercent: 15,
+        enableLoadBasedDefer: true,
+        enableHorizonSmoothing: false,
+      }
+    );
+
+    expect(plan.itemsByDate.get(todayKey)?.map((item) => item.id)).toEqual(['high', 'mid']);
+    expect(plan.itemsByDate.get(tomorrowKey)?.map((item) => item.id)).toEqual(['low']);
+    expect(plan.loadDeferrals).toHaveLength(1);
+    expect(plan.loadDeferrals[0]?.itemId).toBe('low');
+    expect(plan.days.find((day) => day.dateKey === todayKey)?.overloadLevel).toBe('overloaded');
+  });
+
+  test('系统排期的大量同日到期项会按双预算顺延到后续日期', () => {
+    const today = createDate(0);
+    const todayKey = formatDateKey(today);
+    const items = Array.from({ length: 25 }, (_, index) =>
+      createItem({
+        id: `backlog-${index + 1}`,
+        dayOffset: 0,
+        priority: 9 - index * 0.1,
+        estimatedMinutes: 5,
+        hasManualSchedule: false,
+      })
+    );
+    const plan = planGenerator.generatePlan(items, {
+      horizonDays: 7,
+      dailyBudgetMinutes: 40,
+      flowStretchPercent: 15,
+      enableLoadBasedDefer: true,
+      enableHorizonSmoothing: true,
+      dailyReadingPointCap: 15,
+    });
+
+    const todayItems = plan.itemsByDate.get(todayKey) || [];
+    expect(todayItems.length).toBeLessThanOrEqual(17);
+    expect(todayItems.length).toBeGreaterThan(0);
+    expect(plan.loadDeferrals.length).toBeGreaterThan(0);
+
+    const totalAssigned = Array.from(plan.itemsByDate.values()).reduce(
+      (sum, dayItems) => sum + dayItems.length,
+      0
+    );
+    expect(totalAssigned).toBe(25);
+  });
+
+  test('超出规划窗口仍未分配的项会写入 loadDeferrals', () => {
+    const horizonEnd = createDate(1);
+    const horizonEndKey = formatDateKey(horizonEnd);
+    const items = Array.from({ length: 50 }, (_, index) =>
+      createItem({
+        id: `overflow-${index + 1}`,
+        dayOffset: 0,
+        priority: 9 - index * 0.05,
+        estimatedMinutes: 5,
+        hasManualSchedule: false,
+      })
+    );
+    const plan = planGenerator.generatePlan(items, {
+      horizonDays: 2,
+      dailyBudgetMinutes: 40,
+      flowStretchPercent: 15,
+      enableLoadBasedDefer: true,
+      enableHorizonSmoothing: false,
+      dailyReadingPointCap: 15,
+    });
+
+    const overflowDeferrals = plan.loadDeferrals.filter(
+      (record) => record.toDateKey === horizonEndKey
+    );
+    expect(overflowDeferrals.length).toBeGreaterThan(0);
+    expect(overflowDeferrals.every((record) => record.action === 'load_defer')).toBe(true);
   });
 });

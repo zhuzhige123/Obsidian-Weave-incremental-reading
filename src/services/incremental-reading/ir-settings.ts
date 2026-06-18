@@ -13,6 +13,7 @@ export const DEFAULT_IR_CALENDAR_SIDEBAR_SETTINGS: IRCalendarSidebarSettings = {
   showSchedulingPreview: false,
   calendarViewMode: "full",
   showMaterialTimers: true,
+  showReadingPointTypeLabels: false,
   backgroundWall: {
     imagePath: "",
     fadePercent: 72
@@ -45,6 +46,15 @@ export function buildDefaultIncrementalReadingSettings(
     appendSourceDocumentBacklinkOnSplitImport: false,
     scheduleStrategy: "processing",
     dailyTimeBudgetMinutes: 40,
+    flowStretchPercent: 15,
+    enableLoadBasedDefer: true,
+    maxEstimatedMinutesPerItem: 18,
+    dailyReadingPointCap: 15,
+    dailyReadingPointStretchCap: 17,
+    horizonSpreadDays: 7,
+    enableHorizonSmoothing: true,
+    interleaveProfile: "related-soft",
+    maxTopicSharePercent: 60,
     maxAppearancesPerDay: 2,
     enableTagGroupPrior: true,
     agingStrength: "low",
@@ -99,6 +109,38 @@ export function normalizeIncrementalReadingSettings(
     readingTargetDefaultNoteBacked: settings?.readingTargetDefaultNoteBacked === true,
     folderSubscription: normalizeIncrementalReadingFolderSubscriptionSettings(settings?.folderSubscription),
     calendarSidebar: normalizeIRCalendarSidebarSettings(settings?.calendarSidebar),
-    paragraphWorkbench: resolveParagraphWorkbenchDisplaySettings(settings?.paragraphWorkbench)
+    paragraphWorkbench: resolveParagraphWorkbenchDisplaySettings(settings?.paragraphWorkbench),
+    flowStretchPercent:
+      typeof settings?.flowStretchPercent === 'number'
+        ? Math.max(0, Math.min(40, Math.round(settings.flowStretchPercent)))
+        : defaults.flowStretchPercent,
+    enableLoadBasedDefer: settings?.enableLoadBasedDefer !== false,
+    maxEstimatedMinutesPerItem:
+      typeof settings?.maxEstimatedMinutesPerItem === 'number'
+        ? Math.max(5, Math.min(30, Math.round(settings.maxEstimatedMinutesPerItem)))
+        : defaults.maxEstimatedMinutesPerItem,
+    dailyReadingPointCap:
+      typeof settings?.dailyReadingPointCap === 'number'
+        ? Math.max(5, Math.min(40, Math.round(settings.dailyReadingPointCap)))
+        : defaults.dailyReadingPointCap,
+    dailyReadingPointStretchCap:
+      typeof settings?.dailyReadingPointStretchCap === 'number'
+        ? Math.max(5, Math.min(45, Math.round(settings.dailyReadingPointStretchCap)))
+        : defaults.dailyReadingPointStretchCap,
+    horizonSpreadDays:
+      typeof settings?.horizonSpreadDays === 'number'
+        ? Math.max(5, Math.min(14, Math.round(settings.horizonSpreadDays)))
+        : defaults.horizonSpreadDays,
+    enableHorizonSmoothing: settings?.enableHorizonSmoothing !== false,
+    interleaveProfile:
+      settings?.interleaveProfile === 'off' ||
+      settings?.interleaveProfile === 'soft' ||
+      settings?.interleaveProfile === 'related-soft'
+        ? settings.interleaveProfile
+        : defaults.interleaveProfile,
+    maxTopicSharePercent:
+      typeof settings?.maxTopicSharePercent === 'number'
+        ? Math.max(40, Math.min(90, Math.round(settings.maxTopicSharePercent)))
+        : defaults.maxTopicSharePercent,
   };
 }

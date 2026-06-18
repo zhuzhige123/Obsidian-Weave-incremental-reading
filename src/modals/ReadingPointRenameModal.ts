@@ -3,6 +3,7 @@ import { IRReadingPointEditService } from "../services/incremental-reading/readi
 import { buildSaveInputFromDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditSaveBuilder";
 import type { IRReadingPointEditDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
 import { resolveReadingPointSaveErrorMessage } from "../services/incremental-reading/reading-point-edit/reading-point-modal-utils";
+import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 
 export interface ReadingPointRenameModalOptions {
@@ -27,7 +28,7 @@ export class ReadingPointRenameModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.setTitle("重命名");
+		this.setTitle(i18n.t("irModals.readingPointRename.title"));
 		this.modalEl.addClass("weave-reading-point-rename-modal");
 
 		const fieldEl = this.contentEl.createDiv({ cls: "weave-reading-point-rename-field" });
@@ -44,12 +45,12 @@ export class ReadingPointRenameModal extends Modal {
 
 		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
 
-		this.saveButtonEl = buttonRow.createEl("button", { text: "保存", cls: "mod-cta" });
+		this.saveButtonEl = buttonRow.createEl("button", { text: i18n.t("irModals.common.save"), cls: "mod-cta" });
 		this.saveButtonEl.onclick = () => {
 			void this.submit();
 		};
 
-		const cancelButton = buttonRow.createEl("button", { text: "取消" });
+		const cancelButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.cancel") });
 		cancelButton.onclick = () => {
 			this.close();
 		};
@@ -81,7 +82,9 @@ export class ReadingPointRenameModal extends Modal {
 		this.hintEl.empty();
 		this.hintEl.removeClass("mod-warning");
 		if (matches.length > 0) {
-			this.hintEl.setText(`同专题已有同名阅读点：${matches[0].title}`);
+			this.hintEl.setText(
+				i18n.t("irModals.readingPointRename.duplicateTitle", { title: matches[0].title })
+			);
 			this.hintEl.addClass("mod-warning");
 		}
 	}
@@ -93,7 +96,7 @@ export class ReadingPointRenameModal extends Modal {
 
 		const title = this.inputEl.value.trim();
 		if (!title) {
-			new Notice("标题不能为空", 2500);
+			new Notice(i18n.t("irModals.readingPointRename.emptyTitle"), 2500);
 			return;
 		}
 
@@ -116,7 +119,7 @@ export class ReadingPointRenameModal extends Modal {
 			);
 
 			if (result.changed) {
-				new Notice("已重命名", 2500);
+				new Notice(i18n.t("irModals.readingPointRename.renamed"), 2500);
 			}
 			this.options.onSaved?.();
 			this.close();

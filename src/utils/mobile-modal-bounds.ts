@@ -66,8 +66,6 @@ const IGNORED_MEASUREMENT_SELECTORS = [
 	".weave-create-card-modal-container",
 	".weave-edit-card-modal-container",
 	".weave-view-card-modal-container",
-	".study-interface-overlay",
-	".question-bank-study-interface-overlay",
 	".weave-modal-backdrop",
 	".weave-modal-container",
 	".modal-overlay",
@@ -543,8 +541,7 @@ export function injectGlobalModalStyles(): void {
 
 	const styleId = "weave-mobile-modal-global-styles";
 
-	// 样式已迁移到 styles/dynamic-injected.css
-	// 此处仅设置 CSS 变量（动态值）
+	// 移动端模态窗 CSS 变量在此注入（样式见 obsidian-mobile.css）
 	if (activeDocument.getElementById(styleId)) {
 		return;
 	}

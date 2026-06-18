@@ -14,7 +14,8 @@ export interface IRCalendarMaterialListProps {
   getDisplayedMaterialDateLabel: (materialId: string, dateKeys: Map<string, string>) => string;
   getScheduleItemDeckName: (material: ScheduleItem) => string;
   getMaterialExpandButtonLabel: (isExpanded: boolean) => string;
-  handleMaterialClick: (material: ScheduleItem) => void;
+  getReadingPointTypeIndicator: (material: ScheduleItem) => { icon: string; label: string } | null;
+  handleMaterialClick: (material: ScheduleItem, event?: MouseEvent) => void;
   openMaterial: (material: ScheduleItem) => Promise<void>;
   toggleMaterialExpand: (material: ScheduleItem) => Promise<void> | void;
   handleMaterialContextMenu: (event: MouseEvent, anchor: HTMLElement, material: ScheduleItem) => void;
@@ -33,4 +34,7 @@ export interface IRCalendarMaterialListProps {
   formatCompactTimerDuration: (totalSeconds: number) => string;
   formatTimerDuration: (totalSeconds: number) => string;
   formatSiblingDueDate: (nextRepDate: number) => string;
+  batchSelectionMode: boolean;
+  isBatchSelected: (materialId: string) => boolean;
+  toggleBatchSelection: (materialId: string, event?: MouseEvent) => void;
 }

@@ -1,6 +1,7 @@
 import { App, FuzzySuggestModal, TFolder } from "obsidian";
 import { ensureSuggestModalTheme, markLatestSuggestionContainer } from "./suggestModalTheme";
 import { applyStyleProps } from "../utils/style-props";
+import { i18n } from "../utils/i18n";
 
  interface AnchorRect {
  	left: number;
@@ -34,7 +35,7 @@ export class VaultFolderSuggestModal extends FuzzySuggestModal<string> {
 			.sort((a, b) => a.localeCompare(b));
 
 		this.items = ["/", ...folderPaths];
-		this.setPlaceholder(options.placeholder ?? "选择保存文件夹...");
+		this.setPlaceholder(options.placeholder ?? i18n.t("irModals.vaultFolderSuggest.placeholder"));
 	}
 
 	getItems(): string[] {
@@ -60,7 +61,7 @@ export class VaultFolderSuggestModal extends FuzzySuggestModal<string> {
 	}
 
 	getItemText(folderPath: string): string {
-		return folderPath === "/" ? "/（Vault 根目录）" : folderPath;
+		return folderPath === "/" ? i18n.t("irModals.vaultFolderSuggest.vaultRoot") : folderPath;
 	}
 
 	private settle(folderPath: string | null): void {

@@ -419,6 +419,8 @@ export interface IRBlockMeta {
 	autoSubscribedAt?: string;
 	autoSubscribedFolderPath?: string;
 	autoSubscribedBadgeUntil?: string;
+	/** 用户手动改期后固定到的日期（YYYY-MM-DD），负载顺延不会移走该日条目。 */
+	manualSchedulePinnedDateKey?: string;
 }
 
 /**
@@ -1119,6 +1121,24 @@ export interface IRAdvancedScheduleSettings {
 	maxAppearancesPerDay?: number;
 	/** 每日时间预算（分钟）(覆盖策略默认值) */
 	dailyTimeBudgetMinutes?: number;
+	/** 心流 stretch 百分比（0-40，默认 15） */
+	flowStretchPercent?: number;
+	/** 是否启用负载顺延 */
+	enableLoadBasedDefer?: boolean;
+	/** 单条计入负载的时长上限（分钟） */
+	maxEstimatedMinutesPerItem?: number;
+	/** 每日阅读点上限（条数） */
+	dailyReadingPointCap?: number;
+	/** 每日阅读点 stretch 上限（条数） */
+	dailyReadingPointStretchCap?: number;
+	/** 跨日平滑窗口（天） */
+	horizonSpreadDays?: number;
+	/** 是否启用跨日平滑 */
+	enableHorizonSmoothing?: boolean;
+	/** 交错阅读配置 */
+	interleaveProfile?: "off" | "soft" | "related-soft";
+	/** 单主题当日时间占比上限（%） */
+	maxTopicSharePercent?: number;
 	/** 是否启用交错学习软约束 */
 	interleaveMode?: boolean;
 	/** 同主题连续软阈值 */
@@ -1155,6 +1175,15 @@ export interface IRAdvancedScheduleSettings {
 export const DEFAULT_ADVANCED_SCHEDULE_SETTINGS: IRAdvancedScheduleSettings = {
 	maxAppearancesPerDay: 2,
 	dailyTimeBudgetMinutes: 40,
+	flowStretchPercent: 15,
+	enableLoadBasedDefer: true,
+	maxEstimatedMinutesPerItem: 18,
+	dailyReadingPointCap: 15,
+	dailyReadingPointStretchCap: 17,
+	horizonSpreadDays: 7,
+	enableHorizonSmoothing: true,
+	interleaveProfile: "related-soft",
+	maxTopicSharePercent: 60,
 	interleaveMode: true,
 	maxConsecutiveSameTopic: 3,
 	enableTagGroupPrior: true,

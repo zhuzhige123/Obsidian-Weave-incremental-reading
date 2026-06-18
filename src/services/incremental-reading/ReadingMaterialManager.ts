@@ -12,6 +12,7 @@ import type {
 import { ReadingCategory as Category } from "../../types/incremental-reading-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { getReadingTopicId, setReadingMaterialDueAt } from "../../utils/ir-topic-compat";
+import { isIRInternalScheduleSourcePath } from "../../utils/ir-internal-data-path";
 import { logger } from "../../utils/logger";
 import { countWords, estimateReadingTime, generateReadingUUID } from "../../utils/reading-utils";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
@@ -95,6 +96,10 @@ export class ReadingMaterialManager {
 	}
 
 	private async isIRFile(file: TFile): Promise<boolean> {
+		if (file.extension === "irdeck") {
+			return true;
+		}
+
 		try {
 			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 			const fmType =
@@ -937,7 +942,9 @@ export class ReadingMaterialManager {
 
 	/** 获取全部材料。 */
 	getAllMaterials(): ReadingMaterial[] {
-		return this.storage.getAllMaterials();
+		return this.storage
+			.getAllMaterials()
+			.filter((material) => !isIRInternalScheduleSourcePath(material.filePath));
 	}
 
 	// ===== 批量导入 =====

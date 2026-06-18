@@ -9,6 +9,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import EnhancedIcon from '../ui/EnhancedIcon.svelte';
+  import { tr } from '../../utils/i18n';
 
   interface Props {
     value: number;
@@ -39,51 +40,30 @@
     onPreview
   }: Props = $props();
 
+  let t = $derived($tr);
   let localValue = $state(untrack(() => value));
   let isDragging = $state(false);
 
-  const priorityPresets: PriorityPreset[] = [
-    {
-      tone: 'lowest',
-      value: 0,
-      label: '最低',
-      shortHint: '尽量少打扰',
-      description: '仅在整体负载较低时再推进，适合暂不着急的阅读点。',
-      color: 'var(--text-faint)'
-    },
-    {
-      tone: 'low',
-      value: 2.5,
-      label: '低',
-      shortHint: '低频出现',
-      description: '保留在计划里，但不会主动占用太多今天的阅读注意力。',
-      color: 'var(--text-muted)'
-    },
-    {
-      tone: 'medium',
-      value: 5,
-      label: '中',
-      shortHint: '常规节奏',
-      description: '按当前默认节奏安排，是最平衡的推进频率。',
-      color: 'var(--interactive-accent)'
-    },
-    {
-      tone: 'high',
-      value: 7.5,
-      label: '高',
-      shortHint: '更积极推进',
-      description: '会更频繁回到你的阅读流里，适合当前值得优先推进的内容。',
-      color: 'var(--text-warning)'
-    },
-    {
-      tone: 'urgent',
-      value: 10,
-      label: '紧急',
-      shortHint: '优先处理',
-      description: '尽可能优先出现，适合你现在明确不想继续拖延的阅读点。',
-      color: 'var(--text-error)'
-    }
+  const priorityPresetTones: PriorityTone[] = ['lowest', 'low', 'medium', 'high', 'urgent'];
+  const priorityPresetValues = [0, 2.5, 5, 7.5, 10];
+  const priorityPresetColors = [
+    'var(--text-faint)',
+    'var(--text-muted)',
+    'var(--interactive-accent)',
+    'var(--text-warning)',
+    'var(--text-error)'
   ];
+
+  let priorityPresets = $derived(
+    priorityPresetTones.map((tone, index) => ({
+      tone,
+      value: priorityPresetValues[index],
+      label: t(`irPriority.presets.${tone}.label`),
+      shortHint: t(`irPriority.presets.${tone}.shortHint`),
+      description: t(`irPriority.presets.${tone}.description`),
+      color: priorityPresetColors[index]
+    })) as PriorityPreset[]
+  );
 
   $effect(() => {
     if (!isDragging) {
@@ -92,11 +72,12 @@
   });
 
   function getPriorityPreset(v: number): PriorityPreset {
-    if (v <= 1) return priorityPresets[0];
-    if (v <= 3.5) return priorityPresets[1];
-    if (v <= 6.5) return priorityPresets[2];
-    if (v <= 8.5) return priorityPresets[3];
-    return priorityPresets[4];
+    const presets = priorityPresets;
+    if (v <= 1) return presets[0];
+    if (v <= 3.5) return presets[1];
+    if (v <= 6.5) return presets[2];
+    if (v <= 8.5) return presets[3];
+    return presets[4];
   }
 
   function getPriorityColor(v: number): string {
@@ -151,10 +132,10 @@
         <div class="priority-editor__title-group">
           <span class="priority-editor__kicker">
             <span class="priority-editor__kicker-dot" aria-hidden="true"></span>
-            阅读节奏
+            {t('irPriority.kicker')}
           </span>
           <div class="priority-editor__title-row">
-            <span class="priority-editor__title">优先级</span>
+            <span class="priority-editor__title">{t('irPriority.title')}</span>
             <span class="priority-editor__state">{currentPreset.label}</span>
           </div>
         </div>
@@ -163,8 +144,8 @@
           type="button"
           class="clickable-icon priority-editor__close"
           onclick={onToggle}
-          title="关闭优先级面板"
-          aria-label="关闭优先级面板"
+          title={t('irPriority.closeTitle')}
+          aria-label={t('irPriority.closeAria')}
         >
           <EnhancedIcon name="x" size={14} color="var(--text-muted)" />
         </button>
@@ -184,8 +165,8 @@
 
       <div class="priority-editor__slider-section">
         <div class="priority-editor__scale">
-          <span>轻推进</span>
-          <span>更常出现</span>
+          <span>{t('irPriority.scaleLow')}</span>
+          <span>{t('irPriority.scaleHigh')}</span>
         </div>
 
         <div class="priority-editor__slider-shell">
@@ -223,7 +204,7 @@
       </div>
 
       <div class="priority-editor__hint">
-        高优先级内容会更积极地回到你的今日阅读流中。
+        {t('irPriority.hint')}
       </div>
     </div>
   {:else}
@@ -232,11 +213,11 @@
       class="clickable-icon priority-editor__launcher"
       onclick={onToggle}
       {disabled}
-      title="设置优先级"
-      aria-label="设置优先级"
+      title={t('irPriority.setTitle')}
+      aria-label={t('irPriority.setAria')}
     >
       <span class="priority-editor__launcher-copy">
-        <span class="priority-editor__launcher-label">优先级</span>
+        <span class="priority-editor__launcher-label">{t('irPriority.title')}</span>
         <span class="priority-editor__launcher-value" style={`color: ${currentColor};`}>
           {localValue.toFixed(1)} {currentPreset.label}
         </span>

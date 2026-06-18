@@ -333,9 +333,16 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 	const decksRecord =
 		options.seedData?.decksRecord ||
 		(await (await getStorage()).getAllDecks());
-	const blocksRecord =
-		options.seedData?.blocksRecord ||
-		(await (await getStorage()).getAllBlocks());
+	let blocksRecord = options.seedData?.blocksRecord;
+	if (blocksRecord === undefined) {
+		const scanned = await (await getStorage()).getAllBlocks();
+		if (Object.keys(scanned).length === 0) {
+			return summary;
+		}
+		blocksRecord = scanned;
+	} else if (Object.keys(blocksRecord).length === 0) {
+		return summary;
+	}
 	const history = options.seedData?.history || (await (await getStorage()).getHistory());
 
 	const decks = Object.values(decksRecord || {});

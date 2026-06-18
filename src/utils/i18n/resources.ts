@@ -3,15 +3,18 @@ import { standaloneBaseTranslations } from './resources/base';
 import { licenseUiTranslationOverrides } from './resources/license-ui';
 import { irStandaloneUiTranslationOverrides } from './resources/ir-standalone-ui-overrides';
 import { incrementalReadingTranslations, incrementalReadingTranslationOverrides } from './resources/incremental-reading';
+import { irUiSurfaceTranslations } from './resources/ir-ui-surfaces';
 
 export const translations: Record<SupportedLanguage, TranslationKey> = {
 	'zh-CN': {
 		...standaloneBaseTranslations['zh-CN'],
 		...incrementalReadingTranslations['zh-CN'],
+		...irUiSurfaceTranslations['zh-CN'],
 	},
 	'en-US': {
 		...standaloneBaseTranslations['en-US'],
 		...incrementalReadingTranslations['en-US'],
+		...irUiSurfaceTranslations['en-US'],
 	},
 };
 

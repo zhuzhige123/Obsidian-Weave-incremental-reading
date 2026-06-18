@@ -1,11 +1,17 @@
 import { get } from 'svelte/store';
 
-import { i18n, syncI18nWithObsidianLanguage, trArray } from '../i18n';
+import {
+  applyPluginUiLanguagePreference,
+  i18n,
+  shouldFollowObsidianUiLanguage,
+  syncI18nWithObsidianLanguage,
+  trArray,
+} from '../i18n';
 
 describe('i18n runtime fallbacks', () => {
   beforeEach(() => {
     window.localStorage.removeItem('language');
-    i18n.setLanguage('en-US');
+    applyPluginUiLanguagePreference('en-US');
   });
 
   it('prefers concrete translations for high-value keys', () => {
@@ -26,6 +32,7 @@ describe('i18n runtime fallbacks', () => {
   });
 
   it('applies detected Obsidian language only after stable consecutive detections', () => {
+    applyPluginUiLanguagePreference('auto');
     window.localStorage.setItem('language', 'zh');
 
     syncI18nWithObsidianLanguage();
@@ -33,5 +40,17 @@ describe('i18n runtime fallbacks', () => {
 
     syncI18nWithObsidianLanguage();
     expect(i18n.getCurrentLanguage()).toBe('zh-CN');
+  });
+
+  it('keeps pinned plugin ui language when preference is not auto', () => {
+    applyPluginUiLanguagePreference('en-US');
+    window.localStorage.setItem('language', 'zh');
+
+    syncI18nWithObsidianLanguage();
+    syncI18nWithObsidianLanguage();
+
+    expect(shouldFollowObsidianUiLanguage()).toBe(false);
+    expect(i18n.getCurrentLanguage()).toBe('en-US');
+    expect(i18n.t('irDataMgmt.title')).toBe('Incremental Reading Data Management');
   });
 });

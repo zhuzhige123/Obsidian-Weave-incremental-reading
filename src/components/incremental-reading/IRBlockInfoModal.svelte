@@ -23,6 +23,7 @@
     EWMA_ALPHA,
     PRIORITY_NEUTRAL
   } from '../../services/incremental-reading/IRCoreAlgorithmsV4';
+  import { currentLanguage, tr } from '../../utils/i18n';
 
   interface Props {
     block: IRBlock;
@@ -33,6 +34,8 @@
   }
 
   let { block, onClose, position, app, useObsidianModal = false }: Props = $props();
+  let t = $derived($tr);
+  let locale = $derived($currentLanguage);
 
   let modalEl: HTMLDivElement | null = $state(null);
   let left = $state(-9999);
@@ -172,8 +175,8 @@
 
   // 格式化时间戳
   function formatTimestamp(ts: number | null): string {
-    if (!ts) return '未设置';
-    return new Date(ts).toLocaleString('zh-CN', {
+    if (!ts) return t('irBlockInfo.values.notSet');
+    return new Date(ts).toLocaleString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -198,10 +201,10 @@
 
   // 格式化日期时间
   function formatDateTime(dateStr: string | null | undefined): string {
-    if (!dateStr) return '未知';
+    if (!dateStr) return t('irBlockInfo.values.unknown');
     try {
       const date = new Date(dateStr);
-      return date.toLocaleString('zh-CN', {
+      return date.toLocaleString(locale, {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -209,52 +212,53 @@
         minute: '2-digit'
       });
     } catch {
-      return '格式错误';
+      return t('irBlockInfo.values.formatError');
     }
   }
 
-  // 格式化时间间隔（天数）
   function formatInterval(days: number | undefined): string {
-    if (days === undefined || days === null) return '未知';
-    if (days < 1) return '少于1天';
-    if (days === 1) return '1天';
-    if (days < 30) return `${Math.round(days)}天`;
-    if (days < 365) return `${Math.round(days / 30)}个月`;
-    return `${Math.round(days / 365)}年`;
+    if (days === undefined || days === null) return t('irBlockInfo.values.unknown');
+    if (days < 1) return t('irBlockInfo.values.lessThanOneDay');
+    if (days === 1) return t('irBlockInfo.values.oneDay');
+    if (days < 30) return t('irBlockInfo.values.days', { count: Math.round(days) });
+    if (days < 365) return t('irBlockInfo.values.months', { count: Math.round(days / 30) });
+    return t('irBlockInfo.values.years', { count: Math.round(days / 365) });
   }
 
-  // 格式化阅读时长
   function formatReadingTime(seconds: number | undefined): string {
-    if (!seconds || seconds <= 0) return '0秒';
-    if (seconds < 60) return `${seconds}秒`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}分${seconds % 60}秒`;
+    if (!seconds || seconds <= 0) return t('irBlockInfo.values.seconds', { count: 0 });
+    if (seconds < 60) return t('irBlockInfo.values.seconds', { count: seconds });
+    if (seconds < 3600) {
+      return t('irBlockInfo.values.minutesSeconds', {
+        mins: Math.floor(seconds / 60),
+        secs: seconds % 60,
+      });
+    }
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
-    return `${hours}小时${mins}分`;
+    return t('irBlockInfo.values.hoursMinutes', { hours, mins });
   }
 
-  // 获取状态文本
   function getStateText(state: string): string {
     const stateMap: Record<string, string> = {
-      'new': '新内容',
-      'learning': '学习中',
-      'review': '复习中',
-      'suspended': '已暂停',
-      'queued': '已排队',
-      'scheduled': '已调度',
-      'active': '活跃中',
-      'done': '已完成'
+      new: t('irBlockInfo.states.new'),
+      learning: t('irBlockInfo.states.learning'),
+      review: t('irBlockInfo.states.review'),
+      suspended: t('irBlockInfo.states.suspended'),
+      queued: t('irBlockInfo.states.queued'),
+      scheduled: t('irBlockInfo.states.scheduled'),
+      active: t('irBlockInfo.states.active'),
+      done: t('irBlockInfo.states.done'),
     };
-    return stateMap[state] || state || '未知';
+    return stateMap[state] || state || t('irBlockInfo.states.unknown');
   }
 
-  // 获取优先级文本
   function getPriorityText(priority: number | undefined): string {
-    if (priority === undefined) return '未设置';
-    if (priority <= 3) return '低';
-    if (priority <= 6) return '中';
-    if (priority <= 8) return '高';
-    return '紧急';
+    if (priority === undefined) return t('irBlockInfo.priority.unset');
+    if (priority <= 3) return t('irBlockInfo.priority.low');
+    if (priority <= 6) return t('irBlockInfo.priority.medium');
+    if (priority <= 8) return t('irBlockInfo.priority.high');
+    return t('irBlockInfo.priority.urgent');
   }
 
   // 获取优先级颜色
@@ -265,14 +269,13 @@
     return 'var(--text-warning)';
   }
 
-  // 获取理解度评分文本
   function getRatingText(rating: number | undefined): string {
-    if (!rating) return '未评分';
+    if (!rating) return t('irBlockInfo.ratings.unset');
     const ratingMap: Record<number, string> = {
-      1: '忽略',
-      2: '一般',
-      3: '清晰',
-      4: '精通'
+      1: t('irBlockInfo.ratings.ignore'),
+      2: t('irBlockInfo.ratings.ok'),
+      3: t('irBlockInfo.ratings.clear'),
+      4: t('irBlockInfo.ratings.master'),
     };
     return ratingMap[rating] || `${rating}`;
   }
@@ -303,33 +306,32 @@
     role="dialog" 
     tabindex="-1"
     aria-modal={!position && !useObsidianModal}
-    aria-label="内容块信息与来源"
+    aria-label={t('irBlockInfo.dialogLabel')}
   >
     {#if currentView === 'info'}
       <div class="modal-content">
-        <!-- 基础信息 -->
         <section class="info-section">
-          <h4 class="section-title">基础信息</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.basic')}</h4>
           
           <div class="info-row">
-            <span class="info-label">内容块ID</span>
+            <span class="info-label">{t('irBlockInfo.labels.blockId')}</span>
             <span class="info-value mono" title={block.id}>{block.id.slice(0, 12)}...</span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">所属文件</span>
+            <span class="info-label">{t('irBlockInfo.labels.file')}</span>
             <span class="info-value" title={block.filePath}>
-              {block.filePath?.split('/').pop() || '未知文件'}
+              {block.filePath?.split('/').pop() || t('irBlockInfo.values.unknownFile')}
             </span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">内容块状态</span>
+            <span class="info-label">{t('irBlockInfo.labels.state')}</span>
             <span class="info-value status-badge">{getStateText(block.state)}</span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">优先级</span>
+            <span class="info-label">{t('irBlockInfo.labels.priority')}</span>
             <span class="info-value" style="color: {getPriorityColor(block.priorityUi ?? block.priority)}">
               {block.priorityUi !== undefined ? block.priorityUi.toFixed(1) : block.priority} ({getPriorityText(block.priorityUi ?? block.priority)})
             </span>
@@ -337,99 +339,96 @@
 
           {#if block.headingText || (block.headingPath && block.headingPath.length > 0)}
           <div class="info-row">
-            <span class="info-label">标题</span>
-            <span class="info-value">{block.headingText || block.headingPath?.join(' > ') || '无标题'}</span>
+            <span class="info-label">{t('irBlockInfo.labels.title')}</span>
+            <span class="info-value">{block.headingText || block.headingPath?.join(' > ') || t('irBlockInfo.values.noTitle')}</span>
           </div>
           {/if}
         </section>
 
-        <!-- 学习数据 -->
         <section class="info-section">
-          <h4 class="section-title">学习数据</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.learning')}</h4>
           
           <div class="info-row">
-            <span class="info-label">当前间隔</span>
+            <span class="info-label">{t('irBlockInfo.labels.currentInterval')}</span>
             <span class="info-value">{formatInterval(block.interval)}</span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">间隔因子</span>
+            <span class="info-label">{t('irBlockInfo.labels.intervalFactor')}</span>
             <span class="info-value">{block.intervalFactor?.toFixed(2) || '1.50'}</span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">复习次数</span>
-            <span class="info-value">{block.reviewCount || 0}次</span>
+            <span class="info-label">{t('irBlockInfo.labels.reviewCount')}</span>
+            <span class="info-value">{t('irBlockInfo.values.reviewCountSuffix', { count: block.reviewCount || 0 })}</span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">累计阅读时长</span>
+            <span class="info-label">{t('irBlockInfo.labels.totalReadingTime')}</span>
             <span class="info-value">{formatReadingTime(totalReadingTimeSeconds)}</span>
           </div>
           
           {#if block.lastRating}
           <div class="info-row">
-            <span class="info-label">上次理解度</span>
+            <span class="info-label">{t('irBlockInfo.labels.lastRating')}</span>
             <span class="info-value">{getRatingText(block.lastRating)}</span>
           </div>
           {/if}
 
           {#if block.priorityEff !== undefined}
           <div class="info-row">
-            <span class="info-label">有效优先级</span>
+            <span class="info-label">{t('irBlockInfo.labels.effectivePriority')}</span>
             <span class="info-value">{block.priorityEff.toFixed(2)}</span>
           </div>
           {/if}
         </section>
 
-        <!-- 时间信息 -->
         <section class="info-section">
-          <h4 class="section-title">时间信息</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.time')}</h4>
           
           <div class="info-row">
-            <span class="info-label">创建时间</span>
+            <span class="info-label">{t('irBlockInfo.labels.createdAt')}</span>
             <span class="info-value">{formatDateTime(block.createdAt)}</span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">修改时间</span>
+            <span class="info-label">{t('irBlockInfo.labels.updatedAt')}</span>
             <span class="info-value">{formatDateTime(block.updatedAt)}</span>
           </div>
           
           <div class="info-row">
-            <span class="info-label">下次复习</span>
+            <span class="info-label">{t('irBlockInfo.labels.nextReview')}</span>
             <span class="info-value">{formatDateTime(block.nextReview)}</span>
           </div>
           
           {#if block.lastReview}
           <div class="info-row">
-            <span class="info-label">上次复习</span>
+            <span class="info-label">{t('irBlockInfo.labels.lastReview')}</span>
             <span class="info-value">{formatDateTime(block.lastReview)}</span>
           </div>
           {/if}
           
           {#if block.firstReadAt}
           <div class="info-row">
-            <span class="info-label">首次阅读</span>
+            <span class="info-label">{t('irBlockInfo.labels.firstRead')}</span>
             <span class="info-value">{formatDateTime(block.firstReadAt)}</span>
           </div>
           {/if}
         </section>
 
-        <!-- 来源信息 -->
         <section class="info-section">
-          <h4 class="section-title">来源信息</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.source')}</h4>
           
           <div class="info-row">
-            <span class="info-label">源文档</span>
+            <span class="info-label">{t('irBlockInfo.labels.sourceDoc')}</span>
             <span class="info-value link-style" title={block.filePath}>
-              {block.filePath || '未知'}
+              {block.filePath || t('irBlockInfo.values.unknown')}
             </span>
           </div>
           
           {#if block.startLine}
           <div class="info-row">
-            <span class="info-label"># 行号范围</span>
+            <span class="info-label">{t('irBlockInfo.labels.lineRange')}</span>
             <span class="info-value">
               {block.startLine}{block.endLine ? ` - ${block.endLine}` : ''}
             </span>
@@ -438,7 +437,7 @@
 
           {#if block.tags && block.tags.length > 0}
           <div class="info-row">
-            <span class="info-label">标签</span>
+            <span class="info-label">{t('irBlockInfo.labels.tags')}</span>
             <span class="info-value tags-list">
               {#each block.tags as tag}
                 <span class="tag-item">#{tag}</span>
@@ -456,150 +455,160 @@
           type="button"
           class="view-back-btn clickable-icon"
           onclick={() => currentView = 'info'}
-          aria-label="返回详情"
-          title="返回详情"
+          aria-label={t('irBlockInfo.values.backToDetail')}
+          title={t('irBlockInfo.values.backToDetail')}
         >
           <EnhancedIcon name="arrow-left" size={16} />
         </button>
       </div>
       
       <div class="modal-content calc-content">
-        <!-- 算法公式说明 -->
         <section class="info-section">
-          <h4 class="section-title">核心算法公式</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.formula')}</h4>
           <div class="formula-box">
             <code class="formula">I_next = Clamp(I_curr × M_base × M_group × Ψ(P_eff), I_min, I_max)</code>
           </div>
           <p class="formula-desc">
-            其中 Ψ(p) 是变速函数，根据优先级调整间隔增长速度
+            {t('irBlockInfo.calc.formulaDesc')}
           </p>
         </section>
 
-        <!-- 当前参数值 -->
         <section class="info-section">
-          <h4 class="section-title">当前参数值</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.currentParams')}</h4>
           
           <div class="calc-row">
-            <span class="calc-label">I_curr（当前间隔）</span>
-            <span class="calc-value highlight">{currentInterval.toFixed(2)} 天</span>
+            <span class="calc-label">{t('irBlockInfo.calc.labels.currentInterval')}</span>
+            <span class="calc-value highlight">{formatInterval(currentInterval)}</span>
           </div>
           
           <div class="calc-row">
-            <span class="calc-label">M_base（基础扩张乘子）</span>
+            <span class="calc-label">{t('irBlockInfo.calc.labels.mBase')}</span>
             <span class="calc-value">{mBase}</span>
           </div>
           
           <div class="calc-row">
-            <span class="calc-label">M_group（TagGroup 系数）</span>
+            <span class="calc-label">{t('irBlockInfo.calc.labels.mGroup')}</span>
             <span class="calc-value">{mGroup}</span>
           </div>
           
           <div class="calc-row">
-            <span class="calc-label">P_eff（有效优先级）</span>
+            <span class="calc-label">{t('irBlockInfo.calc.labels.pEff')}</span>
             <span class="calc-value highlight">{effectivePriority.toFixed(2)}</span>
           </div>
           
           <div class="calc-row">
-            <span class="calc-label">Ψ(P_eff)（变速系数）</span>
+            <span class="calc-label">{t('irBlockInfo.calc.labels.psi')}</span>
             <span class="calc-value highlight">{psiValue.toFixed(4)}</span>
           </div>
           
           <div class="calc-row">
-            <span class="calc-label">I_min / I_max</span>
-            <span class="calc-value">{I_MIN} / {I_MAX} 天</span>
+            <span class="calc-label">{t('irBlockInfo.calc.labels.minMax')}</span>
+            <span class="calc-value">{I_MIN} / {I_MAX}</span>
           </div>
         </section>
 
-        <!-- 变速函数解释 -->
         <section class="info-section">
-          <h4 class="section-title">变速函数 Ψ(p) 解释</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.psiExplain')}</h4>
           <div class="psi-explanation">
             {#if effectivePriority > PRIORITY_NEUTRAL}
               <div class="psi-case high-priority">
-                                <div class="psi-text">
-                  <strong>高优先级模式</strong>
-                  <p>P_eff = {effectivePriority.toFixed(2)} > 5</p>
+                <div class="psi-text">
+                  <strong>{t('irBlockInfo.calc.highPriority')}</strong>
+                  <p>P_eff = {effectivePriority.toFixed(2)} &gt; 5</p>
                   <p>Ψ = 1.0 - ({effectivePriority.toFixed(2)} - 5) / 5 × 0.6 = <strong>{psiValue.toFixed(4)}</strong></p>
-                  <p class="psi-effect">效果：间隔缩短，复习频率提高</p>
+                  <p class="psi-effect">{t('irBlockInfo.calc.highEffect')}</p>
                 </div>
               </div>
             {:else if effectivePriority < PRIORITY_NEUTRAL}
               <div class="psi-case low-priority">
-                                <div class="psi-text">
-                  <strong>低优先级模式</strong>
+                <div class="psi-text">
+                  <strong>{t('irBlockInfo.calc.lowPriority')}</strong>
                   <p>P_eff = {effectivePriority.toFixed(2)} &lt; 5</p>
                   <p>Ψ = 1.0 + (5 - {effectivePriority.toFixed(2)}) / 5 × 2.0 = <strong>{psiValue.toFixed(4)}</strong></p>
-                  <p class="psi-effect">效果：间隔拉长，复习频率降低</p>
+                  <p class="psi-effect">{t('irBlockInfo.calc.lowEffect')}</p>
                 </div>
               </div>
             {:else}
               <div class="psi-case neutral">
-                                <div class="psi-text">
-                  <strong>中性优先级</strong>
-                  <p>P_eff = 5（中性点）</p>
+                <div class="psi-text">
+                  <strong>{t('irBlockInfo.calc.neutralPriority')}</strong>
+                  <p>{t('irBlockInfo.calc.neutralPoint')}</p>
                   <p>Ψ = <strong>1.0</strong></p>
-                  <p class="psi-effect">效果：标准间隔增长</p>
+                  <p class="psi-effect">{t('irBlockInfo.calc.neutralEffect')}</p>
                 </div>
               </div>
             {/if}
           </div>
         </section>
 
-        <!-- 计算过程演示 -->
         <section class="info-section">
-          <h4 class="section-title">计算过程演示</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.calcDemo')}</h4>
           <div class="calc-steps">
             <div class="calc-step">
               <span class="step-num">1</span>
               <span class="step-content">
-                原始计算：{currentInterval.toFixed(2)} × {mBase} × {mGroup} × {psiValue.toFixed(4)}
+                {t('irBlockInfo.calc.stepRaw', {
+                  interval: currentInterval.toFixed(2),
+                  mBase,
+                  mGroup,
+                  psi: psiValue.toFixed(4),
+                })}
               </span>
             </div>
             <div class="calc-step">
               <span class="step-num">2</span>
               <span class="step-content">
-                = {(currentInterval * mBase * mGroup * psiValue).toFixed(4)} 天
+                {t('irBlockInfo.calc.stepResult', {
+                  value: (currentInterval * mBase * mGroup * psiValue).toFixed(4),
+                })}
               </span>
             </div>
             <div class="calc-step">
               <span class="step-num">3</span>
               <span class="step-content">
-                Clamp 到 [{I_MIN}, {I_MAX}]：<strong>{simulatedNextInterval.toFixed(2)} 天</strong>
+                {t('irBlockInfo.calc.stepClamp', {
+                  min: I_MIN,
+                  max: I_MAX,
+                  value: simulatedNextInterval.toFixed(2),
+                })}
               </span>
             </div>
           </div>
         </section>
 
-        <!-- 实际调度结果 -->
         <section class="info-section">
-          <h4 class="section-title">实际调度结果</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.actualSchedule')}</h4>
           
           <div class="calc-row">
-            <span class="calc-label">下次复习时间</span>
+            <span class="calc-label">{t('irBlockInfo.calc.nextReviewTime')}</span>
             <span class="calc-value">{formatTimestamp(nextRepTimestamp())}</span>
           </div>
           
           <div class="calc-row">
-            <span class="calc-label">距今天数</span>
+            <span class="calc-label">{t('irBlockInfo.calc.daysFromToday')}</span>
             <span class="calc-value" class:overdue={daysUntilNextReview() !== null && daysUntilNextReview()! < 0}>
               {#if daysUntilNextReview() !== null}
-                {daysUntilNextReview()! >= 0 ? `+${daysUntilNextReview()!.toFixed(2)}` : daysUntilNextReview()!.toFixed(2)} 天
+                {t('irBlockInfo.values.daysOffset', {
+                  value:
+                    daysUntilNextReview()! >= 0
+                      ? `+${daysUntilNextReview()!.toFixed(2)}`
+                      : daysUntilNextReview()!.toFixed(2),
+                })}
               {:else}
-                未设置
+                {t('irBlockInfo.values.notSet')}
               {/if}
             </span>
           </div>
 
           <div class="calc-row">
-            <span class="calc-label">预测下次间隔</span>
-            <span class="calc-value highlight">{simulatedNextInterval.toFixed(2)} 天</span>
+            <span class="calc-label">{t('irBlockInfo.calc.predictedInterval')}</span>
+            <span class="calc-value highlight">{formatInterval(simulatedNextInterval)}</span>
           </div>
         </section>
 
-        <!-- 优先级变更历史 -->
         {#if priorityLog.length > 0}
         <section class="info-section">
-          <h4 class="section-title">优先级变更历史</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.priorityHistory')}</h4>
           <div class="priority-log">
             {#each priorityLog.slice(-5).reverse() as entry}
               <div class="log-entry">
@@ -616,18 +625,17 @@
         </section>
         {/if}
 
-        <!-- EWMA 说明 -->
         <section class="info-section">
-          <h4 class="section-title">优先级平滑（EWMA）</h4>
+          <h4 class="section-title">{t('irBlockInfo.sections.ewma')}</h4>
           <div class="formula-box">
             <code class="formula">P_eff = α × P_ui + (1-α) × P_eff_old</code>
           </div>
           <div class="calc-row">
-            <span class="calc-label">α（EWMA 系数）</span>
+            <span class="calc-label">{t('irBlockInfo.calc.labels.alpha')}</span>
             <span class="calc-value">{EWMA_ALPHA}</span>
           </div>
           <p class="formula-desc">
-            EWMA 用于平滑优先级变化，避免单次调整造成过大波动。每次调整只影响 {(EWMA_ALPHA * 100).toFixed(0)}% 的权重。
+            {t('irBlockInfo.calc.ewmaDesc', { percent: (EWMA_ALPHA * 100).toFixed(0) })}
           </p>
         </section>
       </div>
@@ -638,8 +646,8 @@
           type="button"
           class="view-back-btn clickable-icon"
           onclick={() => currentView = 'info'}
-          aria-label="返回详情"
-          title="返回详情"
+          aria-label={t('irBlockInfo.values.backToDetail')}
+          title={t('irBlockInfo.values.backToDetail')}
         >
           <EnhancedIcon name="arrow-left" size={16} />
         </button>
@@ -649,7 +657,7 @@
         <div class="json-toolbar">
           <button class="copy-btn" onclick={copyJson}>
             <EnhancedIcon name="copy" size={14} />
-            <span>复制</span>
+            <span>{t('irBlockInfo.values.copy')}</span>
           </button>
         </div>
         <pre class="json-view">{formattedJson}</pre>

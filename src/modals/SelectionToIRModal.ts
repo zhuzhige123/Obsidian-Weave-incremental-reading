@@ -1,4 +1,5 @@
 import { App, Menu, Modal, Setting, normalizePath } from "obsidian";
+import { i18n } from "../utils/i18n";
 import { VaultFolderSuggestModal } from "./VaultFolderSuggestModal";
 
 export interface SelectionToIRSubmitPayload {
@@ -50,7 +51,7 @@ export class SelectionToIRModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.titleEl.setText("从选区创建增量阅读点");
+		this.titleEl.setText(i18n.t("irModals.selectionToIr.title"));
 		this.modalEl.addClass("weave-selection-to-ir-modal");
 
 		const { contentEl } = this;
@@ -63,11 +64,11 @@ export class SelectionToIRModal extends Modal {
 
 		const deckInfoEl = deckToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
 		deckInfoEl.createDiv({
-			text: "所属专题",
+			text: i18n.t("irModals.selectionToIr.deckName"),
 			cls: "setting-item-name",
 		});
 		deckInfoEl.createDiv({
-			text: "点击下拉菜单选择增量阅读专题。",
+			text: i18n.t("irModals.selectionToIr.deckDesc"),
 			cls: "setting-item-description",
 		});
 
@@ -83,11 +84,11 @@ export class SelectionToIRModal extends Modal {
 
 		const folderInfoEl = folderToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
 		folderInfoEl.createDiv({
-			text: "保存路径",
+			text: i18n.t("irModals.selectionToIr.savePath"),
 			cls: "setting-item-name",
 		});
 		folderInfoEl.createDiv({
-			text: "默认遵循上次选择或 Obsidian 的新建笔记位置，也可以切换到其他文件夹。",
+			text: i18n.t("irModals.selectionToIr.savePathDesc"),
 			cls: "setting-item-description",
 		});
 
@@ -100,15 +101,15 @@ export class SelectionToIRModal extends Modal {
 		});
 
 		const titleDesc = this.options.titleDetected
-			? "已从选中文本中自动提取标题，你可以继续修改。"
-			: "未检测到明确标题，已先用选中文本前缀生成标题。";
+			? i18n.t("irModals.selectionToIr.titleDetected")
+			: i18n.t("irModals.selectionToIr.titleFallback");
 
 		new Setting(contentEl)
-			.setName("标题")
+			.setName(i18n.t("irModals.common.title"))
 			.setDesc(titleDesc)
 			.addText((text) => {
 				text.setValue(this.draftTitle);
-				text.setPlaceholder("输入阅读点标题");
+				text.setPlaceholder(i18n.t("irModals.selectionToIr.titlePlaceholder"));
 				text.inputEl.addClass("weave-selection-to-ir-title-input");
 				this.titleInputEl = text.inputEl;
 				text.onChange((value) => {
@@ -119,10 +120,10 @@ export class SelectionToIRModal extends Modal {
 
 		const footerEl = contentEl.createDiv({ cls: "weave-selection-to-ir-footer" });
 
-		const cancelButton = footerEl.createEl("button", { text: "取消" });
+		const cancelButton = footerEl.createEl("button", { text: i18n.t("irModals.common.cancel") });
 		cancelButton.addEventListener("click", () => this.close());
 
-		this.createButtonEl = footerEl.createEl("button", { text: "创建阅读点" });
+		this.createButtonEl = footerEl.createEl("button", { text: i18n.t("irModals.selectionToIr.createReadingPoint") });
 		this.createButtonEl.classList.add("mod-cta");
 		this.createButtonEl.addEventListener("click", () => {
 			void this.handleCreate();
@@ -147,22 +148,24 @@ export class SelectionToIRModal extends Modal {
 	}
 
 	private getFolderButtonText(): string {
-		return `保存到：${this.getFolderDisplayName(this.selectedFolder)}`;
+		return i18n.t("irModals.common.saveTo", { path: this.getFolderDisplayName(this.selectedFolder) });
 	}
 
 	private getDeckButtonText(): string {
 		const selectedDeck = this.options.deckOptions.find((deck) => deck.id === this.selectedDeckId);
-		return selectedDeck ? `专题：${selectedDeck.name}` : "选择增量阅读专题";
+		return selectedDeck
+			? i18n.t("irModals.common.topicLabel", { name: selectedDeck.name })
+			: i18n.t("irModals.common.selectTopic");
 	}
 
 	private getFolderDisplayName(folderPath: string): string {
 		const normalized = normalizeFolderPath(folderPath);
 		if (normalized === "/") {
-			return "库根目录";
+			return i18n.t("irModals.common.vaultRoot");
 		}
 
 		const exists = this.app.vault.getAbstractFileByPath(normalized);
-		return exists ? normalized : `${normalized}（创建）`;
+		return exists ? normalized : i18n.t("irModals.common.createSuffix", { path: normalized });
 	}
 
 	private applyPickerButtonStyle(buttonEl: HTMLButtonElement): void {
@@ -192,7 +195,7 @@ export class SelectionToIRModal extends Modal {
 
 	private async showFolderPicker(): Promise<void> {
 		const picker = new VaultFolderSuggestModal(this.app, {
-			placeholder: "选择阅读点保存路径...",
+			placeholder: i18n.t("irModals.selectionToIr.folderPickerPlaceholder"),
 		});
 		const folderPath = await picker.openAndSelect();
 		if (!folderPath) {
@@ -226,7 +229,7 @@ export class SelectionToIRModal extends Modal {
 		this.creating = true;
 		if (this.createButtonEl) {
 			this.createButtonEl.disabled = true;
-			this.createButtonEl.textContent = "创建中...";
+			this.createButtonEl.textContent = i18n.t("irModals.common.creating");
 		}
 
 		try {
@@ -241,7 +244,7 @@ export class SelectionToIRModal extends Modal {
 		} finally {
 			this.creating = false;
 			if (this.createButtonEl) {
-				this.createButtonEl.textContent = "创建阅读点";
+				this.createButtonEl.textContent = i18n.t("irModals.selectionToIr.createReadingPoint");
 			}
 			this.syncCreateButtonState();
 		}

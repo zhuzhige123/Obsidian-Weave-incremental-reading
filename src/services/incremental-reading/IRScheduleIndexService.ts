@@ -6,12 +6,13 @@ import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
 import {
-	buildLegacyBlockFromPointSnapshot,
+	isIRInternalScheduleSourcePath,
+} from "../../utils/ir-internal-data-path";
+import {
 	buildLegacyChunkFromPointSnapshot,
 	buildLegacyEpubTaskFromPointSnapshot,
 	buildLegacyPdfTaskFromPointSnapshot,
 	getStoredPointKind,
-	isLegacyBlockPointSnapshot,
 } from "./IRLegacyTaskCompatAdapter";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
@@ -21,7 +22,7 @@ import {
 	buildScheduleFingerprint,
 } from "./IRScheduleFingerprint";
 
-export const IR_SCHEDULE_INDEX_VERSION = "1.0.0";
+export const IR_SCHEDULE_INDEX_VERSION = "1.1.0";
 
 export interface IRScheduleIndexSources {
 	chunks: IRChunkFileData[];
@@ -36,7 +37,9 @@ export interface IRScheduleIndexSources {
 interface IRScheduleIndexStore {
 	version: string;
 	updatedAt: string;
-	snapshotCacheVersion: number;
+	/** @deprecated 仅兼容旧磁盘格式；freshness 已改用 pointFilesRevision */
+	snapshotCacheVersion?: number;
+	pointFilesRevision: string;
 	externalTasksRevision: string;
 	scheduleFingerprint: string;
 	chunks: IRChunkFileData[];
@@ -76,6 +79,42 @@ export class IRScheduleIndexService {
 		};
 	}
 
+	/**
+	 * 冷启动预读：将新鲜磁盘索引载入内存，避免月历打开时重复判 stale。
+	 */
+	async warmDiskCache(): Promise<boolean> {
+		if (this.memoryStore && (await this.matchesPointFilesRevision(this.memoryStore))) {
+			return true;
+		}
+
+		const diskStore = await this.readDiskStore();
+		if (diskStore && (await this.matchesPointFilesRevision(diskStore))) {
+			this.memoryStore = diskStore;
+			logger.debug("[IRScheduleIndexService] schedule index warmed from disk", {
+				chunks: diskStore.chunks.length,
+				pdfTasks: diskStore.pdfTasks.length,
+				epubTasks: diskStore.epubTasks.length,
+			});
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * 读取已缓存的调度指纹，不触发全库 point 扫描重建。
+	 * 缓存过期时返回 null，调用方应走 stale 路径或按需 await getScheduleSources()。
+	 */
+	async peekScheduleFingerprint(): Promise<string | null> {
+		try {
+			if (await this.warmDiskCache()) {
+				return String(this.memoryStore?.scheduleFingerprint || "").trim() || null;
+			}
+		} catch (error) {
+			logger.debug("[IRScheduleIndexService] peekScheduleFingerprint unavailable", error);
+		}
+		return null;
+	}
+
 	private getIndexPath(): string {
 		return getPluginPaths(this.app).cache.incrementalReading.scheduleIndex;
 	}
@@ -85,7 +124,8 @@ export class IRScheduleIndexService {
 			return null;
 		}
 		const candidate = raw as Partial<IRScheduleIndexStore>;
-		if (candidate.version !== IR_SCHEDULE_INDEX_VERSION) {
+		const version = String(candidate.version || "").trim();
+		if (version !== IR_SCHEDULE_INDEX_VERSION && version !== "1.0.0") {
 			return null;
 		}
 		return {
@@ -94,7 +134,11 @@ export class IRScheduleIndexService {
 				typeof candidate.updatedAt === "string" && candidate.updatedAt.trim()
 					? candidate.updatedAt
 					: new Date().toISOString(),
-			snapshotCacheVersion: Number(candidate.snapshotCacheVersion ?? -1),
+			snapshotCacheVersion:
+				typeof candidate.snapshotCacheVersion === "number"
+					? candidate.snapshotCacheVersion
+					: undefined,
+			pointFilesRevision: String(candidate.pointFilesRevision || "").trim(),
 			externalTasksRevision: String(candidate.externalTasksRevision || ""),
 			scheduleFingerprint: String(candidate.scheduleFingerprint || ""),
 			chunks: Array.isArray(candidate.chunks) ? (candidate.chunks) : [],
@@ -141,10 +185,18 @@ export class IRScheduleIndexService {
 		return buildExternalBookmarkTasksRevision([...pdfTasks, ...epubTasks]);
 	}
 
-	private async isStoreFresh(store: IRScheduleIndexStore): Promise<boolean> {
+	private async matchesPointFilesRevision(store: IRScheduleIndexStore): Promise<boolean> {
+		const pointFilesRevision = String(store.pointFilesRevision || "").trim();
+		if (!pointFilesRevision) {
+			return false;
+		}
 		await this.pointStorage.initialize();
-		const snapshotCacheVersion = this.pointStorage.getSnapshotListCacheVersion();
-		if (store.snapshotCacheVersion !== snapshotCacheVersion) {
+		const currentRevision = await this.pointStorage.getPointFilesIndexRevision();
+		return pointFilesRevision === currentRevision;
+	}
+
+	private async isStoreFresh(store: IRScheduleIndexStore): Promise<boolean> {
+		if (!(await this.matchesPointFilesRevision(store))) {
 			return false;
 		}
 		const externalTasksRevision = await this.getExternalTasksRevision();
@@ -198,6 +250,9 @@ export class IRScheduleIndexService {
 			const kind = getStoredPointKind(snapshot);
 			if (kind === "chunk") {
 				const { chunk } = buildLegacyChunkFromPointSnapshot(snapshot);
+				if (isIRInternalScheduleSourcePath(chunk.filePath)) {
+					continue;
+				}
 				if (!seenIds.has(chunk.chunkId)) {
 					chunks.push(chunk);
 					seenIds.add(chunk.chunkId);
@@ -206,6 +261,9 @@ export class IRScheduleIndexService {
 			}
 			if (kind === "pdf") {
 				const task = buildLegacyPdfTaskFromPointSnapshot(snapshot);
+				if (isIRInternalScheduleSourcePath(task.pdfPath)) {
+					continue;
+				}
 				if (!seenIds.has(task.id)) {
 					pdfTasks.push(task);
 					seenIds.add(task.id);
@@ -214,19 +272,16 @@ export class IRScheduleIndexService {
 			}
 			if (kind === "epub") {
 				const task = buildLegacyEpubTaskFromPointSnapshot(snapshot);
+				if (isIRInternalScheduleSourcePath(task.epubFilePath)) {
+					continue;
+				}
 				if (!seenIds.has(task.id)) {
 					epubTasks.push(task);
 					seenIds.add(task.id);
 				}
 				continue;
 			}
-			if (isLegacyBlockPointSnapshot(snapshot)) {
-				const block = buildLegacyBlockFromPointSnapshot(snapshot);
-				if (block && !seenIds.has(block.id)) {
-					blocks.push(block);
-					seenIds.add(block.id);
-				}
-			}
+			// Phase 3：legacy-block 不再进入 schedule index；请用数据管理窗「统一阅读点格式」迁移。
 		}
 
 		await Promise.all([this.pdfService.initialize(), this.epubService.initialize()]);
@@ -256,10 +311,11 @@ export class IRScheduleIndexService {
 			epubTasks,
 		});
 		const externalTasksRevision = buildExternalBookmarkTasksRevision([...pdfTasks, ...epubTasks]);
+		const pointFilesRevision = await this.pointStorage.getPointFilesIndexRevision();
 		const store: IRScheduleIndexStore = {
 			version: IR_SCHEDULE_INDEX_VERSION,
 			updatedAt: new Date().toISOString(),
-			snapshotCacheVersion: this.pointStorage.getSnapshotListCacheVersion(),
+			pointFilesRevision,
 			externalTasksRevision,
 			scheduleFingerprint,
 			chunks,

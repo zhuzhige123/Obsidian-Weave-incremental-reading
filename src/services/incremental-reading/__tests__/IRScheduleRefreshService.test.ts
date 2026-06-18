@@ -49,6 +49,20 @@ vi.mock("../IRCalendarDayIndexService", () => ({
 	}),
 }));
 
+const projectionNotifyMock = vi.fn();
+
+vi.mock("../IRProjectionRuntime", () => ({
+	getSharedIRProjectionRuntime: () => ({
+		notify: projectionNotifyMock,
+	}),
+}));
+
+vi.mock("../IRDueDateIndexService", () => ({
+	getSharedIRDueDateIndexService: () => ({
+		invalidateAsync: vi.fn(),
+	}),
+}));
+
 vi.mock("../../../utils/logger", () => ({
 	logger: {
 		error: vi.fn(),
@@ -148,16 +162,16 @@ describe("IRScheduleRefreshService", () => {
 		expect(event.detail).toEqual(detail);
 	});
 
-	it("broadcasts a lightweight IR update while invalidating caches", () => {
+	it("broadcasts a lightweight IR update without full cache invalidation by default", () => {
 		const detail = broadcastIRDataUpdated({} as any, {
 			reason: "ui_refresh",
 			deckIds: ["deck-2"],
 		});
 
-		expect(workspaceInvalidateMock).toHaveBeenCalledTimes(1);
-		expect(scheduleIndexInvalidateMock).toHaveBeenCalledTimes(1);
-		expect(calendarInvalidateMock).toHaveBeenCalledTimes(1);
-		expect(invalidateScheduleCacheMock).toHaveBeenCalledTimes(1);
+		expect(workspaceInvalidateMock).not.toHaveBeenCalled();
+		expect(scheduleIndexInvalidateMock).not.toHaveBeenCalled();
+		expect(calendarInvalidateMock).not.toHaveBeenCalled();
+		expect(invalidateScheduleCacheMock).not.toHaveBeenCalled();
 		expect(detail.reason).toBe("ui_refresh");
 		expect(detail.deckIds).toEqual(["deck-2"]);
 		expect(typeof detail.generatedAt).toBe("number");
@@ -175,6 +189,12 @@ describe("IRScheduleRefreshService", () => {
 			priorityDateKeys: ["2026-05-29"],
 		});
 		expect(invalidateScheduleCacheMock).toHaveBeenCalledTimes(1);
+		expect(projectionNotifyMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				priorityDateKeys: ["2026-05-29"],
+				reason: "metadata_changed",
+			})
+		);
 	});
 
 	it("can skip schedule cache invalidation for lightweight UI-only broadcasts", () => {
@@ -183,8 +203,26 @@ describe("IRScheduleRefreshService", () => {
 			invalidateScheduleCache: false,
 		});
 
-		expect(workspaceInvalidateMock).toHaveBeenCalledTimes(1);
+		expect(workspaceInvalidateMock).not.toHaveBeenCalled();
 		expect(invalidateScheduleCacheMock).not.toHaveBeenCalled();
 		expect(detail.reason).toBe("ui_refresh");
+	});
+
+	it("uses deck-scoped invalidation for archive_block with priority dates", async () => {
+		await recomputeAndBroadcastIRData({} as any, "archive_block", {
+			deckIds: ["deck-1"],
+			priorityDateKeys: ["2026-05-29"],
+		});
+
+		expect(workspaceInvalidateMock).toHaveBeenCalledTimes(1);
+		expect(calendarInvalidateMock).toHaveBeenCalledWith({
+			priorityDateKeys: expect.arrayContaining(["2026-05-29"]),
+		});
+		expect(projectionNotifyMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				reason: "archive_block",
+				deckIds: ["deck-1"],
+			})
+		);
 	});
 });

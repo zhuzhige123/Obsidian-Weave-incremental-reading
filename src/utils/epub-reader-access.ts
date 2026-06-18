@@ -1,9 +1,9 @@
 import { Notice, type App } from "obsidian";
 import type { EpubHostReaderCapabilities } from "../services/epub-integration/epub-host";
+import { i18n } from "./i18n";
 import { getObsidianPluginAs } from "./obsidian-plugin-registry";
 
 export const EPUB_READER_PLUGIN_ID = "weave-epub-reader";
-export const EPUB_READER_DISPLAY_NAME = "Weave EPUB 阅读器";
 
 const EPUB_READER_NOTICE_COOLDOWN_MS = 8_000;
 
@@ -20,6 +20,13 @@ function isPluginEnabledInSettings(app: App, pluginId: string): boolean {
 	const enabledPlugins = (app.plugins as { enabledPlugins?: Set<string> } | undefined)?.enabledPlugins;
 	return enabledPlugins?.has(pluginId) ?? false;
 }
+
+export function getEpubReaderDisplayName(): string {
+	return i18n.t("irMain.epubReader.displayName");
+}
+
+/** @deprecated Use {@link getEpubReaderDisplayName} for localized display name. */
+export const EPUB_READER_DISPLAY_NAME = "Weave EPUB 阅读器";
 
 export function getEpubReaderPluginAvailability(app: App): EpubReaderPluginAvailability {
 	if (getObsidianPluginAs(app, EPUB_READER_PLUGIN_ID)) {
@@ -43,14 +50,24 @@ export function getEpubReaderHost(app: App): EpubHostReaderCapabilities | null {
 }
 
 export function getEpubReaderUnavailableMessage(app: App): string {
+	const displayName = getEpubReaderDisplayName();
 	const availability = getEpubReaderPluginAvailability(app);
 	if (availability === "failed") {
-		return `${EPUB_READER_DISPLAY_NAME}（${EPUB_READER_PLUGIN_ID}）已在社区插件中启用，但当前未能成功加载。请打开开发者控制台查看报错，或在社区插件列表中关闭后重新启用该插件。`;
+		return i18n.t("irMain.epubReader.unavailableFailed", {
+			displayName,
+			pluginId: EPUB_READER_PLUGIN_ID,
+		});
 	}
 	if (availability === "disabled") {
-		return `${EPUB_READER_DISPLAY_NAME}（${EPUB_READER_PLUGIN_ID}）已安装但未启用。请在 Obsidian 设置 → 社区插件中启用。`;
+		return i18n.t("irMain.epubReader.unavailableDisabled", {
+			displayName,
+			pluginId: EPUB_READER_PLUGIN_ID,
+		});
 	}
-	return `未检测到 ${EPUB_READER_DISPLAY_NAME}（${EPUB_READER_PLUGIN_ID}）。请在 Obsidian 设置 → 社区插件中安装并启用。`;
+	return i18n.t("irMain.epubReader.unavailableMissing", {
+		displayName,
+		pluginId: EPUB_READER_PLUGIN_ID,
+	});
 }
 
 export function notifyEpubReaderUnavailable(app: App): void {

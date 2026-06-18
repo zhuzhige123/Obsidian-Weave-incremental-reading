@@ -20,12 +20,8 @@ export interface AssociatedNoteMenuOptions {
 	openAllTitle?: string;
 }
 
-function uiText(zh: string, en: string): string {
-	return i18n.getCurrentLanguage() === "zh-CN" ? zh : en;
-}
-
 function untitledNoteLabel(): string {
-	return uiText("\u672a\u547d\u540d\u7b14\u8bb0", "Untitled note");
+	return i18n.t("irSidebar.associatedNote.untitled");
 }
 
 export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): void {
@@ -39,17 +35,16 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 		onSetPrimary,
 		onRemove,
 		onClear,
-		openAllTitle = uiText("\u6253\u5f00\u5173\u8054\u7b14\u8bb0", "Open linked notes"),
+		openAllTitle = i18n.t("irSidebar.associatedNote.openLinkedNotes"),
 	} = options;
 
 	if (notePaths.length > 0) {
 		menu.addItem((item) =>
 			item
 				.setTitle(
-					uiText(
-						`\u6253\u5f00\u4e3b\u7b14\u8bb0\uff1a${getLabel(notePaths[0])}`,
-						`Open primary note: ${getLabel(notePaths[0])}`
-					)
+					i18n.t("irSidebar.associatedNote.openPrimaryNote", {
+						name: getLabel(notePaths[0]),
+					})
 				)
 				.setIcon("file-text")
 				.onClick(() => {
@@ -59,9 +54,9 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 
 		menu.addItem((item) => {
 			item.setTitle(openAllTitle).setIcon("files");
-			const subMenu = item.setSubmenu();
+			const subMenu = (item as any).setSubmenu();
 			for (const notePath of notePaths) {
-				subMenu.addItem((subItem) => {
+				subMenu.addItem((subItem: any) => {
 					subItem
 						.setTitle(getLabel(notePath))
 						.setIcon(getLinkableVaultNoteIcon(notePath))
@@ -79,8 +74,8 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 		item
 			.setTitle(
 				notePaths.length > 0
-					? uiText("\u8ffd\u52a0\u5173\u8054\u7b14\u8bb0", "Add linked note")
-					: uiText("\u5173\u8054\u7b14\u8bb0", "Link note")
+					? i18n.t("irSidebar.associatedNote.addLinkedNote")
+					: i18n.t("irSidebar.associatedNote.menuLink")
 			)
 			.setIcon("plus")
 			.onClick(() => {
@@ -92,8 +87,8 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 		item
 			.setTitle(
 				notePaths.length > 0
-					? uiText("\u65b0\u5efa\u5e76\u8ffd\u52a0\u7b14\u8bb0", "Create and add note")
-					: uiText("\u65b0\u5efa\u5e76\u5173\u8054\u7b14\u8bb0", "Create and link note")
+					? i18n.t("irSidebar.associatedNote.createAndAddNote")
+					: i18n.t("irSidebar.associatedNote.createAndLinkNote")
 			)
 			.setIcon("file-plus")
 			.onClick(() => {
@@ -108,14 +103,14 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 	menu.addSeparator();
 
 	menu.addItem((item) => {
-		item.setTitle(uiText("\u8bbe\u4e3a\u4e3b\u7b14\u8bb0", "Set primary note")).setIcon("star");
-		const subMenu = item.setSubmenu();
+		item.setTitle(i18n.t("irSidebar.associatedNote.setPrimaryNote")).setIcon("star");
+		const subMenu = (item as any).setSubmenu();
 		for (const notePath of notePaths) {
 			const isPrimary = notePath === notePaths[0];
-			subMenu.addItem((subItem) => {
+			subMenu.addItem((subItem: any) => {
 				subItem
 					.setTitle(
-						`${isPrimary ? uiText("\u4e3b\u7b14\u8bb0", "Primary") : uiText("\u8bbe\u4e3a\u4e3b\u7b14\u8bb0", "Set primary note")}: ${getLabel(notePath)}`
+						`${isPrimary ? i18n.t("irSidebar.associatedNote.primary") : i18n.t("irSidebar.associatedNote.setPrimaryNote")}: ${getLabel(notePath)}`
 					)
 					.setIcon(isPrimary ? "check" : "chevrons-up")
 					.setDisabled(isPrimary)
@@ -129,10 +124,10 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 	});
 
 	menu.addItem((item) => {
-		item.setTitle(uiText("\u79fb\u9664\u5173\u8054\u7b14\u8bb0", "Remove linked note")).setIcon("trash");
-		const subMenu = item.setSubmenu();
+		item.setTitle(i18n.t("irSidebar.associatedNote.removeLinkedNote")).setIcon("trash");
+		const subMenu = (item as any).setSubmenu();
 		for (const notePath of notePaths) {
-			subMenu.addItem((subItem) => {
+			subMenu.addItem((subItem: any) => {
 				subItem
 					.setTitle(getLabel(notePath))
 					.setIcon("trash")
@@ -146,7 +141,7 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 	menu.addSeparator();
 	menu.addItem((item) =>
 		item
-			.setTitle(uiText("\u6e05\u7a7a\u5173\u8054\u7b14\u8bb0", "Clear linked notes"))
+			.setTitle(i18n.t("irSidebar.associatedNote.clearLinkedNotes"))
 			.setIcon("x-circle")
 			.onClick(() => {
 				void onClear();
@@ -155,7 +150,7 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 }
 
 function sanitizeAssociatedNoteBaseName(rawName: string): string {
-	const normalized = String(rawName || "").trim().replace(/[\\/:*?"<>|#^[\]]+/g, " ");
+	const normalized = String(rawName || "").trim().replace(/[\\/:*?"<>|#^\[\]]+/g, " ");
 	const compact = normalized.replace(/\s+/g, " ").trim();
 	return compact || untitledNoteLabel();
 }
@@ -264,11 +259,6 @@ export async function openLinkedVaultNote(app: App, notePath: string): Promise<T
 	return file;
 }
 
-/** @deprecated Use {@link openLinkedVaultNote} */
-export async function openAssociatedMarkdownNote(app: App, notePath: string): Promise<TFile | null> {
-	return openLinkedVaultNote(app, notePath);
-}
-
 export function getLinkedVaultNoteLabel(app: App, notePath: string): string {
 	const file = resolveLinkableVaultNoteFile(app, notePath);
 	if (file) {
@@ -285,11 +275,6 @@ export function getLinkedVaultNoteLabel(app: App, notePath: string): string {
 		filename.replace(/\.excalidraw\.md$/i, "").replace(/\.(?:md|markdown|canvas)$/i, "") ||
 		untitledNoteLabel()
 	);
-}
-
-/** @deprecated Use {@link getLinkedVaultNoteLabel} */
-export function getAssociatedMarkdownLabel(app: App, notePath: string): string {
-	return getLinkedVaultNoteLabel(app, notePath);
 }
 
 export async function pickLinkableVaultNoteFile(

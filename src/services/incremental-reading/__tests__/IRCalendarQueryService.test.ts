@@ -58,6 +58,50 @@ describe("IRCalendarQueryService cache title normalization", () => {
 		expect(result.materialsByDate.get("2026-05-01")?.[1]?.displayName).toBeUndefined();
 	});
 
+	it("excludes schedule items backed by .irdeck internal data files", () => {
+		const service = new IRCalendarQueryService({} as any);
+		const irdeckItem = {
+			id: "irdeck-1",
+			title: "pdf.irdeck",
+			displayName: "pdf.irdeck",
+			sourceFile: "weave/incremental-reading/points/pdf.irdeck",
+			priority: 5,
+			intervalDays: 1,
+			scheduleStatus: "new",
+			nextRepDate: 0,
+			nextReviewDate: null,
+			sourceType: "chunk",
+		} as any;
+		const validItem = {
+			id: "md-1",
+			title: "正常阅读点",
+			sourceFile: "Notes/demo.md",
+			priority: 5,
+			intervalDays: 1,
+			scheduleStatus: "new",
+			nextRepDate: 0,
+			nextReviewDate: null,
+			sourceType: "chunk",
+		} as any;
+
+		const result = (service as any).attachRuntimeContext(
+			{
+				workspaceData: { generatedAt: 1 } as any,
+				readingMaterials: [],
+				materialsByDate: new Map([["2026-05-01", [irdeckItem, validItem]]]),
+				continueReadingSuspendedItemsPool: [irdeckItem],
+				schedule: { generatedAt: 2, version: 1, deckIds: [], days: [] },
+				scope: { deckIds: [], cacheKey: "__all__::__default__", stateKey: "old" },
+			},
+			{ generatedAt: 1 } as any,
+			[],
+			{ deckIds: [], cacheKey: "__all__::__default__" }
+		);
+
+		expect(result.materialsByDate.get("2026-05-01")).toEqual([validItem]);
+		expect(result.continueReadingSuspendedItemsPool).toEqual([]);
+	});
+
 	it("normalizes hydrated disk-cache epub items with missing displayName", () => {
 		const service = new IRCalendarQueryService({} as any);
 		const hydrated = (service as any).hydrateScheduleItem({

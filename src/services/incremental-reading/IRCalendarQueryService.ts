@@ -5,6 +5,7 @@ import { readIncrementalReadingSettings } from "../../utils/ir-plugin-host-acces
 import type { ReadingMaterial } from "../../types/incremental-reading-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
+import { shouldExcludeScheduleItemBySource } from "../../utils/ir-internal-data-path";
 import { getIrEpubStorageService } from "../epub-integration/ir-epub-storage-access";
 import type { IrEpubStorageLike } from "../epub-integration/ir-epub-storage-types";
 import {
@@ -22,7 +23,6 @@ import {
 import {
 	buildScheduleItemFromChunkData,
 	buildScheduleItemFromEpubTask,
-	buildScheduleItemFromLegacyBlock,
 	buildScheduleItemFromPdfTask,
 	buildScheduleItemFromProjectedItem,
 	type ScheduleItem,
@@ -200,20 +200,17 @@ export class IRCalendarQueryService {
 			deckIds: this.normalizeIdentifiers(options.deckIds || []),
 			horizonDays: options.horizonDays,
 		});
-		let scheduleFingerprint = "";
-		try {
-			scheduleFingerprint = String(
-				(await getSharedIRScheduleIndexService(this.app).getScheduleSources()).scheduleFingerprint ||
-					""
-			).trim();
-		} catch (error) {
-			logger.debug("[IRCalendarQueryService] tier-0 schedule fingerprint unavailable", error);
-			return null;
+		const scheduleIndex = getSharedIRScheduleIndexService(this.app);
+		const dayIndexService = getSharedIRCalendarDayIndexService(this.app);
+		let scheduleFingerprint = String((await scheduleIndex.peekScheduleFingerprint()) || "").trim();
+		if (!scheduleFingerprint) {
+			const manifest = await dayIndexService.peekScopeManifest(cacheKey);
+			scheduleFingerprint = String(manifest?.scheduleFingerprint || "").trim();
 		}
 		if (!scheduleFingerprint) {
 			return null;
 		}
-		const tier0 = await getSharedIRCalendarDayIndexService(this.app).tryHydrateTier0({
+		const tier0 = await dayIndexService.tryHydrateTier0({
 			cacheKey,
 			settingsFingerprint,
 			scheduleFingerprint,
@@ -270,6 +267,100 @@ export class IRCalendarQueryService {
 		};
 	}
 
+	/**
+	 * 从日索引恢复优先日期列表（仅校验 settings 指纹，不阻塞于工作区/调度指纹）。
+	 * 用于月历首屏在完整查询挂起时先解除「正在加载」阻塞。
+	 */
+	async tryGetCalendarShellFromDayIndex(
+		options: Pick<IRCalendarQueryOptions, "deckIds" | "horizonDays" | "priorityDateKeys">
+	): Promise<{
+		result: IRCalendarQueryResult;
+		daySummaries: Map<string, IRCalendarDaySummary>;
+	} | null> {
+		const priorityDateKeys = Array.from(
+			new Set((options.priorityDateKeys || []).map((key) => String(key || "").trim()).filter(Boolean))
+		);
+		if (priorityDateKeys.length === 0) {
+			return null;
+		}
+
+		const settingsFingerprint = this.buildSettingsFingerprint();
+		const cacheKey = this.buildQueryCacheKey({
+			deckIds: this.normalizeIdentifiers(options.deckIds || []),
+			horizonDays: options.horizonDays,
+		});
+		const shell = await getSharedIRCalendarDayIndexService(this.app).tryHydrateDateKeys({
+			cacheKey,
+			settingsFingerprint,
+			dateKeys: priorityDateKeys,
+		});
+		if (!shell) {
+			return null;
+		}
+
+		const stubWorkspace = this.createStubWorkspaceData();
+		const queryScope = this.buildQueryScopeFromSerialized(
+			{
+				materialsByDate: [],
+				continueReadingSuspendedItemsPool: [],
+				schedule: {
+					generatedAt: Date.now(),
+					version: 1,
+					deckIds: this.normalizeIdentifiers(options.deckIds || []),
+					days: [],
+				},
+				scope: {
+					deckIds: this.normalizeIdentifiers(options.deckIds || []),
+					horizonDays: options.horizonDays,
+					cacheKey,
+				},
+			},
+			cacheKey
+		);
+		const hydratedBase: IRCalendarQueryResult = {
+			workspaceData: stubWorkspace,
+			readingMaterials: [],
+			materialsByDate: shell.materialsByDate,
+			continueReadingSuspendedItemsPool: [],
+			schedule: this.hydratePlannedSchedule({
+				generatedAt: Date.now(),
+				version: 1,
+				deckIds: this.normalizeIdentifiers(options.deckIds || []),
+				days: [],
+			}),
+			scope: {
+				...queryScope,
+				stateKey: "",
+			},
+		};
+		const result = this.attachRuntimeContext(hydratedBase, stubWorkspace, [], queryScope);
+		logger.debug("[IRCalendarQueryService] day-index shell served", {
+			cacheKey,
+			priorityDateKeys,
+		});
+		return {
+			result,
+			daySummaries: shell.daySummaries,
+		};
+	}
+
+	/** 调度指纹过期时仍可读磁盘缓存，供首屏 stale-while-revalidate。 */
+	async tryGetStaleDiskCalendarResult(
+		options: Pick<IRCalendarQueryOptions, "deckIds" | "horizonDays" | "priorityDateKeys" | "includeReadingMaterials">
+	): Promise<IRCalendarQueryResult | null> {
+		const settingsFingerprint = this.buildSettingsFingerprint();
+		const cacheKey = this.buildQueryCacheKey({
+			deckIds: this.normalizeIdentifiers(options.deckIds || []),
+			horizonDays: options.horizonDays,
+		});
+		return this.tryHydrateDiskCacheFast(
+			cacheKey,
+			settingsFingerprint,
+			options.includeReadingMaterials !== false,
+			{ allowStaleScheduleFingerprint: true }
+		);
+	}
+
 	async getCalendarQueryResult(options: IRCalendarQueryOptions = {}): Promise<IRCalendarQueryResult> {
 		const includeReadingMaterials = options.includeReadingMaterials !== false;
 		const preferDiskCache = options.preferDiskCache === true;
@@ -291,6 +382,20 @@ export class IRCalendarQueryService {
 					generatedAt: optimistic.schedule.generatedAt,
 				});
 				return optimistic;
+			}
+
+			const staleOptimistic = await this.tryHydrateDiskCacheFast(
+				preliminaryCacheKey,
+				settingsFingerprint,
+				includeReadingMaterials,
+				{ allowStaleScheduleFingerprint: true }
+			);
+			if (staleOptimistic) {
+				logger.debug("[IRCalendarQueryService] stale disk cache served on fast path", {
+					cacheKey: preliminaryCacheKey,
+					generatedAt: staleOptimistic.schedule.generatedAt,
+				});
+				return staleOptimistic;
 			}
 		}
 
@@ -423,19 +528,28 @@ export class IRCalendarQueryService {
 	private async tryHydrateDiskCacheFast(
 		cacheKey: string,
 		settingsFingerprint: string,
-		includeReadingMaterials: boolean
+		includeReadingMaterials: boolean,
+		options?: { allowStaleScheduleFingerprint?: boolean }
 	): Promise<IRCalendarQueryResult | null> {
 		const diskEntry = await this.readDiskCacheEntry(cacheKey);
 		if (!diskEntry?.result || diskEntry.settingsFingerprint !== settingsFingerprint) {
 			return null;
 		}
 
-		const scheduleFingerprintValid = await this.isDiskCacheScheduleFingerprintValid(
-			diskEntry.scheduleFingerprint
-		);
-		if (!scheduleFingerprintValid) {
-			logger.debug("[IRCalendarQueryService] optimistic disk cache skipped (stale schedule fingerprint)");
-			return null;
+		const allowStaleScheduleFingerprint = options?.allowStaleScheduleFingerprint === true;
+		if (!allowStaleScheduleFingerprint) {
+			const scheduleFingerprintValid = await this.isDiskCacheScheduleFingerprintValid(
+				diskEntry.scheduleFingerprint,
+				cacheKey
+			);
+			if (!scheduleFingerprintValid) {
+				logger.debug("[IRCalendarQueryService] optimistic disk cache skipped (stale schedule fingerprint)");
+				return null;
+			}
+		} else {
+			logger.debug("[IRCalendarQueryService] serving stale disk cache while schedule revalidates", {
+				cacheKey,
+			});
 		}
 
 		const stubWorkspace = this.createStubWorkspaceData();
@@ -458,19 +572,33 @@ export class IRCalendarQueryService {
 	}
 
 	private async isDiskCacheScheduleFingerprintValid(
-		cachedScheduleFingerprint: string
+		cachedScheduleFingerprint: string,
+		cacheKey?: string
 	): Promise<boolean> {
 		const expected = String(cachedScheduleFingerprint || "").trim();
 		if (!expected) {
 			return false;
 		}
 		try {
-			const indexSources = await getSharedIRScheduleIndexService(this.app).getScheduleSources();
-			return String(indexSources.scheduleFingerprint || "").trim() === expected;
+			const scheduleIndex = getSharedIRScheduleIndexService(this.app);
+			const peeked = await scheduleIndex.peekScheduleFingerprint();
+			if (peeked !== null) {
+				return peeked === expected;
+			}
+			const resolvedCacheKey = String(cacheKey || "").trim();
+			if (resolvedCacheKey) {
+				const manifest = await getSharedIRCalendarDayIndexService(this.app).peekScopeManifest(
+					resolvedCacheKey
+				);
+				const manifestFingerprint = String(manifest?.scheduleFingerprint || "").trim();
+				if (manifestFingerprint) {
+					return manifestFingerprint === expected;
+				}
+			}
 		} catch (error) {
 			logger.debug("[IRCalendarQueryService] schedule fingerprint validation failed:", error);
-			return false;
 		}
+		return false;
 	}
 
 	private async syncDayIndexFromResult(input: {
@@ -521,12 +649,14 @@ export class IRCalendarQueryService {
 		const normalizedMaterialsByDate = new Map(
 			Array.from(result.materialsByDate.entries(), ([dateKey, items]) => [
 				dateKey,
-				items.map((item) => this.normalizeScheduleItemDisplayName(item)),
+				items
+					.filter((item) => !shouldExcludeScheduleItemBySource(item))
+					.map((item) => this.normalizeScheduleItemDisplayName(item)),
 			])
 		);
-		const normalizedSuspendedItems = result.continueReadingSuspendedItemsPool.map((item) =>
-			this.normalizeScheduleItemDisplayName(item)
-		);
+		const normalizedSuspendedItems = result.continueReadingSuspendedItemsPool
+			.filter((item) => !shouldExcludeScheduleItemBySource(item))
+			.map((item) => this.normalizeScheduleItemDisplayName(item));
 		return {
 			...result,
 			workspaceData,
@@ -566,7 +696,9 @@ export class IRCalendarQueryService {
 		for (const [dateKey, dayLoad] of projectedDayLoadMap.entries()) {
 			materialsByDate.set(
 				dateKey,
-				dayLoad.items.map((item) => buildScheduleItemFromProjectedItem(item))
+				dayLoad.items
+					.map((item) => buildScheduleItemFromProjectedItem(item))
+					.filter((item) => !shouldExcludeScheduleItemBySource(item))
 			);
 		}
 
@@ -656,10 +788,6 @@ export class IRCalendarQueryService {
 
 		for (const chunk of Object.values(workspaceData.chunksRecord)) {
 			appendIfSuspended(buildScheduleItemFromChunkData(chunk));
-		}
-
-		for (const block of Object.values(workspaceData.blocksRecord)) {
-			appendIfSuspended(buildScheduleItemFromLegacyBlock(block));
 		}
 
 		for (const task of workspaceData.pdfTasks) {

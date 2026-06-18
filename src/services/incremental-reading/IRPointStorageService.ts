@@ -4,10 +4,16 @@ import { safeReadJson, safeWriteJson } from "../../utils/safe-json-io";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
+import { sanitizeUserReadingSourcePath } from "../../utils/ir-internal-data-path";
+import {
+	countInvalidSourcePathFieldsInRawPoint,
+	sanitizePointSourcePathFields,
+} from "../../utils/ir-point-source-path";
 import { readString } from "../../utils/unknown-record";
 import { normalizeChunkForRuntime } from "../../utils/ir-topic-compat";
 import { parseYAMLFromContent } from "../../utils/yaml-utils";
 import { remapAssociatedNotePaths } from "./IRAssociatedNoteSignals";
+import { buildPointFilesIndexRevision } from "./IRScheduleFingerprint";
 import {
 	deriveLegacyBlockTitle,
 	getLegacyBlocksData,
@@ -55,6 +61,10 @@ import type {
 import { IR_POINT_STORAGE_VERSION } from "../../types/ir-point-storage-types";
 import { stableStringifyForMerge } from "../../utils/stable-json-stringify";
 import type { IRMergePointIdConflict, IRMergePointVariant } from "../../types/ir-data-management-types";
+import type {
+	IRPointSourcePathNormalizationResult,
+	IRPointSourcePathScanResult,
+} from "../../types/ir-point-source-path-types";
 
 type AdapterLike = App["vault"]["adapter"];
 
@@ -169,6 +179,7 @@ const POINT_FILES_INDEX_DEFAULT: IRPointFileIndex = {
 	files: [],
 };
 const runtimeBaselineByApp = new WeakMap<App, Promise<void>>();
+const runtimeBaselineInProgressByApp = new WeakMap<App, boolean>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -248,6 +259,11 @@ export class IRPointStorageService {
 	private snapshotListCache: IRPointSnapshot[] | null = null;
 	private snapshotListInflight: Promise<IRPointSnapshot[]> | null = null;
 	private snapshotListCacheVersion = 0;
+	private pointIdLocationIndex = new Map<
+		string,
+		{ absolutePath: string; topicId: string; topicName: string }
+	>();
+	private pointIdLocationIndexReady = false;
 
 	constructor(app: App) {
 		this.app = app;
@@ -392,6 +408,8 @@ export class IRPointStorageService {
 		}
 
 		const task = (async () => {
+			runtimeBaselineInProgressByApp.set(this.app, true);
+			try {
 			await this.initialize();
 			const pointIndexRefresh = await this.refreshPointFilesIndexFromVault();
 			if (
@@ -423,20 +441,43 @@ export class IRPointStorageService {
 				inspection.legacyRegistryFileCount > 0 ||
 				inspection.legacyTopicStoreFileCount > 0;
 			if (!hasAutoMigrationWork && inspection.legacyReaderStateCount <= 0) {
-				return;
+				// 仍继续执行来源路径规范化与 legacy-block 统一
+			} else {
+				logger.info("[IRPointStorageService] 检测到旧增量阅读数据，开始自动迁移到新 points 存储", {
+					pendingCount: inspection.pendingCount,
+					legacyReaderStateCount: inspection.legacyReaderStateCount,
+					pendingItems: inspection.pendingItems,
+				});
+
+				const report = await this.executeMigration();
+				if (report.summary.failures.length > 0) {
+					logger.warn("[IRPointStorageService] 自动迁移存在失败项，请在数据管理中查看迁移报告", {
+						failureCount: report.summary.failures.length,
+					});
+				}
 			}
 
-			logger.info("[IRPointStorageService] 检测到旧增量阅读数据，开始自动迁移到新 points 存储", {
-				pendingCount: inspection.pendingCount,
-				legacyReaderStateCount: inspection.legacyReaderStateCount,
-				pendingItems: inspection.pendingItems,
-			});
+			const pathNormalization = await this.normalizeAllPointSourcePathsOnDisk();
+			if (pathNormalization.filesUpdated > 0) {
+				logger.info("[IRPointStorageService] 已自动规范化阅读点来源路径", pathNormalization);
+			}
 
-			const report = await this.executeMigration();
-			if (report.summary.failures.length > 0) {
-				logger.warn("[IRPointStorageService] 自动迁移存在失败项，请在数据管理中查看迁移报告", {
-					failureCount: report.summary.failures.length,
+			const { getSharedIRLegacyPointUnificationService } = await import(
+				"./IRLegacyPointUnificationService"
+			);
+			const unifyResult =
+				await getSharedIRLegacyPointUnificationService(this.app).migrateLegacyBlockPointsToChunkFormat();
+			if (unifyResult.migrated > 0) {
+				logger.info("[IRPointStorageService] 已自动统一 legacy-block 为 chunk-entry", unifyResult);
+			}
+			if (unifyResult.failed > 0) {
+				logger.warn("[IRPointStorageService] legacy-block 自动统一存在失败项", {
+					failed: unifyResult.failed,
+					errors: unifyResult.errors,
 				});
+			}
+			} finally {
+				runtimeBaselineInProgressByApp.delete(this.app);
 			}
 		})();
 
@@ -538,16 +579,16 @@ export class IRPointStorageService {
 		point?: IRPoint;
 	}): IRPointSourceRecord {
 		const fallbackPath =
-			normalizePath(String(input.sourcePath || "").trim()) ||
-			normalizePath(String(input.existingSource?.path || "").trim()) ||
-			normalizePath(String(input.legacyMaterialRecord?.source?.path || "").trim()) ||
-			normalizePath(String(input.legacyMaterial?.filePath || "").trim()) ||
-			normalizePath(this.readPointMetadataString(input.point, "sourcePath")) ||
-			normalizePath(this.readPointMetadataString(input.point, "rawFilePath")) ||
-			normalizePath(this.readPointMetadataString(input.point, "chunkFilePath")) ||
-			normalizePath(this.readPointLocatorString(input.point, "pdfPath")) ||
-			normalizePath(this.readPointLocatorString(input.point, "sourcePath")) ||
-			normalizePath(this.readPointLocatorString(input.point, "chunkFilePath"));
+			sanitizeUserReadingSourcePath(input.sourcePath) ||
+			sanitizeUserReadingSourcePath(input.existingSource?.path) ||
+			sanitizeUserReadingSourcePath(input.legacyMaterialRecord?.source?.path) ||
+			sanitizeUserReadingSourcePath(input.legacyMaterial?.filePath) ||
+			sanitizeUserReadingSourcePath(this.readPointMetadataString(input.point, "sourcePath")) ||
+			sanitizeUserReadingSourcePath(this.readPointMetadataString(input.point, "rawFilePath")) ||
+			sanitizeUserReadingSourcePath(this.readPointMetadataString(input.point, "chunkFilePath")) ||
+			sanitizeUserReadingSourcePath(this.readPointLocatorString(input.point, "pdfPath")) ||
+			sanitizeUserReadingSourcePath(this.readPointLocatorString(input.point, "sourcePath")) ||
+			sanitizeUserReadingSourcePath(this.readPointLocatorString(input.point, "chunkFilePath"));
 		const materialId =
 			String(input.materialId || "").trim() ||
 			String(input.existingSource?.id || "").trim() ||
@@ -713,6 +754,11 @@ export class IRPointStorageService {
 								typeof entry.updatedAt === "string" && entry.updatedAt.trim()
 									? entry.updatedAt
 									: new Date(0).toISOString(),
+							pointIds: Array.isArray(entry.pointIds)
+								? entry.pointIds
+										.map((pointId) => String(pointId || "").trim())
+										.filter(Boolean)
+								: undefined,
 						};
 					})
 			: [];
@@ -756,6 +802,18 @@ export class IRPointStorageService {
 			updatedAt: new Date().toISOString(),
 		});
 		this.invalidatePointSnapshotListCache();
+		void import("./IRScheduleIndexService").then(({ getSharedIRScheduleIndexService }) => {
+			getSharedIRScheduleIndexService(this.app).invalidate();
+		});
+	}
+
+	/**
+	 * 基于 point-files-index 磁盘内容的持久 revision（跨重启稳定）。
+	 */
+	async getPointFilesIndexRevision(): Promise<string> {
+		await this.initialize();
+		const index = await this.readPointFilesIndex();
+		return buildPointFilesIndexRevision(index);
 	}
 
 	async getPointFileEntryByPath(filePath: string): Promise<{
@@ -897,6 +955,110 @@ export class IRPointStorageService {
 		await this.persistPointFileData(normalizedPath, fileData);
 		await this.refreshPointFilesIndexFromVault();
 		return fileData;
+	}
+
+	async scanInvalidPointSourcePaths(): Promise<IRPointSourcePathScanResult> {
+		await this.initialize();
+		const descriptors = await this.listKnownPointFileDescriptors();
+		const affectedFiles: IRPointSourcePathScanResult["affectedFiles"] = [];
+		let invalidPointCount = 0;
+		let invalidFieldCount = 0;
+
+		for (const descriptor of descriptors) {
+			const fileData = await this.readPointFile(
+				descriptor.absolutePath,
+				descriptor.topicId,
+				descriptor.topicName
+			);
+			let fileInvalidPointCount = 0;
+			let fileInvalidFieldCount = 0;
+
+			for (const point of fileData.points || []) {
+				const fieldCount = countInvalidSourcePathFieldsInRawPoint(point);
+				if (fieldCount <= 0) {
+					continue;
+				}
+				fileInvalidPointCount += 1;
+				fileInvalidFieldCount += fieldCount;
+			}
+
+			if (fileInvalidPointCount <= 0) {
+				continue;
+			}
+
+			invalidPointCount += fileInvalidPointCount;
+			invalidFieldCount += fileInvalidFieldCount;
+			affectedFiles.push({
+				absolutePath: descriptor.absolutePath,
+				topicId: fileData.topicId,
+				topicName: fileData.topicName,
+				invalidPointCount: fileInvalidPointCount,
+				invalidFieldCount: fileInvalidFieldCount,
+			});
+		}
+
+		return {
+			invalidPointCount,
+			invalidFieldCount,
+			affectedFileCount: affectedFiles.length,
+			affectedFiles,
+		};
+	}
+
+	async normalizeAllPointSourcePathsOnDisk(): Promise<IRPointSourcePathNormalizationResult> {
+		await this.initialize();
+		const descriptors = await this.listKnownPointFileDescriptors();
+		const result: IRPointSourcePathNormalizationResult = {
+			filesUpdated: 0,
+			pointsRepaired: 0,
+			pathsCleared: 0,
+			errors: [],
+		};
+
+		for (const descriptor of descriptors) {
+			try {
+				const fileData = await this.readPointFile(
+					descriptor.absolutePath,
+					descriptor.topicId,
+					descriptor.topicName
+				);
+				let fileChanged = false;
+				const nextPoints = (fileData.points || []).map((point) => {
+					const sanitized = sanitizePointSourcePathFields(point);
+					if (!sanitized.changed) {
+						return point;
+					}
+					fileChanged = true;
+					result.pointsRepaired += 1;
+					result.pathsCleared += sanitized.clearedFields.length;
+					return sanitized.point;
+				});
+
+				if (!fileChanged) {
+					continue;
+				}
+
+				await this.persistPointFileData(descriptor.absolutePath, {
+					...fileData,
+					points: nextPoints,
+					updatedAt: new Date().toISOString(),
+				});
+				result.filesUpdated += 1;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				result.errors.push(`${descriptor.absolutePath}: ${message}`);
+				logger.warn("[IRPointStorageService] 规范化来源路径失败", {
+					path: descriptor.absolutePath,
+					error,
+				});
+			}
+		}
+
+		if (result.filesUpdated > 0) {
+			this.invalidatePointSnapshotListCache();
+		}
+
+		return result;
 	}
 
 	/**
@@ -1277,12 +1439,18 @@ export class IRPointStorageService {
 			const topicId = String(fileData.topicId || "").trim() || DEFAULT_TOPIC_ID;
 			const topicName = String(fileData.topicName || "").trim() || DEFAULT_TOPIC_NAME;
 			const pointCount = Array.isArray(fileData.points) ? fileData.points.length : 0;
+			const pointIds = Array.isArray(fileData.points)
+				? fileData.points
+						.map((point) => String(point?.id || "").trim())
+						.filter(Boolean)
+				: [];
 			const updatedAt = String(fileData.updatedAt || "").trim() || new Date().toISOString();
 			const draftEntry: IRPointFileIndex["files"][number] = {
 				topicId,
 				topicName,
 				file: absolutePath,
 				pointCount,
+				pointIds,
 				updatedAt,
 			};
 
@@ -1293,7 +1461,8 @@ export class IRPointStorageService {
 				String(previous.topicName || "").trim() !== topicName ||
 				Number(previous.pointCount || 0) !== pointCount ||
 				String(previous.topicId || "").trim() !== topicId ||
-				String(previous.updatedAt || "").trim() !== updatedAt
+				String(previous.updatedAt || "").trim() !== updatedAt ||
+				this.serializePointIdList(previous.pointIds) !== this.serializePointIdList(pointIds)
 			) {
 				updated += 1;
 			}
@@ -1718,8 +1887,8 @@ export class IRPointStorageService {
 				const hasStoredSource = this.hasEmbeddedPointSource(point);
 				const hasResolvedSource = this.hasEmbeddedPointSource(normalizedPoint);
 				if (!hasStoredSource) {
-					pendingEmbeddedSourceCount += 1;
 					if (hasResolvedSource) {
+						pendingEmbeddedSourceCount += 1;
 						pointSourceBackfills.push({
 							filePath,
 							topicId: entry.topicId,
@@ -2083,10 +2252,13 @@ export class IRPointStorageService {
 			plan.pendingEmbeddedSourceCount > 0 ||
 			(blockLegacyCleanupOnMissingTargets && plan.missingEmbeddedSourceTargetCount > 0)
 		) {
-			logger.warn("[IRPointStorageService] 材料残留清理被阻止，仍存在未解决的阅读点溯源问题", {
-				pendingEmbeddedSourceCount: plan.pendingEmbeddedSourceCount,
-				missingEmbeddedSourceTargetCount: plan.missingEmbeddedSourceTargetCount,
-			});
+			logger.warn(
+				`[IRPointStorageService] 材料残留清理被阻止，仍存在未解决的阅读点溯源问题（待补全溯源 ${plan.pendingEmbeddedSourceCount}，目标文件缺失 ${plan.missingEmbeddedSourceTargetCount}）`,
+				{
+					pendingEmbeddedSourceCount: plan.pendingEmbeddedSourceCount,
+					missingEmbeddedSourceTargetCount: plan.missingEmbeddedSourceTargetCount,
+				}
+			);
 		}
 
 		await DirectoryUtils.pruneEmptyDirsUnder(this.adapter, this.getV2Paths().ir.root, {
@@ -2382,6 +2554,55 @@ export class IRPointStorageService {
 			this.normalizePointFileData(fileData, fileData.topicId, fileData.topicName)
 		);
 		this.invalidatePointSnapshotListCache();
+		await this.syncPointFileIndexEntryFromData(path, fileData);
+	}
+
+	private async syncPointFileIndexEntryFromData(
+		absolutePath: string,
+		fileData: IRPointFileData
+	): Promise<void> {
+		const normalizedPath = normalizePath(String(absolutePath || "").trim());
+		if (!normalizedPath) {
+			return;
+		}
+
+		const pointIds = Array.isArray(fileData.points)
+			? fileData.points.map((point) => String(point?.id || "").trim()).filter(Boolean)
+			: [];
+		const topicId = String(fileData.topicId || "").trim();
+		const topicName = String(fileData.topicName || "").trim();
+		const updatedAt = String(fileData.updatedAt || "").trim() || new Date().toISOString();
+		const pointCount = pointIds.length;
+
+		const index = await this.readPointFilesIndex();
+		const entry = this.findIndexEntryByFilePath(index.files, normalizedPath);
+		if (entry) {
+			entry.topicId = topicId || entry.topicId;
+			entry.topicName = topicName || entry.topicName;
+			entry.pointCount = pointCount;
+			entry.pointIds = pointIds;
+			entry.updatedAt = updatedAt;
+		} else if (topicId) {
+			index.files.push({
+				topicId,
+				topicName,
+				file: normalizedPath,
+				pointCount,
+				pointIds,
+				updatedAt,
+			});
+		}
+
+		index.updatedAt = new Date().toISOString();
+		await this.writePointFilesIndex(index);
+
+		for (const pointId of pointIds) {
+			this.pointIdLocationIndex.set(pointId, {
+				absolutePath: normalizedPath,
+				topicId,
+				topicName,
+			});
+		}
 	}
 
 	private async readPointFile(path: string, topicId: string, topicName: string): Promise<IRPointFileData> {
@@ -2453,6 +2674,112 @@ export class IRPointStorageService {
 	invalidatePointSnapshotListCache(): void {
 		this.snapshotListCacheVersion += 1;
 		this.snapshotListCache = null;
+		this.invalidatePointIdLocationIndex();
+	}
+
+	private invalidatePointIdLocationIndex(): void {
+		this.pointIdLocationIndex.clear();
+		this.pointIdLocationIndexReady = false;
+	}
+
+	private async ensurePointIdLocationIndex(): Promise<void> {
+		if (this.pointIdLocationIndexReady) {
+			return;
+		}
+
+		const index = await this.readPointFilesIndex();
+		const files = index.files || [];
+		const canWarmFromIndex =
+			files.length > 0 && files.every((entry) => Array.isArray(entry.pointIds));
+
+		if (canWarmFromIndex) {
+			for (const entry of files) {
+				const resolved = this.resolveIndexedPointFilePath(entry.file);
+				const absolutePath = resolved?.absolutePath;
+				if (!absolutePath) {
+					continue;
+				}
+				const topicId = String(entry.topicId || "").trim();
+				const topicName = String(entry.topicName || "").trim();
+				for (const pointId of entry.pointIds || []) {
+					const normalizedId = String(pointId || "").trim();
+					if (!normalizedId) {
+						continue;
+					}
+					this.pointIdLocationIndex.set(normalizedId, {
+						absolutePath,
+						topicId,
+						topicName,
+					});
+				}
+			}
+			this.pointIdLocationIndexReady = true;
+			return;
+		}
+
+		const descriptors = await this.listKnownPointFileDescriptors();
+		for (const descriptor of descriptors) {
+			const fileData = await this.readPointFile(
+				descriptor.absolutePath,
+				descriptor.topicId,
+				descriptor.topicName
+			);
+			for (const point of fileData.points) {
+				const pointId = String(point?.id || "").trim();
+				if (!pointId) {
+					continue;
+				}
+				this.pointIdLocationIndex.set(pointId, {
+					absolutePath: descriptor.absolutePath,
+					topicId: descriptor.topicId,
+					topicName: descriptor.topicName,
+				});
+			}
+		}
+
+		this.pointIdLocationIndexReady = true;
+	}
+
+	private async readPointSnapshotFromDescriptor(
+		pointId: string,
+		descriptor: { absolutePath: string; topicId: string; topicName: string }
+	): Promise<IRPointSnapshot | null> {
+		const legacyReadApi = this.getLegacyReadApi();
+		const [legacyMaterials, materialDescriptors] = await Promise.all([
+			getLegacyMaterials(legacyReadApi),
+			this.listMaterialDescriptors(),
+		]);
+		const materialRecords = new Map<string, IRMaterialRecord>();
+		for (const materialDescriptor of materialDescriptors) {
+			if (!materialRecords.has(materialDescriptor.id)) {
+				materialRecords.set(materialDescriptor.id, materialDescriptor.record);
+			}
+		}
+
+		const fileData = await this.readPointFile(
+			descriptor.absolutePath,
+			descriptor.topicId,
+			descriptor.topicName
+		);
+		const point = fileData.points.find(
+			(candidate) => String(candidate?.id || "").trim() === pointId
+		);
+		if (!point) {
+			return null;
+		}
+
+		const normalizedPoint = this.normalizeStoredPoint(
+			point,
+			materialRecords.get(String(point.materialId || "").trim()) || null,
+			legacyMaterials.get(String(point.materialId || "").trim())
+		);
+
+		return {
+			point: normalizedPoint,
+			material: this.buildSyntheticMaterialRecord(normalizedPoint),
+			topicId: descriptor.topicId,
+			topicName: descriptor.topicName,
+		};
 	}
 
 	getSnapshotListCacheVersion(): number {
@@ -2460,7 +2787,9 @@ export class IRPointStorageService {
 	}
 
 	async listPointSnapshots(): Promise<IRPointSnapshot[]> {
-		await this.ensureRuntimeBaseline();
+		if (!runtimeBaselineInProgressByApp.get(this.app)) {
+			await this.ensureRuntimeBaseline();
+		}
 		if (this.snapshotListCache) {
 			return this.snapshotListCache;
 		}
@@ -2489,6 +2818,28 @@ export class IRPointStorageService {
 		const normalizedId = String(pointId || "").trim();
 		if (!normalizedId) {
 			return null;
+		}
+
+		if (this.snapshotListCache) {
+			const cached = this.snapshotListCache.find(
+				(snapshot) => String(snapshot.point.id || "").trim() === normalizedId
+			);
+			if (cached) {
+				return cached;
+			}
+		}
+
+		await this.ensurePointIdLocationIndex();
+		const indexedDescriptor = this.pointIdLocationIndex.get(normalizedId);
+		if (indexedDescriptor) {
+			const indexedSnapshot = await this.readPointSnapshotFromDescriptor(
+				normalizedId,
+				indexedDescriptor
+			);
+			if (indexedSnapshot) {
+				return indexedSnapshot;
+			}
+			this.pointIdLocationIndex.delete(normalizedId);
 		}
 
 		const legacyReadApi = this.getLegacyReadApi();
@@ -3180,6 +3531,14 @@ export class IRPointStorageService {
 		return false;
 	}
 
+	private serializePointIdList(pointIds: string[] | undefined): string {
+		return [...(pointIds || [])]
+			.map((id) => String(id || "").trim())
+			.filter(Boolean)
+			.sort((left, right) => left.localeCompare(right))
+			.join(",");
+	}
+
 	private serializePointFilesIndexFiles(files: IRPointFileIndex["files"]): string {
 		return [...(files || [])]
 			.map((entry) => {
@@ -3187,8 +3546,9 @@ export class IRPointStorageService {
 				const topicId = String(entry?.topicId || "").trim();
 				const topicName = String(entry?.topicName || "").trim();
 				const pointCount = Number(entry?.pointCount || 0);
+				const pointIds = this.serializePointIdList(entry?.pointIds);
 				const updatedAt = String(entry?.updatedAt || "").trim();
-				return `${file}|${topicId}|${topicName}|${pointCount}|${updatedAt}`;
+				return `${file}|${topicId}|${topicName}|${pointCount}|${pointIds}|${updatedAt}`;
 			})
 			.sort((left, right) => left.localeCompare(right, "zh-CN"))
 			.join("\n");
@@ -3605,6 +3965,54 @@ export class IRPointStorageService {
 		};
 	}
 
+	private async removePointCopiesFromOtherTopicFiles(
+		index: IRPointFileIndex,
+		pointId: string,
+		keepTopicId: string,
+		nowIso: string
+	): Promise<boolean> {
+		const normalizedPointId = String(pointId || "").trim();
+		const normalizedKeepTopicId = String(keepTopicId || "").trim();
+		if (!normalizedPointId || !normalizedKeepTopicId) {
+			return false;
+		}
+
+		let changed = false;
+		for (const entry of index.files) {
+			const entryTopicId = String(entry?.topicId || "").trim();
+			if (!entryTopicId || entryTopicId === normalizedKeepTopicId) {
+				continue;
+			}
+
+			const absolutePath = this.resolveIndexedPointFilePath(entry.file)?.absolutePath;
+			if (!absolutePath) {
+				continue;
+			}
+
+			const fileData = await this.readPointFile(absolutePath, entry.topicId, entry.topicName);
+			const hasPoint = fileData.points.some(
+				(candidate) => String(candidate?.id || "").trim() === normalizedPointId
+			);
+			if (!hasPoint) {
+				continue;
+			}
+
+			const nextPoints = fileData.points.filter(
+				(candidate) => String(candidate?.id || "").trim() !== normalizedPointId
+			);
+			await this.persistPointFileData(absolutePath, {
+				...fileData,
+				updatedAt: nowIso,
+				points: nextPoints,
+			});
+			entry.pointCount = nextPoints.length;
+			entry.updatedAt = nowIso;
+			changed = true;
+		}
+
+		return changed;
+	}
+
 	async syncLegacyPoint(
 		input: IRLegacyPointInput,
 		options?: { preserveExisting?: boolean }
@@ -3692,6 +4100,7 @@ export class IRPointStorageService {
 				updatedAt: nowIso,
 			});
 		}
+		await this.removePointCopiesFromOtherTopicFiles(index, input.id, topicId, nowIso);
 		await this.writePointFilesIndex(index);
 
 		return point;
@@ -3730,9 +4139,11 @@ export class IRPointStorageService {
 				String(normalizedChunk.sourceId || "").trim()
 			) ||
 			null;
-		const sourcePath = normalizePath(
-			String(source?.originalPath || source?.rawFilePath || normalizedChunk.filePath || "").trim()
-		);
+		const sourcePath =
+			sanitizeUserReadingSourcePath(source?.originalPath) ||
+			sanitizeUserReadingSourcePath(source?.rawFilePath) ||
+			sanitizeUserReadingSourcePath(normalizedChunk.filePath) ||
+			"";
 		const chunkMeta = (normalizedChunk.meta as unknown as Record<string, unknown> | undefined) || {};
 		const linkedNotePaths: string[] = [];
 		const tags = await this.readChunkTags(normalizedChunk.filePath);

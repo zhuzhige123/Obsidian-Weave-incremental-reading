@@ -5,7 +5,7 @@
   */
   
   import type { EffectiveLicenseState } from '../../../types/license';
-  import type { LicenseInfo } from '../types/settings-types';
+  import type { LicenseInfo } from '../../../types/license';
   import { currentLanguage, tr } from '../../../utils/i18n';
   import {
     formatLicenseDeviceStats,

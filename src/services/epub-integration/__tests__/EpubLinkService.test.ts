@@ -421,4 +421,76 @@ describe('EpubLinkService schedule navigation', () => {
 			})
 		);
 	});
+
+	it('delegates chapter navigation to reader interop when available', async () => {
+		const openEpubInPreferredLeaf = vi.fn(async () => mockLeaf);
+		const navigateToPublicationChapter = vi.fn(async () => undefined);
+		vi.doMock('../../../utils/epub-leaf-utils', () => ({
+			openEpubInPreferredLeaf,
+		}));
+		vi.doMock('../epub-premium', () => ({
+			ensureEpubPremiumAccess: () => true,
+		}));
+		vi.doMock('../ir-epub-storage-access', () => ({
+			getIrEpubStorageService: () => ({
+				resolveSourceFilePath: async (_sourceId?: string, filePath?: string) => filePath || '',
+			}),
+		}));
+		vi.doMock('../epub-reader-interop', () => ({
+			getEpubReaderInteropHost: () => ({ navigateToPublicationChapter }),
+		}));
+
+		const { EpubLinkService: ScheduleEpubLinkService } = await import('../EpubLinkService');
+		const service = new ScheduleEpubLinkService({
+			workspace: { setActiveLeaf: vi.fn() },
+		} as any);
+
+		await service.navigateToEpubScheduleMaterial('Books/demo.epub', {
+			tocHref: 'Text/chapter1.xhtml',
+			sourceId: 'epubsrc-demo',
+		});
+
+		expect(navigateToPublicationChapter).toHaveBeenCalledWith(
+			'Books/demo.epub',
+			'Text/chapter1.xhtml',
+			{ sourceId: 'epubsrc-demo' }
+		);
+		expect(openEpubInPreferredLeaf).not.toHaveBeenCalled();
+	});
+
+	it('uses pendingLocate.href when reader interop is unavailable', async () => {
+		const openEpubInPreferredLeaf = vi.fn(async () => mockLeaf);
+		vi.doMock('../../../utils/epub-leaf-utils', () => ({
+			openEpubInPreferredLeaf,
+		}));
+		vi.doMock('../epub-premium', () => ({
+			ensureEpubPremiumAccess: () => true,
+		}));
+		vi.doMock('../ir-epub-storage-access', () => ({
+			getIrEpubStorageService: () => ({
+				resolveSourceFilePath: async (_sourceId?: string, filePath?: string) => filePath || '',
+			}),
+		}));
+		vi.doMock('../epub-reader-interop', () => ({
+			getEpubReaderInteropHost: () => null,
+		}));
+
+		const { EpubLinkService: ScheduleEpubLinkService } = await import('../EpubLinkService');
+		const service = new ScheduleEpubLinkService({
+			workspace: { setActiveLeaf: vi.fn() },
+		} as any);
+
+		await service.navigateToEpubScheduleMaterial('Books/demo.epub', {
+			tocHref: 'Text/chapter1.xhtml',
+			sourceId: 'epubsrc-demo',
+		});
+
+		expect(openEpubInPreferredLeaf).toHaveBeenCalledWith(
+			expect.anything(),
+			'Books/demo.epub',
+			expect.objectContaining({
+				pendingLocate: { href: 'Text/chapter1.xhtml' },
+			})
+		);
+	});
 });

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tr } from '../../utils/i18n';
+
   export interface ImpactedPreviewItem {
     id: string;
     title: string;
@@ -27,28 +29,29 @@
   }
 
   let { preview }: Props = $props();
+  let t = $derived($tr);
 </script>
 
 {#if preview}
   <div class="ir-calendar-preview-summary">
-    <div class="preview-kicker">实时预览</div>
+    <div class="preview-kicker">{t('irSchedulePreview.kicker')}</div>
     <div class="preview-headline">
-      <span class="preview-headline-label">调整后</span>
+      <span class="preview-headline-label">{t('irSchedulePreview.afterLabel')}</span>
       <span class="preview-headline-value">{preview.beforeDateText} -> {preview.afterDateText}</span>
     </div>
     {#if preview.changedItemCount > 0 || preview.impactedDays > 0}
       <div class="preview-meta">
         {#if preview.changedItemCount > 0}
-          <span class="preview-chip">联动 {preview.changedItemCount} 项</span>
+          <span class="preview-chip">{t('irSchedulePreview.linkedItems', { count: preview.changedItemCount })}</span>
         {/if}
         {#if preview.impactedDays > 0}
-          <span class="preview-chip">影响未来 {preview.impactedDays} 天</span>
+          <span class="preview-chip">{t('irSchedulePreview.impactedDays', { days: preview.impactedDays })}</span>
         {/if}
       </div>
     {/if}
     {#if preview.impactedItems.length > 0}
       <div class="preview-section">
-        <div class="preview-section-title">联动阅读点</div>
+        <div class="preview-section-title">{t('irSchedulePreview.linkedPointsTitle')}</div>
         {#each preview.impactedItems as item}
           <div class="preview-row">
             <span class="preview-name">{item.title}</span>
@@ -59,11 +62,11 @@
     {/if}
     {#if preview.dayDeltas.length > 0}
       <div class="preview-section">
-        <div class="preview-section-title">负载预览</div>
+        <div class="preview-section-title">{t('irSchedulePreview.loadTitle')}</div>
         {#each preview.dayDeltas as day}
           <div class="preview-row">
             <span class="preview-name">{day.dateKey}</span>
-            <span class="preview-change">{day.beforeMinutes.toFixed(1)} -> {day.afterMinutes.toFixed(1)} 分钟</span>
+            <span class="preview-change">{t('irSchedulePreview.minutesChange', { before: day.beforeMinutes.toFixed(1), after: day.afterMinutes.toFixed(1) })}</span>
           </div>
         {/each}
       </div>

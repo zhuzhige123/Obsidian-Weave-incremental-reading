@@ -9,7 +9,12 @@
 
 import type { ContentBlock, RuleSplitConfig } from "../types/content-split-types";
 import { SPLIT_MARKER_REGEX, generateSplitMarkerId } from "../types/content-split-types";
+import { i18n } from "./i18n";
 import { extractBodyContent, parseYAMLFromContent } from "./yaml-utils";
+
+function untitledChunkLabel(): string {
+	return `(${i18n.t("irBlockInfo.values.noTitle")})`;
+}
 
 interface LineSegment {
 	text: string;
@@ -36,7 +41,7 @@ function sanitizeTitleLine(line: string): string {
 		.trim();
 
 	if (!cleaned) {
-		return "(无标题)";
+		return untitledChunkLabel();
 	}
 
 	return cleaned.length > 50 ? `${cleaned.substring(0, 50)}...` : cleaned;
@@ -92,7 +97,7 @@ function extractTitle(content: string, preserveHeading: boolean): string {
 		return sanitizeTitleLine(trimmed);
 	}
 
-	return headingFallback || "(无标题)";
+	return headingFallback || untitledChunkLabel();
 }
 
 export function deriveFileTitleFromContent(content: string, defaultTitle?: string): string {

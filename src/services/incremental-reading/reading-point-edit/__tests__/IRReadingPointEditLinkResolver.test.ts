@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildScheduleItemFromPdfTask } from "../../IRCalendarScheduleItem";
 import {
 	canEditReadingPointLink,
@@ -6,6 +6,12 @@ import {
 	resolveSavedResumeLink,
 	summarizeReadingPointLink,
 } from "../IRReadingPointEditLinkResolver";
+
+const mockApp = {
+	vault: {
+		getAbstractFileByPath: vi.fn(),
+	},
+} as never;
 
 describe("IRReadingPointEditLinkResolver", () => {
 	it("prefers persisted pdf task link over stale schedule projection", () => {
@@ -24,7 +30,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 		} as any);
 
 		expect(
-			resolveReadingPointLinkInputFromParts({
+			resolveReadingPointLinkInputFromParts(mockApp, {
 				material: { ...material, resumeLink: "[[Doc.pdf#page=3]]" },
 				pdfTask: { link: "[[Doc.pdf#page=2]]" } as any,
 			})
@@ -33,7 +39,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 
 	it("prefers chunk meta resumeLink over stale schedule projection", () => {
 		expect(
-			resolveReadingPointLinkInputFromParts({
+			resolveReadingPointLinkInputFromParts(mockApp, {
 				material: {
 					id: "chunk-1",
 					sourceType: "chunk",
@@ -51,7 +57,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 
 	it("prefers persisted snapshot metadata resumeLink over stale schedule projection", () => {
 		expect(
-			resolveReadingPointLinkInputFromParts({
+			resolveReadingPointLinkInputFromParts(mockApp, {
 				material: {
 					id: "epubbm-1",
 					sourceType: "epub",
@@ -73,7 +79,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 
 	it("prefers persisted snapshot metadata resumeLink over stale chunk projection", () => {
 		expect(
-			resolveReadingPointLinkInputFromParts({
+			resolveReadingPointLinkInputFromParts(mockApp, {
 				material: {
 					id: "chunk-1",
 					sourceType: "chunk",

@@ -2,6 +2,20 @@ import { TFile } from 'obsidian';
 import { IRPointWriteService } from '../IRPointWriteService';
 import { IRStorageService } from '../IRStorageService';
 
+vi.mock('../../epub-integration/ir-epub-storage-access', () => ({
+  getIrEpubStorageService: () => ({
+    async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+      return {
+        sourceId: options?.preferredSourceId || `src-${filePath}`,
+        filePath,
+      };
+    },
+    async resolveSourceFilePath(_sourceId: string, fallbackPath?: string) {
+      return fallbackPath || null;
+    },
+  }),
+}));
+
 describe('IRStorageService.deleteChunkData', () => {
   it('删除最后一个同源阅读块时应清理源 Markdown 的增量阅读 frontmatter 并追加已删除标签', async () => {
     const frontmatter: Record<string, unknown> = {
@@ -17,6 +31,7 @@ describe('IRStorageService.deleteChunkData', () => {
     }) as TFile;
 
     const app = {
+      plugins: { getPlugin: vi.fn(() => null) },
       vault: {
         getAbstractFileByPath: vi.fn((filePath: string) => filePath === 'notes/source.md' ? sourceFile : null)
       },
@@ -105,6 +120,7 @@ describe('IRStorageService.deleteChunkData', () => {
     }) as TFile;
 
     const app = {
+      plugins: { getPlugin: vi.fn(() => null) },
       vault: {
         getAbstractFileByPath: vi.fn((filePath: string) => filePath === 'notes/external-ir.md' ? externalFile : null)
       },
@@ -192,6 +208,7 @@ describe('IRStorageService.deleteDeck', () => {
     const trashFile = vi.fn(async () => {});
     const remove = vi.fn(async () => {});
     const app = {
+      plugins: { getPlugin: vi.fn(() => null) },
       vault: {
         getAbstractFileByPath: vi.fn((filePath: string) => filePath === 'notes/topic-source.md' ? sourceFile : null),
         adapter: {
@@ -268,6 +285,9 @@ describe('IRStorageService.deleteDeck', () => {
     }) as TFile;
 
     const app = {
+      plugins: {
+        getPlugin: vi.fn(() => null),
+      },
       vault: {
         getAbstractFileByPath: vi.fn((filePath: string) => filePath === 'notes/topic-external.md' ? sourceFile : null),
         adapter: {
@@ -500,5 +520,75 @@ describe('IRStorageService study session deck compatibility', () => {
       expect.any(String),
       expect.stringContaining('session-canonical')
     );
+  });
+});
+
+describe('IRStorageService.getChunkData', () => {
+  it('uses point snapshot lookup instead of scanning all chunks', async () => {
+    const app = { vault: { getAbstractFileByPath: vi.fn() } };
+    const service = new IRStorageService(app as any);
+    const getAllChunkDataSpy = vi.spyOn(service, 'getAllChunkData');
+    vi.spyOn(service as any, 'initialize').mockResolvedValue(undefined);
+
+    const snapshot = {
+      point: {
+        id: 'chunk-1',
+        pointType: 'chunk-entry',
+        materialId: 'source-1',
+        schedule: { status: 'new', manualPriority: 0, priorityScore: 0, intervalDays: 1 },
+        relations: { topicIds: ['deck-1'] },
+        source: { path: 'notes/source.md', title: 'source', type: 'markdown' },
+        userData: {},
+        metadata: {},
+        stats: { totalReadingTimeMs: 0 },
+        timestamps: { lastInteractionAt: null },
+        trace: { locator: {}, locatorType: 'markdown-chunk' },
+      },
+      material: null,
+      topicId: 'deck-1',
+      topicName: 'deck',
+    };
+
+    const getPointSnapshotById = vi.fn().mockResolvedValue(snapshot);
+    vi.spyOn(service as any, 'getPointStorageService').mockReturnValue({
+      getPointSnapshotById,
+    });
+
+    const chunk = await service.getChunkData('chunk-1');
+
+    expect(getPointSnapshotById).toHaveBeenCalledWith('chunk-1');
+    expect(getAllChunkDataSpy).not.toHaveBeenCalled();
+    expect(chunk?.chunkId).toBe('chunk-1');
+  });
+
+  it('returns null when point snapshot is missing', async () => {
+    const app = { vault: { getAbstractFileByPath: vi.fn() } };
+    const service = new IRStorageService(app as any);
+    vi.spyOn(service as any, 'initialize').mockResolvedValue(undefined);
+    vi.spyOn(service as any, 'getPointStorageService').mockReturnValue({
+      getPointSnapshotById: vi.fn().mockResolvedValue(null),
+    });
+
+    await expect(service.getChunkData('missing-chunk')).resolves.toBeNull();
+  });
+});
+
+describe('IRStorageService.readDeckNamesFromYAML', () => {
+  it('skips directory paths without attempting adapter.read', async () => {
+    const readMock = vi.fn();
+    const statMock = vi.fn().mockResolvedValue({ type: 'folder' });
+    const app = {
+      vault: {
+        adapter: {
+          exists: vi.fn().mockResolvedValue(true),
+          stat: statMock,
+          read: readMock,
+        },
+      },
+    };
+    const service = new IRStorageService(app as any);
+
+    await expect(service.readDeckNamesFromYAML('/')).resolves.toBeNull();
+    expect(readMock).not.toHaveBeenCalled();
   });
 });

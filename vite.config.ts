@@ -207,9 +207,7 @@ export default defineConfig(({ mode }) => {
 									dest: ".",
 								},
 						  ]
-						: isDev
-							? []
-							: []),
+						: []),
 				],
 			}),
 			svelte({
@@ -343,7 +341,7 @@ export default defineConfig(({ mode }) => {
 			},
 			outDir: isDev ? buildOutDir : "dist",
 			copyPublicDir: false,
-			emptyOutDir: false,
+			emptyOutDir: isDev ? false : true,
 			sourcemap: buildSourceMap,
 			target: ["es2020"],
 			minify: shouldMinifyOutput ? "esbuild" : false,

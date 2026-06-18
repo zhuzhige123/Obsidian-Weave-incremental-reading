@@ -15,7 +15,7 @@ vi.mock("../IRScheduleIndexService", () => ({
 			const epubService = new IREpubBookmarkTaskService(app);
 			await Promise.all([storage.initialize(), pdfService.initialize(), epubService.initialize()]);
 			return {
-				chunks: Object.values((await storage.getAllChunkDataWithSync()) || {}),
+				chunks: Object.values((await storage.getAllChunkData()) || {}),
 				blocks: Object.values(await storage.getAllBlocks()),
 				pdfTasks: await pdfService.getAllTasks(),
 				epubTasks: await epubService.getAllTasks(),
@@ -125,7 +125,7 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 				blockIds: [],
 			} as any,
 		});
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({});
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({});
 	});
 
 	afterEach(() => {
@@ -183,7 +183,7 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 
 	it("does not surface chunk-level associated notes in schedule items", async () => {
 		const v2Paths = getV2Paths("");
-		vi.spyOn(IRStorageService.prototype, "getAllChunkDataWithSync").mockResolvedValue({
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({
 			"chunk-array-only": {
 				chunkId: "chunk-array-only",
 				filePath: "Books/Chunk.md",

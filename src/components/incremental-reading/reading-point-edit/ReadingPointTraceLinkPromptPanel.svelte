@@ -10,6 +10,7 @@
   import { buildReadingTargetPreviewMarkdown } from '../../../services/incremental-reading/reading-target/IRReadingTargetCurrentLocation';
   import { getReadingTargetKindLabel } from '../../../services/incremental-reading/reading-target/IRReadingTargetTitleResolver';
   import type { ParsedReadingTarget } from '../../../services/incremental-reading/reading-target/IRReadingTargetTypes';
+  import { tr } from '../../../utils/i18n';
 
   export interface ReadingPointTraceLinkPanelState {
     linkInput: string;
@@ -28,6 +29,8 @@
   }
 
   let { plugin, draft, onStateChange }: Props = $props();
+
+  let t = $derived($tr);
 
   let linkInput = $state(draft.linkInput);
   const originalLinkInput = draft.originalLinkInput;
@@ -70,7 +73,7 @@
     parsedTarget = trimmed ? parseReadingTargetInput(plugin.app, trimmed, contextPath) : null;
     previewMarkdown =
       parsedTarget && !parsedTarget.validationError && parsedTarget.kind !== 'unknown'
-        ? buildReadingTargetPreviewMarkdown(parsedTarget, draft.title || '预览')
+        ? buildReadingTargetPreviewMarkdown(parsedTarget, draft.title || t('irReadingPointEdit.previewFallback'))
         : '';
     previewSourcePath = parsedTarget?.sourceFilePath || contextPath;
   }
@@ -97,13 +100,13 @@
 
 <div class="reading-point-trace-link-body">
   <div class="add-reading-target-panel">
-    <span class="panel-title">定位链接</span>
+    <span class="panel-title">{t('irReadingPointEdit.traceLink.linkTitle')}</span>
     <textarea
       class="link-input"
       bind:value={linkInput}
       oninput={handleLinkInputChange}
       rows="4"
-      placeholder="粘贴 https://…、[[笔记#^块ID]] 或 EPUB/PDF 定位链接"
+      placeholder={t('irReadingPointEdit.traceLink.linkPlaceholder')}
     ></textarea>
     {#if parsedTarget && parsedTarget.kind !== 'unknown' && !validationMessage}
       <div class="target-meta">
@@ -113,13 +116,13 @@
     {#if validationMessage && linkInputTouched}
       <p class="field-error">{validationMessage}</p>
     {:else if !linkInput.trim()}
-      <p class="field-hint">支持网页 URL、Obsidian 双链、块引用与 EPUB/PDF 定位格式。</p>
+      <p class="field-hint">{t('irReadingPointEdit.traceLink.supportedFormatsHint')}</p>
     {/if}
   </div>
 
   {#if previewMarkdown}
     <div class="add-reading-target-panel preview-panel">
-      <span class="panel-title">定位预览</span>
+      <span class="panel-title">{t('irReadingPointEdit.traceLink.locationPreview')}</span>
       <div class="preview-surface">
         <MarkdownRenderer plugin={plugin} source={previewMarkdown} sourcePath={previewSourcePath} />
       </div>
@@ -134,9 +137,9 @@
           bind:checked={preserveScheduleOnLinkChange}
           onchange={handlePreserveScheduleChange}
         />
-        <span>保留复习计划</span>
+        <span>{t('irReadingPointEdit.traceLink.preserveSchedule')}</span>
       </label>
-      <p class="field-hint">修改链接后仍保留当前下次复习时间与间隔。</p>
+      <p class="field-hint">{t('irReadingPointEdit.traceLink.preserveScheduleHint')}</p>
     </div>
   {/if}
 </div>

@@ -10,6 +10,7 @@
 
 import type { App, Editor, TFile } from "obsidian";
 import { MarkdownView, Notice } from "obsidian";
+import { i18n } from "../../utils/i18n";
 import type {
 	AnchorRecord,
 	ReadingMaterial,
@@ -73,6 +74,10 @@ export class AnchorManager {
 	}
 
 	private async isIRFile(file: TFile): Promise<boolean> {
+		if (file.extension === "irdeck") {
+			return true;
+		}
+
 		try {
 			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 			const fmType =
@@ -150,11 +155,11 @@ export class AnchorManager {
 				// 首次标记锚点，自动创建阅读材料
 				material = await this.createMaterialForFile(file, anchorId);
 				materialCreated = true;
-				new Notice("已创建阅读材料并标记锚点");
+				new Notice(i18n.t("irServiceNotices.anchor.createdMaterialAndAnchor"));
 			} else {
 				// 更新现有材料的锚点
 				await this.updateMaterialAnchor(material, file, anchorId);
-				new Notice("已标记阅读锚点");
+				new Notice(i18n.t("irServiceNotices.anchor.markedAnchor"));
 			}
 
 			return {

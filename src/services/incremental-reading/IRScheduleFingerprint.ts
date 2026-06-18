@@ -1,4 +1,5 @@
 import type { IRBlock, IRBlockMeta, IRChunkFileData, IRDeck } from "../../types/ir-types";
+import type { IRPointFileIndex } from "../../types/ir-point-storage-types";
 import type { IRWorkspaceDataSnapshot } from "./IRWorkspaceSnapshotService";
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 
@@ -79,15 +80,6 @@ export function buildScheduleFingerprint(source: IRScheduleFingerprintSource): s
 	}
 
 	const blockSignals: Record<string, unknown> = {};
-	for (const [blockId, block] of Object.entries(source.blocksRecord || {})) {
-		blockSignals[blockId] = {
-			state: block.state,
-			nextReview: block.nextReview,
-			interval: block.interval,
-			priority: block.priority,
-			deckPath: block.deckPath,
-		};
-	}
 
 	const deckSignals: Record<string, unknown> = {};
 	for (const [deckKey, deck] of Object.entries(source.decksRecord || {})) {
@@ -140,6 +132,31 @@ export function buildScheduleFingerprintFromWorkspace(
 		chunksRecord: workspaceData.chunksRecord,
 		pdfTasks: workspaceData.pdfTasks,
 		epubTasks: workspaceData.epubTasks,
+	});
+}
+
+/**
+ * 持久化 revision：基于 point-files-index 内容，跨 Obsidian 重启稳定。
+ * 替代会话内 snapshotListCacheVersion 用于 schedule-index freshness。
+ */
+export function buildPointFilesIndexRevision(index: IRPointFileIndex): string {
+	const fileSignals = (index.files || [])
+		.map((entry) => ({
+			file: String(entry.file || "").trim(),
+			topicId: String(entry.topicId || "").trim(),
+			pointCount: Math.max(0, Number(entry.pointCount || 0)),
+			updatedAt: String(entry.updatedAt || "").trim(),
+			pointIds: Array.isArray(entry.pointIds)
+				? [...entry.pointIds].map((id) => String(id || "").trim()).filter(Boolean).sort()
+				: [],
+		}))
+		.filter((entry) => entry.file)
+		.sort((left, right) => left.file.localeCompare(right.file));
+
+	return hashStableValue({
+		schemaVersion: Number(index.schemaVersion || 0),
+		updatedAt: String(index.updatedAt || "").trim(),
+		files: fileSignals,
 	});
 }
 

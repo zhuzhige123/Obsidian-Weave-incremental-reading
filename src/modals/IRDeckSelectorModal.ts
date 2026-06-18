@@ -1,5 +1,6 @@
 import { type App, SuggestModal, setIcon } from "obsidian";
 import type { IRDeck } from "../types/ir-types";
+import { i18n } from "../utils/i18n";
 import { ensureSuggestModalTheme, markLatestSuggestionContainer } from "./suggestModalTheme";
 
 export class IRDeckSelectorModal extends SuggestModal<IRDeck> {
@@ -11,11 +12,11 @@ export class IRDeckSelectorModal extends SuggestModal<IRDeck> {
 		this.decks = decks;
 		this.onSelect = onSelect;
 
-		this.setPlaceholder("搜索增量阅读专题...");
+		this.setPlaceholder(i18n.t("irModals.deckSelector.placeholder"));
 		this.setInstructions([
-			{ command: "↑↓", purpose: "导航" },
-			{ command: "↵", purpose: "选择" },
-			{ command: "esc", purpose: "关闭" },
+			{ command: "↑↓", purpose: i18n.t("irModals.deckSelector.instructions.navigate") },
+			{ command: "↵", purpose: i18n.t("irModals.deckSelector.instructions.select") },
+			{ command: "esc", purpose: i18n.t("irModals.deckSelector.instructions.close") },
 		]);
 	}
 

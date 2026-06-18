@@ -8,6 +8,7 @@
   import { logger } from '../../utils/logger';
   import { normalizeTagSuggestionOptions, TagInputSuggest } from '../../utils/tag-suggest';
   import { tr } from '../../utils/i18n';
+  import { SCHEDULE_ITEM_TYPE_BADGES } from '../../services/incremental-reading/IRCalendarScheduleItemTypeBadge';
 
   type DataSource = 'memory' | 'questionBank' | 'incremental-reading';
   type TagSuggestionOption = string | { name: string; count?: number };
@@ -30,6 +31,7 @@
     availableTags?: TagSuggestionOption[];
     availablePriorities?: number[];
     availableQuestionTypes?: string[];
+    availableReadingPointTypes?: string[];
     availableSources?: string[];
     availableStatuses?: string[];
     availableStates?: string[];
@@ -58,6 +60,7 @@
     availableTags = [],
     availablePriorities = [],
     availableQuestionTypes = [],
+    availableReadingPointTypes = [...SCHEDULE_ITEM_TYPE_BADGES],
     availableSources = [],
     availableStatuses = [],
     availableStates = [],
@@ -114,6 +117,11 @@
       opts.push({ prefix: 'attempts:', label: t('management.cardSearch.options.attempts'), afterInsert: () => showAttemptsSuggestions() });
       opts.push({ prefix: 'error:', label: t('management.cardSearch.options.error'), afterInsert: () => showErrorSuggestions() });
     } else if (dataSource === 'incremental-reading') {
+      opts.push({
+        prefix: 'type:',
+        label: t('management.cardSearch.options.readingPointType'),
+        afterInsert: () => showReadingPointTypeSuggestions()
+      });
       opts.push({ prefix: 'state:', label: t('management.cardSearch.options.state'), afterInsert: () => showStateSuggestions() });
     }
     return opts;
@@ -261,7 +269,11 @@
     } else if (lastWord.endsWith('priority:')) {
       showPrioritySuggestions();
     } else if (lastWord.endsWith('type:')) {
-      showTypeSuggestions();
+      if (dataSource === 'incremental-reading') {
+        showReadingPointTypeSuggestions();
+      } else {
+        showTypeSuggestions();
+      }
     } else if (lastWord.endsWith('source:')) {
       showSourceSuggestions();
     } else if (lastWord.endsWith('status:')) {
@@ -618,6 +630,25 @@
       item.setDisabled(true);
     });
     availableQuestionTypes.forEach((type) => {
+      menu.addItem((item) => {
+        item.setTitle(type);
+        item.onClick(() => {
+          replaceLastWord(type);
+        });
+      });
+    });
+    showMenuSafe(menu);
+  }
+
+  function showReadingPointTypeSuggestions() {
+    if (!containerRef || menuShown) return;
+    const menu = new Menu();
+    (menu as any).app = app;
+    menu.addItem((item) => {
+      item.setTitle(t('management.cardSearch.menuSections.readingPointType'));
+      item.setDisabled(true);
+    });
+    availableReadingPointTypes.forEach((type) => {
       menu.addItem((item) => {
         item.setTitle(type);
         item.onClick(() => {

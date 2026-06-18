@@ -53,6 +53,7 @@ export class IRWorkspaceSnapshotService {
 	private epubService: IREpubBookmarkTaskService;
 	private workspaceDataCache: IRWorkspaceDataSnapshot | null = null;
 	private inflightWorkspaceData: Promise<IRWorkspaceDataSnapshot> | null = null;
+	private inflightWorkspaceDataVersion = -1;
 	private deckOverviewCache = new Map<string, IRDeckOverviewSnapshot>();
 	private inflightDeckOverview = new Map<string, Promise<IRDeckOverviewSnapshot>>();
 	private cacheVersion = 0;
@@ -68,6 +69,7 @@ export class IRWorkspaceSnapshotService {
 		this.cacheVersion += 1;
 		this.workspaceDataCache = null;
 		this.inflightWorkspaceData = null;
+		this.inflightWorkspaceDataVersion = -1;
 		this.deckOverviewCache.clear();
 		this.inflightDeckOverview.clear();
 	}
@@ -80,18 +82,23 @@ export class IRWorkspaceSnapshotService {
 		if (this.workspaceDataCache) {
 			return this.workspaceDataCache;
 		}
-		if (this.inflightWorkspaceData) {
+		if (
+			this.inflightWorkspaceData &&
+			this.inflightWorkspaceDataVersion === this.cacheVersion
+		) {
 			return this.inflightWorkspaceData;
 		}
 
 		const requestVersion = this.cacheVersion;
 		const snapshotPromise = this.buildWorkspaceData(requestVersion);
 		this.inflightWorkspaceData = snapshotPromise;
+		this.inflightWorkspaceDataVersion = requestVersion;
 		try {
 			return await snapshotPromise;
 		} finally {
 			if (this.inflightWorkspaceData === snapshotPromise) {
 				this.inflightWorkspaceData = null;
+				this.inflightWorkspaceDataVersion = -1;
 			}
 		}
 	}
@@ -344,7 +351,7 @@ export class IRWorkspaceSnapshotService {
 			epubTasks,
 		] = await Promise.all([
 			this.storage.getAllDecks(),
-			this.storage.getAllBlocks(),
+			Promise.resolve({} as Record<string, import("../../types/ir-types").IRBlock>),
 			this.storage.getAllChunkData(),
 			this.storage.getAllSources(),
 			this.storage.getHistory(),

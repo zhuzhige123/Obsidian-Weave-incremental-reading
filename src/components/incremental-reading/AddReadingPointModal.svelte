@@ -15,6 +15,7 @@
   import type { ParsedReadingPoint } from '../../utils/pdf-callout-parser';
   import ObsidianIcon from '../ui/ObsidianIcon.svelte';
   import { logger } from '../../utils/logger';
+  import { tr } from '../../utils/i18n';
 
   interface Props {
     plugin: WeavePlugin;
@@ -27,6 +28,8 @@
 
   let { plugin, deckId, pdfPath, parentTitle, onClose, onCreated }: Props = $props();
 
+  let t = $derived($tr);
+
   let pasteText = $state('');
   let parsedPoints = $state<ParsedReadingPoint[]>([]);
   let isParsed = $state(false);
@@ -36,13 +39,13 @@
 
   function handleParse(): void {
     if (!pasteText.trim()) {
-      new Notice('请粘贴 PDF++ 链接文本');
+      new Notice(t('irAddReadingPoint.notices.pasteRequired'));
       return;
     }
 
     const results = parsePdfCallouts(pasteText);
     if (results.length === 0) {
-      new Notice('未能解析出有效的 PDF++ 链接');
+      new Notice(t('irAddReadingPoint.notices.parseFailed'));
       return;
     }
 
@@ -112,7 +115,7 @@
         createdCount++;
       }
 
-      new Notice(`已创建 ${createdCount} 个阅读点`);
+      new Notice(t('irAddReadingPoint.notices.created', { count: createdCount }));
       logger.info(`[AddReadingPointModal] 创建 ${createdCount} 个阅读点 for ${pdfPath}`);
 
       await recomputeAndBroadcastIRData(plugin.app, 'import_materials');
@@ -120,7 +123,9 @@
       onClose();
     } catch (error) {
       logger.error('[AddReadingPointModal] 创建阅读点失败:', error);
-      new Notice(`创建失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      new Notice(t('irAddReadingPoint.notices.createFailed', {
+        message: error instanceof Error ? error.message : t('irAddReadingPoint.notices.unknownError')
+      }));
     } finally {
       creating = false;
     }
@@ -146,11 +151,11 @@
 <div class="modal-overlay" onclick={handleOverlayClick}>
   <div class="arp-modal">
     <div class="arp-header">
-      <h3>新增阅读点</h3>
+      <h3>{t('irAddReadingPoint.title')}</h3>
       <span class="arp-parent-info" title={pdfPath}>
         {parentTitle}
       </span>
-      <button type="button" class="clickable-icon arp-close" onclick={onClose} aria-label="关闭">
+      <button type="button" class="clickable-icon arp-close" onclick={onClose} aria-label={t('irAddReadingPoint.closeAriaLabel')}>
         <ObsidianIcon name="x" size={16} />
       </button>
     </div>
@@ -159,22 +164,22 @@
       {#if !isParsed}
         <div class="arp-paste-section">
           <p class="arp-hint">
-            粘贴 PDF++ 选区链接（支持多条，用空行分隔）
+            {t('irAddReadingPoint.hint')}
           </p>
           <textarea
             class="arp-textarea"
             bind:value={pasteText}
-            placeholder={`> [!PDF|] [[file.pdf#page=1&selection=...|display]]\n> > 标题文本\n\n> [!PDF|] [[file.pdf#page=2&selection=...|display]]\n> > 另一个标题`}
+            placeholder={t('irAddReadingPoint.placeholder')}
             rows={10}
           ></textarea>
         </div>
       {:else}
         <div class="arp-results-section">
           <div class="arp-results-header">
-            <span class="arp-results-count">已解析 {parsedPoints.length} 个阅读点</span>
+            <span class="arp-results-count">{t('irAddReadingPoint.parsedCount', { count: parsedPoints.length })}</span>
             <button class="arp-btn-text" onclick={resetToPaste}>
               <ObsidianIcon name="arrow-left" size={14} />
-              重新粘贴
+              {t('irAddReadingPoint.rePaste')}
             </button>
           </div>
 
@@ -186,14 +191,14 @@
                     class="clickable-icon arp-btn-icon"
                     onclick={() => adjustLevel(index, -1)}
                     disabled={pt.level === 0}
-                    title="减少层级"
+                    title={t('irAddReadingPoint.actions.decreaseLevel')}
                   >
                     <ObsidianIcon name="chevron-left" size={12} />
                   </button>
                   <button
                     class="clickable-icon arp-btn-icon"
                     onclick={() => adjustLevel(index, 1)}
-                    title="增加层级"
+                    title={t('irAddReadingPoint.actions.increaseLevel')}
                   >
                     <ObsidianIcon name="chevron-right" size={12} />
                   </button>
@@ -221,13 +226,13 @@
                 </div>
 
                 <div class="arp-point-actions">
-                  <button type="button" class="clickable-icon arp-btn-icon" onclick={() => movePoint(index, -1)} disabled={index === 0} title="上移">
+                  <button type="button" class="clickable-icon arp-btn-icon" onclick={() => movePoint(index, -1)} disabled={index === 0} title={t('irAddReadingPoint.actions.moveUp')}>
                     <ObsidianIcon name="chevron-up" size={12} />
                   </button>
-                  <button type="button" class="clickable-icon arp-btn-icon" onclick={() => movePoint(index, 1)} disabled={index === parsedPoints.length - 1} title="下移">
+                  <button type="button" class="clickable-icon arp-btn-icon" onclick={() => movePoint(index, 1)} disabled={index === parsedPoints.length - 1} title={t('irAddReadingPoint.actions.moveDown')}>
                     <ObsidianIcon name="chevron-down" size={12} />
                   </button>
-                  <button type="button" class="clickable-icon arp-btn-icon danger" onclick={() => removePoint(index)} title="删除">
+                  <button type="button" class="clickable-icon arp-btn-icon danger" onclick={() => removePoint(index)} title={t('irAddReadingPoint.actions.remove')}>
                     <ObsidianIcon name="trash-2" size={12} />
                   </button>
                 </div>
@@ -239,14 +244,14 @@
     </div>
 
     <div class="arp-footer">
-      <button class="arp-btn-secondary" onclick={onClose}>取消</button>
+      <button class="arp-btn-secondary" onclick={onClose}>{t('irAddReadingPoint.actions.cancel')}</button>
       {#if !isParsed}
         <button class="arp-btn-primary" onclick={handleParse} disabled={!pasteText.trim()}>
-          解析
+          {t('irAddReadingPoint.actions.parse')}
         </button>
       {:else}
         <button class="arp-btn-primary" onclick={handleConfirm} disabled={parsedPoints.length === 0 || creating}>
-          {creating ? '创建中...' : `确认创建 (${parsedPoints.length})`}
+          {creating ? t('irAddReadingPoint.actions.creating') : t('irAddReadingPoint.actions.confirmCreate', { count: parsedPoints.length })}
         </button>
       {/if}
     </div>

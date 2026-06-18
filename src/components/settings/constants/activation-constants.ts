@@ -148,7 +148,7 @@ export const ACTIVATION_ERROR_MESSAGES: Record<
 		title: "产品不匹配",
 		message: "此激活码不适用于当前产品",
 		details: "激活码产品ID与当前插件不匹配",
-		suggestedAction: "请确认激活码是否为Weave插件专用",
+		suggestedAction: "请确认激活码是否适用于 Weave Incremental Reading 插件",
 		recoverable: false,
 	},
 
@@ -301,8 +301,8 @@ export const ACTIVATION_HELP_TEXT = {
 
 	CONTACT_INFO: {
 		email: "tutaoyuan8@outlook.com",
-		subject: "Weave插件激活问题咨询",
-		github: "https://github.com/zhuzhige123/obsidian---Weave",
+		subject: "Weave Incremental Reading 插件激活问题咨询",
+		github: "https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading",
 		purchase: "https://pay.ldxp.cn/item/ned9pw",
 	},
 } as const;

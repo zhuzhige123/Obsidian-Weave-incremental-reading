@@ -1,4 +1,5 @@
 import { normalizePath, TFile, type App } from "obsidian";
+import { i18n } from "../../../utils/i18n";
 import type { ParagraphWorkbenchSegment } from "./types";
 import { logger } from "../../../utils/logger";
 
@@ -22,7 +23,7 @@ export function cleanParagraphBlockTitle(rawTitle: string): string {
 
 export function deriveSegmentTitleDraft(segment: ParagraphWorkbenchSegment | null | undefined): SegmentTitleDraft {
 	if (!segment) {
-		return { title: "未命名阅读点", titleDetected: false };
+		return { title: i18n.t("irSidebar.calendar.untitledPoint"), titleDetected: false };
 	}
 
 	const headingTitle = cleanParagraphBlockTitle(String(segment.title || segment.chapterTitle || ""));
@@ -43,7 +44,7 @@ export function deriveSegmentTitleDraft(segment: ParagraphWorkbenchSegment | nul
 
 	const cleanedLine = cleanParagraphBlockTitle(firstNonEmptyLine);
 	return {
-		title: cleanedLine.length > 80 ? `${cleanedLine.slice(0, 80).trim()}...` : cleanedLine || "未命名阅读点",
+		title: cleanedLine.length > 80 ? `${cleanedLine.slice(0, 80).trim()}...` : cleanedLine || i18n.t("irSidebar.calendar.untitledPoint"),
 		titleDetected: false,
 	};
 }

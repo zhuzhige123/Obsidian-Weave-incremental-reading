@@ -1,5 +1,6 @@
 import { normalizePath, type App } from "obsidian";
 import { parsePdfCallouts } from "../../../utils/pdf-callout-parser";
+import { i18n } from "../../../utils/i18n";
 import { EpubLinkService } from "../../epub-integration/EpubLinkService";
 import { EPUB_RUNTIME } from "../../epub-integration/epub-runtime";
 import { isHttpUrl } from "../../obsidian/obsidian-open-web-url";
@@ -109,43 +110,48 @@ function normalizeEpubResumeLink(raw: string): string {
 function parseEpubReadingTarget(app: App, raw: string): ParsedReadingTarget | null {
 	const label = extractMarkdownLinkLabel(raw);
 	const parsed = EpubLinkService.parseLinkMarkup(raw);
-	if (!parsed?.cfi) {
+	if (!parsed?.cfi && !parsed?.tocHref) {
 		return null;
 	}
 
 	const filePath = parsed.filePath ? normalizePath(parsed.filePath) : "";
 	const sourceId = String(parsed.sourceId || "").trim() || undefined;
 	const hasVaultFile = Boolean(filePath && app.vault.getAbstractFileByPath(filePath));
+	const normalizedResumeLink = normalizeEpubResumeLink(raw);
 
 	if (!hasVaultFile && !sourceId) {
 		return {
 			kind: "epub",
 			rawInput: raw,
-			resumeLink: normalizeEpubResumeLink(raw),
-			epubResumeLink: normalizeEpubResumeLink(raw),
-			epubCfi: parsed.cfi,
+			resumeLink: normalizedResumeLink,
+			epubResumeLink: normalizedResumeLink,
+			epubCfi: parsed.cfi || undefined,
 			epubSourceId: sourceId,
 			epubChapter: parsed.chapter,
+			epubTocHref: parsed.tocHref,
 			sourceFilePath: filePath || undefined,
 			alias: label || parsed.text || undefined,
 			titleHint: label || parsed.text || undefined,
 			validationError: filePath
-				? `未找到 EPUB 文件：${filePath}`
-				: "EPUB 链接缺少有效的 file 或 sid 参数",
+				? i18n.t("irAddTarget.parser.epubFileNotFound", { filePath })
+				: i18n.t("irAddTarget.parser.epubMissingFileOrSid"),
 		};
 	}
 
 	const tocHref =
-		typeof parsed.chapter === "number" && Number.isFinite(parsed.chapter)
+		parsed.tocHref ||
+		(typeof parsed.chapter === "number" && Number.isFinite(parsed.chapter)
 			? `#chapter-${parsed.chapter}`
-			: filePath || parsed.cfi;
+			: parsed.cfi
+				? undefined
+				: filePath);
 
 	return {
 		kind: "epub",
 		rawInput: raw,
-		resumeLink: normalizeEpubResumeLink(raw),
-		epubResumeLink: normalizeEpubResumeLink(raw),
-		epubCfi: parsed.cfi,
+		resumeLink: normalizedResumeLink,
+		epubResumeLink: normalizedResumeLink,
+		epubCfi: parsed.cfi || undefined,
 		epubSourceId: sourceId,
 		epubChapter: parsed.chapter,
 		epubTocHref: tocHref,
@@ -174,7 +180,7 @@ function validateVaultBlock(app: App, filePath: string, blockId: string): string
 	const cache = app.metadataCache.getCache(filePath);
 	const blockRef = cache?.blocks?.[blockId];
 	if (!blockRef) {
-		return `未在「${filePath}」中找到块引用 ^${blockId}`;
+		return i18n.t("irAddTarget.parser.blockRefNotFound", { filePath, blockId });
 	}
 	return null;
 }
@@ -186,7 +192,7 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 			kind: "unknown",
 			rawInput: raw,
 			resumeLink: "",
-			validationError: "请输入或粘贴链接",
+			validationError: i18n.t("irAddTarget.parser.emptyInput"),
 		};
 	}
 
@@ -220,7 +226,7 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 				kind: "unknown",
 				rawInput: raw,
 				resumeLink: "",
-				validationError: "未能解析 PDF++ 链接",
+				validationError: i18n.t("irAddTarget.parser.pdfParseFailed"),
 			};
 		}
 		if (pdfPoints.length === 1) {
@@ -250,7 +256,7 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 			kind: "unknown",
 			rawInput: raw,
 			resumeLink: raw,
-			validationError: "无法识别链接格式，请粘贴网页 URL 或 Obsidian 双链/块引用",
+			validationError: i18n.t("irAddTarget.parser.unknownFormat"),
 		};
 	}
 
@@ -261,7 +267,7 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 			kind: "unknown",
 			rawInput: raw,
 			resumeLink: wikiInner,
-			validationError: `未找到文件：${parsed.filePart}`,
+			validationError: i18n.t("irAddTarget.parser.fileNotFound", { filePath: parsed.filePart }),
 		};
 	}
 
@@ -271,8 +277,7 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 			rawInput: raw,
 			resumeLink: resolvedPath,
 			sourceFilePath: resolvedPath,
-			validationError:
-				"请粘贴 EPUB 阅读器的完整定位链接（含 cfi），例如 [章节名](obsidian://weave-epub-reader?file=...&cfi=...)",
+			validationError: i18n.t("irAddTarget.parser.epubCfiRequired"),
 		};
 	}
 

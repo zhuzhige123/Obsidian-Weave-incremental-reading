@@ -3,6 +3,14 @@ export { IrEpubSourceRegistry } from "./IrEpubSourceRegistry";
 export type { EpubSourceRegistryEntry, IrEpubStorageLike } from "./ir-epub-storage-types";
 export { loadEpubTocForIrImport } from "./ir-epub-toc-loader";
 export {
+	getEpubReaderInteropHost,
+	hasEpubReaderTocInterop,
+	hasEpubReaderChapterNavigationInterop,
+	resolveEpubReaderInteropFailure,
+} from "./epub-reader-interop";
+export { buildEpubChapterResumeLink } from "./epub-chapter-locate";
+export type { EpubReaderInteropHost } from "./epub-reader-interop";
+export {
 	registerEpubHost,
 	resolveEpubCardHost,
 	resolveEpubHost,

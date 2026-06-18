@@ -29,6 +29,7 @@ vi.mock('../IRStorageService', () => ({
     getAllDecks: vi.fn(async () => mockState.decks),
     getAllBlocks: vi.fn(async () => mockState.blocks),
     getAllSources: vi.fn(async () => mockState.sources),
+    getAllChunkData: vi.fn(async () => mockState.chunks),
     getAllChunkDataWithSync: vi.fn(async () => mockState.chunks),
     getHistory: vi.fn(async () => mockState.history),
     getStudySessions: vi.fn(async () => mockState.studySessions)
@@ -163,6 +164,7 @@ function createService() {
     getAllDecks: vi.fn(async () => mockState.decks),
     getAllBlocks: vi.fn(async () => mockState.blocks),
     getAllSources: vi.fn(async () => mockState.sources),
+    getAllChunkData: vi.fn(async () => mockState.chunks),
     getAllChunkDataWithSync: vi.fn(async () => mockState.chunks),
     getHistory: vi.fn(async () => mockState.history),
     getStudySessions: vi.fn(async () => mockState.studySessions)

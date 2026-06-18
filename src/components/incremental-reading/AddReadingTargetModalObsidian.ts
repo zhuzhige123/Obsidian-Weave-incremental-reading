@@ -2,6 +2,7 @@ import { App, Modal } from "obsidian";
 import { mount, unmount } from "svelte";
 import type WeavePlugin from "../../main";
 import { configureWeaveObsidianModalLayout } from "../../utils/obsidian-modal-layout";
+import { i18n } from "../../utils/i18n";
 import AddReadingTargetModal from "./AddReadingTargetModal.svelte";
 
 import type { ReadingTargetScheduleMode } from "../../services/incremental-reading/reading-target/IRReadingTargetScheduleDate";
@@ -28,11 +29,10 @@ export class AddReadingTargetModalObsidian extends Modal {
 	}
 
 	onOpen(): void {
-		this.setTitle("添加到增量阅读");
+		this.setTitle(i18n.t("irAddTarget.title"));
 		configureWeaveObsidianModalLayout(this, {
 			modalClass: "weave-add-reading-target-modal",
 			contentClass: "weave-add-reading-target-modal-content",
-			titleAccent: "purple",
 		});
 
 		this.footerEl = this.modalEl.createDiv({

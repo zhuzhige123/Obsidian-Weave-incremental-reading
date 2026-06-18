@@ -19,6 +19,7 @@ import {
 	type FolderSubscriptionSyncGap,
 } from "./folder-subscription-sync-state";
 import { collectMarkdownFilesForFolderSubscriptionRules } from "./folder-subscription-vault-scan";
+import { spreadBunchedDueDates } from "./IRHorizonLoadPlanner";
 
 export type { ExistingChunkLike, ExistingMaterialLike, FolderSubscriptionSyncGap };
 
@@ -105,6 +106,10 @@ async function readWeaveType(app: App, file: TFile): Promise<string> {
 
 /** 跳过插件内部 IR 系统文件；普通剪藏 md 即使带有 weave-reading-id 仍应参与订阅补齐。 */
 async function shouldSkipFolderSubscriptionFile(app: App, file: TFile): Promise<boolean> {
+	if (file.extension === "irdeck") {
+		return true;
+	}
+
 	const weaveType = await readWeaveType(app, file);
 	if (weaveType === "ir-chunk" || weaveType === "ir-index") {
 		return true;
@@ -291,6 +296,11 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 export async function applyIncrementalReadingFolderSubscriptionCandidates(options: {
 	candidates: IRFolderSubscriptionCandidate[];
 	pinToToday: boolean;
+	initialScheduleSpread?: {
+		enabled: boolean;
+		horizonDays: number;
+		anchorMs: number;
+	};
 	getOrCreateMaterial: (
 		file: TFile,
 		options: {
@@ -310,18 +320,45 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 			autoSubscribedAt: string;
 			autoSubscribedFolderPath: string;
 			pinToToday: boolean;
+			scheduleDate?: Date;
 			existingChunk?: ExistingChunkLike | null;
 			readingMaterialId: string;
 		}
 	) => Promise<boolean>;
 }): Promise<IRFolderSubscriptionApplyResult> {
-	const { candidates, pinToToday, getOrCreateMaterial, setReadingDeck, ensureChunkScheduled } = options;
+	const { candidates, pinToToday, getOrCreateMaterial, setReadingDeck, ensureChunkScheduled } =
+		options;
 	let added = 0;
 	let updated = 0;
 	let unchanged = 0;
 	const addedFiles: string[] = [];
 	const updatedFiles: string[] = [];
 	const unchangedFiles: string[] = [];
+
+	const pendingNewCandidates = candidates.filter(
+		(candidate) =>
+			candidate.needsSync && isFolderSubscriptionPendingNewEntry(candidate.syncGaps)
+	);
+	const spreadDateByPath = new Map<string, number>();
+	if (
+		pinToToday &&
+		options.initialScheduleSpread?.enabled &&
+		pendingNewCandidates.length > 1
+	) {
+		const spread = spreadBunchedDueDates(
+			pendingNewCandidates.map(() => ({
+				nextRepDate: options.initialScheduleSpread?.anchorMs ?? Date.now(),
+			})),
+			Math.max(1, options.initialScheduleSpread?.horizonDays ?? 7),
+			options.initialScheduleSpread?.anchorMs ?? Date.now()
+		);
+		pendingNewCandidates.forEach((candidate, index) => {
+			const spreadMs = spread[index]?.nextRepDate;
+			if (spreadMs) {
+				spreadDateByPath.set(candidate.file.path, spreadMs);
+			}
+		});
+	}
 
 	for (const candidate of candidates) {
 		if (!candidate.needsSync) {
@@ -350,10 +387,16 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 				: candidate.hasChunkRecord
 					? ""
 					: new Date().toISOString();
+		const spreadMs = spreadDateByPath.get(candidate.file.path);
+		const scheduleDate =
+			typeof spreadMs === "number" && Number.isFinite(spreadMs)
+				? new Date(spreadMs)
+				: undefined;
 		const changed = await ensureChunkScheduled(candidate.file, deckId, deckName, {
 			autoSubscribedAt,
 			autoSubscribedFolderPath: String(candidate.rule.folderPath || "").trim(),
-			pinToToday,
+			pinToToday: pinToToday && !scheduleDate,
+			scheduleDate,
 			existingChunk: candidate.existingChunk,
 			readingMaterialId: material.uuid,
 		});

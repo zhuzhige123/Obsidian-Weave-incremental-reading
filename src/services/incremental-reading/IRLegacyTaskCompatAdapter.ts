@@ -5,6 +5,7 @@ import type { IRBlock, IRBlockStatus, IRChunkFileData, IRSourceFileMeta } from "
 import { DEFAULT_IR_BLOCK_META, DEFAULT_IR_BLOCK_STATS } from "../../types/ir-types";
 import { resolveAssociatedNotePath, resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import { supportsPointLinkedNotes } from "./IRLinkedNotePolicy";
+import { sanitizeUserReadingSourcePath } from "../../utils/ir-internal-data-path";
 
 function toTimestamp(value: string | null | undefined): number {
 	if (!value) {
@@ -286,13 +287,18 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 		point.trace?.locator && typeof point.trace.locator === "object"
 			? (point.trace.locator)
 			: undefined;
-	const filePath =
+	const filePath = sanitizeUserReadingSourcePath(
 		readStringRecordValue(metadata, "sourcePath") ||
-		readStringRecordValue(locator, "sourcePath") ||
-		readStringRecordValue(locator, "filePath") ||
-		point.source?.path ||
-		snapshot.material?.source.path ||
-		"";
+			readStringRecordValue(locator, "sourcePath") ||
+			readStringRecordValue(locator, "filePath") ||
+			point.source?.path ||
+			snapshot.material?.source.path ||
+			""
+	);
+	if (!filePath) {
+		return null;
+	}
+
 	const explicitHeadingPath = readStringArrayRecordValue(metadata, "headingPath");
 	const locatorHeadingPath = readStringArrayRecordValue(locator, "headingPath");
 	const title =
@@ -416,15 +422,16 @@ export function buildLegacyChunkFromPointSnapshot(snapshot: IRPointSnapshot): {
 		: [];
 	const locator = snapshot.point.trace.locator || {};
 	const userData = toUnknownRecord(snapshot.point.userData);
-	const chunkFilePath =
+	const chunkFilePath = sanitizeUserReadingSourcePath(
 		typeof userData?.sourceFilePath === "string"
 			? userData.sourceFilePath.trim()
 			: typeof snapshot.point.metadata?.chunkFilePath === "string"
 				? snapshot.point.metadata.chunkFilePath.trim()
 				: typeof locator.chunkFilePath === "string" && locator.chunkFilePath.trim()
 					? locator.chunkFilePath.trim()
-					: snapshot.point.source?.path || snapshot.material?.source.path || "";
-	const sourcePath =
+					: snapshot.point.source?.path || snapshot.material?.source.path || ""
+	);
+	const sourcePath = sanitizeUserReadingSourcePath(
 		typeof snapshot.point.metadata?.sourcePath === "string" &&
 		snapshot.point.metadata.sourcePath.trim()
 			? snapshot.point.metadata.sourcePath.trim()
@@ -433,11 +440,13 @@ export function buildLegacyChunkFromPointSnapshot(snapshot: IRPointSnapshot): {
 				? snapshot.point.metadata.rawFilePath.trim()
 				: typeof locator.sourcePath === "string" && locator.sourcePath.trim()
 					? locator.sourcePath.trim()
-					: snapshot.point.source?.path || snapshot.material?.source.path || chunkFilePath;
-	const rawFilePath =
+					: snapshot.point.source?.path || snapshot.material?.source.path || chunkFilePath
+	);
+	const rawFilePath = sanitizeUserReadingSourcePath(
 		(typeof snapshot.point.metadata?.rawFilePath === "string" &&
 			snapshot.point.metadata.rawFilePath.trim()) ||
-		sourcePath;
+			sourcePath
+	);
 	const indexFilePath =
 		(typeof snapshot.point.metadata?.indexFilePath === "string" &&
 			snapshot.point.metadata.indexFilePath.trim()) ||
@@ -492,11 +501,12 @@ export function buildLegacyChunkFromPointSnapshot(snapshot: IRPointSnapshot): {
 export function buildLegacyPdfTaskFromPointSnapshot(snapshot: IRPointSnapshot): IRPdfBookmarkTask {
 	const topicId = getTaskTopicId(snapshot);
 	const locator = snapshot.point.trace.locator || {};
-	const pdfPath =
+	const pdfPath = sanitizeUserReadingSourcePath(
 		(typeof locator.pdfPath === "string" && locator.pdfPath.trim()) ||
-		snapshot.point.source?.path ||
-		snapshot.material?.source.path ||
-		"";
+			snapshot.point.source?.path ||
+			snapshot.material?.source.path ||
+			""
+	);
 
 	return {
 		id: snapshot.point.id,
@@ -533,7 +543,9 @@ export function buildLegacyEpubTaskFromPointSnapshot(snapshot: IRPointSnapshot):
 		topicId,
 		deckId: topicId,
 		sourceId: snapshot.point.materialId,
-		epubFilePath: snapshot.point.source?.path || snapshot.material?.source.path || "",
+		epubFilePath: sanitizeUserReadingSourcePath(
+			snapshot.point.source?.path || snapshot.material?.source.path || ""
+		),
 		title:
 			snapshot.point.userData.title ||
 			snapshot.point.source?.title ||

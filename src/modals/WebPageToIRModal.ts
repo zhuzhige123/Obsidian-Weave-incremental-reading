@@ -1,4 +1,5 @@
 import { App, Menu, Modal, Setting } from "obsidian";
+import { i18n } from "../utils/i18n";
 
 export interface WebPageToIRSubmitPayload {
 	title: string;
@@ -32,7 +33,7 @@ export class WebPageToIRModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.titleEl.setText("添加到增量阅读");
+		this.titleEl.setText(i18n.t("irModals.webPageToIr.title"));
 		this.modalEl.addClass("weave-selection-to-ir-modal", "weave-web-page-to-ir-modal");
 
 		const { contentEl } = this;
@@ -42,7 +43,7 @@ export class WebPageToIRModal extends Modal {
 		const urlPanelEl = contentEl.createDiv({ cls: "weave-selection-to-ir-panel" });
 		urlPanelEl.createDiv({
 			cls: "setting-item-name",
-			text: "网页链接",
+			text: i18n.t("irModals.webPageToIr.webLink"),
 		});
 		urlPanelEl.createEl("div", {
 			cls: "setting-item-description weave-web-page-to-ir-url",
@@ -54,7 +55,7 @@ export class WebPageToIRModal extends Modal {
 			const selectionPanelEl = contentEl.createDiv({ cls: "weave-selection-to-ir-panel" });
 			selectionPanelEl.createDiv({
 				cls: "setting-item-name",
-				text: "选区摘录",
+				text: i18n.t("irModals.webPageToIr.selectionExcerpt"),
 			});
 			selectionPanelEl.createEl("div", {
 				cls: "setting-item-description weave-web-page-to-ir-selection",
@@ -66,11 +67,11 @@ export class WebPageToIRModal extends Modal {
 		const deckToolbarEl = headerPanelEl.createDiv({ cls: "weave-selection-to-ir-toolbar" });
 		const deckInfoEl = deckToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
 		deckInfoEl.createDiv({
-			text: "所属专题",
+			text: i18n.t("irModals.webPageToIr.deckName"),
 			cls: "setting-item-name",
 		});
 		deckInfoEl.createDiv({
-			text: "选择该网页阅读点要加入的增量阅读专题。",
+			text: i18n.t("irModals.webPageToIr.deckDesc"),
 			cls: "setting-item-description",
 		});
 
@@ -84,18 +85,18 @@ export class WebPageToIRModal extends Modal {
 
 		const titleDesc = selectedText
 			? this.options.titleDetected
-				? "已从选区自动提取标题，你可以继续修改。"
-				: "未检测到明确标题，已根据选区内容生成默认名称。"
+				? i18n.t("irModals.webPageToIr.titleFromSelectionDetected")
+				: i18n.t("irModals.webPageToIr.titleFromSelectionFallback")
 			: this.options.titleDetected
-				? "已使用当前网页标题，你可以继续修改。"
-				: "未能读取网页标题，已根据链接生成默认名称。";
+				? i18n.t("irModals.webPageToIr.titleFromPageDetected")
+				: i18n.t("irModals.webPageToIr.titleFromPageFallback");
 
 		new Setting(contentEl)
-			.setName("阅读点名称")
+			.setName(i18n.t("irModals.webPageToIr.readingPointName"))
 			.setDesc(titleDesc)
 			.addText((text) => {
 				text.setValue(this.draftTitle);
-				text.setPlaceholder("输入阅读点名称");
+				text.setPlaceholder(i18n.t("irModals.webPageToIr.readingPointNamePlaceholder"));
 				text.inputEl.addClass("weave-selection-to-ir-title-input");
 				this.titleInputEl = text.inputEl;
 				text.onChange((value) => {
@@ -105,10 +106,10 @@ export class WebPageToIRModal extends Modal {
 			});
 
 		const footerEl = contentEl.createDiv({ cls: "weave-selection-to-ir-footer" });
-		const cancelButton = footerEl.createEl("button", { text: "取消" });
+		const cancelButton = footerEl.createEl("button", { text: i18n.t("irModals.common.cancel") });
 		cancelButton.addEventListener("click", () => this.close());
 
-		this.createButtonEl = footerEl.createEl("button", { text: "确认添加" });
+		this.createButtonEl = footerEl.createEl("button", { text: i18n.t("irModals.webPageToIr.confirmAdd") });
 		this.createButtonEl.classList.add("mod-cta");
 		this.createButtonEl.addEventListener("click", () => {
 			void this.handleCreate();
@@ -134,7 +135,9 @@ export class WebPageToIRModal extends Modal {
 
 	private getDeckButtonText(): string {
 		const selectedDeck = this.options.deckOptions.find((deck) => deck.id === this.selectedDeckId);
-		return selectedDeck ? `专题：${selectedDeck.name}` : "选择增量阅读专题";
+		return selectedDeck
+			? i18n.t("irModals.common.topicLabel", { name: selectedDeck.name })
+			: i18n.t("irModals.common.selectTopic");
 	}
 
 	private applyPickerButtonStyle(buttonEl: HTMLButtonElement): void {
@@ -176,7 +179,7 @@ export class WebPageToIRModal extends Modal {
 		this.creating = true;
 		if (this.createButtonEl) {
 			this.createButtonEl.disabled = true;
-			this.createButtonEl.textContent = "添加中...";
+			this.createButtonEl.textContent = i18n.t("irModals.common.adding");
 		}
 
 		try {
@@ -190,7 +193,7 @@ export class WebPageToIRModal extends Modal {
 		} finally {
 			this.creating = false;
 			if (this.createButtonEl) {
-				this.createButtonEl.textContent = "确认添加";
+				this.createButtonEl.textContent = i18n.t("irModals.webPageToIr.confirmAdd");
 			}
 			this.syncCreateButtonState();
 		}

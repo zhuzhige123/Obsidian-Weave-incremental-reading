@@ -311,7 +311,12 @@
 		document.addEventListener("pointerdown", handlePointerDown, true);
 		document.addEventListener("selectionchange", handleSelectionActivity);
 
+		const unsubscribeProjection = workbenchService.subscribeProjectionScheduleRefresh(() => {
+			session = workbenchService.getSession();
+		});
+
 		return () => {
+			unsubscribeProjection();
 			document.removeEventListener("fullscreenchange", handleFullscreenChange);
 			document.removeEventListener("pointerdown", handlePointerDown, true);
 			document.removeEventListener("selectionchange", handleSelectionActivity);

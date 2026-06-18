@@ -603,6 +603,48 @@ chunk body`,
 		expect(pointIndex.files[0]?.file).toBe("weave/incremental-reading/points/New Topic.irdeck");
 	});
 
+	it("moves a point to a new topic shard and removes stale copies from the previous topic", async () => {
+		const v2Paths = getV2Paths("");
+		const { app, files } = createMemoryApp();
+		const service = new IRPointStorageService(app);
+		const sharedInput = {
+			id: "pdfbm-move-1",
+			title: "Selection 1",
+			status: "new",
+			sourceType: "pdf-bookmark" as const,
+			sourcePath: "Docs/Test.pdf",
+			locatorType: "pdf-selection",
+			locator: { page: 1 },
+		};
+
+		await service.syncLegacyPoint({
+			...sharedInput,
+			topicId: "topic-a",
+			topicName: "Topic A",
+		});
+		await service.syncLegacyPoint({
+			...sharedInput,
+			topicId: "topic-b",
+			topicName: "Topic B",
+		});
+
+		const topicAFile = JSON.parse(
+			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Topic A.irdeck`)) || "{}"
+		);
+		const topicBFile = JSON.parse(
+			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Topic B.irdeck`)) || "{}"
+		);
+
+		expect(topicAFile.points || []).toHaveLength(0);
+		expect(topicBFile.points || []).toHaveLength(1);
+		expect(topicBFile.points[0]?.id).toBe("pdfbm-move-1");
+		expect(topicBFile.points[0]?.relations?.topicIds).toEqual(["topic-b"]);
+
+		const snapshot = await service.getPointSnapshotById("pdfbm-move-1");
+		expect(snapshot?.topicId).toBe("topic-b");
+		expect(snapshot?.topicName).toBe("Topic B");
+	});
+
 	it("reuses the current .irdeck topic name when legacy-format sync no longer has topics.json", async () => {
 		const v2Paths = getV2Paths("");
 		const { app, files } = createMemoryApp();

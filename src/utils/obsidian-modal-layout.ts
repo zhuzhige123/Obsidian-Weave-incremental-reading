@@ -12,7 +12,8 @@ export type WeaveObsidianModalTitleAccent =
 interface ConfigureWeaveObsidianModalLayoutOptions {
 	modalClass: string;
 	contentClass: string;
-	titleAccent?: WeaveObsidianModalTitleAccent;
+	/** 标题左侧插件标识色条；默认 purple，与设置页分组标题一致 */
+	titleAccent?: WeaveObsidianModalTitleAccent | false;
 }
 
 export function configureWeaveObsidianModalLayout(
@@ -29,7 +30,8 @@ export function configureWeaveObsidianModalLayout(
 		...options.contentClass.split(/\s+/).filter(Boolean)
 	);
 
-	if (options.titleAccent) {
-		modal.titleEl.addClass("with-accent-bar", `accent-${options.titleAccent}`);
+	const titleAccent = options.titleAccent === false ? null : (options.titleAccent ?? "purple");
+	if (titleAccent) {
+		modal.titleEl.addClass("with-accent-bar", `accent-${titleAccent}`);
 	}
 }

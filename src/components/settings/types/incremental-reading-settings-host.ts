@@ -12,6 +12,7 @@ export interface IncrementalReadingSettingsHost {
 		weaveParentFolder?: string;
 		incrementalReading?: IncrementalReadingSettings;
 		showPremiumFeaturesPreview?: boolean;
+		uiLanguage?: import("../../../utils/i18n").PluginUiLanguagePreference;
 	};
 	irTagGroupService?: IRTagGroupService;
 	getIncrementalReadingSettings(): IncrementalReadingSettings;

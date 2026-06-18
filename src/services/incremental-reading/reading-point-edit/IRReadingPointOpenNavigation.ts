@@ -221,6 +221,11 @@ export async function openScheduleItemReadingTarget(
 		return opened ? "web" : "none";
 	}
 
+	if (isEpubBookmarkTaskId(material.id)) {
+		const resumeLink = await resolveReadingPointOpenLink(app, material);
+		return (await openEpubReadingTarget(app, material, resumeLink, null)) ? "epub" : "none";
+	}
+
 	const resumeLink = await resolveReadingPointOpenLink(app, material);
 	if (!resumeLink.trim()) {
 		return "none";

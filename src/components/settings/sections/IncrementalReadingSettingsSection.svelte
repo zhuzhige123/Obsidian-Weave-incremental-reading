@@ -425,6 +425,65 @@
     }
   }
 
+  function handleFlowStretchChange(event: Event) {
+    if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
+      return;
+    }
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    if (!isNaN(value) && value >= 0 && value <= 40) {
+      settingsEditor.updateIncrementalReading((incrementalReading) => {
+        incrementalReading.flowStretchPercent = value;
+      });
+      saveSettings();
+    }
+  }
+
+  function handleLoadBasedDeferChange(event: Event) {
+    if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
+      return;
+    }
+    settingsEditor.updateIncrementalReading((incrementalReading) => {
+      incrementalReading.enableLoadBasedDefer = (event.target as HTMLInputElement).checked;
+    });
+    saveSettings();
+  }
+
+  function handleDailyReadingPointCapChange(event: Event) {
+    if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
+      return;
+    }
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    if (!isNaN(value) && value >= 5 && value <= 40) {
+      settingsEditor.updateIncrementalReading((incrementalReading) => {
+        incrementalReading.dailyReadingPointCap = value;
+      });
+      saveSettings();
+    }
+  }
+
+  function handleHorizonSmoothingChange(event: Event) {
+    if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
+      return;
+    }
+    settingsEditor.updateIncrementalReading((incrementalReading) => {
+      incrementalReading.enableHorizonSmoothing = (event.target as HTMLInputElement).checked;
+    });
+    saveSettings();
+  }
+
+  function handleHorizonSpreadDaysChange(event: Event) {
+    if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
+      return;
+    }
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    if (!isNaN(value) && value >= 5 && value <= 14) {
+      settingsEditor.updateIncrementalReading((incrementalReading) => {
+        incrementalReading.horizonSpreadDays = value;
+      });
+      saveSettings();
+    }
+  }
+
   // 处理每日出现上限变更
   function handleMaxAppearancesChange(event: Event) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
@@ -527,6 +586,11 @@
           strategyOptions={STRATEGY_OPTIONS}
           {handleStrategyDropdownChange}
           {handleTimeBudgetChange}
+          {handleFlowStretchChange}
+          {handleLoadBasedDeferChange}
+          {handleDailyReadingPointCapChange}
+          {handleHorizonSmoothingChange}
+          {handleHorizonSpreadDaysChange}
           {handleMaxAppearancesChange}
           showSection={canUsePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}
           strategyTitle={premiumTitle(t('irSettings.strategyTitle'), PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}

@@ -1,4 +1,5 @@
 import { normalizePath, type App } from "obsidian";
+import { i18n } from "../../../utils/i18n";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import { resolveAssociatedNotePaths } from "../IRAssociatedNoteSignals";
 import { IRHostSharedService } from "../IRHostSharedService";
@@ -25,8 +26,10 @@ import { IRStorageService } from "../IRStorageService";
 import { getReadingTargetKindLabel } from "../reading-target/IRReadingTargetTitleResolver";
 import { parseReadingTargetInput } from "../reading-target/IRReadingTargetParser";
 import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
-import type { IRBlock, IRChunkFileData } from "../../../types/ir-types";
+import { migrateToIRBlockV4, type IRBlock, type IRChunkFileData } from "../../../types/ir-types";
 import type { IRParameterContext, IRPointSnapshot, IRTraceState } from "../../../types/ir-point-storage-types";
+import { resolveReadingPointStoredSchedule } from "./IRReadingPointStoredSchedule";
+import { IRReadingPointTopicMigrationService } from "./IRReadingPointTopicMigrationService";
 import { getChunkTopicIds, getTaskTopicId } from "../../../utils/ir-topic-compat";
 import {
 	canEditReadingPointLink,
@@ -91,6 +94,7 @@ export class IRReadingPointEditService {
 	private readonly pointTagService: IRPointTagService;
 	private readonly pdfService: IRPdfBookmarkTaskService;
 	private readonly epubService: IREpubBookmarkTaskService;
+	private readonly topicMigration: IRReadingPointTopicMigrationService;
 
 	constructor(private readonly app: App) {
 		this.host = new IRHostSharedService(app);
@@ -101,6 +105,7 @@ export class IRReadingPointEditService {
 		this.pointTagService = new IRPointTagService(app);
 		this.pdfService = new IRPdfBookmarkTaskService(app);
 		this.epubService = new IREpubBookmarkTaskService(app);
+		this.topicMigration = new IRReadingPointTopicMigrationService(app);
 	}
 
 	static getMaterialClassOptions(): Array<{ value: string; label: string }> {
@@ -202,15 +207,17 @@ export class IRReadingPointEditService {
 			return null;
 		}
 
-		const [snapshot, pdfTask, epubTask, legacyBlock, decks] = await Promise.all([
+		const [snapshot, pdfTask, epubTask, legacyBlock, chunk, decks, pointTopicIds] = await Promise.all([
 			this.pointStorage.getPointSnapshotById(pointId),
 			isPdfBookmarkTaskId(pointId) ? this.pdfService.getTask(pointId) : Promise.resolve(null),
 			isEpubBookmarkTaskId(pointId) ? this.epubService.getTask(pointId) : Promise.resolve(null),
 			material.sourceType === "legacy-block" ? this.storage.getBlock(pointId) : Promise.resolve(null),
+			material.sourceType === "chunk" ? this.storage.getChunkData(pointId) : Promise.resolve(null),
 			this.storage.getAllDecks(),
+			this.pointRead.getPointTopicIds(pointId),
 		]);
 
-		const linkInput = resolveReadingPointLinkInputFromParts({
+		const linkInput = resolveReadingPointLinkInputFromParts(this.app, {
 			material,
 			snapshot,
 			pdfTask,
@@ -223,19 +230,22 @@ export class IRReadingPointEditService {
 			: null;
 
 		const deckId =
-			String(material.deckId || "").trim() ||
+			String(pointTopicIds[0] || "").trim() ||
+			String(
+				getChunkTopicIds(
+					snapshot ? { topicIds: snapshot.point.relations?.topicIds } : undefined
+				)[0] || ""
+			).trim() ||
 			String(snapshot?.topicId || "").trim() ||
-			String(getChunkTopicIds(
-				snapshot ? { topicIds: snapshot.point.relations?.topicIds } : undefined
-			)[0] || "").trim() ||
 			String(getTaskTopicId(pdfTask || epubTask || undefined) || "").trim() ||
-			String(legacyBlock?.deckPath || "").trim();
+			String(legacyBlock?.deckPath || "").trim() ||
+			String(material.deckId || "").trim();
 
 		const deckName =
 			(deckId && decks[deckId]?.name) ||
 			snapshot?.topicName ||
 			deckId ||
-			"默认专题";
+			i18n.t("irServiceNotices.defaults.defaultTopic");
 
 		const title =
 			String(snapshot?.point.userData?.title || "").trim() ||
@@ -246,7 +256,7 @@ export class IRReadingPointEditService {
 		const tags = await this.loadTags(material, pdfTask, epubTask, null);
 		const tagGroupId = tags.length > 0 ? await this.pointTagService.matchGroupForTags(tags) : "default";
 		const allGroups = await this.pointTagService.getTagGroups();
-		const tagGroupName = allGroups.find((group) => group.id === tagGroupId)?.name || "默认";
+		const tagGroupName = allGroups.find((group) => group.id === tagGroupId)?.name || i18n.t("irSidebar.calendar.defaultTagGroup");
 
 		const associatedNotePaths = supportsPointLinkedNotesForScheduleItem(material)
 			? resolveAssociatedNotePaths({
@@ -259,10 +269,21 @@ export class IRReadingPointEditService {
 				})
 			: [];
 
+		const storedNextRepDate = Number(
+			(snapshot?.point.schedule.nextReviewAt
+				? Date.parse(snapshot.point.schedule.nextReviewAt)
+				: 0) ||
+				pdfTask?.nextRepDate ||
+				epubTask?.nextRepDate ||
+				chunk?.nextRepDate ||
+				(legacyBlock ? Number(migrateToIRBlockV4(legacyBlock).nextRepDate || 0) : 0) ||
+				0
+		);
+
 		return {
 			pointId,
 			sourceType: material.sourceType || "unknown",
-			kindLabel: parsedTarget ? getReadingTargetKindLabel(parsedTarget.kind) : "阅读点",
+			kindLabel: parsedTarget ? getReadingTargetKindLabel(parsedTarget.kind) : i18n.t("irAddTarget.kindLabels.readingPoint"),
 			title,
 			titleManuallyEdited: readTitleManuallyEdited(metadata),
 			linkInput,
@@ -271,21 +292,15 @@ export class IRReadingPointEditService {
 			deckId,
 			deckName,
 			priority: Number(
-				material.priority ??
-					snapshot?.point.schedule.manualPriority ??
+				snapshot?.point.schedule.manualPriority ??
 					pdfTask?.priorityUi ??
 					epubTask?.priorityUi ??
+					chunk?.priorityUi ??
+					material.priority ??
 					5
 			),
-			nextRepDate: Number(
-				material.nextRepDate ??
-					(pdfTask?.nextRepDate ||
-						epubTask?.nextRepDate ||
-						(snapshot?.point.schedule.nextReviewAt
-							? Date.parse(snapshot.point.schedule.nextReviewAt)
-							: 0) ||
-						0)
-			),
+			nextRepDate:
+				storedNextRepDate > 0 ? storedNextRepDate : Number(material.nextRepDate || 0),
 			tags,
 			tagGroupName,
 			associatedNotePaths,
@@ -303,6 +318,33 @@ export class IRReadingPointEditService {
 			canEditLink: canEditReadingPointLink(material),
 			canEditAssociatedNotes: supportsPointLinkedNotesForScheduleItem(material),
 			canEditTags: material.sourceType !== "legacy-block",
+		};
+	}
+
+	/**
+	 * 仅更换所属专题：不改动调度字段（nextRepDate / interval / status / 复习记录）。
+	 */
+	async saveTopicChange(
+		material: ScheduleItem,
+		targetDeckId: string
+	): Promise<IRReadingPointEditSaveResult> {
+		await this.initialize();
+
+		const migration = await this.topicMigration.movePointToTopic({
+			pointId: material.id,
+			targetDeckId,
+			sourceTypeHint: material.sourceType || "unknown",
+			sourceDocumentPath: material.sourceFile || undefined,
+		});
+
+		if (migration.changed) {
+			this.storage.invalidateScheduleRuntimeCaches();
+			await recomputeAndBroadcastIRData(this.app, "metadata_changed");
+		}
+
+		return {
+			changed: migration.changed,
+			sourceDocumentPath: migration.sourceDocumentPath,
 		};
 	}
 
@@ -324,12 +366,27 @@ export class IRReadingPointEditService {
 			throw new Error("reading-point-edit-missing-deck");
 		}
 
+		const previousTopicIds = await this.pointRead.getPointTopicIds(pointId);
+		const previousDeckId = String(previousTopicIds[0] || "").trim();
+		const topicChanged = previousDeckId !== deckId;
+
 		const normalizedTags = normalizeReadingPointTags(input.tags);
 		const normalizedNotes = resolveAssociatedNotePaths({
 			associatedNotePaths: input.associatedNotePaths,
 		});
 		const linkChanged =
 			String(input.linkInput || "").trim() !== String(input.originalLinkInput || "").trim();
+		const storedSchedule = await resolveReadingPointStoredSchedule(this.app, pointId);
+		const preserveScheduleFields = !linkChanged;
+		const preserveTopic = topicChanged;
+		const effectiveDeckId =
+			topicChanged && previousDeckId
+				? previousDeckId
+				: storedSchedule?.deckId || previousDeckId || deckId;
+		const effectivePriority =
+			preserveScheduleFields && storedSchedule ? storedSchedule.priority : input.priority;
+		const effectiveNextRepDate =
+			preserveScheduleFields && storedSchedule ? storedSchedule.nextRepDate : input.nextRepDate;
 		const parsedTarget = linkChanged
 			? parseReadingTargetInput(
 					this.app,
@@ -370,9 +427,9 @@ export class IRReadingPointEditService {
 		if (isPdfBookmarkTaskId(pointId)) {
 			const result = await this.savePdfPoint(pointId, {
 				title,
-				deckId,
-				priority: input.priority,
-				nextRepDate: input.nextRepDate,
+				deckId: effectiveDeckId,
+				priority: effectivePriority,
+				nextRepDate: effectiveNextRepDate,
 				tags: normalizedTags,
 				isStarred: input.isStarred,
 				note: input.note,
@@ -380,6 +437,8 @@ export class IRReadingPointEditService {
 				parsedTarget,
 				savedResumeLink,
 				preserveScheduleOnLinkChange: input.preserveScheduleOnLinkChange,
+				preserveScheduleFields,
+				preserveTopic,
 				associatedNotePaths: normalizedNotes,
 				titleManuallyEdited: input.titleManuallyEdited,
 				parameterContext: input.parameterContextOverride ? input.parameterContext : null,
@@ -389,9 +448,9 @@ export class IRReadingPointEditService {
 		} else if (isEpubBookmarkTaskId(pointId)) {
 			const result = await this.saveEpubPoint(pointId, {
 				title,
-				deckId,
-				priority: input.priority,
-				nextRepDate: input.nextRepDate,
+				deckId: effectiveDeckId,
+				priority: effectivePriority,
+				nextRepDate: effectiveNextRepDate,
 				tags: normalizedTags,
 				isStarred: input.isStarred,
 				note: input.note,
@@ -399,6 +458,8 @@ export class IRReadingPointEditService {
 				parsedTarget,
 				savedResumeLink,
 				preserveScheduleOnLinkChange: input.preserveScheduleOnLinkChange,
+				preserveScheduleFields,
+				preserveTopic,
 				associatedNotePaths: normalizedNotes,
 				titleManuallyEdited: input.titleManuallyEdited,
 				parameterContext: input.parameterContextOverride ? input.parameterContext : null,
@@ -410,9 +471,9 @@ export class IRReadingPointEditService {
 			if (chunk) {
 				const result = await this.saveChunkPoint(chunk, {
 					title,
-					deckId,
-					priority: input.priority,
-					nextRepDate: input.nextRepDate,
+					deckId: effectiveDeckId,
+					priority: effectivePriority,
+					nextRepDate: effectiveNextRepDate,
 					tags: normalizedTags,
 					isStarred: input.isStarred,
 					note: input.note,
@@ -420,6 +481,8 @@ export class IRReadingPointEditService {
 					parsedTarget,
 					savedResumeLink,
 					preserveScheduleOnLinkChange: input.preserveScheduleOnLinkChange,
+					preserveScheduleFields,
+					preserveTopic,
 					associatedNotePaths: normalizedNotes,
 					titleManuallyEdited: input.titleManuallyEdited,
 					parameterContext: input.parameterContextOverride ? input.parameterContext : null,
@@ -433,9 +496,9 @@ export class IRReadingPointEditService {
 				}
 				const result = await this.saveLegacyBlockPoint(block, {
 					title,
-					deckId,
-					priority: input.priority,
-					nextRepDate: input.nextRepDate,
+					deckId: effectiveDeckId,
+					priority: effectivePriority,
+					nextRepDate: effectiveNextRepDate,
 					tags: normalizedTags,
 					isStarred: input.isStarred,
 					note: input.note,
@@ -443,6 +506,8 @@ export class IRReadingPointEditService {
 					parsedTarget,
 					savedResumeLink,
 					preserveScheduleOnLinkChange: input.preserveScheduleOnLinkChange,
+					preserveScheduleFields,
+					preserveTopic,
 					titleManuallyEdited: input.titleManuallyEdited,
 					parameterContext: input.parameterContextOverride ? input.parameterContext : null,
 				});
@@ -467,20 +532,15 @@ export class IRReadingPointEditService {
 			}
 		}
 
-		const decks = await this.storage.getAllDecks();
-		const currentDeckId =
-			Object.values(decks).find((deck) => Array.isArray(deck.blockIds) && deck.blockIds.includes(pointId))
-				?.id ||
-			deckId;
-		if (currentDeckId !== deckId || deckId) {
-			const deckResult = await this.pointWrite.updateDecks(
-				{
-					uuid: pointId,
-					sourceFile: sourceDocumentPath,
-				} as any,
-				[deckId]
-			);
-			changed = changed || Boolean(deckResult);
+		if (topicChanged) {
+			const migration = await this.topicMigration.movePointToTopic({
+				pointId,
+				targetDeckId: deckId,
+				sourceTypeHint: input.sourceType,
+				sourceDocumentPath,
+			});
+			changed = changed || migration.changed;
+			sourceDocumentPath = migration.sourceDocumentPath || sourceDocumentPath;
 		}
 
 		if (changed) {
@@ -556,6 +616,8 @@ export class IRReadingPointEditService {
 			parsedTarget: ParsedReadingTarget | null;
 			savedResumeLink: string | null;
 			preserveScheduleOnLinkChange: boolean;
+			preserveScheduleFields: boolean;
+			preserveTopic: boolean;
 			associatedNotePaths: string[];
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
@@ -576,18 +638,26 @@ export class IRReadingPointEditService {
 				: {}),
 		});
 
+		const topicId = input.preserveTopic
+			? String(existing.topicId || existing.deckId || input.deckId || "").trim()
+			: input.deckId;
 		const updates: Partial<IRPdfBookmarkTask> & { link?: string } = {
 			title: input.title,
-			topicId: input.deckId,
-			deckId: input.deckId,
-			priorityUi: input.priority,
-			priorityEff: input.priority,
 			favorite: input.isStarred,
 			tags: input.tags,
 		};
 
-		if (!input.preserveScheduleOnLinkChange || !input.linkChanged) {
-			updates.nextRepDate = input.nextRepDate;
+		if (!input.preserveTopic) {
+			updates.topicId = topicId;
+			updates.deckId = topicId;
+		}
+
+		if (!input.preserveScheduleFields) {
+			updates.priorityUi = input.priority;
+			updates.priorityEff = input.priority;
+			if (!input.preserveScheduleOnLinkChange || !input.linkChanged) {
+				updates.nextRepDate = input.nextRepDate;
+			}
 		}
 
 		if (input.linkChanged && input.savedResumeLink) {
@@ -610,14 +680,18 @@ export class IRReadingPointEditService {
 		await this.pointStorage.syncLegacyPoint(
 			{
 				id: pointId,
-				topicId: input.deckId,
+				topicId,
 				title: input.title,
 				note: input.note,
 				isStarred: input.isStarred,
 				tags: input.tags,
 				status: updated?.status || existing.status,
-				priorityUi: input.priority,
-				priorityEff: input.priority,
+				...(input.preserveScheduleFields
+					? {}
+					: {
+							priorityUi: input.priority,
+							priorityEff: input.priority,
+						}),
 				intervalDays: updated?.intervalDays ?? existing.intervalDays,
 				nextRepDate: updated?.nextRepDate ?? existing.nextRepDate,
 				sourceType: "pdf-bookmark",
@@ -658,6 +732,8 @@ export class IRReadingPointEditService {
 			parsedTarget: ParsedReadingTarget | null;
 			savedResumeLink: string | null;
 			preserveScheduleOnLinkChange: boolean;
+			preserveScheduleFields: boolean;
+			preserveTopic: boolean;
 			associatedNotePaths: string[];
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
@@ -678,6 +754,9 @@ export class IRReadingPointEditService {
 				: {}),
 		});
 
+		const topicId = input.preserveTopic
+			? String(existing.topicId || existing.deckId || input.deckId || "").trim()
+			: input.deckId;
 		const locator = { ...(snapshot?.point.trace?.locator || {}) };
 		if (input.linkChanged && input.parsedTarget && input.savedResumeLink) {
 			if (input.parsedTarget.kind === "epub") {
@@ -694,14 +773,27 @@ export class IRReadingPointEditService {
 			locator.resumeLink = input.savedResumeLink;
 		}
 
-		await this.epubService.updateTask(pointId, {
+		const epubUpdates: Partial<IREpubBookmarkTask> = {
 			title: input.title,
-			topicId: input.deckId,
-			deckId: input.deckId,
-			priorityUi: input.priority,
-			priorityEff: input.priority,
 			tags: input.tags,
-			nextRepDate: input.preserveScheduleOnLinkChange && input.linkChanged ? existing.nextRepDate : input.nextRepDate,
+		};
+
+		if (!input.preserveTopic) {
+			epubUpdates.topicId = topicId;
+			epubUpdates.deckId = topicId;
+		}
+
+		if (!input.preserveScheduleFields) {
+			epubUpdates.priorityUi = input.priority;
+			epubUpdates.priorityEff = input.priority;
+			epubUpdates.nextRepDate =
+				input.preserveScheduleOnLinkChange && input.linkChanged
+					? existing.nextRepDate
+					: input.nextRepDate;
+		}
+
+		await this.epubService.updateTask(pointId, {
+			...epubUpdates,
 			tocHref:
 				input.linkChanged && input.parsedTarget?.kind === "epub" && input.parsedTarget.epubTocHref
 					? input.parsedTarget.epubTocHref
@@ -720,17 +812,21 @@ export class IRReadingPointEditService {
 		await this.pointStorage.syncLegacyPoint(
 			{
 				id: pointId,
-				topicId: input.deckId,
+				topicId,
 				title: input.title,
 				note: input.note,
 				isStarred: input.isStarred,
 				tags: input.tags,
 				status: existing.status,
-				priorityUi: input.priority,
-				priorityEff: input.priority,
+				...(input.preserveScheduleFields
+					? {}
+					: {
+							priorityUi: input.priority,
+							priorityEff: input.priority,
+						}),
 				intervalDays: existing.intervalDays,
 				nextRepDate:
-					input.preserveScheduleOnLinkChange && input.linkChanged
+					input.preserveScheduleFields || (input.preserveScheduleOnLinkChange && input.linkChanged)
 						? existing.nextRepDate
 						: input.nextRepDate,
 				sourceType: "epub-bookmark",
@@ -769,6 +865,8 @@ export class IRReadingPointEditService {
 			parsedTarget: ParsedReadingTarget | null;
 			savedResumeLink: string | null;
 			preserveScheduleOnLinkChange: boolean;
+			preserveScheduleFields: boolean;
+			preserveTopic: boolean;
 			associatedNotePaths: string[];
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
@@ -784,14 +882,18 @@ export class IRReadingPointEditService {
 				: {}),
 		});
 
-		chunk.topicIds = [input.deckId];
-		chunk.deckIds = [input.deckId];
-		chunk.priorityUi = input.priority;
-		chunk.priorityEff = input.priority;
-		chunk.favorite = input.isStarred;
-		if (!input.preserveScheduleOnLinkChange || !input.linkChanged) {
-			chunk.nextRepDate = input.nextRepDate;
+		if (!input.preserveTopic) {
+			chunk.topicIds = [input.deckId];
+			chunk.deckIds = [input.deckId];
 		}
+		if (!input.preserveScheduleFields) {
+			chunk.priorityUi = input.priority;
+			chunk.priorityEff = input.priority;
+			if (!input.preserveScheduleOnLinkChange || !input.linkChanged) {
+				chunk.nextRepDate = input.nextRepDate;
+			}
+		}
+		chunk.favorite = input.isStarred;
 		chunk.meta = {
 			...(chunk.meta || {}),
 			pointTitle: input.title,
@@ -805,14 +907,20 @@ export class IRReadingPointEditService {
 		await this.pointStorage.syncLegacyPoint(
 			{
 				id: chunk.chunkId,
-				topicId: input.deckId,
+				topicId: input.preserveTopic
+					? String(chunk.topicIds?.[0] || chunk.deckIds?.[0] || input.deckId || "").trim()
+					: input.deckId,
 				title: input.title,
 				note: input.note,
 				isStarred: input.isStarred,
 				tags: input.tags,
 				status: chunk.scheduleStatus || "new",
-				priorityUi: input.priority,
-				priorityEff: input.priority,
+				...(input.preserveScheduleFields
+					? {}
+					: {
+							priorityUi: input.priority,
+							priorityEff: input.priority,
+						}),
 				intervalDays: chunk.intervalDays,
 				nextRepDate: chunk.nextRepDate,
 				sourceType: "ir-chunk",
@@ -857,20 +965,26 @@ export class IRReadingPointEditService {
 			parsedTarget: ParsedReadingTarget | null;
 			savedResumeLink: string | null;
 			preserveScheduleOnLinkChange: boolean;
+			preserveScheduleFields: boolean;
+			preserveTopic: boolean;
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
 		}
 	): Promise<{ changed: boolean; sourceDocumentPath?: string }> {
 		block.headingText = input.title;
-		block.priorityUi = input.priority;
-		block.priorityEff = input.priority;
-		block.priority = input.priority >= 6 ? 1 : input.priority >= 4 ? 2 : 3;
+		if (!input.preserveScheduleFields) {
+			block.priorityUi = input.priority;
+			block.priorityEff = input.priority;
+			block.priority = input.priority >= 6 ? 1 : input.priority >= 4 ? 2 : 3;
+			if (!input.preserveScheduleOnLinkChange || !input.linkChanged) {
+				block.nextReview = new Date(input.nextRepDate).toISOString();
+			}
+		}
 		block.notes = input.note;
 		block.favorite = input.isStarred;
 		block.tags = input.tags;
-		block.deckPath = input.deckId;
-		if (!input.preserveScheduleOnLinkChange || !input.linkChanged) {
-			block.nextReview = new Date(input.nextRepDate).toISOString();
+		if (!input.preserveTopic) {
+			block.deckPath = input.deckId;
 		}
 
 		if (input.linkChanged && input.parsedTarget?.sourceFilePath) {
@@ -895,16 +1009,22 @@ export class IRReadingPointEditService {
 		await this.pointStorage.syncLegacyPoint(
 			{
 				id: block.id,
-				topicId: input.deckId,
+				topicId: input.preserveTopic ? String(block.deckPath || input.deckId || "").trim() : input.deckId,
 				title: input.title,
 				note: input.note,
 				isStarred: input.isStarred,
 				tags: input.tags,
 				status: block.state || "new",
-				priorityUi: input.priority,
-				priorityEff: input.priority,
+				...(input.preserveScheduleFields
+					? {}
+					: {
+							priorityUi: input.priority,
+							priorityEff: input.priority,
+						}),
 				intervalDays: block.interval ?? 1,
-				nextRepDate: input.nextRepDate,
+				nextRepDate: input.preserveScheduleFields
+					? Number(migrateToIRBlockV4(block).nextRepDate || 0)
+					: input.nextRepDate,
 				sourceType: "legacy-block",
 				sourcePath: block.filePath,
 				locatorType: "markdown-block",

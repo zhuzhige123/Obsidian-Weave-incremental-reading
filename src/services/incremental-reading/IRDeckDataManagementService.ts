@@ -16,6 +16,7 @@ import { IR_POINT_STORAGE_VERSION } from "../../types/ir-point-storage-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
 import { readString } from "../../utils/unknown-record";
+import { countInvalidSourcePathFieldsInRawPoint } from "../../utils/ir-point-source-path";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
 import { IRPointStorageService } from "./IRPointStorageService";
 
@@ -24,6 +25,7 @@ const BACKUP_PLUGIN_IDS = ["weave-incremental-reading", "weave"] as const;
 
 export class IRDeckDataManagementService {
 	private app: App;
+	private pointStorageService: IRPointStorageService | null = null;
 
 	constructor(app: App) {
 		this.app = app;
@@ -34,7 +36,10 @@ export class IRDeckDataManagementService {
 	}
 
 	private get pointStorage(): IRPointStorageService {
-		return new IRPointStorageService(this.app);
+		if (!this.pointStorageService) {
+			this.pointStorageService = new IRPointStorageService(this.app);
+		}
+		return this.pointStorageService;
 	}
 
 	getCanonicalPointsDir(): string {
@@ -231,6 +236,7 @@ export class IRDeckDataManagementService {
 		} else if (points) {
 			let missingPointIdCount = 0;
 			let missingSourcePathCount = 0;
+			let invalidSourcePathPointCount = 0;
 			for (const point of points) {
 				if (!point || typeof point !== "object") {
 					missingPointIdCount += 1;
@@ -247,6 +253,9 @@ export class IRDeckDataManagementService {
 				if (!readString(source?.path)) {
 					missingSourcePathCount += 1;
 				}
+				if (countInvalidSourcePathFieldsInRawPoint(record) > 0) {
+					invalidSourcePathPointCount += 1;
+				}
 			}
 			if (missingPointIdCount > 0) {
 				issues.push({
@@ -260,6 +269,13 @@ export class IRDeckDataManagementService {
 					code: "missing_source_path",
 					message: `有 ${missingSourcePathCount} 个阅读点缺少 source.path`,
 					severity: "info",
+				});
+			}
+			if (invalidSourcePathPointCount > 0) {
+				issues.push({
+					code: "invalid_source_path",
+					message: `有 ${invalidSourcePathPointCount} 个阅读点含无效来源路径（如 /、目录或无扩展名）`,
+					severity: "warning",
 				});
 			}
 		}
@@ -556,6 +572,10 @@ export class IRDeckDataManagementService {
 			1,
 			reserved
 		);
+
+		if (await this.adapter.exists(targetPath)) {
+			throw new Error(`库内已存在同名专题文件，无法恢复：${targetPath}`);
+		}
 
 		await this.adapter.write(targetPath, raw);
 		await this.pointStorage.refreshPointFilesIndexFromVault();

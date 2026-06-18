@@ -1,16 +1,30 @@
 import { createDefaultIRBlockV4 } from "../../../types/ir-types";
+import { createStandaloneIRTestApp } from "../../../tests/mocks/test-app";
+import * as IRScheduleModeMutationService from "../IRScheduleModeMutationService";
+import * as IRPointScheduleMutator from "../IRPointScheduleMutator";
 import { IRV4SchedulerService } from "../IRV4SchedulerService";
+
+vi.mock("../IRLoadDeferService", () => ({
+	applyLoadDeferralsFromPlan: vi.fn().mockResolvedValue(0),
+}));
+
+vi.mock("../../epub-integration/ir-epub-storage-access", () => ({
+	getIrEpubStorageService: () => ({
+		async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+			return {
+				sourceId: options?.preferredSourceId || `src-${filePath}`,
+				filePath,
+			};
+		},
+		async resolveSourceFilePath(_sourceId: string, fallbackPath?: string) {
+			return fallbackPath || null;
+		},
+	}),
+}));
 
 describe("IRV4SchedulerService bookmark deck fallback", () => {
 	it("会同时按 deckId 和旧 deckPath 收集书签任务块并去重", async () => {
-		const app = {
-			plugins: {
-				getPlugin: vi.fn(() => null),
-			},
-			vault: {
-				adapter: {},
-			},
-		} as any;
+		const app = createStandaloneIRTestApp() as any;
 
 		const service = new IRV4SchedulerService(app);
 		const pdfTask = { id: "pdf-task-1" } as any;
@@ -65,14 +79,7 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 	});
 
 	it("recordSession 会将 deckPath 归一化为标准 deck.id", async () => {
-		const app = {
-			plugins: {
-				getPlugin: vi.fn(() => null),
-			},
-			vault: {
-				adapter: {},
-			},
-		} as any;
+		const app = createStandaloneIRTestApp() as any;
 
 		const service = new IRV4SchedulerService(app);
 		const block = createDefaultIRBlockV4("chunk-1", "notes/source.md");
@@ -114,7 +121,7 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 	});
 
 	it("统一计划生成器会把标签组 profile 映射成轻量排序偏置", async () => {
-		const app = {
+		const app = createStandaloneIRTestApp({
 			plugins: {
 				getPlugin: vi.fn(() => ({
 					settings: {
@@ -123,14 +130,13 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 							defaultIntervalFactor: 1.5,
 							interleaveMode: false,
 							maxConsecutiveSameTopic: 3,
+							enableLoadBasedDefer: false,
+							enableHorizonSmoothing: false,
 						},
 					},
 				})),
 			},
-			vault: {
-				adapter: {},
-			},
-		} as any;
+		}) as any;
 
 		const service = new IRV4SchedulerService(app);
 		const denseBlock = {
@@ -171,7 +177,7 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 	});
 
 	it("关闭 enableTagGroupPrior 时不会应用标签组排序偏置", async () => {
-		const app = {
+		const app = createStandaloneIRTestApp({
 			plugins: {
 				getPlugin: vi.fn(() => ({
 					settings: {
@@ -184,10 +190,7 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 					},
 				})),
 			},
-			vault: {
-				adapter: {},
-			},
-		} as any;
+		}) as any;
 
 		const service = new IRV4SchedulerService(app);
 		const denseBlock = {
@@ -225,5 +228,38 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 		const result = await (service as any).generateUnifiedQueue([denseBlock, looseBlock], 15, null);
 
 		expect(result.queue.map((block: any) => block.id)).toEqual(["loose", "dense"]);
+	});
+
+	it("manualRescheduleBlockWithPreviewV4 通过 persistBlockScheduleState 写入", async () => {
+		const app = createStandaloneIRTestApp() as any;
+		const persistSpy = vi
+			.spyOn(IRPointScheduleMutator, "persistBlockScheduleState")
+			.mockResolvedValue({ pointId: "legacy-block-1" });
+		vi.spyOn(IRScheduleModeMutationService, "recordScheduleMenuActionInteraction").mockResolvedValue(
+			undefined
+		);
+
+		const service = new IRV4SchedulerService(app);
+		await (service as any).initialize();
+		const block = createDefaultIRBlockV4("legacy-block-1", "notes/legacy.md");
+		const nextRepDate = block.nextRepDate + 86_400_000;
+
+		await service.manualRescheduleBlockWithPreviewV4(
+			block,
+			{
+				nextRepDate,
+				intervalDays: block.intervalDays,
+				scheduleStatus: block.status,
+			},
+			""
+		);
+
+		expect(persistSpy).toHaveBeenCalledWith(
+			app,
+			block,
+			expect.objectContaining({
+				nextRepDate,
+			})
+		);
 	});
 });

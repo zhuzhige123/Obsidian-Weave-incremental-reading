@@ -8,6 +8,7 @@ import { canEditReadingPointLink } from "./IRReadingPointEditLinkResolver";
 import type { IRReadingPointEditSaveResult } from "./IRReadingPointEditTypes";
 import { IRReadingPointEditService } from "./IRReadingPointEditService";
 import { logger } from "../../../utils/logger";
+import { i18n } from "../../../utils/i18n";
 
 let activePrompt: Modal | null = null;
 
@@ -39,7 +40,7 @@ async function loadDraftOrNotify(app: App, material: ScheduleItem) {
 	const service = new IRReadingPointEditService(app);
 	const draft = await service.loadDraft(material);
 	if (!draft) {
-		new Notice("未找到该阅读点，可能已被删除。", 3000);
+		new Notice(i18n.t("irServiceNotices.quickEdit.pointNotFoundDeleted"), 3000);
 		return null;
 	}
 	return draft;
@@ -61,7 +62,7 @@ export async function promptRenameReadingPoint(
 		modal.open();
 	} catch (error) {
 		logger.error("[readingPointQuickEdit] rename failed", error);
-		new Notice("打开重命名失败，请稍后重试。", 3000);
+		new Notice(i18n.t("irServiceNotices.quickEdit.openRenameFailed"), 3000);
 	}
 }
 
@@ -72,14 +73,14 @@ export async function openReadingPointTraceLinkPrompt(
 ): Promise<void> {
 	try {
 		if (!canEditReadingPointLink(material)) {
-			new Notice("该阅读点暂不支持编辑溯源链接。", 3000);
+			new Notice(i18n.t("irServiceNotices.quickEdit.traceLinkUnsupported"), 3000);
 			return;
 		}
 
 		const draft = await loadDraftOrNotify(plugin.app, material);
 		if (!draft || !draft.canEditLink) {
 			if (draft && !draft.canEditLink) {
-				new Notice("该阅读点暂不支持编辑溯源链接。", 3000);
+				new Notice(i18n.t("irServiceNotices.quickEdit.traceLinkUnsupported"), 3000);
 			}
 			return;
 		}
@@ -89,7 +90,7 @@ export async function openReadingPointTraceLinkPrompt(
 		modal.open();
 	} catch (error) {
 		logger.error("[readingPointQuickEdit] trace link prompt failed", error);
-		new Notice("打开溯源链接编辑失败，请稍后重试。", 3000);
+		new Notice(i18n.t("irServiceNotices.quickEdit.openTraceLinkFailed"), 3000);
 	}
 }
 
@@ -105,7 +106,7 @@ export async function openReadingPointTagsPrompt(
 		}
 
 		if (!draft.canEditTags) {
-			new Notice("该阅读点暂不支持编辑标签。", 3000);
+			new Notice(i18n.t("irServiceNotices.quickEdit.tagsUnsupported"), 3000);
 			return;
 		}
 
@@ -114,6 +115,6 @@ export async function openReadingPointTagsPrompt(
 		modal.open();
 	} catch (error) {
 		logger.error("[readingPointQuickEdit] tags prompt failed", error);
-		new Notice("打开标签编辑失败，请稍后重试。", 3000);
+		new Notice(i18n.t("irServiceNotices.quickEdit.openTagsFailed"), 3000);
 	}
 }

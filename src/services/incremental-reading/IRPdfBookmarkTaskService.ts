@@ -41,12 +41,15 @@ function generatePdfBookmarkTaskId(): string {
 	return `pdfbm-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function mergeTaskMeta(existing: IRBlockMeta, updates?: Partial<IRBlockMeta>): IRBlockMeta {
+function mergeTaskMeta(
+	existing: IRBlockMeta,
+	updates?: Partial<IRBlockMeta> & { manualSchedulePinnedDateKey?: string | null }
+): IRBlockMeta {
 	if (!updates) {
 		return existing;
 	}
 
-	return {
+	const merged: IRBlockMeta = {
 		...existing,
 		...updates,
 		siblings: updates.siblings
@@ -56,6 +59,13 @@ function mergeTaskMeta(existing: IRBlockMeta, updates?: Partial<IRBlockMeta>): I
 			  }
 			: existing.siblings,
 	};
+	if (
+		"manualSchedulePinnedDateKey" in updates &&
+		updates.manualSchedulePinnedDateKey === null
+	) {
+		delete merged.manualSchedulePinnedDateKey;
+	}
+	return merged;
 }
 
 function mergeTaskStats(existing: IRBlockStats, updates?: Partial<IRBlockStats>): IRBlockStats {
@@ -95,13 +105,7 @@ export class IRPdfBookmarkTaskService {
 			return;
 		}
 
-		try {
-			await this.getPointStorageService().ensureRuntimeBaseline();
-		} catch (error) {
-			logger.warn("[IRPdfBookmarkTaskService] 自动迁移旧 PDF 书签失败，继续使用已存在的新 points", error);
-			await this.getPointStorageService().initialize();
-		}
-
+		await this.getPointStorageService().initialize();
 		this.initialized = true;
 	}
 
@@ -276,7 +280,7 @@ export class IRPdfBookmarkTaskService {
 	async updateTask(
 		id: string,
 		updates: Partial<Omit<IRPdfBookmarkTask, "id" | "createdAt" | "meta" | "stats">> & {
-			meta?: Partial<IRBlockMeta>;
+			meta?: Partial<IRBlockMeta> & { manualSchedulePinnedDateKey?: string | null };
 			stats?: Partial<IRBlockStats>;
 		}
 	): Promise<IRPdfBookmarkTask | null> {

@@ -1,12 +1,18 @@
 import type { App } from "obsidian";
 import { Notice } from "obsidian";
+import { i18n } from "../../../utils/i18n";
 import { resolveEpubHost } from "../../epub-integration/epub-host";
 import { IRParagraphAddToTopicModal } from "../../../modals/IRParagraphAddToTopicModal";
 import { IRDeckManager } from "../IRDeckManager";
 import { IREpubBookmarkTaskService } from "../IREpubBookmarkTaskService";
 import { IRPointStorageService } from "../IRPointStorageService";
 import { IRPointWriteService } from "../IRPointWriteService";
-import { recomputeAndBroadcastIRData } from "../IRScheduleRefreshService";
+import { recomputeAndBroadcastIRData, broadcastPriorityChangeUpdate } from "../IRScheduleRefreshService";
+import {
+	dateToLocalDateKey,
+	refreshIRAfterWorkbenchScheduleMutation,
+	subscribeIRWorkbenchProjectionRefresh,
+} from "./IRWorkbenchScheduleRefreshBridge";
 import { IRStorageAdapterV4 } from "../IRStorageAdapterV4";
 import { IRStorageService } from "../IRStorageService";
 import { IRV4SchedulerService } from "../IRV4SchedulerService";
@@ -92,6 +98,16 @@ export class ParagraphWorkbenchService {
 		this.scheduleIntervalDays = normalizeParagraphScheduleIntervalDays(days, this.scheduleIntervalDays);
 	}
 
+	subscribeProjectionScheduleRefresh(onUpdated: () => void): () => void {
+		return subscribeIRWorkbenchProjectionRefresh(
+			this.app,
+			() => {
+				void this.refreshSessionQueueProgress().then(onUpdated);
+			},
+			() => this.session?.topicId
+		);
+	}
+
 	async open(input: ParagraphWorkbenchOpenInput): Promise<ParagraphWorkbenchSession | null> {
 		this.session = await createParagraphWorkbenchSession(this.app, input);
 		this.registeredPointId = input.pointId ?? null;
@@ -122,7 +138,7 @@ export class ParagraphWorkbenchService {
 		await this.recordCurrentSegmentProgress();
 		const next = await this.navigateRelative(1);
 		if (next) {
-			await recomputeAndBroadcastIRData(this.app, "complete_block", {
+			await refreshIRAfterWorkbenchScheduleMutation(this.app, "complete_block", {
 				deckIds: this.session?.topicId ? [this.session.topicId] : undefined,
 			});
 		}
@@ -164,13 +180,13 @@ export class ParagraphWorkbenchService {
 
 	async openAddToTopicModal(): Promise<ParagraphWorkbenchSession | null> {
 		if (!this.session) {
-			new Notice("请先打开段落阅读内容", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.openContentFirst"), 3000);
 			return this.session;
 		}
 
 		const segment = getCurrentWorkbenchSegment(this.session);
 		if (!segment) {
-			new Notice("当前没有可添加的段落", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.noParagraph"), 3000);
 			return this.session;
 		}
 
@@ -203,7 +219,7 @@ export class ParagraphWorkbenchService {
 			});
 		} catch (error) {
 			logger.error("[ParagraphWorkbenchService] openAddToTopicModal failed:", error);
-			new Notice("打开专题选择失败，请重试", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.openDeckSelectFailed"), 3000);
 		}
 
 		return this.session;
@@ -226,7 +242,7 @@ export class ParagraphWorkbenchService {
 
 		const title = cleanParagraphBlockTitle(rawTitle);
 		if (!title) {
-			new Notice("请输入阅读点标题", 3000);
+			new Notice(i18n.t("irNotices.enterReadingPointTitle"), 3000);
 			throw new Error("paragraph-workbench-title-empty");
 		}
 
@@ -234,7 +250,7 @@ export class ParagraphWorkbenchService {
 		await storage.initialize();
 		const deck = await storage.getDeckById(deckId);
 		if (!deck || deck.archivedAt) {
-			new Notice("所选专题不存在或已归档", 3000);
+			new Notice(i18n.t("irNotices.deckNotFoundOrArchived"), 3000);
 			throw new Error("paragraph-workbench-deck-missing");
 		}
 
@@ -262,7 +278,7 @@ export class ParagraphWorkbenchService {
 			this.applyTopicToSession(deckId, deck.name, duplicate.id);
 			await this.syncPriorityFromRegisteredPoint();
 			await this.refreshSessionQueueProgress();
-			new Notice(`当前段落已在专题「${deck.name}」中`, 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.paragraphAlreadyInDeck", { deckName: deck.name }), 3000);
 			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
 			return;
 		}
@@ -293,35 +309,35 @@ export class ParagraphWorkbenchService {
 		await this.syncPriorityFromRegisteredPoint();
 		await this.refreshSessionQueueProgress();
 		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-		new Notice(`已添加到专题「${deck.name}」`, 2500);
+		new Notice(i18n.t("irServiceNotices.workbench.addedToDeck", { deckName: deck.name }), 2500);
 	}
 
 	async createMemoryCardFromSelection(selectedText: string): Promise<boolean> {
 		if (!this.session) {
-			new Notice("请先打开段落阅读内容", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.openContentFirst"), 3000);
 			return false;
 		}
 
 		const normalizedSelection = String(selectedText || "").replace(/\r\n?/g, "\n").trim();
 		if (!normalizedSelection) {
-			new Notice("请先选中要摘录的文本", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.selectExcerptFirst"), 3000);
 			return false;
 		}
 
 		if (!isWeaveMemoryHostAvailable(this.app)) {
-			new Notice("请先安装并启用 Weave 主插件以创建记忆卡片", 4000);
+			new Notice(i18n.t("irServiceNotices.workbench.weaveMainPluginRequired"), 4000);
 			return false;
 		}
 
 		const sourcePath = resolveParagraphWorkbenchSourcePath(this.session.sourcePath);
 		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
-			new Notice("无法识别源文档路径，制卡已取消", 3500);
+			new Notice(i18n.t("irServiceNotices.workbench.sourcePathUnknown"), 3500);
 			return false;
 		}
 
 		const segment = getCurrentWorkbenchSegment(this.session);
 		if (!segment) {
-			new Notice("当前段落不可用，制卡已取消", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.paragraphUnavailable"), 3000);
 			return false;
 		}
 
@@ -334,7 +350,7 @@ export class ParagraphWorkbenchService {
 
 			const host = resolveWeaveMemoryHost(this.app);
 			if (!host) {
-				new Notice("请先安装并启用 Weave 主插件以创建记忆卡片", 4000);
+				new Notice(i18n.t("irServiceNotices.workbench.weaveMainPluginRequired"), 4000);
 				return false;
 			}
 			const cardMetadata: { sourceFile: string; sourceBlock?: string } = {
@@ -353,7 +369,7 @@ export class ParagraphWorkbenchService {
 						if (this.registeredPointId) {
 							await this.incrementExtractStat(this.registeredPointId);
 						}
-						new Notice("记忆卡片已创建", 2500);
+						new Notice(i18n.t("irServiceNotices.workbench.memoryCardCreated"), 2500);
 					})();
 				},
 			});
@@ -361,7 +377,7 @@ export class ParagraphWorkbenchService {
 			return true;
 		} catch (error) {
 			logger.error("[ParagraphWorkbenchService] createMemoryCardFromSelection failed:", error);
-			new Notice("创建记忆卡片失败，请重试", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.createMemoryCardFailed"), 3000);
 			return false;
 		}
 	}
@@ -397,7 +413,7 @@ export class ParagraphWorkbenchService {
 
 	async applyPriority(notice: string): Promise<void> {
 		if (!this.registeredPointId || !this.session?.topicId) {
-			new Notice("请先将当前段落添加到专题", 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.addParagraphToDeckFirst"), 3000);
 			return;
 		}
 		try {
@@ -419,7 +435,7 @@ export class ParagraphWorkbenchService {
 				"paragraph_workbench",
 				this.session.topicId
 			);
-			await recomputeAndBroadcastIRData(this.app, "change_priority", {
+			broadcastPriorityChangeUpdate(this.app, {
 				deckIds: [this.session.topicId],
 			});
 			new Notice(notice);
@@ -459,8 +475,9 @@ export class ParagraphWorkbenchService {
 				},
 				this.session.topicId
 			);
-			await recomputeAndBroadcastIRData(this.app, "manual_reschedule", {
+			await refreshIRAfterWorkbenchScheduleMutation(this.app, "manual_reschedule", {
 				deckIds: [this.session.topicId],
+				extraPriorityDateKeys: [dateToLocalDateKey(nextDate)],
 			});
 			new Notice(notice);
 		} catch (error) {
@@ -489,7 +506,7 @@ export class ParagraphWorkbenchService {
 				(await adapter.getBlockV4(this.registeredPointId)) || migrateToIRBlockV4(blockRecord);
 			await scheduler.archiveBlockWithPreviewV4(blockV4, this.session?.topicId || "");
 			if (this.session?.topicId) {
-				await recomputeAndBroadcastIRData(this.app, "archive_block", {
+				await refreshIRAfterWorkbenchScheduleMutation(this.app, "archive_block", {
 					deckIds: [this.session.topicId],
 				});
 			}
@@ -519,7 +536,7 @@ export class ParagraphWorkbenchService {
 			await storage.addBlocksToDeck(deckId, [duplicate.id]);
 			this.applyTopicToSession(deckId, deckName, duplicate.id);
 			await this.refreshSessionQueueProgress();
-			new Notice(`当前 Canvas 节点已在专题「${deckName}」中`, 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.canvasNodeAlreadyInDeck", { deckName }), 3000);
 			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
 			return;
 		}
@@ -561,7 +578,7 @@ export class ParagraphWorkbenchService {
 		this.applyTopicToSession(deckId, deckName, block.id);
 		await this.refreshSessionQueueProgress();
 		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-		new Notice(`已添加到专题「${deckName}」`, 2500);
+		new Notice(i18n.t("irServiceNotices.workbench.addedToDeck", { deckName }), 2500);
 	}
 
 	private async addEpubSegmentToTopic(
@@ -574,7 +591,7 @@ export class ParagraphWorkbenchService {
 		const cfi = readString(segment.metadata?.cfiRange) || readString(segment.sourceLink);
 		const chapterHref = readString(segment.metadata?.chapterHref);
 		if (!cfi && !chapterHref) {
-			new Notice("无法识别 EPUB 段落定位信息", 3500);
+			new Notice(i18n.t("irServiceNotices.workbench.epubParagraphLocationFailed"), 3500);
 			throw new Error("paragraph-workbench-epub-locator-missing");
 		}
 
@@ -591,7 +608,7 @@ export class ParagraphWorkbenchService {
 			await new IRStorageService(this.app).addBlocksToDeck(deckId, [duplicate.id]);
 			this.applyTopicToSession(deckId, deckName, duplicate.id);
 			await this.refreshSessionQueueProgress();
-			new Notice(`当前 EPUB 段落已在专题「${deckName}」中`, 3000);
+			new Notice(i18n.t("irServiceNotices.workbench.epubParagraphAlreadyInDeck", { deckName }), 3000);
 			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
 			return;
 		}
@@ -615,7 +632,7 @@ export class ParagraphWorkbenchService {
 		this.applyTopicToSession(deckId, deckName, created.id);
 		await this.refreshSessionQueueProgress();
 		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-		new Notice(`已添加到专题「${deckName}」`, 2500);
+		new Notice(i18n.t("irServiceNotices.workbench.addedToDeck", { deckName }), 2500);
 	}
 
 	private async attachBlockToDeck(

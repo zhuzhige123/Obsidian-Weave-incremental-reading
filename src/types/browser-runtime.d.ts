@@ -16,6 +16,9 @@ type NodeOsModule = {
 };
 
 declare global {
+	/** Obsidian active webview document (eslint obsidianmd/no-forbidden-ui-globals). */
+	const activeDocument: Document;
+
 	interface Navigator {
 		deviceMemory?: number;
 		connection?: NetworkInformationLike;

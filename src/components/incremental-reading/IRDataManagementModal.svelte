@@ -3,6 +3,14 @@
   import { Notice } from 'obsidian';
   import type WeavePlugin from '../../main';
   import { IRDeckDataManagementService } from '../../services/incremental-reading/IRDeckDataManagementService';
+  import {
+    getSharedIRLegacyPointUnificationService,
+    type IRLegacyPointFormatScanResult,
+  } from '../../services/incremental-reading/IRLegacyPointUnificationService';
+  import {
+    getSharedIRPointSourcePathNormalizationService,
+    type IRPointSourcePathScanResult,
+  } from '../../services/incremental-reading/IRPointSourcePathNormalizationService';
   import { recomputeAndBroadcastIRData } from '../../services/incremental-reading/IRScheduleRefreshService';
   import type {
     IRBackupOrphanEntry,
@@ -10,20 +18,28 @@
     IRDuplicateTopicGroup,
     IRMergePointIdConflict,
     IRPointFileFormatReport,
+    IRPointFileMergeResult,
     IRPointFileMovePlanItem,
     IRPointFilePairDiff,
     IRVaultPointFileEntry
   } from '../../types/ir-data-management-types';
+  import { IR_POINT_STORAGE_VERSION } from '../../types/ir-point-storage-types';
   import { showObsidianConfirm } from '../../utils/obsidian-confirm';
+  import { formatIRDataManagementPathLabel } from '../../utils/ir-data-management-path';
   import { logger } from '../../utils/logger';
+  import { obsidianTooltipAction } from '../../utils/obsidian-tooltip-action';
+  import { tr } from '../../utils/i18n';
+  import TabNavigation from '../ui/TabNavigation.svelte';
+  import ObsidianIcon from '../ui/ObsidianIcon.svelte';
+  import type { TabDefinition } from '../../types/view-card-modal-types';
   import type { IRLegacyStorageMigrationSummary } from '../../services/incremental-reading/IRLegacyStorageMigrationFacade';
 
   interface Props {
     plugin: WeavePlugin;
-    onClose?: () => void;
   }
 
-  let { plugin, onClose }: Props = $props();
+  let { plugin }: Props = $props();
+  let t = $derived($tr);
 
   type TabId = 'vault' | 'format' | 'duplicates' | 'backups';
 
@@ -32,6 +48,7 @@
   let isBusy = $state(false);
   let scanResult = $state<IRDataManagementScanResult | null>(null);
   let targetDir = $state('');
+  let targetDirTouched = $state(false);
   let movePlan = $state<IRPointFileMovePlanItem[]>([]);
 
   let selectedDuplicateGroup = $state<IRDuplicateTopicGroup | null>(null);
@@ -43,14 +60,77 @@
   let mergePointIdConflicts = $state<IRMergePointIdConflict[] | null>(null);
   let mergeConflictChoices = $state<Record<string, string>>({});
   let legacySummary = $state<IRLegacyStorageMigrationSummary | null>(null);
+  let pointFormatScan = $state<IRLegacyPointFormatScanResult | null>(null);
+  let pointFormatScanLoading = $state(false);
+  let invalidSourcePathScan = $state<IRPointSourcePathScanResult | null>(null);
+  let invalidSourcePathScanLoading = $state(false);
+  let helpOpen = $state(false);
+  let helpControlEl = $state<HTMLDivElement | undefined>(undefined);
 
-  const service = $derived(new IRDeckDataManagementService(plugin.app));
+  const service = new IRDeckDataManagementService(plugin.app);
+
+  let dataMgmtTabs = $derived.by((): TabDefinition[] => {
+    const vaultCount = scanResult?.vaultFiles.length ?? 0;
+    const formatCount =
+      (scanResult?.needsMigrationFiles.length ?? 0) +
+      (scanResult?.emptyPointFiles.length ?? 0) +
+      (pointFormatScan?.legacyBlockCount ?? 0) +
+      (invalidSourcePathScan?.invalidPointCount ?? 0);
+    const duplicateCount = scanResult?.duplicateGroups.length ?? 0;
+    const backupCount = scanResult?.backupOrphans.length ?? 0;
+    const countSuffix = (count: number) =>
+      scanResult ? t('irDataMgmt.tabs.countSuffix', { count }) : '';
+
+    return [
+      { id: 'vault', label: `${t('irDataMgmt.tabs.vault')}${countSuffix(vaultCount)}`, icon: '' },
+      { id: 'format', label: `${t('irDataMgmt.tabs.format')}${countSuffix(formatCount)}`, icon: '' },
+      { id: 'duplicates', label: `${t('irDataMgmt.tabs.duplicates')}${countSuffix(duplicateCount)}`, icon: '' },
+      { id: 'backups', label: `${t('irDataMgmt.tabs.backups')}${countSuffix(backupCount)}`, icon: '' },
+    ];
+  });
+
+  function handleTabChange(tabId: string): void {
+    activeTab = tabId as TabId;
+    helpOpen = false;
+  }
+
+  function toggleTabHelp(event: MouseEvent): void {
+    event.stopPropagation();
+    helpOpen = !helpOpen;
+  }
+
+  async function handleRescanClick(): Promise<void> {
+    helpOpen = false;
+    await refreshScan();
+    await refreshLegacySummary();
+    await refreshPointFormatScan();
+    await refreshInvalidSourcePathScan();
+  }
+
+  $effect(() => {
+    if (!helpOpen) {
+      return;
+    }
+
+    const onDocumentClick = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Node) || !helpControlEl?.contains(target)) {
+        helpOpen = false;
+      }
+    };
+
+    document.addEventListener('click', onDocumentClick, true);
+    return () => document.removeEventListener('click', onDocumentClick, true);
+  });
 
   async function refreshScan(): Promise<void> {
     isLoading = true;
+    const previousKeeperPath = keeperPath;
     try {
       scanResult = await service.scan();
-      targetDir = scanResult.canonicalPointsDir;
+      if (!targetDirTouched) {
+        targetDir = scanResult.canonicalPointsDir;
+      }
       movePlan = service.buildNormalizeMovePlan(scanResult.vaultFiles, targetDir);
       if (
         selectedDuplicateGroup &&
@@ -60,16 +140,16 @@
       } else if (!selectedDuplicateGroup) {
         selectedDuplicateGroup = scanResult.duplicateGroups[0] || null;
       }
-      resetDiffState();
+      resetDiffState(previousKeeperPath);
     } catch (error) {
       logger.error('[IRDataManagementModal] scan failed', error);
-      new Notice('扫描增量阅读数据失败');
+      new Notice(t('irDataMgmt.notices.scanFailed'));
     } finally {
       isLoading = false;
     }
   }
 
-  function resetDiffState(): void {
+  function resetDiffState(preserveKeeperPath = ''): void {
     diffLeftPath = '';
     diffRightPath = '';
     pairDiff = null;
@@ -77,7 +157,12 @@
     mergePointIdConflicts = null;
     mergeConflictChoices = {};
     if (selectedDuplicateGroup?.files.length) {
-      keeperPath = selectedDuplicateGroup.files[0]?.absolutePath || '';
+      const filePaths = selectedDuplicateGroup.files.map((file) => file.absolutePath);
+      const nextKeeper =
+        preserveKeeperPath && filePaths.includes(preserveKeeperPath)
+          ? preserveKeeperPath
+          : selectedDuplicateGroup.files[0]?.absolutePath || '';
+      keeperPath = nextKeeper;
       diffLeftPath = selectedDuplicateGroup.files[0]?.absolutePath || '';
       diffRightPath = selectedDuplicateGroup.files[1]?.absolutePath || '';
     }
@@ -100,7 +185,7 @@
 
   async function runCompare(): Promise<void> {
     if (!diffLeftPath || !diffRightPath || diffLeftPath === diffRightPath) {
-      new Notice('请选择两个不同的文件进行比较');
+      new Notice(t('irDataMgmt.notices.compareNeedTwoFiles'));
       return;
     }
     isBusy = true;
@@ -108,7 +193,7 @@
       pairDiff = await service.comparePointFiles(diffLeftPath, diffRightPath);
     } catch (error) {
       logger.error('[IRDataManagementModal] compare failed', error);
-      new Notice('比较失败');
+      new Notice(t('irDataMgmt.notices.compareFailed'));
     } finally {
       isBusy = false;
     }
@@ -117,11 +202,13 @@
   async function afterDataMutation(): Promise<void> {
     await recomputeAndBroadcastIRData(plugin.app, 'ui_refresh');
     await refreshScan();
+    await refreshPointFormatScan();
+    await refreshInvalidSourcePathScan();
   }
 
   async function executeNormalizeMove(): Promise<void> {
     if (movePlan.length === 0) {
-      new Notice('没有需要移动的文件');
+      new Notice(t('irDataMgmt.notices.noFilesToMove'));
       return;
     }
 
@@ -129,14 +216,22 @@
       .slice(0, 8)
       .map((item) => `• ${item.sourcePath}\n  → ${item.targetPath}`)
       .join('\n');
-    const more = movePlan.length > 8 ? `\n… 另有 ${movePlan.length - 8} 个文件` : '';
+    const more =
+      movePlan.length > 8
+        ? t('irDataMgmt.confirm.normalizeMoveMore', { more: movePlan.length - 8 })
+        : '';
 
     const confirmed = await showObsidianConfirm(
       plugin.app,
-      `将把 ${movePlan.length} 个专题文件移动到：\n${targetDir}\n\n${preview}${more}`,
+      t('irDataMgmt.confirm.normalizeMoveBody', {
+        count: movePlan.length,
+        targetDir,
+        preview,
+        more,
+      }),
       {
-        title: '确认规范移动',
-        confirmText: '开始移动',
+        title: t('irDataMgmt.confirm.normalizeMoveTitle'),
+        confirmText: t('irDataMgmt.confirm.normalizeMoveConfirm'),
         confirmClass: 'mod-warning'
       }
     );
@@ -147,11 +242,105 @@
     isBusy = true;
     try {
       const moved = await service.executeMovePlan(movePlan);
-      new Notice(`已移动 ${moved} 个专题文件`);
+      new Notice(t('irDataMgmt.notices.movedFiles', { count: moved }));
       await afterDataMutation();
     } catch (error) {
       logger.error('[IRDataManagementModal] move failed', error);
-      new Notice(`移动失败：${error instanceof Error ? error.message : String(error)}`);
+      new Notice(
+        t('irDataMgmt.notices.moveFailed', {
+          message: error instanceof Error ? error.message : String(error),
+        })
+      );
+    } finally {
+      isBusy = false;
+    }
+  }
+
+  function setMergeConflictState(conflicts: IRMergePointIdConflict[]): void {
+    mergePointIdConflicts = conflicts;
+    const next: Record<string, string> = {};
+    for (const conflict of conflicts) {
+      next[conflict.pointId] = defaultConflictChoice(conflict);
+    }
+    mergeConflictChoices = next;
+  }
+
+  function validateConflictChoices(
+    conflicts: IRMergePointIdConflict[],
+    choices: Record<string, string>
+  ): boolean {
+    return conflicts.every((conflict) => {
+      const choice = choices[conflict.pointId];
+      return Boolean(choice && conflict.variants.some((variant) => variant.filePath === choice));
+    });
+  }
+
+  function buildMergeSuccessNotice(
+    mergeResult: IRPointFileMergeResult,
+    hasResolvedConflicts = false
+  ): string {
+    if (hasResolvedConflicts) {
+      return t('irDataMgmt.notices.mergeSuccessWithResolutions', {
+        added: mergeResult.addedPointCount,
+        skipped: mergeResult.skippedDuplicatePointCount,
+        replaced: mergeResult.replacedByResolutionCount,
+        removed: mergeResult.removedPaths.length,
+      });
+    }
+    return t('irDataMgmt.notices.mergeSuccess', {
+      added: mergeResult.addedPointCount,
+      skipped: mergeResult.skippedDuplicatePointCount,
+      removed: mergeResult.removedPaths.length,
+    });
+  }
+
+  async function confirmMergeDuplicates(
+    keeper: string,
+    toRemove: string[],
+    resolvedConflictCount = 0
+  ): Promise<boolean> {
+    const conflictNote =
+      resolvedConflictCount > 0
+        ? t('irDataMgmt.confirm.mergeConflictNote', { count: resolvedConflictCount })
+        : '';
+    return showObsidianConfirm(
+      plugin.app,
+      t('irDataMgmt.confirm.mergeBody', {
+        keeperLabel:
+          resolvedConflictCount > 0
+            ? t('irDataMgmt.confirm.mergeKeeperFileLabel')
+            : t('irDataMgmt.confirm.mergeKeeperLabel'),
+        keeper,
+        conflictNote,
+        removeCount: toRemove.length,
+        toRemove: toRemove.join('\n'),
+      }),
+      {
+        title: t('irDataMgmt.confirm.mergeTitle'),
+        confirmText: t('irDataMgmt.confirm.mergeConfirm'),
+        confirmClass: 'mod-warning'
+      }
+    );
+  }
+
+  async function runMergeDuplicates(
+    toRemove: string[],
+    options?: { resolutions?: Record<string, string> }
+  ): Promise<void> {
+    isBusy = true;
+    try {
+      const mergeResult = await service.mergeDuplicateGroupKeepingFile(keeperPath, toRemove, options);
+      if (mergeResult.conflicts?.length) {
+        setMergeConflictState(mergeResult.conflicts);
+        new Notice(t('irDataMgmt.notices.mergeConflictPickVersion'));
+        return;
+      }
+      new Notice(buildMergeSuccessNotice(mergeResult, Boolean(options?.resolutions)));
+      cancelMergeConflictUi();
+      await afterDataMutation();
+    } catch (error) {
+      logger.error('[IRDataManagementModal] delete duplicates failed', error);
+      new Notice(t('irDataMgmt.notices.deleteFailed'));
     } finally {
       isBusy = false;
     }
@@ -159,7 +348,7 @@
 
   async function applyKeeperAndRemoveOthers(): Promise<void> {
     if (!selectedDuplicateGroup || !keeperPath) {
-      new Notice('请先选择要保留的文件');
+      new Notice(t('irDataMgmt.notices.selectKeeperFirst'));
       return;
     }
 
@@ -168,53 +357,24 @@
       .filter((path) => path !== keeperPath);
 
     if (toRemove.length === 0) {
-      new Notice('没有其它文件需要删除');
+      new Notice(t('irDataMgmt.notices.noOtherFilesToDelete'));
       return;
     }
 
     if (mergePointIdConflicts?.length) {
-      for (const conflict of mergePointIdConflicts) {
-        const choice = mergeConflictChoices[conflict.pointId];
-        if (!choice || !conflict.variants.some((v) => v.filePath === choice)) {
-          new Notice('请为每个冲突阅读点选择要保留的文件版本');
-          return;
-        }
+      if (!validateConflictChoices(mergePointIdConflicts, mergeConflictChoices)) {
+        new Notice(t('irDataMgmt.notices.pickConflictVersion'));
+        return;
       }
-
-      const confirmed = await showObsidianConfirm(
-        plugin.app,
-        `保留文件：\n${keeperPath}\n\n已处理 ${mergePointIdConflicts.length} 个「同阅读点 id、内容不一致」冲突（按你在下方选择的版本写入）。\n\n将把其它 ${toRemove.length} 个副本合并进保留文件后删除：\n${toRemove.join('\n')}\n\n此操作不可撤销。`,
-        {
-          title: '确认合并并删除其它副本',
-          confirmText: '合并后删除',
-          confirmClass: 'mod-warning'
-        }
+      const confirmed = await confirmMergeDuplicates(
+        keeperPath,
+        toRemove,
+        mergePointIdConflicts.length
       );
       if (!confirmed) {
         return;
       }
-
-      isBusy = true;
-      try {
-        const mergeResult = await service.mergeDuplicateGroupKeepingFile(keeperPath, toRemove, {
-          resolutions: mergeConflictChoices
-        });
-        if (mergeResult.conflicts?.length) {
-          mergePointIdConflicts = mergeResult.conflicts;
-          new Notice('合并未完成：仍有冲突，请重新选择版本');
-          return;
-        }
-        new Notice(
-          `已合并 ${mergeResult.addedPointCount} 个阅读点，跳过相同内容 ${mergeResult.skippedDuplicatePointCount} 个，按选择覆盖 ${mergeResult.replacedByResolutionCount} 个，删除 ${mergeResult.removedPaths.length} 个文件`
-        );
-        cancelMergeConflictUi();
-        await afterDataMutation();
-      } catch (error) {
-        logger.error('[IRDataManagementModal] delete duplicates failed', error);
-        new Notice('删除失败');
-      } finally {
-        isBusy = false;
-      }
+      await runMergeDuplicates(toRemove, { resolutions: mergeConflictChoices });
       return;
     }
 
@@ -222,68 +382,35 @@
     try {
       const conflicts = await service.detectMergePointIdConflicts(keeperPath, toRemove);
       if (conflicts.length > 0) {
-        mergePointIdConflicts = conflicts;
-        const next: Record<string, string> = {};
-        for (const conflict of conflicts) {
-          next[conflict.pointId] = defaultConflictChoice(conflict);
-        }
-        mergeConflictChoices = next;
+        setMergeConflictState(conflicts);
         new Notice(
-          `检测到 ${conflicts.length} 个阅读点在不同文件中内容不一致。请在下方为每个点选择保留版本，然后再次点击合并按钮。`
+          t('irDataMgmt.notices.conflictsDetected', { count: conflicts.length })
         );
         return;
       }
     } catch (error) {
       logger.error('[IRDataManagementModal] conflict scan failed', error);
-      new Notice('检测合并冲突失败');
+      new Notice(t('irDataMgmt.notices.conflictScanFailed'));
       return;
     } finally {
       isBusy = false;
     }
 
-    const confirmed = await showObsidianConfirm(
-      plugin.app,
-      `保留：\n${keeperPath}\n\n将把其它 ${toRemove.length} 个文件中的阅读点（按 id 去重）合并进保留文件，然后删除这些副本：\n${toRemove.join('\n')}\n\n此操作不可撤销。`,
-      {
-        title: '确认合并并删除其它副本',
-        confirmText: '合并后删除',
-        confirmClass: 'mod-warning'
-      }
-    );
+    const confirmed = await confirmMergeDuplicates(keeperPath, toRemove);
     if (!confirmed) {
       return;
     }
-
-    isBusy = true;
-    try {
-      const mergeResult = await service.mergeDuplicateGroupKeepingFile(keeperPath, toRemove);
-      if (mergeResult.conflicts?.length) {
-        mergePointIdConflicts = mergeResult.conflicts;
-        const next: Record<string, string> = {};
-        for (const conflict of mergeResult.conflicts) {
-          next[conflict.pointId] = defaultConflictChoice(conflict);
-        }
-        mergeConflictChoices = next;
-        new Notice('检测到内容冲突，请在下方选择保留版本后再合并');
-        return;
-      }
-      new Notice(
-        `已合并 ${mergeResult.addedPointCount} 个阅读点，跳过重复 ${mergeResult.skippedDuplicatePointCount} 个，删除 ${mergeResult.removedPaths.length} 个文件`
-      );
-      await afterDataMutation();
-    } catch (error) {
-      logger.error('[IRDataManagementModal] delete duplicates failed', error);
-      new Notice('删除失败');
-    } finally {
-      isBusy = false;
-    }
+    await runMergeDuplicates(toRemove);
   }
 
   async function recoverOrphan(entry: IRBackupOrphanEntry): Promise<void> {
     const confirmed = await showObsidianConfirm(
       plugin.app,
-      `将恢复到库内目录：\n${targetDir || scanResult?.canonicalPointsDir}\n\n来源：\n${entry.absolutePath}`,
-      { title: '确认恢复专题文件', confirmText: '恢复' }
+      t('irDataMgmt.confirm.recoverBody', {
+        targetDir: targetDir || scanResult?.canonicalPointsDir || '',
+        sourcePath: entry.absolutePath,
+      }),
+      { title: t('irDataMgmt.confirm.recoverTitle'), confirmText: t('irDataMgmt.confirm.recoverConfirm') }
     );
     if (!confirmed) {
       return;
@@ -295,11 +422,15 @@
         entry,
         targetDir || scanResult?.canonicalPointsDir
       );
-      new Notice(`已恢复到：${targetPath}`);
+      new Notice(t('irDataMgmt.notices.recoveredTo', { path: targetPath }));
       await afterDataMutation();
     } catch (error) {
       logger.error('[IRDataManagementModal] recover failed', error);
-      new Notice('恢复失败');
+      new Notice(
+        t('irDataMgmt.notices.recoverFailed', {
+          message: error instanceof Error ? error.message : String(error),
+        })
+      );
     } finally {
       isBusy = false;
     }
@@ -308,10 +439,10 @@
   async function deleteOrphanWithoutRecover(entry: IRBackupOrphanEntry): Promise<void> {
     const confirmed = await showObsidianConfirm(
       plugin.app,
-      `不恢复并删除备份文件：\n${entry.absolutePath}\n\n此操作不可撤销。`,
+      t('irDataMgmt.confirm.deleteBackupBody', { path: entry.absolutePath }),
       {
-        title: '确认删除备份文件',
-        confirmText: '删除',
+        title: t('irDataMgmt.confirm.deleteBackupTitle'),
+        confirmText: t('irDataMgmt.confirm.deleteBackupConfirm'),
         confirmClass: 'mod-warning'
       }
     );
@@ -322,11 +453,11 @@
     isBusy = true;
     try {
       await service.deleteBackupFile(entry.absolutePath);
-      new Notice('已删除备份文件');
+      new Notice(t('irDataMgmt.notices.backupDeleted'));
       await refreshScan();
     } catch (error) {
       logger.error('[IRDataManagementModal] delete backup failed', error);
-      new Notice('删除失败');
+      new Notice(t('irDataMgmt.notices.deleteFailed'));
     } finally {
       isBusy = false;
     }
@@ -340,15 +471,24 @@
     movePlan = service.buildNormalizeMovePlan(scanResult.vaultFiles, targetDir);
   }
 
+  function handleTargetDirInput(): void {
+    targetDirTouched = true;
+    updateMovePlan();
+  }
+
   function fileLabel(file: IRVaultPointFileEntry): string {
-    return `${file.topicName}（${file.pointCount} 点）`;
+    return t('irDataMgmt.fileLabel', { name: file.topicName, count: file.pointCount });
   }
 
   async function migrateSingleFile(report: IRPointFileFormatReport): Promise<void> {
     const confirmed = await showObsidianConfirm(
       plugin.app,
-      `将把以下文件迁移为当前规范结构（schemaVersion=${1}）：\n${report.absolutePath}\n\n${report.issues.map((issue) => `• ${issue.message}`).join('\n')}`,
-      { title: '确认迁移专题文件', confirmText: '迁移' }
+      t('irDataMgmt.confirm.migrateFileBody', {
+        version: IR_POINT_STORAGE_VERSION,
+        path: report.absolutePath,
+        issues: report.issues.map((issue) => `• ${issue.message}`).join('\n'),
+      }),
+      { title: t('irDataMgmt.confirm.migrateFileTitle'), confirmText: t('irDataMgmt.confirm.migrateFileConfirm') }
     );
     if (!confirmed) {
       return;
@@ -357,11 +497,11 @@
     isBusy = true;
     try {
       await service.migratePointFileToCurrentSchema(report.absolutePath);
-      new Notice('专题文件已迁移为当前规范格式');
+      new Notice(t('irDataMgmt.notices.migratedFile'));
       await afterDataMutation();
     } catch (error) {
       logger.error('[IRDataManagementModal] migrate file failed', error);
-      new Notice('迁移失败');
+      new Notice(t('irDataMgmt.notices.migrateFailed'));
     } finally {
       isBusy = false;
     }
@@ -370,14 +510,14 @@
   async function migrateAllNeedingFiles(): Promise<void> {
     const targets = scanResult?.needsMigrationFiles || [];
     if (targets.length === 0) {
-      new Notice('没有需要迁移的文件');
+      new Notice(t('irDataMgmt.notices.noFilesToMigrate'));
       return;
     }
 
     const confirmed = await showObsidianConfirm(
       plugin.app,
-      `将迁移 ${targets.length} 个专题文件为当前规范结构。建议先备份库。`,
-      { title: '确认批量迁移', confirmText: '开始迁移', confirmClass: 'mod-warning' }
+      t('irDataMgmt.confirm.migrateBatchBody', { count: targets.length }),
+      { title: t('irDataMgmt.confirm.migrateBatchTitle'), confirmText: t('irDataMgmt.confirm.migrateBatchConfirm'), confirmClass: 'mod-warning' }
     );
     if (!confirmed) {
       return;
@@ -386,11 +526,11 @@
     isBusy = true;
     try {
       const migrated = await service.migrateAllPointFiles(targets);
-      new Notice(`已迁移 ${migrated} 个专题文件`);
+      new Notice(t('irDataMgmt.notices.migratedBatch', { count: migrated }));
       await afterDataMutation();
     } catch (error) {
       logger.error('[IRDataManagementModal] batch migrate failed', error);
-      new Notice('批量迁移失败');
+      new Notice(t('irDataMgmt.notices.batchMigrateFailed'));
     } finally {
       isBusy = false;
     }
@@ -399,10 +539,10 @@
   async function promptDeleteEmptyFile(file: IRVaultPointFileEntry): Promise<void> {
     const confirmed = await showObsidianConfirm(
       plugin.app,
-      `该专题文件没有任何阅读点：\n${file.absolutePath}\n\n是否删除此 .irdeck 文件？`,
+      t('irDataMgmt.confirm.deleteEmptyBody', { path: file.absolutePath }),
       {
-        title: '删除空专题文件',
-        confirmText: '删除',
+        title: t('irDataMgmt.confirm.deleteEmptyTitle'),
+        confirmText: t('irDataMgmt.confirm.deleteEmptyConfirm'),
         confirmClass: 'mod-warning'
       }
     );
@@ -413,11 +553,11 @@
     isBusy = true;
     try {
       await service.deleteVaultPointFile(file.absolutePath);
-      new Notice('已删除空专题文件');
+      new Notice(t('irDataMgmt.notices.emptyFileDeleted'));
       await afterDataMutation();
     } catch (error) {
       logger.error('[IRDataManagementModal] delete empty file failed', error);
-      new Notice('删除失败');
+      new Notice(t('irDataMgmt.notices.deleteFailed'));
     } finally {
       isBusy = false;
     }
@@ -432,11 +572,129 @@
     }
   }
 
+  async function refreshPointFormatScan(): Promise<void> {
+    pointFormatScanLoading = true;
+    try {
+      pointFormatScan = await getSharedIRLegacyPointUnificationService(plugin.app).scanPointFormats();
+    } catch (error) {
+      logger.error('[IRDataManagementModal] point format scan failed', error);
+      pointFormatScan = null;
+      new Notice(t('irDataMgmt.notices.pointFormatScanFailed'));
+    } finally {
+      pointFormatScanLoading = false;
+    }
+  }
+
+  async function refreshInvalidSourcePathScan(): Promise<void> {
+    invalidSourcePathScanLoading = true;
+    try {
+      invalidSourcePathScan = await getSharedIRPointSourcePathNormalizationService(
+        plugin.app
+      ).scanInvalidSourcePaths();
+    } catch (error) {
+      logger.error('[IRDataManagementModal] invalid source path scan failed', error);
+      invalidSourcePathScan = null;
+      new Notice(t('irDataMgmt.notices.invalidSourcePathScanFailed'));
+    } finally {
+      invalidSourcePathScanLoading = false;
+    }
+  }
+
+  async function runInvalidSourcePathNormalization(): Promise<void> {
+    const pointCount = invalidSourcePathScan?.invalidPointCount ?? 0;
+    const fileCount = invalidSourcePathScan?.affectedFileCount ?? 0;
+    if (pointCount <= 0) {
+      new Notice(t('irDataMgmt.notices.noInvalidSourcePaths'));
+      return;
+    }
+
+    const confirmed = await showObsidianConfirm(
+      plugin.app,
+      t('irDataMgmt.confirm.invalidSourcePathNormalizeBody', { pointCount, fileCount }),
+      {
+        title: t('irDataMgmt.confirm.invalidSourcePathNormalizeTitle'),
+        confirmText: t('irDataMgmt.confirm.invalidSourcePathNormalizeConfirm'),
+        confirmClass: 'mod-warning',
+      }
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    isBusy = true;
+    try {
+      const result = await getSharedIRPointSourcePathNormalizationService(
+        plugin.app
+      ).normalizeAllStoredSourcePaths();
+      new Notice(
+        t('irDataMgmt.notices.invalidSourcePathNormalizeDone', {
+          pointsRepaired: result.pointsRepaired,
+          pathsCleared: result.pathsCleared,
+          filesUpdated: result.filesUpdated,
+        })
+      );
+      if (result.errors.length > 0) {
+        logger.warn('[IRDataManagementModal] invalid source path normalization errors', result.errors);
+      }
+      await afterDataMutation();
+      await refreshInvalidSourcePathScan();
+      await refreshScan();
+    } catch (error) {
+      logger.error('[IRDataManagementModal] invalid source path normalization failed', error);
+      new Notice(t('irDataMgmt.notices.invalidSourcePathNormalizeFailed'));
+    } finally {
+      isBusy = false;
+    }
+  }
+
+  async function runPointFormatUnification(): Promise<void> {
+    const legacyCount = pointFormatScan?.legacyBlockCount ?? 0;
+    if (legacyCount <= 0) {
+      new Notice(t('irDataMgmt.notices.noLegacyPointsToUnify'));
+      return;
+    }
+
+    const confirmed = await showObsidianConfirm(
+      plugin.app,
+      t('irDataMgmt.confirm.pointFormatUnifyBody', { count: legacyCount }),
+      {
+        title: t('irDataMgmt.confirm.pointFormatUnifyTitle'),
+        confirmText: t('irDataMgmt.confirm.pointFormatUnifyConfirm'),
+        confirmClass: 'mod-warning',
+      }
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    isBusy = true;
+    try {
+      const result = await getSharedIRLegacyPointUnificationService(plugin.app).migrateLegacyBlockPointsToChunkFormat();
+      new Notice(
+        t('irDataMgmt.notices.pointFormatUnifyDone', {
+          migrated: result.migrated,
+          skipped: result.skipped,
+          failed: result.failed,
+        })
+      );
+      if (result.errors.length > 0) {
+        logger.warn('[IRDataManagementModal] point format unification errors', result.errors);
+      }
+      await afterDataMutation();
+      await refreshPointFormatScan();
+    } catch (error) {
+      logger.error('[IRDataManagementModal] point format unification failed', error);
+      new Notice(t('irDataMgmt.notices.pointFormatUnifyFailed'));
+    } finally {
+      isBusy = false;
+    }
+  }
+
   async function runLegacyStorageMigration(): Promise<void> {
     const confirmed = await showObsidianConfirm(
       plugin.app,
-      '这会把旧 chunks/sources/materials 等 vault 残留迁移到新 IR 存储结构，并清理已迁移的旧文件。建议先备份。',
-      { title: '执行旧存储迁移', confirmText: '开始迁移', confirmClass: 'mod-warning' }
+      t('irDataMgmt.confirm.legacyMigrationBody'),
+      { title: t('irDataMgmt.confirm.legacyMigrationTitle'), confirmText: t('irDataMgmt.confirm.legacyMigrationConfirm'), confirmClass: 'mod-warning' }
     );
     if (!confirmed) {
       return;
@@ -445,12 +703,17 @@
     isBusy = true;
     try {
       const report = await plugin.executeLegacyStorageMigration();
-      new Notice(`旧存储迁移完成：成功 ${report.success}，失败 ${report.failed}`);
+      new Notice(
+        t('irDataMgmt.notices.legacyMigrationDone', {
+          success: report.success,
+          failed: report.failed,
+        })
+      );
       await refreshLegacySummary();
       await refreshScan();
     } catch (error) {
       logger.error('[IRDataManagementModal] legacy migration failed', error);
-      new Notice('旧存储迁移失败');
+      new Notice(t('irDataMgmt.notices.legacyMigrationFailed'));
     } finally {
       isBusy = false;
     }
@@ -459,75 +722,75 @@
   onMount(() => {
     void refreshScan();
     void refreshLegacySummary();
+    void refreshPointFormatScan();
+    void refreshInvalidSourcePathScan();
   });
 </script>
 
 <div class="ir-data-mgmt">
-  <nav class="ir-data-mgmt__tabs" aria-label="数据管理分类">
-    <button
-      type="button"
-      class="clickable-icon ir-data-mgmt__tab"
-      class:is-active={activeTab === 'vault'}
-      onclick={() => { activeTab = 'vault'; }}
-    >
-      库内专题文件
-      {#if scanResult}
-        <span class="ir-data-mgmt__badge">{scanResult.vaultFiles.length}</span>
-      {/if}
-    </button>
-    <button
-      type="button"
-      class="clickable-icon ir-data-mgmt__tab"
-      class:is-active={activeTab === 'format'}
-      onclick={() => { activeTab = 'format'; }}
-    >
-      格式与空专题
-      {#if scanResult}
-        <span class="ir-data-mgmt__badge">{scanResult.needsMigrationFiles.length + scanResult.emptyPointFiles.length}</span>
-      {/if}
-    </button>
-    <button
-      type="button"
-      class="clickable-icon ir-data-mgmt__tab"
-      class:is-active={activeTab === 'duplicates'}
-      onclick={() => { activeTab = 'duplicates'; }}
-    >
-      重复专题
-      {#if scanResult}
-        <span class="ir-data-mgmt__badge">{scanResult.duplicateGroups.length}</span>
-      {/if}
-    </button>
-    <button
-      type="button"
-      class="clickable-icon ir-data-mgmt__tab"
-      class:is-active={activeTab === 'backups'}
-      onclick={() => { activeTab = 'backups'; }}
-    >
-      备份孤立专题
-      {#if scanResult}
-        <span class="ir-data-mgmt__badge">{scanResult.backupOrphans.length}</span>
-      {/if}
-    </button>
-  </nav>
+  <div class="ir-data-mgmt__header">
+    <div class="ir-data-mgmt__tabs">
+      <TabNavigation
+        tabs={dataMgmtTabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        variant="plain"
+      />
+    </div>
 
-  <div class="ir-data-mgmt__toolbar">
-    <button type="button" class="clickable-icon mod-muted" disabled={isLoading || isBusy} onclick={() => { void refreshScan(); void refreshLegacySummary(); }}>
-      重新扫描
-    </button>
-    {#if isLoading}
-      <span class="ir-data-mgmt__hint">正在扫描…</span>
-    {:else if scanResult}
-      <span class="ir-data-mgmt__hint">
-        规范目录：{scanResult.canonicalPointsDir}
-      </span>
-    {/if}
+    <div class="ir-data-mgmt__header-actions">
+      <div class="ir-data-mgmt__help-control" bind:this={helpControlEl}>
+        <button
+          type="button"
+          class="clickable-icon ir-data-mgmt__icon-btn"
+          class:is-active={helpOpen}
+          aria-label={t('irDataMgmt.help.ariaLabel')}
+          aria-expanded={helpOpen}
+          onclick={toggleTabHelp}
+        >
+          <ObsidianIcon name="help-circle" size={16} />
+        </button>
+
+        {#if helpOpen}
+          <div class="ir-data-mgmt__help-popover" role="dialog" aria-label={t('irDataMgmt.help.dialogLabel')}>
+            {#if activeTab === 'vault'}
+              <p>
+                {t('irDataMgmt.help.vault', {
+                  canonicalDir: scanResult
+                    ? scanResult.canonicalPointsDir
+                    : t('irDataMgmt.help.vaultCanonicalPending'),
+                })}
+              </p>
+            {:else if activeTab === 'format'}
+              <p>{t('irDataMgmt.help.format')}</p>
+            {:else if activeTab === 'duplicates'}
+              <p>{t('irDataMgmt.help.duplicates')}</p>
+            {:else}
+              <p>{t('irDataMgmt.help.backups')}</p>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <button
+        type="button"
+        class="clickable-icon ir-data-mgmt__icon-btn"
+        class:is-loading={isLoading}
+        disabled={isLoading || isBusy}
+        aria-label={t('irDataMgmt.rescan.ariaLabel')}
+        use:obsidianTooltipAction={isLoading ? t('irDataMgmt.rescan.loading') : t('irDataMgmt.rescan.tooltip')}
+        onclick={() => void handleRescanClick()}
+      >
+        <ObsidianIcon name="refresh-cw" size={16} />
+      </button>
+    </div>
   </div>
 
   {#if legacySummary && legacySummary.pendingCount > 0}
     <section class="ir-data-mgmt__legacy-banner">
       <div class="ir-data-mgmt__legacy-copy">
-        <strong>旧 vault 存储迁移</strong>
-        <p>检测到 {legacySummary.pendingCount} 项旧增量阅读存储待迁移（Weave 主插件已不再处理此类任务）。</p>
+        <strong>{t('irDataMgmt.legacy.title')}</strong>
+        <p>{t('irDataMgmt.legacy.description', { count: legacySummary.pendingCount })}</p>
       </div>
       <button
         type="button"
@@ -535,49 +798,142 @@
         disabled={isBusy}
         onclick={() => void runLegacyStorageMigration()}
       >
-        执行旧存储迁移
+        {t('irDataMgmt.legacy.action')}
       </button>
     </section>
   {/if}
 
   {#if isLoading}
-    <div class="ir-data-mgmt__empty">正在扫描库内与插件备份中的增量阅读专题文件…</div>
+    <div class="ir-data-mgmt__empty">{t('irDataMgmt.loading')}</div>
   {:else if !scanResult}
-    <div class="ir-data-mgmt__empty">扫描失败，请重试。</div>
+    <div class="ir-data-mgmt__empty">{t('irDataMgmt.scanFailedInline')}</div>
   {:else if activeTab === 'format'}
-    <section class="ir-data-mgmt__section">
-      <p class="ir-data-mgmt__desc">
-        检查 <code>.irdeck</code> 是否符合当前数据结构（schemaVersion、deck、tagGroups、points 等）。旧格式可一键迁移；没有任何阅读点的文件可删除。
-      </p>
+    <section class="ir-data-mgmt__section" role="tabpanel" id="format-panel">
+      <div class="ir-data-mgmt__subsection">
+        <h4 class="ir-data-mgmt__subsection-title">{t('irDataMgmt.format.pointKindTitle')}</h4>
+        {#if pointFormatScanLoading && !pointFormatScan}
+          <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.format.pointKindLoading')}</p>
+        {:else if pointFormatScan}
+          <p class="ir-data-mgmt__desc">
+            {t('irDataMgmt.format.pointKindStats', {
+              total: pointFormatScan.totalCount,
+              chunk: pointFormatScan.chunkCount,
+              legacy: pointFormatScan.legacyBlockCount,
+              pdf: pointFormatScan.pdfCount,
+              epub: pointFormatScan.epubCount,
+              other: pointFormatScan.otherCount,
+            })}
+          </p>
+          {#if pointFormatScan.legacyBlockCount > 0}
+            <p class="ir-data-mgmt__desc">{t('irDataMgmt.format.pointKindLegacyHint')}</p>
+            <div class="ir-data-mgmt__actions">
+              <button
+                type="button"
+                class="mod-cta"
+                disabled={isBusy}
+                onclick={() => void runPointFormatUnification()}
+              >
+                {t('irDataMgmt.format.unifyLegacyPoints', { count: pointFormatScan.legacyBlockCount })}
+              </button>
+            </div>
+          {:else}
+            <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.format.pointKindAllUnified')}</p>
+          {/if}
+        {/if}
+      </div>
 
       <div class="ir-data-mgmt__subsection">
-        <h4>需规范迁移（{scanResult.needsMigrationFiles.length}）</h4>
+        <h4 class="ir-data-mgmt__subsection-title">
+          {t('irDataMgmt.format.invalidSourcePathTitle', {
+            count: invalidSourcePathScan?.invalidPointCount ?? 0,
+          })}
+        </h4>
+        {#if invalidSourcePathScanLoading && !invalidSourcePathScan}
+          <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.format.invalidSourcePathLoading')}</p>
+        {:else if invalidSourcePathScan}
+          {#if invalidSourcePathScan.invalidPointCount > 0}
+            <p class="ir-data-mgmt__desc">
+              {t('irDataMgmt.format.invalidSourcePathStats', {
+                pointCount: invalidSourcePathScan.invalidPointCount,
+                fieldCount: invalidSourcePathScan.invalidFieldCount,
+                fileCount: invalidSourcePathScan.affectedFileCount,
+              })}
+            </p>
+            <p class="ir-data-mgmt__desc">{t('irDataMgmt.format.invalidSourcePathHint')}</p>
+            <div class="ir-data-mgmt__actions">
+              <button
+                type="button"
+                class="mod-cta"
+                disabled={isBusy}
+                onclick={() => void runInvalidSourcePathNormalization()}
+              >
+                {t('irDataMgmt.format.normalizeInvalidSourcePaths', {
+                  pointCount: invalidSourcePathScan.invalidPointCount,
+                })}
+              </button>
+            </div>
+            <div class="ir-data-mgmt__table-wrap">
+              <table class="ir-data-mgmt__table">
+                <thead>
+                  <tr>
+                    <th>{t('irDataMgmt.columns.topic')}</th>
+                    <th>{t('irDataMgmt.columns.path')}</th>
+                    <th>{t('irDataMgmt.columns.points')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each invalidSourcePathScan.affectedFiles as file (file.absolutePath)}
+                    {@const pathInfo = formatIRDataManagementPathLabel(
+                      file.absolutePath,
+                      scanResult.canonicalPointsDir
+                    )}
+                    <tr>
+                      <td>
+                        <div class="ir-data-mgmt__cell-title">{file.topicName || file.topicId}</div>
+                        <div class="ir-data-mgmt__cell-sub">{file.topicId}</div>
+                      </td>
+                      <td><code class="ir-data-mgmt__path" title={pathInfo.full}>{pathInfo.display}</code></td>
+                      <td>{file.invalidPointCount}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {:else}
+            <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.format.invalidSourcePathAllClean')}</p>
+          {/if}
+        {/if}
+      </div>
+
+      <div class="ir-data-mgmt__subsection">
+        <h4 class="ir-data-mgmt__subsection-title">{t('irDataMgmt.format.needsMigrationTitle', { count: scanResult.needsMigrationFiles.length })}</h4>
         {#if scanResult.needsMigrationFiles.length === 0}
-          <p class="ir-data-mgmt__empty-inline">所有可见专题文件均已符合当前结构。</p>
+          <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.format.allCompliant')}</p>
         {:else}
           <div class="ir-data-mgmt__actions">
             <button type="button" class="mod-cta" disabled={isBusy} onclick={() => void migrateAllNeedingFiles()}>
-              批量迁移为当前格式（{scanResult.needsMigrationFiles.length}）
+              {t('irDataMgmt.format.batchMigrate', { count: scanResult.needsMigrationFiles.length })}
             </button>
           </div>
           <div class="ir-data-mgmt__table-wrap">
             <table class="ir-data-mgmt__table">
               <thead>
                 <tr>
-                  <th>专题</th>
-                  <th>路径</th>
-                  <th>问题</th>
-                  <th>操作</th>
+                  <th>{t('irDataMgmt.columns.topic')}</th>
+                  <th>{t('irDataMgmt.columns.path')}</th>
+                  <th>{t('irDataMgmt.columns.issues')}</th>
+                  <th>{t('irDataMgmt.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {#each scanResult.needsMigrationFiles as report (report.absolutePath)}
+                  {@const pathInfo = formatIRDataManagementPathLabel(report.absolutePath, scanResult.canonicalPointsDir)}
                   <tr>
                     <td>
                       <div class="ir-data-mgmt__cell-title">{report.topicName || report.topicId}</div>
                       <div class="ir-data-mgmt__cell-sub">{report.topicId}</div>
                     </td>
-                    <td><code>{report.absolutePath}</code></td>
+                    <td><code class="ir-data-mgmt__path" title={pathInfo.full}>{pathInfo.display}</code></td>
                     <td>
                       <ul class="ir-data-mgmt__issue-list">
                         {#each report.issues as issue (issue.code + issue.message)}
@@ -587,7 +943,7 @@
                     </td>
                     <td>
                       <button type="button" class="clickable-icon mod-muted" disabled={isBusy} onclick={() => void migrateSingleFile(report)}>
-                        迁移
+                        {t('irDataMgmt.format.migrate')}
                       </button>
                     </td>
                   </tr>
@@ -599,30 +955,31 @@
       </div>
 
       <div class="ir-data-mgmt__subsection">
-        <h4>空专题文件（{scanResult.emptyPointFiles.length}）</h4>
+        <h4 class="ir-data-mgmt__subsection-title">{t('irDataMgmt.format.emptyTitle', { count: scanResult.emptyPointFiles.length })}</h4>
         {#if scanResult.emptyPointFiles.length === 0}
-          <p class="ir-data-mgmt__empty-inline">没有阅读点数为 0 的专题文件。</p>
+          <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.format.noEmpty')}</p>
         {:else}
           <div class="ir-data-mgmt__table-wrap">
             <table class="ir-data-mgmt__table">
               <thead>
                 <tr>
-                  <th>专题</th>
-                  <th>路径</th>
-                  <th>操作</th>
+                  <th>{t('irDataMgmt.columns.topic')}</th>
+                  <th>{t('irDataMgmt.columns.path')}</th>
+                  <th>{t('irDataMgmt.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {#each scanResult.emptyPointFiles as file (file.absolutePath)}
+                  {@const pathInfo = formatIRDataManagementPathLabel(file.absolutePath, scanResult.canonicalPointsDir)}
                   <tr>
                     <td>
                       <div class="ir-data-mgmt__cell-title">{file.topicName}</div>
                       <div class="ir-data-mgmt__cell-sub">{file.topicId}</div>
                     </td>
-                    <td><code>{file.absolutePath}</code></td>
+                    <td><code class="ir-data-mgmt__path" title={pathInfo.full}>{pathInfo.display}</code></td>
                     <td>
                       <button type="button" class="mod-warning" disabled={isBusy} onclick={() => void promptDeleteEmptyFile(file)}>
-                        删除空文件
+                        {t('irDataMgmt.format.deleteEmpty')}
                       </button>
                     </td>
                   </tr>
@@ -634,56 +991,61 @@
       </div>
     </section>
   {:else if activeTab === 'vault'}
-    <section class="ir-data-mgmt__section">
-      <p class="ir-data-mgmt__desc">
-        列出 Obsidian 文件列表可见的全部 <code>.irdeck</code>。可将散落文件一键移动到下方目标目录；同专题 ID 的多份文件会排在同一目录下（第 2 份起使用 <code>.part2</code> 后缀）。
-      </p>
+    <section class="ir-data-mgmt__section" role="tabpanel" id="vault-panel">
+      <div class="ir-data-mgmt__panel">
+        <div class="ir-data-mgmt__panel-header">
+          <h3 class="ir-data-mgmt__panel-title">{t('irDataMgmt.vault.pathPanelTitle')}</h3>
+          <p class="ir-data-mgmt__desc">
+            {t('irDataMgmt.vault.pathPanelDesc', { canonicalDir: scanResult.canonicalPointsDir })}
+          </p>
+        </div>
 
-      <label class="ir-data-mgmt__field">
-        <span>目标目录</span>
-        <input
-          type="text"
-          class="ir-data-mgmt__input"
-          bind:value={targetDir}
-          oninput={updateMovePlan}
-        />
-      </label>
-
-      <div class="ir-data-mgmt__actions">
-        <button
-          type="button"
-          class="mod-cta"
-          disabled={isBusy || movePlan.length === 0}
-          onclick={() => void executeNormalizeMove()}
-        >
-          一键规范移动（{movePlan.length}）
-        </button>
+        <div class="ir-data-mgmt__target-row">
+          <label class="ir-data-mgmt__field">
+            <span>{t('irDataMgmt.vault.targetDir')}</span>
+            <input
+              type="text"
+              class="ir-data-mgmt__input"
+              bind:value={targetDir}
+              oninput={handleTargetDirInput}
+            />
+          </label>
+          <button
+            type="button"
+            class="mod-cta ir-data-mgmt__move-btn"
+            disabled={isBusy || movePlan.length === 0}
+            onclick={() => void executeNormalizeMove()}
+          >
+            {t('irDataMgmt.vault.normalizeMove', { count: movePlan.length })}
+          </button>
+        </div>
       </div>
 
       <div class="ir-data-mgmt__table-wrap">
         <table class="ir-data-mgmt__table">
           <thead>
             <tr>
-              <th>专题</th>
-              <th>路径</th>
-              <th>阅读点</th>
-              <th>状态</th>
+              <th>{t('irDataMgmt.columns.topic')}</th>
+              <th>{t('irDataMgmt.columns.path')}</th>
+              <th>{t('irDataMgmt.columns.points')}</th>
+              <th>{t('irDataMgmt.columns.status')}</th>
             </tr>
           </thead>
           <tbody>
             {#each scanResult.vaultFiles as file (file.absolutePath)}
+              {@const pathInfo = formatIRDataManagementPathLabel(file.absolutePath, scanResult.canonicalPointsDir)}
               <tr>
                 <td>
                   <div class="ir-data-mgmt__cell-title">{file.topicName}</div>
                   <div class="ir-data-mgmt__cell-sub">{file.topicId}</div>
                 </td>
-                <td><code>{file.absolutePath}</code></td>
+                <td><code class="ir-data-mgmt__path" title={pathInfo.full}>{pathInfo.display}</code></td>
                 <td>{file.pointCount}</td>
                 <td>
                   {#if file.isInCanonicalDir}
-                    <span class="ir-data-mgmt__tag is-ok">已在规范目录</span>
+                    <span class="ir-data-mgmt__tag is-ok">{t('irDataMgmt.vault.statusInCanonical')}</span>
                   {:else}
-                    <span class="ir-data-mgmt__tag is-warn">待整理</span>
+                    <span class="ir-data-mgmt__tag is-pending">{t('irDataMgmt.vault.statusPending')}</span>
                   {/if}
                 </td>
               </tr>
@@ -693,15 +1055,11 @@
       </div>
     </section>
   {:else if activeTab === 'duplicates'}
-    <section class="ir-data-mgmt__section ir-data-mgmt__split">
-      <p class="ir-data-mgmt__desc">
-        同一专题 ID 对应多份库内文件时，请比较差异后选择要保留的一份；其余副本将从库内删除（请先确认阅读点是否已合并到保留文件）。
-      </p>
-
+    <section class="ir-data-mgmt__section ir-data-mgmt__split" role="tabpanel" id="duplicates-panel">
       <aside class="ir-data-mgmt__aside">
-        <h4>重复专题组</h4>
+        <h4>{t('irDataMgmt.duplicates.groupsTitle')}</h4>
         {#if scanResult.duplicateGroups.length === 0}
-          <p class="ir-data-mgmt__empty-inline">当前没有同 ID 多文件专题。</p>
+          <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.duplicates.noGroups')}</p>
         {:else}
           <ul class="ir-data-mgmt__group-list">
             {#each scanResult.duplicateGroups as group (group.topicId)}
@@ -713,7 +1071,7 @@
                   onclick={() => selectDuplicateGroup(group)}
                 >
                   {group.topicName}
-                  <span class="ir-data-mgmt__cell-sub">{group.files.length} 个文件</span>
+                  <span class="ir-data-mgmt__cell-sub">{t('irDataMgmt.duplicates.fileCount', { count: group.files.length })}</span>
                 </button>
               </li>
             {/each}
@@ -723,7 +1081,7 @@
 
       <div class="ir-data-mgmt__main">
         {#if !selectedDuplicateGroup}
-          <p class="ir-data-mgmt__empty-inline">请选择左侧重复专题组。</p>
+          <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.duplicates.selectGroup')}</p>
         {:else}
           <h4>{selectedDuplicateGroup.topicName}</h4>
           <ul class="ir-data-mgmt__file-pick-list">
@@ -741,7 +1099,7 @@
                     }}
                   />
                   <span>{fileLabel(file)}</span>
-                  <code>{file.absolutePath}</code>
+                  <code class="ir-data-mgmt__path" title={file.absolutePath}>{formatIRDataManagementPathLabel(file.absolutePath, scanResult?.canonicalPointsDir ?? '').display}</code>
                 </label>
               </li>
             {/each}
@@ -749,7 +1107,7 @@
 
           <div class="ir-data-mgmt__diff-controls">
             <label>
-              比较 A
+              {t('irDataMgmt.duplicates.compareA')}
               <select bind:value={diffLeftPath}>
                 {#each selectedDuplicateGroup.files as file (file.absolutePath)}
                   <option value={file.absolutePath}>{file.absolutePath}</option>
@@ -757,7 +1115,7 @@
               </select>
             </label>
             <label>
-              比较 B
+              {t('irDataMgmt.duplicates.compareB')}
               <select bind:value={diffRightPath}>
                 {#each selectedDuplicateGroup.files as file (file.absolutePath)}
                   <option value={file.absolutePath}>{file.absolutePath}</option>
@@ -765,35 +1123,39 @@
               </select>
             </label>
             <button type="button" class="clickable-icon mod-muted" disabled={isBusy} onclick={() => void runCompare()}>
-              分析差异
+              {t('irDataMgmt.duplicates.analyzeDiff')}
             </button>
           </div>
 
           {#if pairDiff}
             <div class="ir-data-mgmt__diff-panel">
               <p>
-                A：{pairDiff.pointCountA} 点 · B：{pairDiff.pointCountB} 点 · 相同 ID：{pairDiff.sharedPointIds.length}
+                {t('irDataMgmt.duplicates.diffSummary', {
+                  countA: pairDiff.pointCountA,
+                  countB: pairDiff.pointCountB,
+                  shared: pairDiff.sharedPointIds.length,
+                })}
               </p>
               <div class="ir-data-mgmt__diff-cols">
                 <div>
-                  <h5>仅在 A（{pairDiff.onlyInA.length}）</h5>
+                  <h5>{t('irDataMgmt.duplicates.onlyInA', { count: pairDiff.onlyInA.length })}</h5>
                   <ul>
                     {#each pairDiff.onlyInA.slice(0, 30) as id}
                       <li><code>{id}</code></li>
                     {/each}
                     {#if pairDiff.onlyInA.length > 30}
-                      <li>… 还有 {pairDiff.onlyInA.length - 30} 个</li>
+                      <li>{t('irDataMgmt.duplicates.moreIds', { count: pairDiff.onlyInA.length - 30 })}</li>
                     {/if}
                   </ul>
                 </div>
                 <div>
-                  <h5>仅在 B（{pairDiff.onlyInB.length}）</h5>
+                  <h5>{t('irDataMgmt.duplicates.onlyInB', { count: pairDiff.onlyInB.length })}</h5>
                   <ul>
                     {#each pairDiff.onlyInB.slice(0, 30) as id}
                       <li><code>{id}</code></li>
                     {/each}
                     {#if pairDiff.onlyInB.length > 30}
-                      <li>… 还有 {pairDiff.onlyInB.length - 30} 个</li>
+                      <li>{t('irDataMgmt.duplicates.moreIds', { count: pairDiff.onlyInB.length - 30 })}</li>
                     {/if}
                   </ul>
                 </div>
@@ -803,9 +1165,9 @@
 
           {#if mergePointIdConflicts?.length}
             <div class="ir-data-mgmt__conflict-panel">
-              <h5>同阅读点 ID 内容冲突（请为每个点选择保留哪一版）</h5>
+              <h5>{t('irDataMgmt.duplicates.conflictTitle')}</h5>
               <p class="ir-data-mgmt__cell-sub">
-                下列阅读点在多个文件里 id 相同但字段不一致；未选择完整前不会写入保留文件，也不会删除副本。
+                {t('irDataMgmt.duplicates.conflictHint')}
               </p>
               <ul class="ir-data-mgmt__conflict-list">
                 {#each mergePointIdConflicts as conflict (conflict.pointId)}
@@ -839,7 +1201,7 @@
                 {/each}
               </ul>
               <button type="button" class="clickable-icon mod-muted" disabled={isBusy} onclick={() => cancelMergeConflictUi()}>
-                取消冲突处理
+                {t('irDataMgmt.duplicates.cancelConflict')}
               </button>
             </div>
           {/if}
@@ -851,29 +1213,25 @@
             onclick={() => void applyKeeperAndRemoveOthers()}
           >
             {mergePointIdConflicts?.length
-              ? '确认合并（已选版本）并删除其它副本'
-              : '保留所选文件并删除其它副本'}
+              ? t('irDataMgmt.duplicates.mergeWithChoices')
+              : t('irDataMgmt.duplicates.mergeAndDelete')}
           </button>
         {/if}
       </div>
     </section>
   {:else}
-    <section class="ir-data-mgmt__section">
-      <p class="ir-data-mgmt__desc">
-        以下文件仅存在于插件安装目录的 <code>backups</code> / <code>json-recovery</code> 中，当前库内没有相同专题 ID 的在用文件。可恢复到库内规范目录，或选择不恢复并直接删除备份。
-      </p>
-
+    <section class="ir-data-mgmt__section" role="tabpanel" id="backups-panel">
       {#if scanResult.backupOrphans.length === 0}
-        <p class="ir-data-mgmt__empty-inline">未发现备份中的孤立专题文件。</p>
+        <p class="ir-data-mgmt__empty-inline">{t('irDataMgmt.backups.empty')}</p>
       {:else}
         <div class="ir-data-mgmt__table-wrap">
           <table class="ir-data-mgmt__table">
             <thead>
               <tr>
-                <th>专题</th>
-                <th>备份路径</th>
-                <th>阅读点</th>
-                <th>操作</th>
+                <th>{t('irDataMgmt.columns.topic')}</th>
+                <th>{t('irDataMgmt.columns.backupPath')}</th>
+                <th>{t('irDataMgmt.columns.points')}</th>
+                <th>{t('irDataMgmt.columns.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -883,11 +1241,11 @@
                     <div class="ir-data-mgmt__cell-title">{entry.topicName}</div>
                     <div class="ir-data-mgmt__cell-sub">{entry.topicId}</div>
                   </td>
-                  <td><code>{entry.relativePath}</code></td>
+                  <td><code class="ir-data-mgmt__path" title={entry.absolutePath}>{entry.relativePath}</code></td>
                   <td>{entry.pointCount}</td>
                   <td class="ir-data-mgmt__row-actions">
                     <button type="button" class="mod-cta" disabled={isBusy} onclick={() => void recoverOrphan(entry)}>
-                      恢复到库内
+                      {t('irDataMgmt.backups.recover')}
                     </button>
                     <button
                       type="button"
@@ -895,7 +1253,7 @@
                       disabled={isBusy}
                       onclick={() => void deleteOrphanWithoutRecover(entry)}
                     >
-                      不恢复，删除
+                      {t('irDataMgmt.backups.deleteWithoutRecover')}
                     </button>
                   </td>
                 </tr>
@@ -912,53 +1270,104 @@
   .ir-data-mgmt {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--size-4-3);
     min-height: 420px;
-    max-height: min(78vh, 720px);
+  }
+
+  .ir-data-mgmt__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--size-4-3);
+    min-width: 0;
   }
 
   .ir-data-mgmt__tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
-  .ir-data-mgmt__tab {
+  .ir-data-mgmt__tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ir-data-mgmt__header-actions {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 0 10px;
-    min-height: 40px;
+    gap: var(--size-4-1);
+    flex: 0 0 auto;
+  }
+
+  .ir-data-mgmt__help-control {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .ir-data-mgmt__icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--size-4-8);
+    height: var(--size-4-8);
+    min-width: var(--size-4-8);
+    padding: 0;
     border: none;
     box-shadow: none;
     border-radius: var(--clickable-icon-radius, var(--radius-s));
-    background: transparent;
     color: var(--text-muted);
+    background: transparent;
     cursor: pointer;
     transition: background-color 0.15s ease, color 0.15s ease;
   }
 
-  .ir-data-mgmt__tab:hover {
+  .ir-data-mgmt__icon-btn:hover:not(:disabled) {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
   }
 
-  .ir-data-mgmt__tab.is-active {
+  .ir-data-mgmt__icon-btn.is-active {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
-    font-weight: 600;
   }
 
-  .ir-data-mgmt__badge {
+  .ir-data-mgmt__icon-btn.is-loading :global(.obsidian-icon) {
+    animation: ir-data-mgmt-spin 0.85s linear infinite;
+  }
+
+  @keyframes ir-data-mgmt-spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .ir-data-mgmt__help-popover {
+    position: absolute;
+    top: calc(100% + var(--size-4-1));
+    right: 0;
+    z-index: calc(var(--layer-popover, 1000) + 2);
+    width: min(360px, 78vw);
+    padding: var(--size-4-3);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-l);
+    background: color-mix(in oklab, var(--background-primary) 92%, var(--background-secondary));
+    box-shadow: var(--shadow-s);
+  }
+
+  .ir-data-mgmt__help-popover p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    line-height: 1.55;
+  }
+
+  .ir-data-mgmt__help-popover code {
     font-size: var(--font-ui-smaller);
-    opacity: 0.85;
-  }
-
-  .ir-data-mgmt__toolbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
   }
 
   .ir-data-mgmt__legacy-banner {
@@ -986,17 +1395,66 @@
     line-height: 1.5;
   }
 
-  .ir-data-mgmt__hint {
-    color: var(--text-muted);
-    font-size: var(--font-ui-small);
-  }
-
   .ir-data-mgmt__section {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--size-4-3);
     overflow: auto;
     flex: 1;
+    min-height: 0;
+  }
+
+  .ir-data-mgmt__panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-3);
+    padding: var(--size-4-4);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-l);
+    background: color-mix(in oklab, var(--background-primary), var(--background-secondary) 26%);
+  }
+
+  .ir-data-mgmt__panel-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+  }
+
+  .ir-data-mgmt__panel-title,
+  .ir-data-mgmt__subsection-title {
+    margin: 0;
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+    line-height: 1.4;
+  }
+
+  .ir-data-mgmt__target-row {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--size-4-3);
+    min-width: 0;
+  }
+
+  .ir-data-mgmt__target-row .ir-data-mgmt__field {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ir-data-mgmt__move-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 640px) {
+    .ir-data-mgmt__target-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .ir-data-mgmt__move-btn {
+      width: 100%;
+    }
   }
 
   .ir-data-mgmt__desc {
@@ -1052,19 +1510,31 @@
     font-size: var(--font-ui-smaller);
   }
 
+  .ir-data-mgmt__path {
+    display: block;
+    max-width: min(320px, 36vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-ui-smaller);
+  }
+
   .ir-data-mgmt__tag {
     display: inline-block;
     padding: 2px 6px;
     border-radius: var(--radius-s);
     font-size: var(--font-ui-smaller);
+    font-weight: 500;
   }
 
   .ir-data-mgmt__tag.is-ok {
-    background: var(--background-modifier-success);
+    background: color-mix(in oklab, var(--color-green), transparent 84%);
+    color: var(--text-success);
   }
 
-  .ir-data-mgmt__tag.is-warn {
-    background: var(--background-modifier-error);
+  .ir-data-mgmt__tag.is-pending {
+    background: color-mix(in oklab, var(--color-yellow), transparent 84%);
+    color: var(--text-warning);
   }
 
   .ir-data-mgmt__empty,
@@ -1232,11 +1702,11 @@
   .ir-data-mgmt__subsection {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--size-4-2);
   }
 
-  .ir-data-mgmt__subsection h4 {
-    margin: 8px 0 0;
+  .ir-data-mgmt__subsection h4:not(.ir-data-mgmt__subsection-title) {
+    margin: var(--size-4-2) 0 0;
     font-size: var(--font-ui-medium);
   }
 

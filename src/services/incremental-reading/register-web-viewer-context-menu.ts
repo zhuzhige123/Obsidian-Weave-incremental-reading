@@ -6,6 +6,7 @@ import {
 	readWebViewerUrlFromView,
 } from "../obsidian/web-viewer-context";
 import { PREMIUM_FEATURES } from "../premium/PremiumFeatureGuard";
+import { i18n } from "../../utils/i18n";
 import { logger } from "../../utils/logger";
 
 type ElectronContextMenuItem =
@@ -107,12 +108,12 @@ export function registerWebViewerContextMenuPatch(
 				}
 
 				const irItem: ElectronContextMenuItem = {
-					label: "添加到增量阅读",
+					label: i18n.t("irCommands.addToIr"),
 					click: () => {
 						if (
 							!host.ensurePremiumFeatureAccess(
 								PREMIUM_FEATURES.INCREMENTAL_READING,
-								"增量阅读"
+								i18n.t("irCommands.defaultIrName")
 							)
 						) {
 							return;

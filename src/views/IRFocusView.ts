@@ -36,10 +36,6 @@ export class IRFocusView extends ItemView {
 		});
 	}
 
-	private isChinese(): boolean {
-		return i18n.getCurrentLanguage() === "zh-CN";
-	}
-
 	getViewType(): string {
 		return VIEW_TYPE_IR_FOCUS;
 	}
@@ -49,10 +45,8 @@ export class IRFocusView extends ItemView {
 			return "";
 		}
 		return this.deckName
-			? `${this.deckName} · ${this.isChinese() ? "旧入口兼容" : "Legacy Entry"}`
-			: this.isChinese()
-			? "增量阅读（旧入口兼容）"
-			: "Incremental Reading (Legacy Entry)";
+			? `${this.deckName} · ${i18n.t("irViews.focus.legacyEntrySuffix")}`
+			: i18n.t("irViews.focus.defaultTitleLegacy");
 	}
 
 	getIcon(): string {
@@ -77,7 +71,7 @@ export class IRFocusView extends ItemView {
 		this.deckName =
 			typeof state?.deckName === "string" && state.deckName.trim()
 				? state.deckName
-				: this.deckPath.split("/").pop() || (this.isChinese() ? "增量阅读" : "Incremental Reading");
+				: this.deckPath.split("/").pop() || i18n.t("irCommands.defaultIrName");
 	}
 
 	async onOpen(): Promise<void> {
@@ -97,18 +91,12 @@ export class IRFocusView extends ItemView {
 
 		const container = this.contentEl.createDiv({ cls: "weave-legacy-ir-focus-redirect" });
 		container.createEl("h3", {
-			text: this.isChinese()
-				? "旧增量阅读主阅读界面已移除"
-				: "The legacy incremental reading view has been removed",
+			text: i18n.t("irViews.focus.removedTitle"),
 		});
 		container.createEl("p", {
 			text: this.deckName
-				? this.isChinese()
-					? `正在切换到左侧月历阅读侧边栏，请在那里继续处理“${this.deckName}”。`
-					: `Switching to the left calendar reading sidebar. Continue working on "${this.deckName}" there.`
-				: this.isChinese()
-				? "正在切换到左侧月历阅读侧边栏，请在那里继续调度和打开阅读材料。"
-				: "Switching to the left calendar reading sidebar. Continue scheduling and opening reading materials there.",
+				? i18n.t("irViews.focus.redirectWithDeck", { deckName: this.deckName })
+				: i18n.t("irViews.focus.redirectGeneric"),
 		});
 	}
 

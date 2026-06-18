@@ -296,4 +296,43 @@ describe("IRCalendarDayIndexService", () => {
 		expect(monthHeatmap?.get("2026-05")?.["2026-05-29"]).toBe(1);
 		expect(monthHeatmap?.get("2026-05")?.["2026-05-30"]).toBe(1);
 	});
+
+	it("hydrates tier-0 even when priority dates are empty", async () => {
+		const service = new IRCalendarDayIndexService(app);
+		const cacheKey = "__all__::__default__";
+		await service.syncFromMaterialsByDate({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
+			materialsByDate: new Map([
+				[
+					"2026-05-30",
+					[
+						{
+							id: "chunk-2",
+							title: "明日",
+							sourceFile: "Notes/b.md",
+							priority: 5,
+							intervalDays: 1,
+							scheduleStatus: "scheduled",
+							nextRepDate: 0,
+							nextReviewDate: null,
+						} as any,
+					],
+				],
+			]),
+			priorityDateKeys: ["2026-05-30"],
+		});
+
+		await service.flushPendingWrites();
+		const tier0 = await service.tryHydrateTier0({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
+			priorityDateKeys: ["2026-05-29", "2026-05-30"],
+		});
+
+		expect(tier0?.materialsByDate.get("2026-05-29")).toEqual([]);
+		expect(tier0?.materialsByDate.get("2026-05-30")).toHaveLength(1);
+	});
 });

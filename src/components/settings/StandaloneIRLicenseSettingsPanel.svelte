@@ -80,7 +80,7 @@
       }
 
       if (result.removalKind === "inherited-only") {
-        showNotification("已关闭主插件 Weave 授权继承。", "success");
+        showNotification(t('about.license.notices.inheritedDisabled'), "success");
         return;
       }
 
@@ -97,7 +97,7 @@
   <div class="standalone-ir-license-settings-card">
     <div class="standalone-ir-license-settings-header">
       <h3 class="section-title with-accent-bar accent-purple">{t("about.license.title")}</h3>
-      <p class="section-description">当前版本现有功能已免费开放。这里保留独立增量阅读激活码与主插件 Weave 授权继承能力，供后续新增高级功能继续使用。</p>
+      <p class="section-description">{t('about.license.notices.standaloneDescription')}</p>
     </div>
 
     <div class="standalone-ir-license-settings-content">

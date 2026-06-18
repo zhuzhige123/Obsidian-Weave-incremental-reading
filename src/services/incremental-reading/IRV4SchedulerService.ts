@@ -21,6 +21,7 @@ import type {
 } from "../../types/ir-types";
 import { migrateToIRBlockV4 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
+import { i18n } from "../../utils/i18n";
 import {
 	readAdvancedScheduleSettingsSnapshot,
 	readTagGroupFollowMode,
@@ -38,13 +39,20 @@ import {
 import { IREpubBookmarkTaskService, isEpubBookmarkTaskId } from "./IREpubBookmarkTaskService";
 import { IRPdfBookmarkTaskService, isPdfBookmarkTaskId } from "./IRPdfBookmarkTaskService";
 import { IRPlanGeneratorService } from "./IRPlanGeneratorService";
+import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
+import { persistBlockScheduleState } from "./IRPointScheduleMutator";
+import {
+	computeScheduleModeAdjustedBlock,
+} from "./IRScheduleModePreviewService";
+import { recordScheduleMenuActionInteraction } from "./IRScheduleModeMutationService";
 import { IRQueueGeneratorV4 } from "./IRQueueGeneratorV4";
 import { IRPointWriteService } from "./IRPointWriteService";
 import { getSharedIRScheduleKernel } from "./IRScheduleKernel";
-import type {
-	IRPlannedDay,
-	IRPlannedScheduleItem,
-	IRScheduleExplanation,
+import {
+	readSequenceMeta,
+	type IRPlannedDay,
+	type IRPlannedScheduleItem,
+	type IRScheduleExplanation,
 } from "./IRScheduleKernel";
 import { calculateLoadSignal } from "./IRSchedulerV3";
 import { IRStateMachineV4 } from "./IRStateMachineV4";
@@ -531,8 +539,10 @@ export class IRV4SchedulerService {
 		let candidates = this.stateMachine.getCandidatePool(transitioned);
 
 		// 自动后推：过载时将低优先级 scheduled 块推迟
+		// 当启用负载顺延（IRDailyLoadAllocator）时，由计划生成器统一处理，跳过旧 1.5× 阈值逻辑。
 		const postponeStrategy = advSettings.autoPostponeStrategy;
-		if (postponeStrategy !== "off" && candidates.length > 0) {
+		const loadDeferEnabled = advSettings.enableLoadBasedDefer !== false || advSettings.enableHorizonSmoothing !== false;
+		if (!loadDeferEnabled && postponeStrategy !== "off" && candidates.length > 0) {
 			const AUTO_POSTPONE_CFG: Record<string, { priorityThreshold: number; postponeDays: number }> =
 				{
 					gentle: { priorityThreshold: 3, postponeDays: 1 },
@@ -648,11 +658,28 @@ export class IRV4SchedulerService {
 		const advSettings = this.getAdvancedSettingsSnapshot();
 		await this.applyTagGroupPriorityBiases(plannedItems, advSettings);
 		const plan = this.planGenerator.generatePlan(plannedItems, {
-			horizonDays: 7,
+			horizonDays: advSettings.horizonSpreadDays ?? 7,
 			dailyBudgetMinutes: timeBudgetMinutes,
 			enableInterleaving: advSettings.interleaveMode !== false,
 			maxConsecutiveSameTopic: advSettings.maxConsecutiveSameTopic ?? 3,
+			flowStretchPercent: advSettings.flowStretchPercent,
+			enableLoadBasedDefer: advSettings.enableLoadBasedDefer,
+			maxEstimatedMinutesPerItem: advSettings.maxEstimatedMinutesPerItem,
+			dailyReadingPointCap: advSettings.dailyReadingPointCap,
+			dailyReadingPointStretchCap: advSettings.dailyReadingPointStretchCap,
+			enableHorizonSmoothing: advSettings.enableHorizonSmoothing,
+			interleaveProfile: advSettings.interleaveProfile,
+			maxTopicSharePercent: advSettings.maxTopicSharePercent,
 		});
+
+		if (
+			advSettings.enableLoadBasedDefer !== false &&
+			plan.loadDeferrals.length > 0
+		) {
+			await applyLoadDeferralsFromPlan(this.app, plan.loadDeferrals, {
+				reason: "ui_refresh",
+			});
+		}
 
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
@@ -766,6 +793,9 @@ export class IRV4SchedulerService {
 			: isEpubBookmarkTaskId(block.id)
 			? "epub"
 			: "chunk";
+		const sequenceMeta = readSequenceMeta(
+			(block.meta || {}) as unknown as Record<string, unknown>
+		);
 
 		return {
 			id: block.id,
@@ -780,6 +810,7 @@ export class IRV4SchedulerService {
 			nextReviewDate,
 			estimatedMinutes,
 			sourceType,
+			...sequenceMeta,
 			explanation: this.buildQueueExplanation(block, estimatedMinutes, currentSourcePath),
 		};
 	}
@@ -815,7 +846,7 @@ export class IRV4SchedulerService {
 				block.nextRepDate > 0 && block.nextRepDate < Date.now()
 					? Math.max(1, Math.floor((Date.now() - block.nextRepDate) / (24 * 60 * 60 * 1000)))
 					: 0,
-			hasManualSchedule: block.nextRepDate > 0,
+			hasManualSchedule: Boolean(block.meta?.manualSchedulePinnedDateKey),
 			estimatedMinutes,
 			scoreBreakdown,
 			compositeScore: scoreBreakdown.compositeScore,
@@ -920,9 +951,10 @@ export class IRV4SchedulerService {
 			};
 		}
 
-		// 5. 持久化调度
+		// 5. 持久化调度（L0 mutator 单写者）
+		await persistBlockScheduleState(this.app, blockV4, updatedBlock);
+
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 			await this._pdfBookmarkTaskService.recordTaskInteraction(
 				updatedBlock.id,
 				data.readingTimeSeconds,
@@ -933,7 +965,6 @@ export class IRV4SchedulerService {
 				}
 			);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(updatedBlock);
 			await this._epubBookmarkTaskService.recordTaskInteraction(
 				updatedBlock.id,
 				data.readingTimeSeconds,
@@ -944,20 +975,16 @@ export class IRV4SchedulerService {
 				}
 			);
 		} else {
-			await this.chunkAdapter.updateChunkSchedule(updatedBlock.id, {
-				priorityUi: updatedBlock.priorityUi,
-				priorityEff: updatedBlock.priorityEff,
-				intervalDays: updatedBlock.intervalDays,
-				nextRepDate: updatedBlock.nextRepDate,
-				scheduleStatus: updatedBlock.status,
-			});
-
-			// 6. 记录交互统计
-			await this.chunkAdapter.recordChunkInteraction(updatedBlock.id, data.readingTimeSeconds, {
-				extracts: data.createdExtractCount,
-				cardsCreated: data.createdCardCount,
-				notesWritten: data.createdNoteCount,
-			});
+			await this.chunkAdapter.recordChunkInteraction(
+				updatedBlock.id,
+				data.readingTimeSeconds,
+				{
+					extracts: data.createdExtractCount,
+					cardsCreated: data.createdCardCount,
+					notesWritten: data.createdNoteCount,
+				},
+				{ skipScheduleCacheInvalidate: true }
+			);
 		}
 
 		// 7. 记录会话历史
@@ -1042,18 +1069,27 @@ export class IRV4SchedulerService {
 									const fragment = activeDocument.createDocumentFragment();
 									const msgEl = fragment.createEl("div");
 									msgEl.createEl("div", {
-										text: `"${originalPath.split("/").pop()}" 的标签已变化`,
+										text: i18n.t("irServiceNotices.scheduler.tagDriftTitle", {
+											fileName: originalPath.split("/").pop() || originalPath,
+										}),
 									});
 									msgEl.createEl("div", {
-										text: `匹配到新标签组「${drift.newGroupName}」（原：「${drift.oldGroupName}」）`,
+										text: i18n.t("irServiceNotices.scheduler.tagDriftDescription", {
+											newName: drift.newGroupName,
+											oldName: drift.oldGroupName,
+										}),
 										cls: "weave-ir-tag-drift-description",
 									});
 									const btnRow = msgEl.createEl("div", {
 										cls: "weave-ir-tag-drift-actions",
 									});
-									const switchBtn = btnRow.createEl("button", { text: "切换" });
+									const switchBtn = btnRow.createEl("button", {
+										text: i18n.t("irServiceNotices.scheduler.switchBtn"),
+									});
 									switchBtn.addClass("weave-ir-tag-drift-button");
-									const keepBtn = btnRow.createEl("button", { text: "保持" });
+									const keepBtn = btnRow.createEl("button", {
+										text: i18n.t("irServiceNotices.scheduler.keepBtn"),
+									});
 									keepBtn.addClass("weave-ir-tag-drift-button");
 
 									const notice = new Notice(fragment, 15000);
@@ -1067,7 +1103,11 @@ export class IRV4SchedulerService {
 													newGroupId,
 													storageAdapter
 												);
-												new Notice(`已切换到标签组「${drift.newGroupName}」`);
+												new Notice(
+													i18n.t("irServiceNotices.scheduler.switchedTagGroup", {
+														groupName: drift.newGroupName,
+													})
+												);
 											} catch (e) {
 												logger.error("[IRV4SchedulerService] 标签组切换失败:", e);
 											}
@@ -1173,17 +1213,14 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		newPriorityUi: number,
 		reason: string,
-		deckPath: string
+		_deckPath: string
 	): Promise<IRPriorityUpdateResultV4> {
 		await this.initialize();
 		const updatedBlock = this.createPriorityUpdatedBlock(blockV4, newPriorityUi, reason);
-		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
-			: undefined;
 
 		return {
 			block: updatedBlock,
-			futurePlanPreview,
+			futurePlanPreview: undefined,
 		};
 	}
 
@@ -1191,16 +1228,13 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		newPriorityUi: number,
 		reason: string,
-		deckPath: string
+		_deckPath: string
 	): Promise<IRPriorityUpdateResultV4> {
 		const updatedBlock = await this.updatePriorityV4(blockV4, newPriorityUi, reason);
-		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
-			: undefined;
 
 		return {
 			block: updatedBlock,
-			futurePlanPreview,
+			futurePlanPreview: undefined,
 		};
 	}
 
@@ -1438,12 +1472,8 @@ export class IRV4SchedulerService {
 
 		const updatedBlock = this.createManualRescheduledBlock(blockV4, options);
 
-		await this.persistBlockScheduleMutation(updatedBlock, {
-			nextRepDate: updatedBlock.nextRepDate,
-			intervalDays: updatedBlock.intervalDays,
-			scheduleStatus: updatedBlock.status,
-		});
-		await this.recordZeroSignalInteraction(updatedBlock.id);
+		await persistBlockScheduleState(this.app, blockV4, updatedBlock);
+		await recordScheduleMenuActionInteraction(this.app, updatedBlock.id);
 
 		const futurePlanPreview = deckPath
 			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
@@ -1467,14 +1497,17 @@ export class IRV4SchedulerService {
 	async previewManualRescheduleBlockV4(
 		blockV4: IRBlockV4,
 		options: IRManualRescheduleOptionsV4,
-		deckPath: string
+		deckPath: string,
+		previewOptions?: { includeImpactPreview?: boolean }
 	): Promise<IRBlockMutationPreviewResultV4> {
 		await this.initialize();
 
 		const updatedBlock = this.createManualRescheduledBlock(blockV4, options);
-		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
-			: undefined;
+		const includeImpactPreview = previewOptions?.includeImpactPreview === true;
+		const futurePlanPreview =
+			includeImpactPreview && deckPath
+				? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+				: undefined;
 
 		return {
 			block: updatedBlock,
@@ -1562,13 +1595,27 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		options: IRManualRescheduleOptionsV4
 	): IRBlockV4 {
+		const meta = { ...(blockV4.meta || {}) };
+		if (options.nextRepDate > 0) {
+			meta.manualSchedulePinnedDateKey = this.formatScheduleDateKey(options.nextRepDate);
+		} else {
+			delete meta.manualSchedulePinnedDateKey;
+		}
 		return {
 			...blockV4,
 			nextRepDate: options.nextRepDate,
 			intervalDays: options.intervalDays ?? blockV4.intervalDays,
 			status: options.scheduleStatus ?? blockV4.status,
 			updatedAt: Date.now(),
+			meta,
 		};
+	}
+
+	private formatScheduleDateKey(timestamp: number): string {
+		const date = new Date(timestamp);
+		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+			date.getDate()
+		).padStart(2, "0")}`;
 	}
 
 	private createPriorityUpdatedBlock(
@@ -1583,45 +1630,15 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		mode: IRScheduleModeV4
 	): Promise<IRBlockV4> {
-		const schedulingDefaultIntervals: Record<IRScheduleModeV4, number> = {
-			intensive: 1,
-			normal: 3,
-			slow: 7,
-		};
-		const intervalMultipliers: Record<IRScheduleModeV4, number> = {
-			intensive: 0.5,
-			normal: 1,
-			slow: 1.8,
-		};
-
 		const advancedSettings = this.getAdvancedSettingsSnapshot();
 		const tagGroup = blockV4.meta?.tagGroup || "default";
 		const profile = await this.tagGroupService.getProfile(tagGroup);
 		const mGroup = advancedSettings.enableTagGroupPrior ? profile.intervalFactorBase || 1.0 : 1.0;
-		const currentInterval = blockV4.intervalDays || 1;
-		const priorityEff = blockV4.priorityEff ?? blockV4.priorityUi ?? 5;
 
-		let intervalDays: number;
-		if (currentInterval <= 1) {
-			intervalDays = schedulingDefaultIntervals[mode];
-		} else {
-			const psi = calculatePsi(priorityEff);
-			intervalDays = Math.round(
-				currentInterval *
-					(advancedSettings.defaultIntervalFactor ?? M_BASE) *
-					mGroup *
-					psi *
-					intervalMultipliers[mode]
-			);
-		}
-
-		intervalDays = Math.max(1, Math.min(intervalDays, advancedSettings.maxIntervalDays ?? 365));
-		const nextRepDate = calculateNextRepDate(intervalDays);
-
-		return this.createManualRescheduledBlock(blockV4, {
-			nextRepDate,
-			intervalDays,
-			scheduleStatus: "queued",
+		return computeScheduleModeAdjustedBlock(blockV4, mode, {
+			block: blockV4,
+			advancedSettings,
+			tagGroupIntervalFactor: mGroup,
 		});
 	}
 
@@ -1738,44 +1755,8 @@ export class IRV4SchedulerService {
 		await this.storageService.addSession(session);
 	}
 
-	private async persistBlockScheduleMutation(
-		block: IRBlockV4,
-		changes: {
-			nextRepDate?: number;
-			intervalDays?: number;
-			scheduleStatus?: IRBlockStatus;
-			priorityUi?: number;
-			priorityEff?: number;
-		}
-	): Promise<void> {
-		if (isPdfBookmarkTaskId(block.id)) {
-			await this._pdfBookmarkTaskService.updateTaskFromBlock(block);
-			return;
-		}
-		if (isEpubBookmarkTaskId(block.id)) {
-			await this._epubBookmarkTaskService.updateTaskFromBlock(block);
-			return;
-		}
-
-		await this.chunkAdapter.updateChunkSchedule(block.id, {
-			nextRepDate: changes.nextRepDate,
-			intervalDays: changes.intervalDays,
-			scheduleStatus: changes.scheduleStatus,
-			priorityUi: changes.priorityUi,
-			priorityEff: changes.priorityEff,
-		});
-	}
-
 	private async recordZeroSignalInteraction(blockId: string): Promise<void> {
-		if (isPdfBookmarkTaskId(blockId)) {
-			await this._pdfBookmarkTaskService.recordTaskInteraction(blockId, 0, {});
-			return;
-		}
-		if (isEpubBookmarkTaskId(blockId)) {
-			await this._epubBookmarkTaskService.recordTaskInteraction(blockId, 0, {});
-			return;
-		}
-		await this.chunkAdapter.recordChunkInteraction(blockId, 0, {});
+		await recordScheduleMenuActionInteraction(this.app, blockId);
 	}
 
 	/**

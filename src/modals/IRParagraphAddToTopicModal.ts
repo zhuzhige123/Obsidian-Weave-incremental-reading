@@ -1,5 +1,6 @@
 import { App, Menu, Modal, Setting } from "obsidian";
 import type { IRDeck } from "../types/ir-types";
+import { i18n } from "../utils/i18n";
 
 export interface IRParagraphAddToTopicSubmitPayload {
 	deckId: string;
@@ -37,7 +38,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.titleEl.setText("添加到增量阅读专题");
+		this.titleEl.setText(i18n.t("irModals.paragraphAddToTopic.title"));
 		this.modalEl.addClass("weave-ir-paragraph-add-to-topic-modal");
 
 		const { contentEl } = this;
@@ -46,9 +47,9 @@ export class IRParagraphAddToTopicModal extends Modal {
 
 		const deckToolbarEl = contentEl.createDiv({ cls: "weave-selection-to-ir-toolbar" });
 		const deckInfoEl = deckToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
-		deckInfoEl.createDiv({ text: "所属专题", cls: "setting-item-name" });
+		deckInfoEl.createDiv({ text: i18n.t("irModals.paragraphAddToTopic.deckName"), cls: "setting-item-name" });
 		deckInfoEl.createDiv({
-			text: "选择已有专题，或新建一个专题后再添加当前段落。",
+			text: i18n.t("irModals.paragraphAddToTopic.deckDesc"),
 			cls: "setting-item-description",
 		});
 
@@ -64,7 +65,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 		if (this.showNewDeckInput) {
 			this.renderNewDeckInput(newDeckRow);
 		} else {
-			const createDeckBtn = newDeckRow.createEl("button", { text: "新建专题" });
+			const createDeckBtn = newDeckRow.createEl("button", { text: i18n.t("irModals.paragraphAddToTopic.newTopic") });
 			createDeckBtn.addClass("mod-cta");
 			createDeckBtn.addEventListener("click", () => {
 				this.showNewDeckInput = true;
@@ -74,15 +75,15 @@ export class IRParagraphAddToTopicModal extends Modal {
 		}
 
 		const titleDesc = this.options.titleDetected
-			? "已从当前段落中自动提取标题，你可以继续修改。"
-			: "未检测到明确标题，已先用段落前缀生成标题。";
+			? i18n.t("irModals.paragraphAddToTopic.titleDetected")
+			: i18n.t("irModals.paragraphAddToTopic.titleFallback");
 
 		new Setting(contentEl)
-			.setName("标题")
+			.setName(i18n.t("irModals.common.title"))
 			.setDesc(titleDesc)
 			.addText((text) => {
 				text.setValue(this.draftTitle);
-				text.setPlaceholder("输入阅读点标题");
+				text.setPlaceholder(i18n.t("irModals.paragraphAddToTopic.titlePlaceholder"));
 				this.titleInputEl = text.inputEl;
 				text.onChange((value) => {
 					this.draftTitle = value;
@@ -91,10 +92,10 @@ export class IRParagraphAddToTopicModal extends Modal {
 			});
 
 		const footerEl = contentEl.createDiv({ cls: "weave-selection-to-ir-footer" });
-		const cancelButton = footerEl.createEl("button", { text: "取消" });
+		const cancelButton = footerEl.createEl("button", { text: i18n.t("irModals.common.cancel") });
 		cancelButton.addEventListener("click", () => this.close());
 
-		this.submitButtonEl = footerEl.createEl("button", { text: "添加到专题" });
+		this.submitButtonEl = footerEl.createEl("button", { text: i18n.t("irModals.paragraphAddToTopic.submit") });
 		this.submitButtonEl.classList.add("mod-cta");
 		this.submitButtonEl.addEventListener("click", () => {
 			void this.handleSubmit();
@@ -116,7 +117,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 		const inputWrap = container.createDiv({ cls: "weave-ir-paragraph-new-deck-input-wrap" });
 		this.newDeckInputEl = inputWrap.createEl("input", {
 			type: "text",
-			placeholder: "输入新专题名称",
+			placeholder: i18n.t("irModals.paragraphAddToTopic.newTopicPlaceholder"),
 		});
 		this.newDeckInputEl.addEventListener("keydown", (evt) => {
 			if (evt.key === "Enter") {
@@ -125,13 +126,13 @@ export class IRParagraphAddToTopicModal extends Modal {
 			}
 		});
 
-		const createBtn = container.createEl("button", { text: "创建" });
+		const createBtn = container.createEl("button", { text: i18n.t("irModals.common.create") });
 		createBtn.addClass("mod-cta");
 		createBtn.addEventListener("click", () => {
 			void this.handleCreateDeck();
 		});
 
-		const cancelBtn = container.createEl("button", { text: "取消" });
+		const cancelBtn = container.createEl("button", { text: i18n.t("irModals.common.cancel") });
 		cancelBtn.addEventListener("click", () => {
 			this.showNewDeckInput = false;
 			this.newDeckInputEl = null;
@@ -143,14 +144,16 @@ export class IRParagraphAddToTopicModal extends Modal {
 
 	private getDeckButtonText(): string {
 		const selectedDeck = this.deckOptions.find((deck) => deck.id === this.selectedDeckId);
-		return selectedDeck ? `专题：${selectedDeck.name}` : "选择增量阅读专题";
+		return selectedDeck
+			? i18n.t("irModals.common.topicLabel", { name: selectedDeck.name })
+			: i18n.t("irModals.common.selectTopic");
 	}
 
 	private showDeckMenu(evt: MouseEvent): void {
 		const menu = new Menu();
 		if (this.deckOptions.length === 0) {
 			menu.addItem((item) => {
-				item.setTitle("暂无专题，请先新建").setDisabled(true);
+				item.setTitle(i18n.t("irModals.common.noTopicsYet")).setDisabled(true);
 			});
 		}
 
@@ -212,7 +215,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 		this.submitting = true;
 		if (this.submitButtonEl) {
 			this.submitButtonEl.disabled = true;
-			this.submitButtonEl.textContent = "添加中...";
+			this.submitButtonEl.textContent = i18n.t("irModals.common.adding");
 		}
 
 		try {
@@ -224,7 +227,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 		} finally {
 			this.submitting = false;
 			if (this.submitButtonEl) {
-				this.submitButtonEl.textContent = "添加到专题";
+				this.submitButtonEl.textContent = i18n.t("irModals.paragraphAddToTopic.submit");
 			}
 			this.syncSubmitButtonState();
 		}

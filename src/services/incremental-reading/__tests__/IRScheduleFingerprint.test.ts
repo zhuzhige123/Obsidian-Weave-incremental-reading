@@ -1,4 +1,8 @@
-import { buildExternalBookmarkTasksRevision, buildScheduleFingerprint } from "../IRScheduleFingerprint";
+import {
+	buildExternalBookmarkTasksRevision,
+	buildPointFilesIndexRevision,
+	buildScheduleFingerprint,
+} from "../IRScheduleFingerprint";
 
 describe("IRScheduleFingerprint", () => {
 	it("ignores history when building schedule fingerprint", () => {
@@ -70,5 +74,69 @@ describe("IRScheduleFingerprint", () => {
 		};
 
 		expect(buildScheduleFingerprint(base as any)).not.toBe(buildScheduleFingerprint(updated as any));
+	});
+
+	it("builds stable point-files index revision independent of file order", () => {
+		const left = buildPointFilesIndexRevision({
+			schemaVersion: 1,
+			updatedAt: "2026-06-19T00:00:00.000Z",
+			files: [
+				{
+					topicId: "b",
+					topicName: "B",
+					file: "Topics/B.irdeck",
+					pointCount: 2,
+					updatedAt: "2026-06-18T00:00:00.000Z",
+					pointIds: ["p2", "p1"],
+				},
+				{
+					topicId: "a",
+					topicName: "A",
+					file: "Topics/A.irdeck",
+					pointCount: 1,
+					updatedAt: "2026-06-17T00:00:00.000Z",
+					pointIds: ["p0"],
+				},
+			],
+		});
+		const right = buildPointFilesIndexRevision({
+			schemaVersion: 1,
+			updatedAt: "2026-06-19T00:00:00.000Z",
+			files: [
+				{
+					topicId: "a",
+					topicName: "A",
+					file: "Topics/A.irdeck",
+					pointCount: 1,
+					updatedAt: "2026-06-17T00:00:00.000Z",
+					pointIds: ["p0"],
+				},
+				{
+					topicId: "b",
+					topicName: "B",
+					file: "Topics/B.irdeck",
+					pointCount: 2,
+					updatedAt: "2026-06-18T00:00:00.000Z",
+					pointIds: ["p2", "p1"],
+				},
+			],
+		});
+		expect(left).toBe(right);
+
+		const changed = buildPointFilesIndexRevision({
+			schemaVersion: 1,
+			updatedAt: "2026-06-19T00:00:00.000Z",
+			files: [
+				{
+					topicId: "a",
+					topicName: "A",
+					file: "Topics/A.irdeck",
+					pointCount: 2,
+					updatedAt: "2026-06-17T00:00:00.000Z",
+					pointIds: ["p0", "p3"],
+				},
+			],
+		});
+		expect(changed).not.toBe(left);
 	});
 });

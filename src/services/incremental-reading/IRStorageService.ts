@@ -40,9 +40,13 @@ import {
 	getStoredPointKind,
 	isLegacyBlockPointSnapshot,
 } from "./IRLegacyTaskCompatAdapter";
+import { isIRInternalScheduleSourcePath } from "../../utils/ir-internal-data-path";
 import { getSharedIRPointStorageService, IRPointStorageService } from "./IRPointStorageService";
 import type { IRPointSnapshot } from "../../types/ir-point-storage-types";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
+import { getSharedIRScheduleImpactPreviewCoordinator } from "./IRScheduleImpactPreviewCoordinator";
+import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
+import { getSharedIRRefreshScheduler } from "./IRRefreshScheduler";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
 import { DirectoryUtils } from "../../utils/directory-utils";
@@ -88,11 +92,16 @@ export class IRStorageService {
 		this.runtimePointProjection = null;
 	}
 
-	invalidateScheduleRuntimeCaches(): void {
+	invalidateScheduleRuntimeCaches(options?: { skipScheduleIndex?: boolean }): void {
 		this.invalidateRuntimePointProjection();
 		getSharedIRWorkspaceSnapshotService(this.app).invalidate();
-		getSharedIRScheduleIndexService(this.app).invalidate();
+		if (!options?.skipScheduleIndex) {
+			getSharedIRScheduleIndexService(this.app).invalidate();
+		}
 		getSharedIRCalendarQueryService(this.app).invalidate();
+		getSharedIRScheduleImpactPreviewCoordinator(this.app).invalidate();
+		getSharedIRProjectionRuntime(this.app).markStale();
+		getSharedIRRefreshScheduler(this.app).markBootstrapStale();
 	}
 
 	/** 直接从 points 存储按 legacy id 删除，并刷新调度相关缓存。 */
@@ -778,6 +787,7 @@ export class IRStorageService {
 	async saveBlock(block: IRBlock): Promise<void> {
 		await this.initialize();
 		await this.syncLegacyBlockToPointStorage(block);
+		this.invalidateScheduleRuntimeCaches();
 	}
 
 	/**
@@ -1552,7 +1562,10 @@ export class IRStorageService {
 		return history.sessions.filter((s) => s.blockId === blockId);
 	}
 
-	async getCalendarProgress(): Promise<Record<string, string[]>> {
+	async getCalendarProgressState(): Promise<{
+		byDate: Record<string, string[]>;
+		displayOrderByDate: Record<string, Record<string, number>>;
+	}> {
 		await this.initialize();
 		const content = await this.readStructuredLocalStateWithLegacyFallback({
 			localPath: this.getCalendarProgressStoragePath(),
@@ -1562,24 +1575,65 @@ export class IRStorageService {
 		});
 
 		try {
-			const data = JSON.parse(content) as { version?: string; byDate?: Record<string, string[]> };
-			return data.byDate && typeof data.byDate === "object" ? data.byDate : {};
+			const data = JSON.parse(content) as {
+				version?: string;
+				byDate?: Record<string, string[]>;
+				displayOrderByDate?: Record<string, Record<string, number>>;
+			};
+			const byDate = data.byDate && typeof data.byDate === "object" ? data.byDate : {};
+			const displayOrderByDate =
+				data.displayOrderByDate && typeof data.displayOrderByDate === "object"
+					? data.displayOrderByDate
+					: {};
+			return { byDate, displayOrderByDate };
 		} catch (error) {
 			logger.error("[IRStorageService] 解析 calendar-progress JSON 失败:", error);
-			return {};
+			return { byDate: {}, displayOrderByDate: {} };
 		}
 	}
 
-	async addCalendarCompletion(dateKey: string, chunkId: string): Promise<void> {
+	async getCalendarProgress(): Promise<Record<string, string[]>> {
+		const state = await this.getCalendarProgressState();
+		return state.byDate;
+	}
+
+	async getCalendarCompletionDisplayOrder(
+		dateKey: string
+	): Promise<Record<string, number>> {
+		const normalizedDateKey = String(dateKey || "").trim();
+		if (!normalizedDateKey) {
+			return {};
+		}
+		const state = await this.getCalendarProgressState();
+		const order = state.displayOrderByDate[normalizedDateKey];
+		return order && typeof order === "object" ? { ...order } : {};
+	}
+
+	async addCalendarCompletion(
+		dateKey: string,
+		chunkId: string,
+		displayIndex?: number
+	): Promise<void> {
 		await this.initialize();
 
-		const byDate = await this.getCalendarProgress();
-		const current = Array.isArray(byDate[dateKey]) ? byDate[dateKey] : [];
+		const state = await this.getCalendarProgressState();
+		const current = Array.isArray(state.byDate[dateKey]) ? state.byDate[dateKey] : [];
 		if (!current.includes(chunkId)) {
-			byDate[dateKey] = [...current, chunkId];
+			state.byDate[dateKey] = [...current, chunkId];
 		}
 
-		const store = { version: IR_STORAGE_VERSION, byDate };
+		if (typeof displayIndex === "number" && Number.isFinite(displayIndex) && displayIndex >= 0) {
+			state.displayOrderByDate[dateKey] = {
+				...(state.displayOrderByDate[dateKey] || {}),
+				[chunkId]: Math.round(displayIndex),
+			};
+		}
+
+		const store = {
+			version: IR_STORAGE_VERSION,
+			byDate: state.byDate,
+			displayOrderByDate: state.displayOrderByDate,
+		};
 		await this.writeFile(this.getCalendarProgressStoragePath(), JSON.stringify(store));
 	}
 
@@ -1591,20 +1645,34 @@ export class IRStorageService {
 			return;
 		}
 
-		const byDate = await this.getCalendarProgress();
-		const targetDateKeys = dateKey ? [dateKey] : Object.keys(byDate);
+		const state = await this.getCalendarProgressState();
+		const targetDateKeys = dateKey ? [dateKey] : Object.keys(state.byDate);
 
 		for (const key of targetDateKeys) {
-			const current = Array.isArray(byDate[key]) ? byDate[key] : [];
+			const current = Array.isArray(state.byDate[key]) ? state.byDate[key] : [];
 			const next = current.filter((id) => id !== normalizedChunkId);
 			if (next.length > 0) {
-				byDate[key] = next;
+				state.byDate[key] = next;
 			} else {
-				delete byDate[key];
+				delete state.byDate[key];
+			}
+
+			if (state.displayOrderByDate[key]) {
+				const nextOrder = { ...state.displayOrderByDate[key] };
+				delete nextOrder[normalizedChunkId];
+				if (Object.keys(nextOrder).length > 0) {
+					state.displayOrderByDate[key] = nextOrder;
+				} else {
+					delete state.displayOrderByDate[key];
+				}
 			}
 		}
 
-		const store = { version: IR_STORAGE_VERSION, byDate };
+		const store = {
+			version: IR_STORAGE_VERSION,
+			byDate: state.byDate,
+			displayOrderByDate: state.displayOrderByDate,
+		};
 		await this.writeFile(this.getCalendarProgressStoragePath(), JSON.stringify(store));
 	}
 
@@ -2100,19 +2168,40 @@ export class IRStorageService {
 		return (await this.projectRuntimeChunkStoresFromPoints()).chunks;
 	}
 
-	/** 获取单个块文件的调度数据。 */
+	/** 获取单个块文件的调度数据（O(1) 点索引，不扫描全库）。 */
 	async getChunkData(
 		chunkId: string
 	): Promise<import("../../types/ir-types").IRChunkFileData | null> {
-		const chunks = await this.getAllChunkData();
-		return chunks[chunkId] || null;
+		await this.initialize();
+		const normalizedId = String(chunkId || "").trim();
+		if (!normalizedId) {
+			return null;
+		}
+
+		const cachedProjection = this.runtimePointProjection?.chunks[normalizedId];
+		if (cachedProjection) {
+			return cachedProjection;
+		}
+
+		const snapshot = await this.getPointStorageService().getPointSnapshotById(normalizedId);
+		if (!snapshot || getStoredPointKind(snapshot) !== "chunk") {
+			return null;
+		}
+
+		const { chunk } = buildLegacyChunkFromPointSnapshot(snapshot);
+		return normalizeChunkForRuntime(chunk);
 	}
 
 	/** 保存单个块文件的调度数据。 */
-	async saveChunkData(chunk: import("../../types/ir-types").IRChunkFileData): Promise<void> {
+	async saveChunkData(
+		chunk: import("../../types/ir-types").IRChunkFileData,
+		options?: { skipScheduleCacheInvalidate?: boolean }
+	): Promise<void> {
 		await this.initialize();
 		await this.syncChunkPointToNewStorage(chunk, undefined, undefined, { throwOnError: true });
-		this.invalidateScheduleRuntimeCaches();
+		if (!options?.skipScheduleCacheInvalidate) {
+			this.invalidateScheduleRuntimeCaches();
+		}
 	}
 
 	/** 批量保存块文件调度数据。 */
@@ -2350,11 +2439,10 @@ export class IRStorageService {
 		return { synced: chunksToUpdate.length, removed: removedFromDecks };
 	}
 
-	/** 先同步 YAML 牌组数据，再返回最新块数据。 */
+	/** @deprecated 请直接使用 getAllChunkData()；YAML 牌组同步请显式调用 syncDeckDataFromYAML()。 */
 	async getAllChunkDataWithSync(): Promise<
 		Record<string, import("../../types/ir-types").IRChunkFileData>
 	> {
-		await this.syncDeckDataFromYAML();
 		return this.getAllChunkData();
 	}
 
@@ -2364,13 +2452,14 @@ export class IRStorageService {
 
 	/** 从块文件 YAML 读取多牌组名称。 */
 	async readDeckNamesFromYAML(filePath: string): Promise<string[] | null> {
-		try {
-			const adapter = this.app.vault.adapter;
-			if (!(await adapter.exists(filePath))) {
-				return null;
-			}
+		if (!(await this.isReadableChunkSourceFilePath(filePath))) {
+			return null;
+		}
 
-			const content = await adapter.read(filePath);
+		try {
+			const normalizedPath = normalizePath(String(filePath || "").trim());
+			const adapter = this.app.vault.adapter;
+			const content = await adapter.read(normalizedPath);
 			const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
 			if (!yamlMatch) return null;
 
@@ -2422,9 +2511,42 @@ export class IRStorageService {
 
 			return null;
 		} catch (error) {
+			const code = String((error as NodeJS.ErrnoException)?.code || "");
+			if (code === "EISDIR") {
+				logger.debug(`[IRStorageService] 跳过目录路径 deck_names 读取: ${filePath}`);
+				return null;
+			}
 			logger.warn(`[IRStorageService] 读取块文件 deck_names 失败: ${filePath}`, error);
 			return null;
 		}
+	}
+
+	/** 块 YAML 同步仅针对 vault 内可读 Markdown 文件，跳过目录与内部数据路径。 */
+	private async isReadableChunkSourceFilePath(filePath: string): Promise<boolean> {
+		const normalizedPath = normalizePath(String(filePath || "").trim());
+		if (!normalizedPath || normalizedPath === "/" || normalizedPath.endsWith("/")) {
+			return false;
+		}
+		if (isIRInternalScheduleSourcePath(normalizedPath)) {
+			return false;
+		}
+
+		const adapter = this.app.vault.adapter;
+		if (!(await adapter.exists(normalizedPath))) {
+			return false;
+		}
+
+		try {
+			const stat = await adapter.stat(normalizedPath);
+			if (!stat || stat.type === "folder") {
+				return false;
+			}
+		} catch {
+			return false;
+		}
+
+		const fileName = normalizedPath.split("/").pop() || "";
+		return fileName.length > 0 && fileName.includes(".");
 	}
 
 	/** 验证 YAML 中的牌组名称，并返回对应的有效牌组 ID。 */

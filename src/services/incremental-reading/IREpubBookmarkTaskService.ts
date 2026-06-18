@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { normalizePath } from "obsidian";
 import { getIrEpubStorageService } from "../epub-integration/ir-epub-storage-access";
+import { buildEpubChapterResumeLink } from "../epub-integration/epub-chapter-locate";
 import type { IRBlockMeta, IRBlockStats, IRBlockStatus, IRBlockV4 } from "../../types/ir-types";
 import { DEFAULT_IR_BLOCK_META, DEFAULT_IR_BLOCK_STATS } from "../../types/ir-types";
 import { getTaskTopicId } from "../../utils/ir-topic-compat";
@@ -43,12 +44,15 @@ function generateEpubBookmarkTaskId(): string {
 	return `epubbm-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function mergeTaskMeta(existing: IRBlockMeta, updates?: Partial<IRBlockMeta>): IRBlockMeta {
+function mergeTaskMeta(
+	existing: IRBlockMeta,
+	updates?: Partial<IRBlockMeta> & { manualSchedulePinnedDateKey?: string | null }
+): IRBlockMeta {
 	if (!updates) {
 		return existing;
 	}
 
-	return {
+	const merged: IRBlockMeta = {
 		...existing,
 		...updates,
 		siblings: updates.siblings
@@ -58,6 +62,13 @@ function mergeTaskMeta(existing: IRBlockMeta, updates?: Partial<IRBlockMeta>): I
 			  }
 			: existing.siblings,
 	};
+	if (
+		"manualSchedulePinnedDateKey" in updates &&
+		updates.manualSchedulePinnedDateKey === null
+	) {
+		delete merged.manualSchedulePinnedDateKey;
+	}
+	return merged;
 }
 
 function mergeTaskStats(existing: IRBlockStats, updates?: Partial<IRBlockStats>): IRBlockStats {
@@ -105,13 +116,7 @@ export class IREpubBookmarkTaskService {
 			return;
 		}
 
-		try {
-			await this.getPointStorageService().ensureRuntimeBaseline();
-		} catch (error) {
-			logger.warn("[IREpubBookmarkTaskService] 自动迁移旧 EPUB 书签失败，继续使用已存在的新 points", error);
-			await this.getPointStorageService().initialize();
-		}
-
+		await this.getPointStorageService().initialize();
 		this.initialized = true;
 	}
 
@@ -179,6 +184,14 @@ export class IREpubBookmarkTaskService {
 				: typeof normalizedTask.stats?.lastInteraction === "number"
 					? normalizedTask.stats.lastInteraction
 					: undefined;
+		const chapterResumeLink = buildEpubChapterResumeLink(
+			this.app,
+			normalizedTask.epubFilePath,
+			normalizedTask.tocHref,
+			normalizedTask.title,
+			normalizedTask.sourceId,
+			normalizedTask.tocLevel
+		);
 
 		await this.getPointStorageService().syncLegacyPoint({
 			id: normalizedTask.id,
@@ -201,6 +214,8 @@ export class IREpubBookmarkTaskService {
 				tocHref: normalizedTask.tocHref,
 				tocLevel: normalizedTask.tocLevel,
 				resumeCfi: normalizedTask.resumeCfi,
+				resumeLink: chapterResumeLink,
+				link: chapterResumeLink,
 			},
 			linkedNotePaths,
 			explicitTagGroupId:
@@ -215,7 +230,10 @@ export class IREpubBookmarkTaskService {
 				totalReadingTimeSec: normalizedTask.stats?.totalReadingTimeSec,
 				lastInteractionAt,
 			},
-			metadata: Object.keys(sourceSequenceMetadata).length > 0 ? sourceSequenceMetadata : undefined,
+			metadata: {
+				...(Object.keys(sourceSequenceMetadata).length > 0 ? sourceSequenceMetadata : {}),
+				resumeLink: chapterResumeLink,
+			},
 		});
 
 		return (await this.getTask(normalizedTask.id)) || normalizedTask;
@@ -435,7 +453,7 @@ export class IREpubBookmarkTaskService {
 	async updateTask(
 		id: string,
 		updates: Partial<Omit<IREpubBookmarkTask, "id" | "createdAt" | "meta" | "stats">> & {
-			meta?: Partial<IRBlockMeta>;
+			meta?: Partial<IRBlockMeta> & { manualSchedulePinnedDateKey?: string | null };
 			stats?: Partial<IRBlockStats>;
 		}
 	): Promise<IREpubBookmarkTask | null> {
