@@ -138,7 +138,7 @@ export class IRReadingPointTopicMigrationService {
 					}),
 					[targetDeckId]
 				);
-				changed = true || Boolean(deckResult);
+				changed = changed || Boolean(deckResult);
 				break;
 			}
 			case "point":

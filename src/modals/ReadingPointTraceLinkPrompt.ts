@@ -1,8 +1,7 @@
 import { App, Modal, Notice } from "obsidian";
 import { mount, unmount } from "svelte";
-import ReadingPointTraceLinkPromptPanel, {
-	type ReadingPointTraceLinkPanelState,
-} from "../components/incremental-reading/reading-point-edit/ReadingPointTraceLinkPromptPanel.svelte";
+import ReadingPointTraceLinkPromptPanel from "../components/incremental-reading/reading-point-edit/ReadingPointTraceLinkPromptPanel.svelte";
+import type { ReadingPointTraceLinkPanelState } from "../components/incremental-reading/reading-point-edit/ReadingPointTraceLinkPromptPanel.types";
 import type WeavePlugin from "../main";
 import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
 import { buildSaveInputFromDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditSaveBuilder";
@@ -40,7 +39,7 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 			props: {
 				plugin: this.options.plugin,
 				draft: this.options.draft,
-				onStateChange: (state) => {
+				onStateChange: (state: ReadingPointTraceLinkPanelState) => {
 					this.panelState = state;
 				},
 			},

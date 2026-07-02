@@ -5,7 +5,6 @@ import { EpubLinkService } from "../../epub-integration/EpubLinkService";
 import { EPUB_RUNTIME } from "../../epub-integration/epub-runtime";
 import { isHttpUrl } from "../../obsidian/obsidian-open-web-url";
 import {
-	extractWikiLinkTarget,
 	normalizeObsidianBlockId,
 } from "../paragraph-workbench/paragraph-block-reference";
 import type { ParsedReadingTarget } from "./IRReadingTargetTypes";

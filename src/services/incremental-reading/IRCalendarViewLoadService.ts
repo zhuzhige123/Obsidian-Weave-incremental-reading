@@ -6,7 +6,6 @@ import {
 	getSharedIRCalendarQueryService,
 	type IRCalendarQueryResult,
 } from "./IRCalendarQueryService";
-import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import {
 	getSharedIRProjectionRuntime,
 	type IRProjectionPriorityHydrateResult,

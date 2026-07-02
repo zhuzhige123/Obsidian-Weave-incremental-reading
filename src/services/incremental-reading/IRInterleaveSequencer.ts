@@ -96,8 +96,8 @@ export function sequenceItemsForDailyReading<T extends IRScheduleSortableItem>(
 
 		if (swapIndex > index) {
 			const temp = sequenced[index];
-			sequenced[index] = sequenced[swapIndex] as T;
-			sequenced[swapIndex] = temp as T;
+			sequenced[index] = sequenced[swapIndex];
+			sequenced[swapIndex] = temp;
 		}
 	}
 

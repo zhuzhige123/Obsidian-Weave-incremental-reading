@@ -27,7 +27,7 @@ import { getReadingTargetKindLabel } from "../reading-target/IRReadingTargetTitl
 import { parseReadingTargetInput } from "../reading-target/IRReadingTargetParser";
 import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
 import { migrateToIRBlockV4, type IRBlock, type IRChunkFileData } from "../../../types/ir-types";
-import type { IRParameterContext, IRPointSnapshot, IRTraceState } from "../../../types/ir-point-storage-types";
+import type { IRParameterContext, IRTraceState } from "../../../types/ir-point-storage-types";
 import { resolveReadingPointStoredSchedule } from "./IRReadingPointStoredSchedule";
 import { IRReadingPointTopicMigrationService } from "./IRReadingPointTopicMigrationService";
 import { getChunkTopicIds, getTaskTopicId } from "../../../utils/ir-topic-compat";
@@ -252,7 +252,7 @@ export class IRReadingPointEditService {
 			String(material.displayName || material.title || "").trim() ||
 			pointId;
 
-		const metadata = (snapshot?.point.metadata || {}) as Record<string, unknown>;
+		const metadata = (snapshot?.point.metadata || {});
 		const tags = await this.loadTags(material, pdfTask, epubTask, null);
 		const tagGroupId = tags.length > 0 ? await this.pointTagService.matchGroupForTags(tags) : "default";
 		const allGroups = await this.pointTagService.getTagGroups();

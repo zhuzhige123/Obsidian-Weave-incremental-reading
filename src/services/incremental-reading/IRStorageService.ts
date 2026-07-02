@@ -2511,7 +2511,9 @@ export class IRStorageService {
 
 			return null;
 		} catch (error) {
-			const code = String((error as NodeJS.ErrnoException)?.code || "");
+			const rawCode = (error as { code?: unknown })?.code;
+			const code =
+				typeof rawCode === "string" || typeof rawCode === "number" ? String(rawCode) : "";
 			if (code === "EISDIR") {
 				logger.debug(`[IRStorageService] 跳过目录路径 deck_names 读取: ${filePath}`);
 				return null;

@@ -71,6 +71,8 @@ describe("IRScheduleRecomputeCoordinator", () => {
 		});
 		(globalThis as any).window = {
 			dispatchEvent: vi.fn(),
+			setTimeout: globalThis.setTimeout.bind(globalThis),
+			clearTimeout: globalThis.clearTimeout.bind(globalThis),
 		};
 		(globalThis as any).CustomEvent = class TestCustomEvent<T = unknown> {
 			type: string;

@@ -3143,10 +3143,6 @@
     white-space: nowrap;
   }
 
-  .info-text strong {
-    color: var(--interactive-accent);
-  }
-
   .tree-container {
     flex: 1 1 0%;
     min-height: 0;

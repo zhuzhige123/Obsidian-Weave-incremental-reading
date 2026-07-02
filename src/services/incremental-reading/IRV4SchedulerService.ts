@@ -34,7 +34,6 @@ import {
 	calculateNextInterval,
 	calculateNextRepDate,
 	calculatePriorityEWMA,
-	calculatePsi,
 } from "./IRCoreAlgorithmsV4";
 import { IREpubBookmarkTaskService, isEpubBookmarkTaskId } from "./IREpubBookmarkTaskService";
 import { IRPdfBookmarkTaskService, isPdfBookmarkTaskId } from "./IRPdfBookmarkTaskService";

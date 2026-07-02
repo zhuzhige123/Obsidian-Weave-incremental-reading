@@ -29,7 +29,7 @@ function readEpubResumeLink(task: IREpubBookmarkTask | null | undefined): string
 function readSnapshotResumeLink(app: App, snapshot?: IRPointSnapshot | null): string {
 	const metadata = snapshot?.point.metadata;
 	if (metadata && typeof metadata === "object") {
-		const resumeLink = (metadata as Record<string, unknown>).resumeLink;
+		const resumeLink = (metadata).resumeLink;
 		if (typeof resumeLink === "string" && resumeLink.trim()) {
 			return resumeLink.trim();
 		}
@@ -84,7 +84,8 @@ export function resolveReadingPointLinkInputFromParts(
 	}
 
 	if (isPdfBookmarkTaskId(material.id)) {
-		const pdfLink = String(pdfTask?.link || snapshot?.point.trace?.locator?.link || "").trim();
+		const rawPdfLink = pdfTask?.link ?? snapshot?.point.trace?.locator?.link;
+		const pdfLink = typeof rawPdfLink === "string" ? rawPdfLink.trim() : "";
 		if (pdfLink) {
 			return pdfLink;
 		}

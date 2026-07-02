@@ -142,7 +142,7 @@ export class IRLegacyPointUnificationService {
 			topicIds,
 			topicName: snapshot.topicName,
 			title: String(point.userData?.title || point.source?.title || pointId).trim(),
-			tags: Array.isArray(point.userData?.tags) ? [...(point.userData.tags as string[])] : [],
+			tags: Array.isArray(point.userData?.tags) ? [...(point.userData.tags)] : [],
 			status: String(point.schedule?.status || "new"),
 			priorityUi:
 				typeof point.schedule?.manualPriority === "number"

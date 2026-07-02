@@ -34,6 +34,7 @@ import {
 import { recomputeAndBroadcastIRData } from "./services/incremental-reading/IRScheduleRefreshService";
 import { scheduleIRWorkspaceWarmup } from "./services/incremental-reading/IRWorkspaceWarmup";
 import { getSharedIRProjectionRuntime } from "./services/incremental-reading/IRProjectionRuntime";
+import { getSharedIRHostCriticalWorkGuard } from "./services/incremental-reading/IRHostCriticalWorkGuard";
 import { getSharedIRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
 import { IRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
 import { IRStorageService } from "./services/incremental-reading/IRStorageService";
@@ -190,6 +191,8 @@ export default class StandaloneIncrementalReadingPlugin
 	private irCalendarSidebarSettingsCache: IRCalendarSidebarSettings | null = null;
 	private irHostSharedService: IRHostSharedService | null = null;
 	private irDeckIndexRefreshTimer: number | null = null;
+	private pendingIRDeckChangedPaths = new Set<string>();
+	private pendingIRDeckRemovedPaths = new Set<string>();
 	private incrementalReadingFolderSubscriptionResyncTimer: number | null = null;
 	private incrementalReadingFolderSubscriptionSyncPromise: Promise<number> | null = null;
 	private deferredStartupPromise: Promise<void> | null = null;
@@ -217,6 +220,7 @@ export default class StandaloneIncrementalReadingPlugin
 		licenseManager.initializeCloud(this.app);
 		this.dataStorage = {};
 		markServiceReady("dataStorage");
+		getSharedIRHostCriticalWorkGuard(this.app).register(this);
 
 		registerEpubHost(this.app, this);
 		PremiumFeatureGuard.getInstance().primeLicenseState({
@@ -353,8 +357,12 @@ export default class StandaloneIncrementalReadingPlugin
 			await this.initializeReadingMaterialServices();
 			await this.ensureDefaultIRDeckExists();
 			void getSharedIRPointStorageService(this.app).ensureRuntimeBaseline();
-			void this.refreshIRDeckIndexFromVault({ trigger: "startup", recompute: false });
-			void this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "startup" });
+			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(async () => {
+				await this.refreshIRDeckIndexFromVault({ trigger: "startup", recompute: false });
+			});
+			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(async () => {
+				await this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "startup" });
+			});
 		} catch (error) {
 			logger.warn("[Standalone IR] 后台启动任务失败", error);
 		}
@@ -1117,25 +1125,67 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 		this.incrementalReadingFolderSubscriptionResyncTimer = window.setTimeout(() => {
 			this.incrementalReadingFolderSubscriptionResyncTimer = null;
-			void this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "file-change" });
+			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(async () => {
+				await this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "file-change" });
+			});
 		}, 300);
 	}
 
 	private registerIRDeckVaultSync(): void {
-		const scheduleRefreshForPathChange = (nextPath?: string | null, previousPath?: string | null) => {
-			if (!isIRDeckFilePath(nextPath) && !isIRDeckFilePath(previousPath)) {
+		const queuePathChange = (options: {
+			path?: string | null;
+			previousPath?: string | null;
+			deleted?: boolean;
+		}) => {
+			if (options.previousPath && isIRDeckFilePath(options.previousPath)) {
+				const normalizedPrevious = normalizePath(options.previousPath);
+				this.pendingIRDeckRemovedPaths.add(normalizedPrevious);
+				this.pendingIRDeckChangedPaths.delete(normalizedPrevious);
+			}
+
+			if (options.deleted && options.path && isIRDeckFilePath(options.path)) {
+				const normalized = normalizePath(options.path);
+				this.pendingIRDeckRemovedPaths.add(normalized);
+				this.pendingIRDeckChangedPaths.delete(normalized);
+			} else if (options.path && isIRDeckFilePath(options.path)) {
+				const normalized = normalizePath(options.path);
+				this.pendingIRDeckChangedPaths.add(normalized);
+				this.pendingIRDeckRemovedPaths.delete(normalized);
+			}
+
+			if (this.pendingIRDeckChangedPaths.size === 0 && this.pendingIRDeckRemovedPaths.size === 0) {
 				return;
 			}
 			this.scheduleIRDeckIndexRefresh();
 		};
 
-		this.registerEvent(this.app.vault.on("create", (file) => scheduleRefreshForPathChange(file?.path)));
-		this.registerEvent(this.app.vault.on("modify", (file) => scheduleRefreshForPathChange(file?.path)));
-		this.registerEvent(this.app.vault.on("delete", (file) => scheduleRefreshForPathChange(file?.path)));
 		this.registerEvent(
-			this.app.vault.on("rename", (file, oldPath) =>
-				scheduleRefreshForPathChange(file?.path, oldPath)
-			)
+			this.app.vault.on("create", (file) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path });
+				}
+			})
+		);
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path });
+				}
+			})
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path, deleted: true });
+				}
+			})
+		);
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path, previousPath: oldPath });
+				}
+			})
 		);
 	}
 
@@ -1146,17 +1196,36 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.irDeckIndexRefreshTimer = window.setTimeout(() => {
 			this.irDeckIndexRefreshTimer = null;
-			void this.refreshIRDeckIndexFromVault({ trigger: "vault_change", recompute: true });
+			const changedPaths = Array.from(this.pendingIRDeckChangedPaths);
+			const removedPaths = Array.from(this.pendingIRDeckRemovedPaths);
+			this.pendingIRDeckChangedPaths.clear();
+			this.pendingIRDeckRemovedPaths.clear();
+			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(async () => {
+				await this.refreshIRDeckIndexFromVault({
+					trigger: "vault_change",
+					recompute: true,
+					changedPaths,
+					removedPaths,
+				});
+			});
 		}, 250);
 	}
 
 	private async refreshIRDeckIndexFromVault(options: {
 		trigger: "startup" | "vault_change";
 		recompute: boolean;
+		changedPaths?: string[];
+		removedPaths?: string[];
 	}): Promise<void> {
 		try {
 			const pointStorage = new IRPointStorageService(this.app);
-			const result = await pointStorage.refreshPointFilesIndexFromVault();
+			const result =
+				options.trigger === "vault_change" &&
+				((options.changedPaths?.length ?? 0) > 0 || (options.removedPaths?.length ?? 0) > 0)
+					? await pointStorage.refreshPointFilesIndexForVaultPaths(options.changedPaths || [], {
+							removedPaths: options.removedPaths,
+						})
+					: await pointStorage.refreshPointFilesIndexFromVault();
 			const hasIndexChanges = result.added > 0 || result.updated > 0 || result.removed > 0;
 
 			if (hasIndexChanges) {

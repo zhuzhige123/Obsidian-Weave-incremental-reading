@@ -365,8 +365,8 @@ export class IRReadingTargetAddService {
 		title: string,
 		deckId: string,
 		deckName: string,
-		schedulePin: IRReadingTargetSchedulePin,
-		storage: IRStorageService
+		_schedulePin: IRReadingTargetSchedulePin,
+		_storage: IRStorageService
 	): Promise<IRReadingTargetAddResult> {
 		const target = input.target;
 		const folderPath =

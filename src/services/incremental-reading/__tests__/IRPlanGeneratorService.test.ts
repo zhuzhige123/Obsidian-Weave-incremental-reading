@@ -1,3 +1,20 @@
+const { createMockVaultApp } = vi.hoisted(() => ({
+  createMockVaultApp: () =>
+    ({
+      plugins: { getPlugin: () => null },
+      vault: {
+        configDir: ".obsidian",
+        adapter: {
+          exists: vi.fn().mockResolvedValue(false),
+          mkdir: vi.fn().mockResolvedValue(undefined),
+          read: vi.fn().mockRejectedValue(new Error("ENOENT")),
+          write: vi.fn().mockResolvedValue(undefined),
+          list: vi.fn().mockResolvedValue([]),
+        },
+      },
+    }) as any,
+}));
+
 vi.mock("obsidian", async () => {
   const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
     "../../../tests/mocks/obsidian"
@@ -49,9 +66,7 @@ vi.mock("../IRScheduleIndexService", () => ({
       const { IRStorageService } = await import("../IRStorageService");
       const { IRPdfBookmarkTaskService } = await import("../IRPdfBookmarkTaskService");
       const { IREpubBookmarkTaskService } = await import("../IREpubBookmarkTaskService");
-      const app = {
-        plugins: { getPlugin: () => null },
-      } as any;
+      const app = createMockVaultApp();
       const storage = new IRStorageService(app);
       const pdfService = new IRPdfBookmarkTaskService(app);
       const epubService = new IREpubBookmarkTaskService(app);
@@ -388,6 +403,9 @@ describe('IRPlanGeneratorService', () => {
     const { IRStorageService } = await import('../IRStorageService');
     const { IRPdfBookmarkTaskService } = await import('../IRPdfBookmarkTaskService');
     const { IREpubBookmarkTaskService } = await import('../IREpubBookmarkTaskService');
+    const { IRTagGroupService } = await import('../IRTagGroupService');
+
+    vi.spyOn(IRTagGroupService.prototype, 'initialize').mockResolvedValue(undefined);
 
     vi.spyOn(IRStorageService.prototype, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(IRStorageService.prototype, 'getAllDecks').mockResolvedValue({
@@ -415,14 +433,7 @@ describe('IRPlanGeneratorService', () => {
     vi.spyOn(IREpubBookmarkTaskService.prototype, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(IREpubBookmarkTaskService.prototype, 'getAllTasks').mockResolvedValue([]);
 
-    const kernel = new IRScheduleKernel({
-      plugins: {
-        getPlugin: () => null,
-      },
-      vault: {
-        adapter: {},
-      },
-    } as any);
+    const kernel = new IRScheduleKernel(createMockVaultApp());
     const normalPlan = await kernel.recomputeScheduleForDeck('ui_refresh', {
       deckIds: ['deck-1'],
       horizonDays: 3,
@@ -445,6 +456,9 @@ describe('IRPlanGeneratorService', () => {
     const { IRStorageService } = await import('../IRStorageService');
     const { IRPdfBookmarkTaskService } = await import('../IRPdfBookmarkTaskService');
     const { IREpubBookmarkTaskService } = await import('../IREpubBookmarkTaskService');
+    const { IRTagGroupService } = await import('../IRTagGroupService');
+
+    vi.spyOn(IRTagGroupService.prototype, 'initialize').mockResolvedValue(undefined);
 
     vi.spyOn(IRStorageService.prototype, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(IRStorageService.prototype, 'getAllDecks').mockResolvedValue({
@@ -483,14 +497,7 @@ describe('IRPlanGeneratorService', () => {
     vi.spyOn(IREpubBookmarkTaskService.prototype, 'initialize').mockResolvedValue(undefined);
     vi.spyOn(IREpubBookmarkTaskService.prototype, 'getAllTasks').mockResolvedValue([]);
 
-    const kernel = new IRScheduleKernel({
-      plugins: {
-        getPlugin: () => null,
-      },
-      vault: {
-        adapter: {},
-      },
-    } as any);
+    const kernel = new IRScheduleKernel(createMockVaultApp());
     const normalPlan = await kernel.recomputeScheduleForDeck('ui_refresh', {
       deckIds: ['deck-1'],
       horizonDays: 4,

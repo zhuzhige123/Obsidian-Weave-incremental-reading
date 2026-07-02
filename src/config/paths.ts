@@ -102,10 +102,54 @@ export const LEGACY_MACHINE_DATA_SUBDIR = "_data";
 /** 旧增量阅读正文/文件化块兼容目录（新正文默认路径已不再写入这里） */
 export const DEFAULT_IR_IMPORT_FOLDER = `${WEAVE_DATA}/incremental-reading/IR`;
 const DEFAULT_OBSIDIAN_CONFIG_DIR = [".", "obsidian"].join("");
+const DEFAULT_CONFIG_DIR_PATH_MARKER = `/${DEFAULT_OBSIDIAN_CONFIG_DIR}`;
+const DEFAULT_CONFIG_DIR_PATH_SEGMENT = `${DEFAULT_CONFIG_DIR_PATH_MARKER}/`;
 
 function resolveVaultConfigDir(app?: { vault: { configDir: string } }): string {
 	const configDir = app?.vault?.configDir?.trim();
-	return configDir && configDir.length > 0 ? configDir : DEFAULT_OBSIDIAN_CONFIG_DIR;
+	const raw = configDir && configDir.length > 0 ? configDir : DEFAULT_OBSIDIAN_CONFIG_DIR;
+	const normalized = normalizePath(raw);
+	if (!/^[A-Za-z]:\//.test(normalized)) {
+		return normalized;
+	}
+
+	const obsidianIndex = normalized.lastIndexOf(DEFAULT_CONFIG_DIR_PATH_MARKER);
+	if (obsidianIndex >= 0) {
+		return normalized.slice(obsidianIndex + 1);
+	}
+
+	const segments = normalized.split("/").filter(Boolean);
+	return segments[segments.length - 1] || DEFAULT_OBSIDIAN_CONFIG_DIR;
+}
+
+/** vault.adapter 只接受相对 vault 根的路径；剥离 Windows 绝对路径前缀。 */
+export function toVaultAdapterPath(
+	app: { vault: { configDir: string } } | undefined,
+	inputPath: string
+): string {
+	const normalized = normalizePath(String(inputPath || "").trim());
+	if (!normalized || !/^[A-Za-z]:\//.test(normalized)) {
+		return normalized;
+	}
+
+	const configDir = resolveVaultConfigDir(app);
+	const configMarker = `/${configDir}/`;
+	const configIndex = normalized.indexOf(configMarker);
+	if (configIndex >= 0) {
+		return normalized.slice(configIndex + 1);
+	}
+
+	const obsidianIndex = normalized.indexOf(DEFAULT_CONFIG_DIR_PATH_SEGMENT);
+	if (obsidianIndex >= 0) {
+		return normalized.slice(obsidianIndex + 1);
+	}
+
+	const pluginsIndex = normalized.indexOf("/plugins/");
+	if (pluginsIndex >= 0) {
+		return `${configDir}${normalized.slice(pluginsIndex)}`;
+	}
+
+	return normalized;
 }
 
 export function normalizeWeaveParentFolder(parentFolder?: string): string {

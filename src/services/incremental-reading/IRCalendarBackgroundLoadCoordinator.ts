@@ -19,7 +19,10 @@ export class IRCalendarBackgroundLoadCoordinator {
 	}
 
 	shouldDeferWarmup(): boolean {
-		return this.activeOwner === "sidebar-load" || this.activeOwner === "sidebar-reconcile";
+		return (
+			this.activeOwner === "sidebar-load" ||
+			this.activeOwner === "sidebar-reconcile"
+		);
 	}
 
 	runHeavyLoad<T>(owner: IRCalendarHeavyLoadOwner, task: () => Promise<T>): Promise<T> {

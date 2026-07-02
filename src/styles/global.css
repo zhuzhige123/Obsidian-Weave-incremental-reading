@@ -18,6 +18,12 @@
 @import './ir-calendar-search-portal.css'; /* 月历阅读材料搜索下拉（portal 到 body） */
 @import './ir-paragraph-workbench.css';  /* 增量阅读段落工作台 */
 
+/* Off-screen anchor used to trigger obsidian:// protocol handling. */
+.weave-protocol-open-anchor {
+  position: fixed;
+  left: -9999px;
+}
+
 /* 在插件容器内重映射 Obsidian 变量到 Weave 设计令牌。 */
 .weave-app {
   /* 字体设置 */

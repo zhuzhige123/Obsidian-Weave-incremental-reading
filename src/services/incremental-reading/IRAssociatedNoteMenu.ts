@@ -54,9 +54,9 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 
 		menu.addItem((item) => {
 			item.setTitle(openAllTitle).setIcon("files");
-			const subMenu = (item as any).setSubmenu();
+			const subMenu = item.setSubmenu();
 			for (const notePath of notePaths) {
-				subMenu.addItem((subItem: any) => {
+				subMenu.addItem((subItem) => {
 					subItem
 						.setTitle(getLabel(notePath))
 						.setIcon(getLinkableVaultNoteIcon(notePath))
@@ -104,10 +104,10 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 
 	menu.addItem((item) => {
 		item.setTitle(i18n.t("irSidebar.associatedNote.setPrimaryNote")).setIcon("star");
-		const subMenu = (item as any).setSubmenu();
+		const subMenu = item.setSubmenu();
 		for (const notePath of notePaths) {
 			const isPrimary = notePath === notePaths[0];
-			subMenu.addItem((subItem: any) => {
+			subMenu.addItem((subItem) => {
 				subItem
 					.setTitle(
 						`${isPrimary ? i18n.t("irSidebar.associatedNote.primary") : i18n.t("irSidebar.associatedNote.setPrimaryNote")}: ${getLabel(notePath)}`
@@ -125,9 +125,9 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 
 	menu.addItem((item) => {
 		item.setTitle(i18n.t("irSidebar.associatedNote.removeLinkedNote")).setIcon("trash");
-		const subMenu = (item as any).setSubmenu();
+		const subMenu = item.setSubmenu();
 		for (const notePath of notePaths) {
-			subMenu.addItem((subItem: any) => {
+			subMenu.addItem((subItem) => {
 				subItem
 					.setTitle(getLabel(notePath))
 					.setIcon("trash")
@@ -150,7 +150,7 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 }
 
 function sanitizeAssociatedNoteBaseName(rawName: string): string {
-	const normalized = String(rawName || "").trim().replace(/[\\/:*?"<>|#^\[\]]+/g, " ");
+	const normalized = String(rawName || "").trim().replace(/[\\/:*?"<>|#^[\]]+/g, " ");
 	const compact = normalized.replace(/\s+/g, " ").trim();
 	return compact || untitledNoteLabel();
 }

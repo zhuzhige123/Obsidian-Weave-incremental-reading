@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { logger } from "../../utils/logger";
 import { getSharedIRCalendarBackgroundLoadCoordinator } from "./IRCalendarBackgroundLoadCoordinator";
+import { getSharedIRHostCriticalWorkGuard } from "./IRHostCriticalWorkGuard";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
 import {
 	getSharedIRProjectionRuntime,
@@ -146,7 +147,8 @@ export class IRRefreshScheduler {
 			const run = (): void => {
 				void (async () => {
 					const coordinator = getSharedIRCalendarBackgroundLoadCoordinator(this.app);
-					if (coordinator.isHeavyLoadActive()) {
+					const hostCriticalWorkGuard = getSharedIRHostCriticalWorkGuard(this.app);
+					if (coordinator.isHeavyLoadActive() || hostCriticalWorkGuard.shouldDeferVaultBackgroundWork()) {
 						window.setTimeout(run, BOOTSTRAP_DEFER_RETRY_MS);
 						return;
 					}
@@ -300,6 +302,15 @@ export class IRRefreshScheduler {
 			return;
 		}
 		this.pendingCalendarReconcile = null;
+
+		const hostCriticalWorkGuard = getSharedIRHostCriticalWorkGuard(this.app);
+		if (hostCriticalWorkGuard.shouldDeferVaultBackgroundWork()) {
+			this.pendingCalendarReconcile = unit;
+			window.setTimeout(() => {
+				void this.flushCalendarReconcile();
+			}, BOOTSTRAP_DEFER_RETRY_MS);
+			return;
+		}
 
 		const runtime = getSharedIRProjectionRuntime(this.app);
 		if (unit.kind === "calendar-reconcile") {

@@ -25,12 +25,12 @@ export function resolveSuggestionContainerForAnchor(
 	anchor: HTMLElement,
 	options: { scopeEl?: ParentNode | null } = {}
 ): HTMLElement | null {
-	if (typeof document === "undefined") {
+	if (typeof activeDocument === "undefined") {
 		return null;
 	}
 
 	const anchorRect = anchor.getBoundingClientRect();
-	const roots = options.scopeEl ? [options.scopeEl] : [document];
+	const roots = options.scopeEl ? [options.scopeEl] : [activeDocument];
 	const candidates: HTMLElement[] = [];
 
 	for (const root of roots) {

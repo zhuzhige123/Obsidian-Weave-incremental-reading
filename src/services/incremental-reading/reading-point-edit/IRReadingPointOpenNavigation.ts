@@ -1,12 +1,7 @@
-import { normalizePath, TFile, type App } from "obsidian";
-import { EpubLinkService } from "../../epub-integration/EpubLinkService";
-import { getIrEpubStorageService } from "../../epub-integration/ir-epub-storage-access";
+import { normalizePath, type App } from "obsidian";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
-import {
-	IREpubBookmarkTaskService,
-	isEpubBookmarkTaskId,
-} from "../IREpubBookmarkTaskService";
 import { openObsidianWebUrl } from "../../obsidian/obsidian-open-web-url";
+import { openResumeLink, resolveResumeLinkForOpen, isObsidianProtocolUrl } from "../../obsidian/obsidian-open-protocol-url";
 import { resolveScheduleItemWebUrl } from "../ir-web-reading-point";
 import { parseReadingTargetInput } from "../reading-target/IRReadingTargetParser";
 import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
@@ -18,22 +13,30 @@ import {
 import { SourceNavigationService } from "../../ui/SourceNavigationService";
 import { resolveReadingPointOpenLink } from "./IRReadingPointEditLinkResolver";
 
+export { resolveResumeLinkForOpen as resolveLinkTextForOpen, openResumeLink as openResolvedResumeLink };
+
 function stripWikiLinkForOpen(raw: string): string {
-	return String(raw || "")
-		.trim()
-		.replace(/^!?\[\[/, "")
-		.replace(/\]\]$/, "")
-		.split("|")[0]
-		.trim();
+	return resolveResumeLinkForOpen(raw);
 }
 
 export function shouldUseNativeReadingTargetNavigation(
 	parsed: ParsedReadingTarget | null | undefined
 ): boolean {
-	if (!parsed || parsed.validationError) {
+	if (!parsed || parsed.kind === "unknown") {
 		return false;
 	}
-	return parsed.kind !== "unknown" && parsed.kind !== "epub";
+	if (!parsed.validationError) {
+		return true;
+	}
+	return isObsidianProtocolResumeTarget(parsed);
+}
+
+function isObsidianProtocolResumeTarget(parsed: ParsedReadingTarget): boolean {
+	if (parsed.kind !== "epub") {
+		return false;
+	}
+	const candidate = resolveResumeLinkForOpen(parsed.epubResumeLink || parsed.resumeLink || parsed.rawInput);
+	return isObsidianProtocolUrl(candidate);
 }
 
 function resolveCanvasFilePath(
@@ -62,7 +65,7 @@ async function readPointCanvasMeta(
 	const pointStorage = getSharedIRPointStorageService(app);
 	await pointStorage.initialize();
 	const snapshot = await pointStorage.getPointSnapshotById(pointId);
-	const metadata = (snapshot?.point.metadata || {}) as Record<string, unknown>;
+	const metadata = (snapshot?.point.metadata || {});
 	const canvasNodeId =
 		typeof metadata.canvasNodeId === "string" ? metadata.canvasNodeId.trim() : "";
 	const canvasTextCandidates = Array.isArray(metadata.canvasTextCandidates)
@@ -82,14 +85,7 @@ export async function openParsedReadingTargetLink(
 		return await openObsidianWebUrl(app, parsed.webUrl);
 	}
 
-	const linkToOpen = stripWikiLinkForOpen(parsed.resumeLink || fallbackLink);
-	if (!linkToOpen) {
-		return false;
-	}
-
-	const contextPath = app.workspace.getActiveFile()?.path ?? "";
-	await app.workspace.openLinkText(linkToOpen, contextPath, false);
-	return true;
+	return openResumeLink(app, parsed.resumeLink || fallbackLink);
 }
 
 async function openCanvasReadingTarget(
@@ -117,99 +113,6 @@ async function openCanvasReadingTarget(
 	return true;
 }
 
-async function openEpubReadingTarget(
-	app: App,
-	material: ScheduleItem,
-	resumeLink: string,
-	parsed: ParsedReadingTarget | null
-): Promise<boolean> {
-	const epubLinkService = new EpubLinkService(app);
-	let filePath = parsed?.sourceFilePath || material.sourceFile || "";
-	let cfi = parsed?.epubCfi;
-	let sourceId = parsed?.epubSourceId;
-	let tocHref = parsed?.epubTocHref;
-
-	if (isEpubBookmarkTaskId(material.id)) {
-		const epubService = new IREpubBookmarkTaskService(app);
-		await epubService.initialize();
-		const task = await epubService.getTask(material.id);
-		if (!task) {
-			return false;
-		}
-
-		const resolvedFilePath =
-			(await getIrEpubStorageService(app).resolveSourceFilePath(
-				String(task.sourceId || "").trim() || undefined,
-				String(task.epubFilePath || "").trim() || undefined
-			)) || String(task.epubFilePath || "").trim();
-		if (!resolvedFilePath) {
-			return false;
-		}
-
-		const epubFile = app.vault.getAbstractFileByPath(resolvedFilePath);
-		if (!(epubFile instanceof TFile)) {
-			return false;
-		}
-
-		await epubLinkService.navigateToEpubScheduleMaterial(resolvedFilePath, {
-			cfi: cfi || task.resumeCfi,
-			sourceId: sourceId || task.sourceId,
-			tocHref: tocHref || task.tocHref,
-			resumeLink,
-		});
-		return true;
-	}
-
-	if (!filePath && !resumeLink.trim()) {
-		return false;
-	}
-
-	await epubLinkService.navigateToEpubScheduleMaterial(filePath, {
-		cfi,
-		sourceId,
-		tocHref,
-		resumeLink,
-	});
-	return true;
-}
-
-async function openEpubBookmarkFallback(app: App, material: ScheduleItem): Promise<boolean> {
-	if (!isEpubBookmarkTaskId(material.id)) {
-		return false;
-	}
-
-	const epubService = new IREpubBookmarkTaskService(app);
-	await epubService.initialize();
-	const task = await epubService.getTask(material.id);
-	if (!task) {
-		return false;
-	}
-
-	const resolvedFilePath =
-		(await getIrEpubStorageService(app).resolveSourceFilePath(
-			String(task.sourceId || "").trim() || undefined,
-			String(task.epubFilePath || "").trim() || undefined
-		)) || String(task.epubFilePath || "").trim();
-	if (!resolvedFilePath) {
-		return false;
-	}
-
-	const epubFile = app.vault.getAbstractFileByPath(resolvedFilePath);
-	if (!(epubFile instanceof TFile)) {
-		return false;
-	}
-
-	const resumeLink = await resolveReadingPointOpenLink(app, material);
-	const epubLinkService = new EpubLinkService(app);
-	await epubLinkService.navigateToEpubScheduleMaterial(resolvedFilePath, {
-		cfi: task.resumeCfi,
-		sourceId: task.sourceId,
-		tocHref: task.tocHref,
-		resumeLink,
-	});
-	return true;
-}
-
 /** 按最新溯源链接打开阅读点；若链接已改为 Vault/PDF/网页等非 EPUB 目标则不走 EPUB 阅读器。 */
 export async function openScheduleItemReadingTarget(
 	app: App,
@@ -219,11 +122,6 @@ export async function openScheduleItemReadingTarget(
 	if (webUrl) {
 		const opened = await openObsidianWebUrl(app, webUrl);
 		return opened ? "web" : "none";
-	}
-
-	if (isEpubBookmarkTaskId(material.id)) {
-		const resumeLink = await resolveReadingPointOpenLink(app, material);
-		return (await openEpubReadingTarget(app, material, resumeLink, null)) ? "epub" : "none";
 	}
 
 	const resumeLink = await resolveReadingPointOpenLink(app, material);
@@ -238,11 +136,10 @@ export async function openScheduleItemReadingTarget(
 
 	if (shouldUseNativeReadingTargetNavigation(parsed)) {
 		const opened = await openParsedReadingTargetLink(app, parsed, resumeLink);
+		if (parsed.kind === "epub") {
+			return opened ? "epub" : "none";
+		}
 		return opened ? "native" : "none";
-	}
-
-	if (parsed.kind === "epub") {
-		return (await openEpubReadingTarget(app, material, resumeLink, parsed)) ? "epub" : "none";
 	}
 
 	return "none";
@@ -257,28 +154,5 @@ export async function tryOpenReadingPointFromScheduleItem(
 	material: ScheduleItem
 ): Promise<boolean> {
 	const routed = await openScheduleItemReadingTarget(app, material);
-	if (routed === "web" || routed === "native") {
-		return true;
-	}
-	if (routed === "epub") {
-		return true;
-	}
-
-	if (resolveScheduleItemWebUrl(app, material)) {
-		return false;
-	}
-
-	const resumeLink = await resolveReadingPointOpenLink(app, material);
-	if (resumeLink.trim()) {
-		const parsed = parseReadingTargetInput(app, resumeLink, material.sourceFile || "");
-		if (shouldUseNativeReadingTargetNavigation(parsed) || parsed.kind === "epub") {
-			return false;
-		}
-	}
-
-	if (await openEpubBookmarkFallback(app, material)) {
-		return true;
-	}
-
-	return false;
+	return routed !== "none";
 }

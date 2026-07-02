@@ -1,5 +1,10 @@
-import { TFile } from "obsidian";
 import type { App, TAbstractFile, WorkspaceLeaf } from "obsidian";
+import { TFile } from "obsidian";
+import {
+	isObsidianProtocolUrl,
+	openObsidianProtocolUrl,
+	resolveResumeLinkForOpen,
+} from "../services/obsidian/obsidian-open-protocol-url";
 
 type WorkspaceCompat = App["workspace"] & {
 	iterateAllLeaves?: (callback: (leaf: WorkspaceLeaf) => void) => void;
@@ -117,6 +122,12 @@ export async function openLinkWithExistingLeaf(
 	} = {}
 ): Promise<WorkspaceLeaf | null> {
 	const { openInNewTab = false, focus = true } = options;
+	const protocolUrl = resolveResumeLinkForOpen(linkText);
+	if (isObsidianProtocolUrl(protocolUrl)) {
+		openObsidianProtocolUrl(app, protocolUrl);
+		return app.workspace.getMostRecentLeaf?.() ?? null;
+	}
+
 	const targetFile = resolveLinkFile(app, linkText, contextPath);
 	const hasSubpath = unwrapLinkText(linkText).includes("#");
 

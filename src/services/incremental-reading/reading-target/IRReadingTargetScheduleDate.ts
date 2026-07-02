@@ -4,7 +4,6 @@ import {
 	getProjectedDayLoad,
 	getProjectedScheduleSummary,
 	type IRProjectedDayLoad,
-	type IRProjectedScheduleSummary,
 } from "../IRProjectedScheduleSummary";
 
 export type ReadingTargetDayLoadLevel = "normal" | "warning" | "overloaded";

@@ -268,6 +268,14 @@ const zhIrSidebar = {
 		addToTodayFailed: '加入今天失败',
 		restoredToToday: '已恢复到今天的阅读列表',
 		restoreSuspendedFailed: '恢复搁置阅读点失败',
+		historyModeBanner: '历史回顾（只读）· 已完成 {completed} 项',
+		historyModeHint: '此处仅展示当天已完成的阅读记录，未完成项已顺延至今天或后续计划日，请在当前日期处理。',
+		historyEmpty: '这一天没有已完成的阅读记录',
+		historyEmptyHint: '通过「安排完成」标记的阅读点会出现在对应日期的历史中。',
+		historyReadOnlyNotice: '历史日期仅供查看与统计，不能在此安排或推迟阅读点。',
+		historyDayTitle: '{completed} 项已完成',
+		historyScheduleCompleted: '已完成（只读）',
+		historySchedulePending: '未完成（只读，已顺延至后续日期）',
 	},
 	continueReading: {
 		dialogAriaLabel: '继续阅读建议',
@@ -577,6 +585,16 @@ const enIrSidebar = {
 		addToTodayFailed: 'Failed to add to today',
 		restoredToToday: 'Restored to today',
 		restoreSuspendedFailed: 'Failed to restore suspended reading point',
+		historyModeBanner: 'History review (read-only) · {completed} completed',
+		historyModeHint:
+			'This view shows reading points completed on this day. Unfinished items have rolled forward to today or a later planned date—handle them on the current date.',
+		historyEmpty: 'No completed reading records for this day',
+		historyEmptyHint:
+			'Reading points marked via Schedule complete will appear in history for that day.',
+		historyReadOnlyNotice: 'Past dates are read-only. Schedule or postpone actions are disabled.',
+		historyDayTitle: '{completed} completed',
+		historyScheduleCompleted: 'Completed (read-only)',
+		historySchedulePending: 'Incomplete (read-only, rolled forward)',
 	},
 	continueReading: {
 		dialogAriaLabel: 'Continue reading suggestions',

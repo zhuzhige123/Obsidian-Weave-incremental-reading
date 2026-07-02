@@ -37,4 +37,5 @@ export interface IRCalendarMaterialListProps {
   batchSelectionMode: boolean;
   isBatchSelected: (materialId: string) => boolean;
   toggleBatchSelection: (materialId: string, event?: MouseEvent) => void;
+  readOnlyHistoryMode: boolean;
 }

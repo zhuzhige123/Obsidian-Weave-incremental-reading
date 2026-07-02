@@ -14,14 +14,27 @@ describe("IRReadingPointOpenNavigation", () => {
 		).toBe(true);
 	});
 
-	it("keeps original EPUB resume links on EPUB navigation path", () => {
-		const parsed = {
-			kind: "epub" as const,
-			rawInput: "obsidian://weave-epub-reader?file=Books/demo.epub&cfi=abc",
-			resumeLink: "obsidian://weave-epub-reader?file=Books/demo.epub&cfi=abc",
-		};
+	it("routes EPUB resume links through native link open path", () => {
+		expect(
+			shouldUseNativeReadingTargetNavigation({
+				kind: "epub",
+				rawInput: "obsidian://weave-epub-reader?file=Books/demo.epub&cfi=abc",
+				resumeLink: "obsidian://weave-epub-reader?file=Books/demo.epub&cfi=abc",
+			})
+		).toBe(true);
+	});
 
-		expect(shouldUseNativeReadingTargetNavigation(parsed)).toBe(false);
+	it("still opens EPUB protocol links when vault file validation fails", () => {
+		const protocolUrl =
+			"obsidian://weave-epub-reader?file=Missing/book.epub&href=OEBPS/Text/part0017.xhtml&sid=epubsrc-demo";
+		expect(
+			shouldUseNativeReadingTargetNavigation({
+				kind: "epub",
+				rawInput: protocolUrl,
+				resumeLink: protocolUrl,
+				validationError: "epub file not found",
+			})
+		).toBe(true);
 	});
 
 	it("detects canvas targets from material source file", () => {

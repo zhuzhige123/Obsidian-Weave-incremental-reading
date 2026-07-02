@@ -29,7 +29,7 @@ function shouldDebounceReason(reason: ScheduleRecomputeReason): boolean {
 
 export class IRScheduleRecomputeCoordinator {
 	private pending: PendingRecompute | null = null;
-	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private debounceTimer: number | null = null;
 	private flushPromise: Promise<UpdatedEventDetail> | null = null;
 	private flushResolvers: Array<{
 		resolve: (detail: UpdatedEventDetail) => void;
@@ -96,10 +96,10 @@ export class IRScheduleRecomputeCoordinator {
 
 	private scheduleFlush(): void {
 		if (this.debounceTimer !== null) {
-			clearTimeout(this.debounceTimer);
+			window.clearTimeout(this.debounceTimer);
 		}
 
-		this.debounceTimer = setTimeout(() => {
+		this.debounceTimer = window.setTimeout(() => {
 			this.debounceTimer = null;
 			void this.flushPending();
 		}, this.debounceMs);

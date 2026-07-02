@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { IRBlockV4 } from "../../types/ir-types";
+import type { IRBlockV4 } from "../../../types/ir-types";
 import {
 	buildScheduleModePreviewInput,
 	computeScheduleMenuActionBlock,

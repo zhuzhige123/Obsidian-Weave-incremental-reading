@@ -170,14 +170,14 @@ export async function syncScheduleMapsPrioritiesFromWorkspace<T extends Schedule
 				stored.priorityUi,
 				stored.priorityEff,
 				[dateKey]
-			) as Map<string, T[]>;
+			);
 			nextPinned = patchScheduleItemsInMapByDate(
 				nextPinned,
 				itemId,
 				stored.priorityUi,
 				stored.priorityEff,
 				[dateKey]
-			) as Map<string, T[]>;
+			);
 		}
 	}
 

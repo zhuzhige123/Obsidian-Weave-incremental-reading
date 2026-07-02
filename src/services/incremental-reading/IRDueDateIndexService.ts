@@ -45,7 +45,7 @@ function normalizePointIdList(ids: string[] | undefined): string[] {
  */
 export class IRDueDateIndexService {
 	private memoryStore: IRDueDateIndexStore | null = null;
-	private writeTimer: ReturnType<typeof setTimeout> | null = null;
+	private writeTimer: number | null = null;
 	private pendingWrite = false;
 
 	constructor(private readonly app: App) {}
@@ -154,7 +154,7 @@ export class IRDueDateIndexService {
 
 	async flushPendingWrites(): Promise<void> {
 		if (this.writeTimer) {
-			clearTimeout(this.writeTimer);
+			window.clearTimeout(this.writeTimer);
 			this.writeTimer = null;
 		}
 		if (!this.pendingWrite || !this.memoryStore) {
@@ -167,9 +167,9 @@ export class IRDueDateIndexService {
 	private scheduleDebouncedWrite(): void {
 		this.pendingWrite = true;
 		if (this.writeTimer) {
-			clearTimeout(this.writeTimer);
+			window.clearTimeout(this.writeTimer);
 		}
-		this.writeTimer = setTimeout(() => {
+		this.writeTimer = window.setTimeout(() => {
 			void this.flushPendingWrites();
 		}, 400);
 	}
@@ -190,11 +190,11 @@ export class IRDueDateIndexService {
 				updatedAt: String(parsed.updatedAt || new Date(0).toISOString()),
 				byDate:
 					parsed.byDate && typeof parsed.byDate === "object"
-						? (parsed.byDate as Record<string, string[]>)
+						? (parsed.byDate)
 						: {},
 				byPointId:
 					parsed.byPointId && typeof parsed.byPointId === "object"
-						? (parsed.byPointId as Record<string, string>)
+						? (parsed.byPointId)
 						: {},
 			};
 		} catch {

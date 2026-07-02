@@ -280,6 +280,80 @@ describe("IRPointStorageService", () => {
 		});
 	});
 
+	it("refreshes only changed irdeck paths without scanning the whole vault", async () => {
+		const v2Paths = getV2Paths("");
+		const existingPath = `${v2Paths.ir.root}/points/Existing Topic.irdeck`;
+		const untouchedPath = `${v2Paths.ir.root}/points/Other Topic.irdeck`;
+		const { app, files } = createMemoryApp(
+			{
+				[existingPath]: JSON.stringify({
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					topicId: "topic-existing",
+					topicName: "Existing Topic",
+					updatedAt: "2026-04-16T12:00:00.000Z",
+					points: [
+						{
+							id: "legacy-block-1",
+							source: { type: "markdown", path: "Notes/Existing.md" },
+							trace: { locatorType: "markdown-block" },
+							relations: { topicIds: ["topic-existing"] },
+						},
+					],
+				}),
+				[untouchedPath]: JSON.stringify({
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					topicId: "topic-other",
+					topicName: "Other Topic",
+					updatedAt: "2026-04-16T11:00:00.000Z",
+					points: [],
+				}),
+			},
+			[`${v2Paths.ir.root}/points`]
+		);
+		files.set(
+			getPointFilesIndexPath(app),
+			JSON.stringify({
+				version: 1,
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				files: [
+					{
+						file: "weave/incremental-reading/points/Stale Topic.irdeck",
+						topicId: "stale-topic",
+						topicName: "Stale Topic",
+						pointCount: 1,
+						updatedAt: "2026-04-16T10:00:00.000Z",
+					},
+					{
+						file: "weave/incremental-reading/points/Other Topic.irdeck",
+						topicId: "topic-other",
+						topicName: "Other Topic",
+						pointCount: 0,
+						updatedAt: "2026-04-16T11:00:00.000Z",
+					},
+				],
+			})
+		);
+		const service = new IRPointStorageService(app);
+
+		const result = await service.refreshPointFilesIndexForVaultPaths(
+			["weave/incremental-reading/points/Existing Topic.irdeck"],
+			{ removedPaths: ["weave/incremental-reading/points/Stale Topic.irdeck"] }
+		);
+		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
+
+		expect(result.scanned).toBe(1);
+		expect(pointIndex.files).toHaveLength(2);
+		expect(pointIndex.files.some((entry: { topicId: string }) => entry.topicId === "stale-topic")).toBe(
+			false
+		);
+		expect(pointIndex.files.map((entry: { file: string }) => entry.file)).toEqual(
+			expect.arrayContaining([
+				"weave/incremental-reading/points/Existing Topic.irdeck",
+				"weave/incremental-reading/points/Other Topic.irdeck",
+			])
+		);
+	});
+
 	it("keeps migrated stats and note links when later legacy syncs omit them, and exposes point snapshots", async () => {
 		const v2Paths = getV2Paths("");
 		const { app, files } = createMemoryApp();

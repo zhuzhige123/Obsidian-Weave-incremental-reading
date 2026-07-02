@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { IRBlockV4 } from "../../types/ir-types";
+import type { IRBlockV4 } from "../../../types/ir-types";
 import {
 	computeAllScheduleMenuBlocks,
 	computePostponeAdjustedBlock,

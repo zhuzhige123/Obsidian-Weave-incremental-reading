@@ -151,7 +151,7 @@ export function sanitizePointSourcePathFields(point: IRPoint): {
 		);
 		nextPoint = {
 			...nextPoint,
-			metadata: metadataResult.next as IRPoint["metadata"],
+			metadata: metadataResult.next,
 		};
 	}
 

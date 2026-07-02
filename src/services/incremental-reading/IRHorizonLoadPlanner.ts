@@ -155,7 +155,7 @@ function isMovableToBucket<T extends IRPlannedScheduleItem>(
 	item: T,
 	fromBucket: HorizonBucket<T>,
 	toBucket: HorizonBucket<T>,
-	today: Date
+	_today: Date
 ): boolean {
 	if (isItemLoadDeferPinned(item, fromBucket.dayKey)) {
 		return false;

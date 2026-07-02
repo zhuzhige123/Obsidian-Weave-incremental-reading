@@ -202,7 +202,7 @@ export function shouldFollowObsidianUiLanguage(): boolean {
 }
 
 export function applyPluginUiLanguagePreference(
-	preference: PluginUiLanguagePreference | unknown
+	preference: unknown
 ): SupportedLanguage {
 	pluginUiLanguagePreference = normalizePluginUiLanguagePreference(preference);
 	const resolvedLanguage =

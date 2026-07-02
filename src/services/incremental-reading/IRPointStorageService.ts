@@ -4,12 +4,13 @@ import { safeReadJson, safeWriteJson } from "../../utils/safe-json-io";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
-import { sanitizeUserReadingSourcePath } from "../../utils/ir-internal-data-path";
+import { isIRDeckFilePath, sanitizeUserReadingSourcePath } from "../../utils/ir-internal-data-path";
 import {
 	countInvalidSourcePathFieldsInRawPoint,
 	sanitizePointSourcePathFields,
 } from "../../utils/ir-point-source-path";
 import { readString } from "../../utils/unknown-record";
+import { runIdleBatchedTasks } from "../../utils/idle-task-queue";
 import { normalizeChunkForRuntime } from "../../utils/ir-topic-compat";
 import { parseYAMLFromContent } from "../../utils/yaml-utils";
 import { remapAssociatedNotePaths } from "./IRAssociatedNoteSignals";
@@ -1411,9 +1412,99 @@ export class IRPointStorageService {
 	}
 
 	async refreshPointFilesIndexFromVault(): Promise<IRPointFilesIndexRefreshResult> {
+		const scannedFiles = await this.collectVisibleVaultPointFilePaths();
+		return this.rebuildPointFilesIndexFromScannedPaths(scannedFiles);
+	}
+
+	/**
+	 * 仅更新指定 .irdeck 路径的专题索引，避免每次 vault 事件都全库枚举。
+	 */
+	async refreshPointFilesIndexForVaultPaths(
+		changedPaths: string[],
+		options?: { removedPaths?: string[] }
+	): Promise<IRPointFilesIndexRefreshResult> {
 		await this.initialize();
 		const index = await this.readPointFilesIndex();
-		const scannedFiles = await this.collectVisibleVaultPointFilePaths();
+		const normalizedChanged = this.normalizeIRDeckVaultPaths(changedPaths);
+		const normalizedRemoved = new Set(this.normalizeIRDeckVaultPaths(options?.removedPaths || []));
+
+		const nextByPath = new Map<string, IRPointFileIndex["files"][number]>();
+		const previousKeys = new Set<string>();
+
+		for (const entry of index.files || []) {
+			const resolvedPath = this.resolveIndexedVaultPath(
+				this.resolveIndexedPointFilePath(entry?.file)?.absolutePath || String(entry?.file || "").trim()
+			);
+			if (!resolvedPath) {
+				continue;
+			}
+			previousKeys.add(resolvedPath);
+			if (normalizedRemoved.has(resolvedPath)) {
+				continue;
+			}
+			nextByPath.set(resolvedPath, entry);
+		}
+
+		let added = 0;
+		let updated = 0;
+
+		await runIdleBatchedTasks(
+			normalizedChanged,
+			async (absolutePath) => {
+				if (!(await this.isIndexedPointFilePath(absolutePath))) {
+					return;
+				}
+
+				const draftEntry = await this.buildPointFileIndexEntry(absolutePath);
+				const previous = nextByPath.get(absolutePath);
+				if (!previous) {
+					added += 1;
+				} else if (this.hasPointFileIndexEntryChanged(previous, draftEntry)) {
+					updated += 1;
+				}
+				nextByPath.set(absolutePath, draftEntry);
+			},
+			{ chunkSize: 4, budgetMs: 12 }
+		);
+
+		const removed = [...previousKeys].filter((path) => !nextByPath.has(path)).length;
+		const nextEntries = Array.from(nextByPath.values()).sort((left, right) =>
+			String(left.file || "").localeCompare(String(right.file || ""), "zh-CN")
+		);
+		return this.commitPointFilesIndexRefresh(index, nextEntries, {
+			scanned: normalizedChanged.length,
+			added,
+			updated,
+			removed,
+		});
+	}
+
+	private normalizeIRDeckVaultPaths(paths: string[]): string[] {
+		return Array.from(
+			new Set(
+				paths
+					.map((path) => this.resolveIndexedVaultPath(path))
+					.filter((path): path is string => Boolean(path))
+			)
+		);
+	}
+
+	private resolveIndexedVaultPath(path: string | null | undefined): string | null {
+		const trimmed = String(path || "").trim();
+		if (!trimmed || !isIRDeckFilePath(trimmed)) {
+			return null;
+		}
+		const resolved =
+			this.resolveIndexedPointFilePath(trimmed)?.absolutePath || normalizePath(trimmed);
+		const normalized = normalizePath(resolved);
+		return normalized && isIRDeckFilePath(normalized) ? normalized : null;
+	}
+
+	private async rebuildPointFilesIndexFromScannedPaths(
+		scannedFiles: string[]
+	): Promise<IRPointFilesIndexRefreshResult> {
+		await this.initialize();
+		const index = await this.readPointFilesIndex();
 		const previousByPath = new Map<string, IRPointFileIndex["files"][number]>();
 		for (const entry of index.files || []) {
 			const resolvedPath = normalizePath(
@@ -1435,35 +1526,11 @@ export class IRPointStorageService {
 				continue;
 			}
 
-			const fileData = await this.readPointFile(absolutePath, DEFAULT_TOPIC_ID, DEFAULT_TOPIC_NAME);
-			const topicId = String(fileData.topicId || "").trim() || DEFAULT_TOPIC_ID;
-			const topicName = String(fileData.topicName || "").trim() || DEFAULT_TOPIC_NAME;
-			const pointCount = Array.isArray(fileData.points) ? fileData.points.length : 0;
-			const pointIds = Array.isArray(fileData.points)
-				? fileData.points
-						.map((point) => String(point?.id || "").trim())
-						.filter(Boolean)
-				: [];
-			const updatedAt = String(fileData.updatedAt || "").trim() || new Date().toISOString();
-			const draftEntry: IRPointFileIndex["files"][number] = {
-				topicId,
-				topicName,
-				file: absolutePath,
-				pointCount,
-				pointIds,
-				updatedAt,
-			};
-
+			const draftEntry = await this.buildPointFileIndexEntry(absolutePath);
 			const previous = previousByPath.get(absolutePath);
 			if (!previous) {
 				added += 1;
-			} else if (
-				String(previous.topicName || "").trim() !== topicName ||
-				Number(previous.pointCount || 0) !== pointCount ||
-				String(previous.topicId || "").trim() !== topicId ||
-				String(previous.updatedAt || "").trim() !== updatedAt ||
-				this.serializePointIdList(previous.pointIds) !== this.serializePointIdList(pointIds)
-			) {
+			} else if (this.hasPointFileIndexEntryChanged(previous, draftEntry)) {
 				updated += 1;
 			}
 
@@ -1471,13 +1538,59 @@ export class IRPointStorageService {
 		}
 
 		const removed = Math.max(0, (index.files || []).length - nextEntries.length);
+		return this.commitPointFilesIndexRefresh(index, nextEntries, {
+			scanned: scannedFiles.length,
+			added,
+			updated,
+			removed,
+		});
+	}
+
+	private async buildPointFileIndexEntry(
+		absolutePath: string
+	): Promise<IRPointFileIndex["files"][number]> {
+		const fileData = await this.readPointFile(absolutePath, DEFAULT_TOPIC_ID, DEFAULT_TOPIC_NAME);
+		const topicId = String(fileData.topicId || "").trim() || DEFAULT_TOPIC_ID;
+		const topicName = String(fileData.topicName || "").trim() || DEFAULT_TOPIC_NAME;
+		const pointCount = Array.isArray(fileData.points) ? fileData.points.length : 0;
+		const pointIds = Array.isArray(fileData.points)
+			? fileData.points.map((point) => String(point?.id || "").trim()).filter(Boolean)
+			: [];
+		const updatedAt = String(fileData.updatedAt || "").trim() || new Date().toISOString();
+		return {
+			topicId,
+			topicName,
+			file: absolutePath,
+			pointCount,
+			pointIds,
+			updatedAt,
+		};
+	}
+
+	private hasPointFileIndexEntryChanged(
+		previous: IRPointFileIndex["files"][number],
+		next: IRPointFileIndex["files"][number]
+	): boolean {
+		return (
+			String(previous.topicName || "").trim() !== String(next.topicName || "").trim() ||
+			Number(previous.pointCount || 0) !== Number(next.pointCount || 0) ||
+			String(previous.topicId || "").trim() !== String(next.topicId || "").trim() ||
+			String(previous.updatedAt || "").trim() !== String(next.updatedAt || "").trim() ||
+			this.serializePointIdList(previous.pointIds) !== this.serializePointIdList(next.pointIds)
+		);
+	}
+
+	private async commitPointFilesIndexRefresh(
+		index: IRPointFileIndex,
+		nextEntries: IRPointFileIndex["files"],
+		stats: Pick<IRPointFilesIndexRefreshResult, "scanned" | "added" | "updated" | "removed">
+	): Promise<IRPointFilesIndexRefreshResult> {
 		const conflicts = this.buildTopicIdConflictReport(nextEntries);
 		const topicCount = new Set(nextEntries.map((entry) => String(entry.topicId || "").trim())).size;
-
 		const indexChanged =
-			added > 0 ||
-			updated > 0 ||
-			removed > 0 ||
+			stats.added > 0 ||
+			stats.updated > 0 ||
+			stats.removed > 0 ||
 			this.serializePointFilesIndexFiles(nextEntries) !==
 				this.serializePointFilesIndexFiles(index.files || []);
 
@@ -1490,12 +1603,12 @@ export class IRPointStorageService {
 		}
 
 		return {
-			scanned: scannedFiles.length,
+			scanned: stats.scanned,
 			topicCount,
 			duplicateTopicGroups: conflicts.length,
-			added,
-			updated,
-			removed,
+			added: stats.added,
+			updated: stats.updated,
+			removed: stats.removed,
 			conflicts,
 		};
 	}

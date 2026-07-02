@@ -2,6 +2,7 @@
  * Vitest 测试设置文件
  */
 
+import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
 type TestStyle = CSSStyleDeclaration & Record<string, string>;

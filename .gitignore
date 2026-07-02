@@ -1,11 +1,13 @@
-# Dependencies and build output
+# Obsidian community review public repository
+
+# Dependencies and build cache
 node_modules/
 dist/
 build/
 .vite/
 *.tsbuildinfo
 
-# Runtime artifacts (distributed via GitHub Releases)
+# Runtime build artifacts (distributed via GitHub Releases only)
 /main.js
 /styles.css
 
@@ -13,7 +15,6 @@ build/
 *.log
 tmp/
 temp/
-.obsidian-community-staging/
 
 # OS / IDE
 .DS_Store
@@ -29,15 +30,23 @@ Thumbs.db
 *.key
 *private-key*
 *private_key*
+*activation-code*
+*activation-codes*
 generated-*.json
 generated-*.txt
 codes-*.txt
 codes-*.json
-*activation-code*
-*activation-codes*
 
-# Local dev artifacts (not part of community repo)
-.desktop-hot-reload/
-.mobile-hot-reload/
-.dev-watch.lock.json
-.mobile-watch.lock.json
+# Development-only (must never appear in this public tree)
+src/
+docs/
+scripts/
+AGENTS.md
+.cursor/
+.codex/
+.augment/
+backend/
+design/
+test/
+tests/
+*.bak

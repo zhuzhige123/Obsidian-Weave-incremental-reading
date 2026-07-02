@@ -37,6 +37,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     mergeCalendarDayCountMaps,
   } from '../../services/incremental-reading/IRCalendarDayCountSync';
   import { toCalendarMonthKey } from '../../services/incremental-reading/IRCalendarProjectionUtils';
+  import {
+    buildHistoryDaySummaries,
+    isPastCalendarDate,
+    isPastCalendarDateKey,
+  } from '../../services/incremental-reading/IRCalendarHistoryUtils';
   import { VIEW_TYPE_IR_CALENDAR } from '../../views/IRCalendarView';
   import { runIdleBatchedTasks } from '../../utils/idle-task-queue';
   import {
@@ -83,7 +88,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { MaterialImportModalObsidian } from './MaterialImportModalObsidian';
   import { AddReadingTargetModalObsidian } from './AddReadingTargetModalObsidian';
   import { canEditReadingPointLink, resolveReadingPointOpenLink } from '../../services/incremental-reading/reading-point-edit/IRReadingPointEditLinkResolver';
-  import { tryOpenReadingPointFromScheduleItem } from '../../services/incremental-reading/reading-point-edit/IRReadingPointOpenNavigation';
+  import { tryOpenReadingPointFromScheduleItem, openResolvedResumeLink } from '../../services/incremental-reading/reading-point-edit/IRReadingPointOpenNavigation';
   import {
     closeActiveReadingPointPrompt,
     openReadingPointTagsPrompt,
@@ -1642,6 +1647,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     material: ScheduleItem,
     options: { announceStart?: boolean } = {}
   ): Promise<void> {
+    if (isPastCalendarDate(selectedDate, today)) {
+      new Notice(t('irSidebar.calendar.historyReadOnlyNotice'));
+      return;
+    }
     if (!ensurePremiumFeature(PREMIUM_FEATURES.READING_TIMER)) {
       return;
     }
@@ -1696,6 +1705,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           nextPinnedByDate.delete(dateKey);
           pinnedByDate = nextPinnedByDate;
         }
+        markSelectedDateHydrationComplete(dateKey);
         return;
       }
 
@@ -1754,6 +1764,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           nextPinnedByDate.delete(dateKey);
           pinnedByDate = nextPinnedByDate;
         }
+        markSelectedDateHydrationComplete(dateKey);
         return;
       }
 
@@ -1763,6 +1774,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       const nextPinnedByDate = new Map(pinnedByDate);
       nextPinnedByDate.set(dateKey, [...merged.values()]);
       pinnedByDate = nextPinnedByDate;
+      markSelectedDateHydrationComplete(dateKey);
+      syncCalendarDayCountsFromLoadedMaterials([dateKey]);
     } catch (error) {
       logger.error('[IRCalendarSidebar] Recovered error message.', error);
     }
@@ -1798,8 +1811,34 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     calendarDayCountsByDate = mergeCalendarDayCountMaps(calendarDayCountsByDate, visibleCounts);
   }
 
+  function mergeHistoryHeatmapFromCalendarProgress(monthKey?: string): void {
+    const summaries = buildHistoryDaySummaries(calendarProgressByDate, {
+      monthKey,
+      today,
+    });
+    if (summaries.size === 0) {
+      return;
+    }
+    mergeCalendarDaySummaries(
+      new Map(
+        Array.from(summaries.entries()).map(([dateKey, summary]) => [
+          dateKey,
+          { totalCount: summary.totalCount },
+        ])
+      )
+    );
+  }
+
   function getScheduledCountForDateKey(dateKey: string): number {
     const normalized = String(dateKey || '').trim();
+    if (isPastCalendarDateKey(normalized, today)) {
+      const pinnedCount = getVisiblePinnedForDate(normalized).length;
+      if (pinnedCount > 0) {
+        return pinnedCount;
+      }
+      const progressIds = calendarProgressByDate[normalized] || [];
+      return progressIds.length;
+    }
     if (materialsByDate.has(normalized) || pinnedByDate.has(normalized)) {
       const ids = new Set<string>();
       for (const item of getVisibleMaterialsForDate(normalized)) {
@@ -1843,6 +1882,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     const normalized = String(dateKey || '').trim();
     if (!normalized) {
       return true;
+    }
+    if (isPastCalendarDateKey(normalized, today)) {
+      const progressIds = calendarProgressByDate[normalized] || [];
+      if (progressIds.length === 0) {
+        return true;
+      }
+      if (getVisiblePinnedForDate(normalized).length > 0) {
+        return true;
+      }
+      return selectedDateHydrationCompletedKeys.has(normalized);
     }
     if (selectedDateHydrationCompletedKeys.has(normalized)) {
       return true;
@@ -2257,8 +2306,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     try {
       const monthHeatmap = await hydrateIRCalendarMonthHeatmap(plugin.app, deckIds, [monthKey]);
       applyMonthHeatmapLoadResult(monthHeatmap);
+      mergeHistoryHeatmapFromCalendarProgress(monthKey);
     } catch (error) {
       logger.debug('[IRCalendarSidebar] Month heatmap projection hydrate skipped:', error);
+      mergeHistoryHeatmapFromCalendarProgress(monthKey);
     }
   }
 
@@ -2365,6 +2416,27 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function getCalendarDayVisualState(date: Date): CalendarDayVisualState {
     const key = formatDateKey(date);
+    if (isPastCalendarDate(date, today)) {
+      const completedIds = Array.isArray(calendarProgressByDate[key])
+        ? calendarProgressByDate[key].filter((id, index, source) => source.indexOf(id) === index)
+        : [];
+      const hydratedCount = getVisiblePinnedForDate(key).length;
+      const completedCount = hydratedCount > 0 ? hydratedCount : completedIds.length;
+      const totalCount = completedCount;
+      return {
+        key,
+        totalCount,
+        completedCount,
+        pendingCount: 0,
+        completionRatio: totalCount > 0 ? 1 : 0,
+        hasTasks: totalCount > 0,
+        isFullyCompleted: totalCount > 0,
+        isPartiallyCompleted: false,
+        isTodayPending: false,
+        isOverduePending: false,
+      };
+    }
+
     const scheduledItems = collectDayQueueSourceItems(key);
     const scheduledIds = new Set(scheduledItems.map((item) => item.id));
     const completedIds = Array.isArray(calendarProgressByDate[key])
@@ -2396,6 +2468,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function getCalendarDayCellTitle(dayState: CalendarDayVisualState): string {
     if (!dayState.hasTasks) return '';
+    if (isPastCalendarDateKey(dayState.key, today)) {
+      return t('irSidebar.calendar.historyDayTitle', { completed: dayState.completedCount });
+    }
     return `${dayState.totalCount} tasks, ${dayState.completedCount} completed, ${dayState.pendingCount} pending`;
   }
 
@@ -2413,9 +2488,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       return [];
     }
     const merged = new Map<string, ScheduleItem>();
-    for (const item of materialsByDate.get(normalized) || []) {
-      if (matchesActiveDeckFilter(item)) {
-        merged.set(item.id, item);
+    if (!isPastCalendarDateKey(normalized, today)) {
+      for (const item of materialsByDate.get(normalized) || []) {
+        if (matchesActiveDeckFilter(item)) {
+          merged.set(item.id, item);
+        }
       }
     }
     for (const item of pinnedByDate.get(normalized) || []) {
@@ -2493,9 +2570,24 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function getSelectedMaterialsBase(): ScheduleItem[] {
     const key = formatDateKey(selectedDate);
+    const merged = new Map<string, ScheduleItem>();
+
+    if (isPastCalendarDate(selectedDate, today)) {
+      for (const item of getVisibleMaterialsForDate(key)) {
+        merged.set(item.id, item);
+      }
+      for (const item of getVisiblePinnedForDate(key)) {
+        merged.set(item.id, item);
+      }
+      const completedIds = calendarProgressByDate[key] || [];
+      return assembleScheduleItemsForDailyQueue([...merged.values()], key, {
+        completedIds,
+        completedIdOrder: completedIds,
+      });
+    }
+
     const materials = getVisibleMaterialsForDate(key);
     const pinned = getVisiblePinnedForDate(key);
-    const merged = new Map<string, ScheduleItem>();
     for (const m of materials) merged.set(m.id, m);
     for (const p of pinned) merged.set(p.id, p);
     const completedIds = calendarProgressByDate[key] || [];
@@ -3155,8 +3247,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     const key = formatDateKey(date);
     clearSelectedDateHydrationCompletedKeys([key]);
     selectedDate = new Date(date);
+    if (isPastCalendarDate(selectedDate, today)) {
+      exitBatchSelectionMode();
+    }
     const done = calendarProgressByDate[key] || [];
     processedChunkIds = new Set(done);
+    if (isPastCalendarDate(selectedDate, today)) {
+      void mergePriorityDatesFromLocalCache([key], getActiveDeckIdsForQuery());
+    }
     void ensureDoneItemsVisibleForDate(key);
     syncContinueReadingSuggestionsModalVisibility();
   }
@@ -3302,6 +3400,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       const storage = await getStorage();
       const progressState = await storage.getCalendarProgressState();
       calendarProgressByDate = progressState.byDate;
+      mergeHistoryHeatmapFromCalendarProgress(toCalendarMonthKey(formatDateKey(currentDate)) || undefined);
 
       const key = formatDateKey(selectedDate);
       const done = calendarProgressByDate[key] || [];
@@ -3811,8 +3910,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       if (!filePath) {
         const recoveredPath = await tryResolveRenamedChunkSource(material);
         if (recoveredPath) {
-          const contextPath = plugin.app.workspace.getActiveFile()?.path ?? '';
-          await plugin.app.workspace.openLinkText(recoveredPath, contextPath, false);
+          await openResolvedResumeLink(plugin.app, recoveredPath);
           return;
         }
 
@@ -3827,8 +3925,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
         const recoveredPath = await tryResolveRenamedChunkSource(material, filePath);
         if (recoveredPath) {
-          const contextPath = plugin.app.workspace.getActiveFile()?.path ?? '';
-          await plugin.app.workspace.openLinkText(recoveredPath, contextPath, false);
+          await openResolvedResumeLink(plugin.app, recoveredPath);
           return;
         }
 
@@ -3836,11 +3933,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         return;
       }
 
-      const contextPath = plugin.app.workspace.getActiveFile()?.path ?? '';
       const rawLink = await resolveScheduleItemOpenResumeLink(material, filePath);
-      const linkToOpen = rawLink.trim().replace(/^!?\[\[/, '').replace(/\]\]$/, '').split('|')[0];
-      await plugin.app.workspace.openLinkText(linkToOpen, contextPath, false);
-      logger.debug('[IRCalendarSidebar] Recovered debug message.', linkToOpen);
+      await openResolvedResumeLink(plugin.app, rawLink);
+      logger.debug('[IRCalendarSidebar] Recovered debug message.', rawLink);
     } catch (error) {
       logger.error('[IRCalendarSidebar] Failed to open block.', error);
       new Notice(t('irSidebar.calendar.openPointFailed'));
@@ -4265,6 +4360,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function openSchedulingMenuForAnchor(anchor: HTMLElement, material: ScheduleItem) {
+    if (isPastCalendarDate(selectedDate, today)) {
+      new Notice(t('irSidebar.calendar.historyReadOnlyNotice'));
+      return;
+    }
+
     const alreadyOpenForSame = schedulingMenuOpen && schedulingMenuTarget?.id === material.id;
     if (alreadyOpenForSame) {
       closeSchedulingMenu();
@@ -4297,6 +4397,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function openPriorityMenuForAnchor(anchor: HTMLElement, material: ScheduleItem) {
+    if (isPastCalendarDate(selectedDate, today)) {
+      new Notice(t('irSidebar.calendar.historyReadOnlyNotice'));
+      return;
+    }
+
     const alreadyOpenForSame = priorityMenuOpen && priorityMenuTarget?.id === material.id;
     if (alreadyOpenForSame) {
       closePriorityMenu();
@@ -4690,6 +4795,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function enterBatchSelectionMode(anchor?: ScheduleItem): void {
+    if (isPastCalendarDate(selectedDate, today)) {
+      new Notice(t('irSidebar.calendar.historyReadOnlyNotice'));
+      return;
+    }
     batchSelectionMode = true;
     if (anchor?.id) {
       batchSelectedIds = new Set([anchor.id]);
@@ -5457,6 +5566,20 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     material: ScheduleItem
   ) {
     try {
+      if (isPastCalendarDate(selectedDate, today)) {
+        const historyMenu = new Menu();
+        historyMenu.addItem((item) => {
+          item
+            .setTitle(t('irSidebar.menu.view'))
+            .setIcon('eye')
+            .onClick(() => {
+              void openBlockInfo(material, popoverPosition);
+            });
+        });
+        historyMenu.showAtPosition(menuPosition);
+        return;
+      }
+
       const menu = new Menu();
 
       menu.addItem((item) => {
@@ -6028,6 +6151,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   async function handleSchedulingAction(action: SchedulingAction, context: SchedulingMenuContext) {
     const { target, pinnedKey } = context;
     if (!target) return;
+    if (isPastCalendarDateKey(pinnedKey, today)) {
+      new Notice(t('irSidebar.calendar.historyReadOnlyNotice'));
+      closeSchedulingMenu();
+      return;
+    }
 
     try {
       const cfg = schedulingConfig.find(c => c.action === action);
@@ -6269,6 +6397,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         }
 
         applyMonthHeatmapLoadResult(loadResult.monthHeatmap);
+        mergeHistoryHeatmapFromCalendarProgress(monthKey || undefined);
         markCalendarHeatmapShellReady();
 
         applyProjectionLoadResult(loadResult.projectionHydrate, priorityDateKeys);
@@ -6665,7 +6794,12 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       calendarDataPhase === 'degraded' ||
       calendarDataPhase === 'error_recoverable'
   );
+  let isSelectedDatePast = $derived(isPastCalendarDate(selectedDate, today));
+  let selectedHistoryCompletedCount = $derived(
+    isSelectedDatePast ? unfilteredSelectedMaterials.length : 0
+  );
   let showSelectedDateMaterialsPending = $derived(
+    !isSelectedDatePast &&
     calendarDataPhase === 'cold_start_blocking' &&
     !isLoading &&
     !hasActiveSearch &&
@@ -6678,12 +6812,22 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     isSameDay(selectedDate, today) &&
     isSelectedDateReadingComplete()
   );
+  let showHistoryHydrationPending = $derived.by(() => {
+    if (!isSelectedDatePast || hasActiveSearch) {
+      return false;
+    }
+    const dateKey = formatDateKey(selectedDate);
+    const progressIds = calendarProgressByDate[dateKey] || [];
+    return progressIds.length > 0 && !isPriorityDateLoadSatisfied(dateKey);
+  });
   let showReadingListPreparing = $derived(
     (isSelectedDatePreparing && calendarDataPhase === 'cold_start_blocking') ||
-      showSelectedDateMaterialsPending
+      showSelectedDateMaterialsPending ||
+      showHistoryHydrationPending
   );
   let showReadingListLoading = $derived(isLoading || showReadingListPreparing);
   let showDayLoadInfoButton = $derived(
+    !isSelectedDatePast &&
     !hasActiveSearch &&
     !showReadingListLoading &&
     displayedMaterials.length > 0 &&
@@ -6748,7 +6892,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     formatSiblingDueDate,
     batchSelectionMode,
     isBatchSelected,
-    toggleBatchSelection
+    toggleBatchSelection,
+    readOnlyHistoryMode: isSelectedDatePast
   } satisfies IRCalendarMaterialListProps);
   let monthNumber = $derived(currentDate.getMonth() + 1);
   let monthYear = $derived(currentDate.getFullYear());
@@ -6774,6 +6919,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   $effect(() => {
     void formatDateKey(selectedDate);
     dayLoadPopoverOpen = false;
+    if (isPastCalendarDate(selectedDate, today)) {
+      closeSchedulingMenu();
+      closePriorityMenu();
+      exitBatchSelectionMode();
+    }
   });
 
   $effect(() => {
@@ -7047,7 +7197,21 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         {/if}
       </div>
     {:else if displayedMaterials.length > 0}
+      {#if isSelectedDatePast}
+        <div class="history-mode-banner" role="note">
+          <span class="history-mode-banner__title">
+            {t('irSidebar.calendar.historyModeBanner', { completed: selectedHistoryCompletedCount })}
+          </span>
+          <span class="history-mode-banner__hint">{t('irSidebar.calendar.historyModeHint')}</span>
+        </div>
+      {/if}
       <IRCalendarMaterialList {...materialListProps} />
+    {:else if isSelectedDatePast && !hasActiveSearch}
+      <div class="loading-state history-empty-state">
+        <ObsidianIcon name="history" size={20} />
+        <span>{t('irSidebar.calendar.historyEmpty')}</span>
+        <span class="history-empty-state__hint">{t('irSidebar.calendar.historyEmptyHint')}</span>
+      </div>
     {:else if hasActiveSearch}
       <div class="loading-state search-empty-state">
         <ObsidianIcon name="search" size={20} />
@@ -8116,6 +8280,37 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     background: transparent;
     padding: 0;
     min-width: 0;
+  }
+
+  .history-mode-banner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--background-modifier-hover) 55%, transparent);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    line-height: 1.45;
+  }
+
+  .history-mode-banner__title {
+    color: var(--text-normal);
+    font-weight: 600;
+  }
+
+  .history-empty-state {
+    text-align: center;
+    gap: 6px;
+  }
+
+  .history-empty-state__hint {
+    color: var(--text-faint);
+    font-size: var(--font-ui-small);
+    line-height: 1.45;
+    max-width: 28rem;
   }
 
   .ir-calendar-sidebar.batch-selection-mode .reading-list {

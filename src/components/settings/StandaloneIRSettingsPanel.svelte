@@ -4,7 +4,7 @@
   import type { IncrementalReadingSettingsHost } from "./types/incremental-reading-settings-host";
   import IncrementalReadingSettingsSection from "./sections/IncrementalReadingSettingsSection.svelte";
   import StandaloneIRLicenseSettingsPanel from "./StandaloneIRLicenseSettingsPanel.svelte";
-  import { VaultFolderSuggestModal } from "../../modals/VaultFolderSuggestModal";
+  import FolderSearchInput from "../ui/FolderSearchInput.svelte";
   import { IRDataManagementModalObsidian } from "../incremental-reading/IRDataManagementModalObsidian";
   import {
     PremiumFeatureGuard,
@@ -202,36 +202,6 @@
     });
   }
 
-  function resetLocalDataFolder(): void {
-    localDataFolderDraft = incrementalReadingSettings.importFolder ?? "";
-  }
-
-  function resetWeaveParentFolder(): void {
-    weaveParentFolderDraft = plugin.settings.weaveParentFolder ?? "";
-  }
-
-  function resetLastFolder(): void {
-    lastFolderDraft = incrementalReadingSettings.selectionQuickCreateLastFolder ?? "";
-  }
-
-  async function chooseFolder(
-    anchorEl: HTMLElement | null | undefined,
-    placeholder: string,
-    onSelected: (value: string) => void,
-    commit: () => Promise<void>
-  ): Promise<void> {
-    const picker = new VaultFolderSuggestModal(plugin.app, {
-      placeholder,
-      anchorRect: anchorEl?.getBoundingClientRect?.() || undefined
-    });
-    const folderPath = await picker.openAndSelect();
-    if (!folderPath) {
-      return;
-    }
-    onSelected(folderPath);
-    await commit();
-  }
-
   function openDataManagementModal(): void {
     new IRDataManagementModalObsidian(plugin.app, {
       plugin: plugin as import("../../main").default,
@@ -317,30 +287,19 @@
                 <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.localDataDesc")}</p>
               </div>
               <div class="standalone-ir-storage-control">
-                <input
-                  type="text"
+                <FolderSearchInput
+                  app={plugin.app}
+                  value={localDataFolderDraft}
+                  savedValue={incrementalReadingSettings.importFolder ?? ''}
                   placeholder={t("irSettings.standalone.dataFolders.localDataPlaceholder")}
-                  bind:value={localDataFolderDraft}
-                  onblur={() => void commitLocalDataFolder()}
-                  onkeydown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void commitLocalDataFolder();
-                    } else if (event.key === "Escape") {
-                      event.preventDefault();
-                      resetLocalDataFolder();
-                    }
+                  onInput={(value) => {
+                    localDataFolderDraft = value;
+                  }}
+                  onCommit={async (value) => {
+                    localDataFolderDraft = value;
+                    await commitLocalDataFolder();
                   }}
                 />
-                <button
-                  type="button"
-                  onclick={(event) => {
-                    const target = event.currentTarget as HTMLElement | null;
-                    void chooseFolder(target, t("irSettings.standalone.dataFolders.localDataPicker"), (value) => {
-                      localDataFolderDraft = value;
-                    }, commitLocalDataFolder);
-                  }}
-                >{t("irSettings.standalone.dataFolders.choose")}</button>
               </div>
             </div>
 
@@ -350,30 +309,19 @@
                 <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.saveFolderDesc")}</p>
               </div>
               <div class="standalone-ir-storage-control">
-                <input
-                  type="text"
+                <FolderSearchInput
+                  app={plugin.app}
+                  value={weaveParentFolderDraft}
+                  savedValue={plugin.settings.weaveParentFolder ?? ''}
                   placeholder={t("irSettings.standalone.dataFolders.saveFolderPlaceholder")}
-                  bind:value={weaveParentFolderDraft}
-                  onblur={() => void commitWeaveParentFolder()}
-                  onkeydown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void commitWeaveParentFolder();
-                    } else if (event.key === "Escape") {
-                      event.preventDefault();
-                      resetWeaveParentFolder();
-                    }
+                  onInput={(value) => {
+                    weaveParentFolderDraft = value;
+                  }}
+                  onCommit={async (value) => {
+                    weaveParentFolderDraft = value;
+                    await commitWeaveParentFolder();
                   }}
                 />
-                <button
-                  type="button"
-                  onclick={(event) => {
-                    const target = event.currentTarget as HTMLElement | null;
-                    void chooseFolder(target, t("irSettings.standalone.dataFolders.saveFolderPicker"), (value) => {
-                      weaveParentFolderDraft = value;
-                    }, commitWeaveParentFolder);
-                  }}
-                >{t("irSettings.standalone.dataFolders.choose")}</button>
               </div>
             </div>
 
@@ -383,30 +331,19 @@
                 <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.readingPointFolderDesc")}</p>
               </div>
               <div class="standalone-ir-storage-control">
-                <input
-                  type="text"
+                <FolderSearchInput
+                  app={plugin.app}
+                  value={lastFolderDraft}
+                  savedValue={incrementalReadingSettings.selectionQuickCreateLastFolder ?? ''}
                   placeholder={t("irSettings.standalone.dataFolders.readingPointPlaceholder")}
-                  bind:value={lastFolderDraft}
-                  onblur={() => void commitLastFolder()}
-                  onkeydown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void commitLastFolder();
-                    } else if (event.key === "Escape") {
-                      event.preventDefault();
-                      resetLastFolder();
-                    }
+                  onInput={(value) => {
+                    lastFolderDraft = value;
+                  }}
+                  onCommit={async (value) => {
+                    lastFolderDraft = value;
+                    await commitLastFolder();
                   }}
                 />
-                <button
-                  type="button"
-                  onclick={(event) => {
-                    const target = event.currentTarget as HTMLElement | null;
-                    void chooseFolder(target, t("irSettings.standalone.dataFolders.readingPointPicker"), (value) => {
-                      lastFolderDraft = value;
-                    }, commitLastFolder);
-                  }}
-                >{t("irSettings.standalone.dataFolders.choose")}</button>
               </div>
             </div>
 
@@ -664,16 +601,6 @@
     max-width: 100%;
   }
 
-  .standalone-ir-storage-control input[type="text"] {
-    flex: 1 1 auto;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .standalone-ir-storage-control button {
-    white-space: nowrap;
-  }
-
   .standalone-ir-storage-control--action-only {
     justify-content: flex-end;
   }
@@ -867,12 +794,33 @@
       flex-basis: auto;
     }
 
+    .standalone-ir-premium-preview-setting-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--standalone-ir-space-3);
+    }
+
+    .standalone-ir-premium-preview-setting-row .modern-switch {
+      align-self: flex-end;
+    }
+
     .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .row) {
       padding: 1rem;
     }
 
     .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .settings-group) {
       padding: 0.9rem;
+    }
+
+    .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .row:has(.label-with-desc)) {
+      align-items: stretch;
+    }
+
+    .standalone-ir-settings-root :global(.incremental-reading-settings .ir-dropdown-compact) {
+      flex: 1 1 auto;
+      width: 100%;
+      max-width: 100%;
+      margin-left: 0;
     }
 
     .standalone-ir-about-overview-item {
