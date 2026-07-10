@@ -938,12 +938,11 @@ export class IRScheduleKernel {
 			associatedNoteSignalIndex,
 			null,
 		);
-		const {
-			associatedNotePath: _ignoredNotePath,
-			associatedNoteScope: _ignoredNoteScope,
-			associatedNotePaths: _ignoredNotePaths,
-			...chunkAssociationSignals
-		} = associationMeta;
+		const chunkAssociationSignals = {
+			associatedNoteScope: associationMeta.associatedNoteScope,
+			linkedCardCount: associationMeta.linkedCardCount,
+			linkedCardPrioritySignal: associationMeta.linkedCardPrioritySignal,
+		};
 		const estimatedMinutes = estimateMinutesFromStats(chunk.stats);
 		const manualPriority =
 			typeof chunk.priorityUi === "number" ? chunk.priorityUi : undefined;

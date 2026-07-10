@@ -123,7 +123,7 @@ export class ReadingMaterialManager {
 			if (fmType?.startsWith("ir-")) {
 				return true;
 			}
-		} catch {}
+		} catch { /* ignored */ }
 
 		if (file.extension !== "md") {
 			return false;
@@ -136,7 +136,7 @@ export class ReadingMaterialManager {
 				const t = match[1].trim().replace(/^['"]|['"]$/g, "");
 				return t.startsWith("ir-");
 			}
-		} catch {}
+		} catch { /* ignored */ }
 
 		return false;
 	}
@@ -492,11 +492,8 @@ export class ReadingMaterialManager {
 		if (readableMarkdownRoot !== "/") {
 			await DirectoryUtils.ensureDirRecursive(adapter, readableMarkdownRoot);
 		}
-		const {
-			deckId,
-			readableMarkdownFolder: _readableMarkdownFolder,
-			...materialOptions
-		} = options;
+		const { deckId, readableMarkdownFolder, ...materialOptions } = options;
+		void readableMarkdownFolder;
 
 		const sourceFolderName = this.sanitizeImportedMarkdownName(
 			sourceFile.basename,
@@ -570,10 +567,8 @@ export class ReadingMaterialManager {
 			sourceFile,
 			readableMarkdownRoot,
 		);
-		const {
-			readableMarkdownFolder: _readableMarkdownFolder,
-			...materialOptions
-		} = options;
+		const { readableMarkdownFolder, ...materialOptions } = options;
+		void readableMarkdownFolder;
 
 		return await this.createMaterial(copiedFile, {
 			...materialOptions,

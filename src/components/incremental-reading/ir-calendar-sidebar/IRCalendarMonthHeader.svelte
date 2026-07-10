@@ -8,7 +8,6 @@
     monthYear: number;
     activeDeckFilterName: string;
     sourceFilePath: string;
-    showTodayAllDoneHeaderChip: boolean;
     showCalendarTools: boolean;
     hasContinueReadingSuggestionOffer: boolean;
     calendarDataPhase: IRCalendarDataPhase;
@@ -25,7 +24,6 @@
     monthYear,
     activeDeckFilterName,
     sourceFilePath,
-    showTodayAllDoneHeaderChip,
     showCalendarTools,
     hasContinueReadingSuggestionOffer,
     calendarDataPhase,
@@ -63,17 +61,6 @@
       <button class="today-btn clickable-icon" type="button" onclick={onGoToToday} title={t('irSidebar.header.today')}>
         {t('irSidebar.header.today')}
       </button>
-      {#if showTodayAllDoneHeaderChip}
-        <span
-          class="calendar-day-complete-chip"
-          role="status"
-          aria-live="polite"
-          title={t('irSidebar.calendar.todayAllDone')}
-        >
-          <ObsidianIcon name="check" size={12} />
-          <span>{t('irSidebar.calendar.todayAllDoneShort')}</span>
-        </span>
-      {/if}
       <button
         class="calendar-tool-btn clickable-icon nav-btn"
         type="button"

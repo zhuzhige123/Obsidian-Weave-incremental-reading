@@ -893,7 +893,7 @@ export function parseObsidianLink(link: string): string | undefined {
 
 		try {
 			docName = decodeURIComponent(docName);
-		} catch {}
+		} catch { /* ignored */ }
 
 		const hasKnownNonMarkdownExtension =
 			/\.(canvas|excalidraw(?:\.md)?|pdf|epub|png|jpe?g|gif|webp|svg|bmp|tiff|mp3|wav|ogg|flac|m4a|mp4|mov|avi|webm|txt|docx?)$/i.test(
@@ -988,7 +988,8 @@ export function migrateSourceFields(content: string): {
 					typeof value === "string" && !!parseBlockId(value),
 			)
 		) {
-			const { we_block: _removedWeBlock, ...newYaml } = yaml;
+			const newYaml = { ...yaml };
+			delete newYaml.we_block;
 			return { content: rebuildContent(content, newYaml), migrated: true };
 		}
 
@@ -1020,7 +1021,8 @@ export function migrateSourceFields(content: string): {
 		}
 
 		// 更新 YAML
-		const { we_block: _removedWeBlock, ...newYaml } = yaml;
+		const newYaml = { ...yaml };
+		delete newYaml.we_block;
 		if (Array.isArray(yaml.we_source)) {
 			const nextSourceValues = sourceValues.filter(
 				(value): value is string =>
@@ -1189,7 +1191,7 @@ export function getCardDeckIds(
 					return result;
 				}
 			}
-		} catch (_e) {
+		} catch { /* ignored */
 			logger.debug("[yaml-utils] 解析 we_decks 失败，尝试回退方案");
 		}
 	}
@@ -1260,7 +1262,7 @@ export function getCardDeckIdsFromFormalSource(
 				result.primaryDeckId = convertedIds[0];
 			}
 		}
-	} catch (_e) {
+	} catch { /* ignored */
 		logger.debug("[yaml-utils] 解析正式归属 we_decks 失败");
 	}
 

@@ -4,10 +4,14 @@
   import type AnkiObsidianPlugin from '../../main';
   import ObsidianIcon from '../ui/ObsidianIcon.svelte';
   import {
-    IRAnalyticsService,
+    getSharedIRAnalyticsService,
     type IRAnalyticsMode,
     type IRAnalyticsSnapshot,
-    type IRAnalyticsTimingBucketKey
+    type IRAnalyticsMaterialType,
+    IR_ANALYTICS_MATERIAL_TYPE_COLORS,
+    IR_ANALYTICS_MATERIAL_TYPE_ICONS,
+    IR_ANALYTICS_MATERIAL_TYPE_ORDER,
+    getPresentMaterialTypes
   } from '../../services/incremental-reading/IRAnalyticsService';
   import { createManagedChartRuntime } from '../../utils/chart-runtime';
   import type { EChartsOption } from '../../utils/echarts-loader';
@@ -24,6 +28,12 @@
     snapshot: IRAnalyticsSnapshot;
     activeTab: ChartTab;
   };
+  type CompositionChartPayload = {
+    snapshot: IRAnalyticsSnapshot;
+  };
+
+  const TOP_MATERIAL_LIMIT = 5;
+  const MATERIAL_CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
 
   const isMobile = Platform.isMobile;
   const WHEEL_THROTTLE_MS = 180;
@@ -42,16 +52,17 @@
   let selectedMode = $state<IRAnalyticsMode>('overall');
   let selectedSelectionKey = $state('');
   let chartRef = $state<HTMLDivElement | null>(null);
-  let analyticsService = $state<IRAnalyticsService | null>(null);
+  let compositionChartRef = $state<HTMLDivElement | null>(null);
+  let analyticsService = $state<ReturnType<typeof getSharedIRAnalyticsService> | null>(null);
   let snapshot = $state<IRAnalyticsSnapshot | null>(null);
   let isLoading = $state(false);
   let loadError = $state('');
   let loadRequestId = 0;
   let wheelThrottle = false;
 
-  async function getAnalyticsService(): Promise<IRAnalyticsService> {
+  async function getAnalyticsService() {
     if (!analyticsService) {
-      analyticsService = new IRAnalyticsService(plugin.app);
+      analyticsService = getSharedIRAnalyticsService(plugin.app);
       await analyticsService.initialize();
     }
     return analyticsService;
@@ -91,30 +102,60 @@
     }
   }
 
-  function getTimingBucketColor(
-    key: IRAnalyticsTimingBucketKey,
-    theme: {
-      loadStatusColors: { low: string; normal: string; high: string; overload: string };
-      seriesPalette: string[];
-    }
-  ): string {
-    switch (key) {
-      case 'overdue_7_plus':
-      case 'overdue_2_7':
-        return theme.loadStatusColors.overload;
-      case 'overdue_lt_2':
-      case 'due_today':
-        return theme.loadStatusColors.high;
-      case 'unscheduled':
-        return theme.seriesPalette[4] || theme.loadStatusColors.low;
-      default:
-        return theme.seriesPalette[0] || theme.loadStatusColors.normal;
-    }
+  function getMaterialTypeLabel(type: IRAnalyticsMaterialType): string {
+    return t(`irAnalytics.materialTypes.${type}`);
+  }
+
+  function getMaterialTypeColor(type: IRAnalyticsMaterialType, theme: { seriesPalette: string[] }): string {
+    const paletteIndex = IR_ANALYTICS_MATERIAL_TYPE_COLORS[type];
+    return theme.seriesPalette[paletteIndex] || theme.seriesPalette[0];
+  }
+
+  function getStackedTypeBarSeries(input: {
+    points: Array<{ typeCounts: Record<IRAnalyticsMaterialType, number> }>;
+    presentTypes: IRAnalyticsMaterialType[];
+    theme: { seriesPalette: string[] };
+    stack: string;
+  }) {
+    const lastTypeIndex = input.presentTypes.length - 1;
+    return input.presentTypes.map((type, index) => ({
+      name: getMaterialTypeLabel(type),
+      type: 'bar' as const,
+      stack: input.stack,
+      barMaxWidth: 34,
+      emphasis: { focus: 'series' as const },
+      itemStyle: {
+        color: getMaterialTypeColor(type, input.theme),
+        ...(index === lastTypeIndex ? { borderRadius: [6, 6, 0, 0] } : {})
+      },
+      data: input.points.map((point) => point.typeCounts[type] || 0)
+    }));
   }
 
   function buildQuantityOption(data: IRAnalyticsSnapshot, theme: any): EChartsOption {
+    const presentTypes = getPresentMaterialTypes(
+      data.quantityTrend.map((point) => point.typeCounts)
+    );
+    const typeSeries = presentTypes.map((type) => ({
+      name: getMaterialTypeLabel(type),
+      type: 'line' as const,
+      smooth: true,
+      showSymbol: false,
+      itemStyle: { color: getMaterialTypeColor(type, theme) },
+      lineStyle: { width: 2 },
+      data: data.quantityTrend.map((point) => point.typeCounts[type] || 0)
+    }));
+    const totalSeries = {
+      name: t('irAnalytics.charts.totalMaterials'),
+      type: 'line' as const,
+      smooth: true,
+      showSymbol: false,
+      itemStyle: { color: theme.seriesPalette[0] },
+      lineStyle: { type: 'dashed' as const, width: 2 },
+      data: data.quantityTrend.map((point) => point.totalCount)
+    };
+
     return {
-      color: [theme.seriesPalette[0], theme.seriesPalette[1], theme.seriesPalette[4]],
       tooltip: {
         trigger: 'axis',
         backgroundColor: theme.tooltipBg,
@@ -126,9 +167,10 @@
       legend: {
         top: 6,
         left: 'center',
+        type: 'scroll',
         textStyle: { color: theme.subTextColor }
       },
-      grid: { left: isMobile ? 34 : 44, right: isMobile ? 12 : 20, top: 62, bottom: 28 },
+      grid: { left: isMobile ? 34 : 44, right: isMobile ? 12 : 20, top: 72, bottom: 28 },
       xAxis: {
         type: 'category',
         data: data.quantityTrend.map((point) => point.label),
@@ -140,17 +182,16 @@
         axisLabel: { color: theme.subTextColor },
         splitLine: { lineStyle: { color: theme.splitLineColor, type: 'dashed' } }
       },
-      series: [
-        { name: t('irAnalytics.charts.totalMaterials'), type: 'line', smooth: true, data: data.quantityTrend.map((point) => point.totalCount) },
-        { name: t('irAnalytics.charts.activeMaterials'), type: 'line', smooth: true, areaStyle: { opacity: 0.12 }, data: data.quantityTrend.map((point) => point.activeCount) },
-        { name: t('irAnalytics.charts.closedMaterials'), type: 'line', smooth: true, data: data.quantityTrend.map((point) => point.closedCount) }
-      ]
+      series: [...typeSeries, totalSeries]
     };
   }
 
   function buildTimingOption(data: IRAnalyticsSnapshot, theme: any): EChartsOption {
+    const presentTypes = getPresentMaterialTypes(
+      data.timingBuckets.map((bucket) => bucket.typeCounts)
+    );
+
     return {
-      color: data.timingBuckets.map((bucket) => getTimingBucketColor(bucket.key, theme)),
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
@@ -160,7 +201,13 @@
         textStyle: { color: theme.textColor },
         confine: true
       },
-      grid: { left: isMobile ? 42 : 48, right: isMobile ? 10 : 20, top: 24, bottom: 76 },
+      legend: {
+        top: 6,
+        left: 'center',
+        type: 'scroll',
+        textStyle: { color: theme.subTextColor }
+      },
+      grid: { left: isMobile ? 42 : 48, right: isMobile ? 10 : 20, top: 72, bottom: 76 },
       xAxis: {
         type: 'category',
         data: data.timingBuckets.map((bucket) => bucket.label),
@@ -172,19 +219,12 @@
         axisLabel: { color: theme.subTextColor },
         splitLine: { lineStyle: { color: theme.splitLineColor, type: 'dashed' } }
       },
-      series: [
-        {
-          type: 'bar',
-          barMaxWidth: 34,
-          data: data.timingBuckets.map((bucket) => ({
-            value: bucket.count,
-            itemStyle: {
-              color: getTimingBucketColor(bucket.key, theme),
-              borderRadius: [6, 6, 0, 0]
-            }
-          }))
-        }
-      ]
+      series: getStackedTypeBarSeries({
+        points: data.timingBuckets,
+        presentTypes,
+        theme,
+        stack: 'timing'
+      })
     };
   }
 
@@ -277,7 +317,115 @@
     };
   }
 
+  function buildCompositionOption(data: IRAnalyticsSnapshot, theme: any): EChartsOption {
+    const slices = data.materialTypeBreakdown.slices;
+    const documentData = slices.map((slice) => ({
+      name: getMaterialTypeLabel(slice.type),
+      value: slice.documentCount,
+      itemStyle: { color: getMaterialTypeColor(slice.type, theme) }
+    }));
+    const hoursData = slices.map((slice) => ({
+      name: getMaterialTypeLabel(slice.type),
+      value: slice.readingHours,
+      itemStyle: { color: getMaterialTypeColor(slice.type, theme) }
+    }));
+
+    const tooltipFormatter = (params: any) => {
+      const point = params?.data;
+      if (!point) return '';
+      const slice = slices.find((item) => getMaterialTypeLabel(item.type) === point.name);
+      if (!slice) return point.name;
+      if (params.seriesIndex === 0) {
+        return [
+          `<strong>${point.name}</strong>`,
+          t('irAnalytics.composition.legendCount', {
+            label: point.name,
+            count: slice.documentCount,
+            share: slice.documentShare
+          })
+        ].join('<br>');
+      }
+      return [
+        `<strong>${point.name}</strong>`,
+        t('irAnalytics.composition.legendHours', {
+          label: point.name,
+          hours: formatMetric(slice.readingHours),
+          share: slice.hoursShare
+        })
+      ].join('<br>');
+    };
+
+    return {
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: theme.tooltipBg,
+        borderColor: theme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: theme.textColor },
+        confine: true,
+        formatter: tooltipFormatter
+      },
+      legend: {
+        bottom: 0,
+        left: 'center',
+        textStyle: { color: theme.subTextColor, fontSize: 11 }
+      },
+      series: [
+        {
+          name: t('irAnalytics.composition.byDocuments'),
+          type: 'pie',
+          radius: isMobile ? ['34%', '52%'] : ['38%', '58%'],
+          center: isMobile ? ['50%', '38%'] : ['28%', '46%'],
+          avoidLabelOverlap: true,
+          label: { show: false },
+          labelLine: { show: false },
+          data: documentData
+        },
+        {
+          name: t('irAnalytics.composition.byHours'),
+          type: 'pie',
+          radius: isMobile ? ['34%', '52%'] : ['38%', '58%'],
+          center: isMobile ? ['50%', '72%'] : ['74%', '46%'],
+          avoidLabelOverlap: true,
+          label: { show: false },
+          labelLine: { show: false },
+          data: hoursData
+        }
+      ],
+      graphic: [
+        {
+          type: 'text',
+          left: isMobile ? 'center' : '22%',
+          top: isMobile ? '18%' : '42%',
+          style: {
+            text: t('irAnalytics.composition.byDocuments'),
+            fill: theme.subTextColor,
+            fontSize: 12,
+            fontWeight: 600,
+            textAlign: 'center'
+          }
+        },
+        {
+          type: 'text',
+          left: isMobile ? 'center' : '68%',
+          top: isMobile ? '52%' : '42%',
+          style: {
+            text: t('irAnalytics.composition.byHours'),
+            fill: theme.subTextColor,
+            fontSize: 12,
+            fontWeight: 600,
+            textAlign: 'center'
+          }
+        }
+      ]
+    };
+  }
+
   function buildForecastOption(data: IRAnalyticsSnapshot, theme: any): EChartsOption {
+    const presentTypes = getPresentMaterialTypes(
+      data.forecast.map((point) => point.typeCounts)
+    );
+
     return {
       color: [theme.seriesPalette[0], theme.seriesPalette[2]],
       tooltip: {
@@ -287,10 +435,35 @@
         borderColor: theme.tooltipBorder,
         borderWidth: 1,
         textStyle: { color: theme.textColor },
-        confine: true
+        confine: true,
+        formatter(params: any) {
+          const items = Array.isArray(params) ? params : [params];
+          if (!items.length) return '';
+          const axisLabel = items[0]?.axisValue ?? '';
+          const forecastPoint = data.forecast.find((point) => point.label === axisLabel);
+          const lines = [`<strong>${axisLabel}</strong>`];
+          for (const item of items) {
+            if (item.seriesType === 'line') {
+              lines.push(`${item.marker}${item.seriesName}: ${item.value}`);
+            } else if (Number(item.value) > 0) {
+              lines.push(`${item.marker}${item.seriesName}: ${item.value}`);
+            }
+          }
+          if (forecastPoint) {
+            lines.push(
+              t('irAnalytics.charts.tooltip.plannedTotal', { count: forecastPoint.itemCount })
+            );
+            if (forecastPoint.overloadLevel !== 'normal') {
+              lines.push(
+                t(`irAnalytics.charts.overload.${forecastPoint.overloadLevel}`)
+              );
+            }
+          }
+          return lines.join('<br>');
+        }
       },
-      legend: { top: 6, left: 'center', textStyle: { color: theme.subTextColor } },
-      grid: { left: isMobile ? 38 : 48, right: isMobile ? 34 : 52, top: 62, bottom: 30 },
+      legend: { top: 6, left: 'center', type: 'scroll', textStyle: { color: theme.subTextColor } },
+      grid: { left: isMobile ? 38 : 48, right: isMobile ? 34 : 52, top: 72, bottom: 30 },
       xAxis: {
         type: 'category',
         data: data.forecast.map((point) => point.label),
@@ -313,28 +486,19 @@
         }
       ],
       series: [
-        {
-          name: t('irAnalytics.charts.plannedItems'),
-          type: 'bar',
-          barMaxWidth: 34,
-          data: data.forecast.map((point) => ({
-            value: point.itemCount,
-            itemStyle: {
-              color:
-                point.overloadLevel === 'overloaded'
-                  ? theme.loadStatusColors.overload
-                  : point.overloadLevel === 'warning'
-                    ? theme.loadStatusColors.high
-                    : theme.seriesPalette[0],
-              borderRadius: [6, 6, 0, 0]
-            }
-          }))
-        },
+        ...getStackedTypeBarSeries({
+          points: data.forecast,
+          presentTypes,
+          theme,
+          stack: 'forecast'
+        }),
         {
           name: t('irAnalytics.charts.estimatedMinutes'),
           type: 'line',
           yAxisIndex: 1,
           smooth: true,
+          showSymbol: false,
+          itemStyle: { color: theme.seriesPalette[2] },
           data: data.forecast.map((point) => point.totalEstimatedMinutes)
         }
       ]
@@ -353,6 +517,12 @@
       onPinchStep: (step) => adjustQuickRange(step),
       cooldownMs: WHEEL_THROTTLE_MS,
       enabled: () => activeTab !== 'activity'
+    }
+  });
+
+  const compositionChartRuntime = createManagedChartRuntime<CompositionChartPayload>({
+    buildOption(payload, theme): EChartsOption {
+      return buildCompositionOption(payload.snapshot, theme);
     }
   });
 
@@ -381,34 +551,26 @@
   }
 
   function getCurrentModeLabel(): string {
-    const modeText = getModeText(selectedMode);
-    return isMobile ? modeText : t('irAnalytics.modes.modePrefix', { mode: modeText });
+    return getModeText(selectedMode);
   }
 
   function getCurrentSelectionLabel(): string {
     if (selectedMode === 'overall') {
-      return isMobile ? t('irAnalytics.modes.all') : t('irAnalytics.modes.overallNoFilter');
+      return t('irAnalytics.modes.all');
     }
     if (!snapshot?.sources.length) {
       return selectedMode === 'topic'
-        ? (isMobile ? t('irAnalytics.modes.noTopicsShort') : t('irAnalytics.modes.noTopics'))
-        : (isMobile ? t('irAnalytics.modes.noTagsShort') : t('irAnalytics.modes.noTags'));
+        ? t('irAnalytics.modes.noTopicsShort')
+        : t('irAnalytics.modes.noTagsShort');
     }
     if (!selectedSelectionKey) {
-      return isMobile
-        ? (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopicShort') : t('irAnalytics.modes.pickTagShort'))
-        : (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopic') : t('irAnalytics.modes.pickTag'));
+      return t('irAnalytics.toolbar.pickSelection');
     }
     const option = snapshot.sources.find((item) => item.key === selectedSelectionKey);
     if (!option) {
-      return isMobile
-        ? (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopicShort') : t('irAnalytics.modes.pickTagShort'))
-        : (selectedMode === 'topic' ? t('irAnalytics.modes.pickTopic') : t('irAnalytics.modes.pickTag'));
+      return t('irAnalytics.toolbar.pickSelection');
     }
-    if (isMobile) return selectedMode === 'topic' ? option.label : `#${option.label}`;
-    return selectedMode === 'topic'
-      ? t('irAnalytics.modes.topicPrefix', { label: option.label })
-      : t('irAnalytics.modes.tagPrefix', { label: option.label });
+    return selectedMode === 'topic' ? option.label : `#${option.label}`;
   }
 
   function getCurrentRangeLabel(): string {
@@ -564,13 +726,34 @@
     return t('irAnalytics.empty.tryOtherFilters');
   }
 
+  function getTopMaterials(snapshotValue: IRAnalyticsSnapshot) {
+    return snapshotValue.sourceBreakdown.slice(0, TOP_MATERIAL_LIMIT);
+  }
+
+  function hasCompositionData(snapshotValue: IRAnalyticsSnapshot): boolean {
+    return snapshotValue.materialTypeBreakdown.slices.length > 0;
+  }
+
+  function hasOutcomeData(snapshotValue: IRAnalyticsSnapshot): boolean {
+    return snapshotValue.materialTypeOutcome.length > 0;
+  }
+
   $effect(() => {
     chartRuntime.setContainer(chartRef);
   });
 
   $effect(() => {
+    compositionChartRuntime.setContainer(compositionChartRef);
+  });
+
+  $effect(() => {
     if (!snapshot || activeTab === 'activity') return;
     chartRuntime.render({ snapshot, activeTab });
+  });
+
+  $effect(() => {
+    if (!snapshot || activeTab !== 'activity' || !hasCompositionData(snapshot)) return;
+    compositionChartRuntime.render({ snapshot });
   });
 
   onMount(() => {
@@ -584,6 +767,7 @@
 
   onDestroy(() => {
     chartRuntime.dispose();
+    compositionChartRuntime.dispose();
   });
 </script>
 
@@ -644,19 +828,6 @@
     {:else if snapshot}
       {#if activeTab === 'activity'}
         <div class="activity-overview-panel">
-          <div class="scope-caption">
-            <span class="scope-title">{snapshot.scopeLabel}</span>
-            <span class="scope-subtitle">
-              {#if snapshot.scopeKey}
-                {t('irAnalytics.scope.summary', { total: snapshot.overview.totalItems, active: snapshot.overview.activeItems })}
-              {:else if selectedMode !== 'overall'}
-                {getEmptyStateMessage()}
-              {:else}
-                {t('irAnalytics.scope.allPoints')}
-              {/if}
-            </span>
-          </div>
-
           <div class="overview-grid">
             <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.totalItems')}</div><div class="overview-value">{snapshot.overview.totalItems}</div></div>
             <div class="overview-card"><div class="overview-label">{t('irAnalytics.overview.activeItems')}</div><div class="overview-value">{snapshot.overview.activeItems}</div></div>
@@ -668,6 +839,100 @@
             <div class="overview-card" title={getOutcomeTooltip('cards')}><div class="overview-label">{t('irAnalytics.overview.cards')}</div><div class="overview-value">{snapshot.overview.cardsCreated}</div><div class="overview-meta">{getOutcomeActionText('cards')}</div></div>
             <div class="overview-card" title={getOutcomeTooltip('notes')}><div class="overview-label">{t('irAnalytics.overview.notes')}</div><div class="overview-value">{snapshot.overview.notesWritten}</div><div class="overview-meta">{getOutcomeActionText('notes')}</div></div>
           </div>
+
+          {#if hasCompositionData(snapshot) || hasOutcomeData(snapshot) || getTopMaterials(snapshot).length > 0}
+            <div class="material-insights-panel">
+              {#if hasCompositionData(snapshot)}
+                <section class="insight-section">
+                  <div class="insight-section-header">
+                    <h3 class="insight-section-title">{t('irAnalytics.composition.title')}</h3>
+                    <span class="insight-section-meta">
+                      {t('irAnalytics.composition.byPoints')} · {snapshot.materialTypeBreakdown.totalPoints}
+                    </span>
+                  </div>
+                  <div class="composition-chart-container" bind:this={compositionChartRef}></div>
+                  <div class="composition-legend">
+                    {#each snapshot.materialTypeBreakdown.slices as slice (slice.type)}
+                      <div class="composition-legend-item">
+                        <span class="composition-legend-swatch" style:background={getMaterialTypeColor(slice.type, { seriesPalette: MATERIAL_CHART_PALETTE })}></span>
+                        <ObsidianIcon name={IR_ANALYTICS_MATERIAL_TYPE_ICONS[slice.type]} size={14} />
+                        <span class="composition-legend-label">{getMaterialTypeLabel(slice.type)}</span>
+                        <span class="composition-legend-value">
+                          {slice.documentCount} / {formatMetric(slice.readingHours)}h / {slice.pointCount}
+                        </span>
+                      </div>
+                    {/each}
+                  </div>
+                </section>
+              {/if}
+
+              {#if hasOutcomeData(snapshot)}
+                <section class="insight-section">
+                  <div class="insight-section-header">
+                    <h3 class="insight-section-title">{t('irAnalytics.outcomeTable.title')}</h3>
+                  </div>
+                  <div class="outcome-table-wrap">
+                    <table class="outcome-table">
+                      <thead>
+                        <tr>
+                          <th>{t('irAnalytics.outcomeTable.type')}</th>
+                          <th>{t('irAnalytics.outcomeTable.readingHours')}</th>
+                          <th>{t('irAnalytics.outcomeTable.extracts')}</th>
+                          <th>{t('irAnalytics.outcomeTable.cards')}</th>
+                          <th>{t('irAnalytics.outcomeTable.notes')}</th>
+                          <th>{t('irAnalytics.outcomeTable.outcomesPerHour')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each snapshot.materialTypeOutcome as row (row.type)}
+                          <tr>
+                            <td>
+                              <span class="outcome-type-cell">
+                                <ObsidianIcon name={IR_ANALYTICS_MATERIAL_TYPE_ICONS[row.type]} size={14} />
+                                <span>{getMaterialTypeLabel(row.type)}</span>
+                              </span>
+                            </td>
+                            <td>{formatMetric(row.readingHours)}h</td>
+                            <td>{row.extracts}</td>
+                            <td>{row.cardsCreated}</td>
+                            <td>{row.notesWritten}</td>
+                            <td class="outcome-highlight">{formatMetric(row.outcomesPerHour)}</td>
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              {/if}
+
+              {#if getTopMaterials(snapshot).length > 0}
+                <section class="insight-section">
+                  <div class="insight-section-header">
+                    <h3 class="insight-section-title">{t('irAnalytics.topMaterials.title')}</h3>
+                  </div>
+                  <div class="top-materials-list">
+                    {#each getTopMaterials(snapshot) as material (material.key)}
+                      <div class="top-material-row">
+                        <div class="top-material-main">
+                          <ObsidianIcon name={IR_ANALYTICS_MATERIAL_TYPE_ICONS[material.materialType]} size={16} />
+                          <div class="top-material-copy">
+                            <div class="top-material-title">{material.label}</div>
+                            <div class="top-material-subtitle">{material.subtitle}</div>
+                          </div>
+                        </div>
+                        <div class="top-material-stats">
+                          <span>{t('irAnalytics.topMaterials.active', { count: material.activeCount })}</span>
+                          <span>{t('irAnalytics.topMaterials.extracts', { count: material.extracts })}</span>
+                          <span>{t('irAnalytics.topMaterials.cards', { count: material.cardsCreated })}</span>
+                          <span>{t('irAnalytics.topMaterials.notes', { count: material.notesWritten })}</span>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </section>
+              {/if}
+            </div>
+          {/if}
         </div>
       {:else}
         <div class="chart-stage">
@@ -717,30 +982,46 @@
 
   .toolbar-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(16px, 3vw, 48px);
+    width: 100%;
   }
 
   .control-wrap {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 8px;
-    min-width: 200px;
+    gap: 10px;
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .control-wrap--selection {
-    flex: 1 1 260px;
+    justify-content: center;
+  }
+
+  .control-wrap--selection .menu-trigger {
+    flex: 1 1 auto;
+    max-width: min(100%, 320px);
   }
 
   .control-wrap--range {
-    margin-left: auto;
+    justify-content: flex-end;
+  }
+
+  .control-wrap--range .menu-trigger {
+    flex: 1 1 auto;
+    max-width: min(100%, 280px);
   }
 
   .toolbar-label {
+    flex: 0 0 auto;
     font-size: 12px;
     font-weight: 600;
     color: var(--text-muted);
     white-space: nowrap;
+    line-height: 1.2;
   }
 
   .menu-trigger {
@@ -748,14 +1029,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    min-width: 150px;
-    min-height: 40px;
-    padding: 0 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    min-height: 36px;
+    padding: 0 12px;
     border-radius: var(--clickable-icon-radius, 9px);
     border: none;
     box-shadow: none;
-    background: transparent;
-    color: var(--text-muted);
+    background: var(--background-primary);
+    color: var(--text-normal);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -780,7 +1063,8 @@
 
   .scope-hint,
   .monitoring-note {
-    padding: 8px 10px;
+    margin-top: 2px;
+    padding: 10px 12px;
     border-radius: 10px;
     font-size: 12px;
     line-height: 1.5;
@@ -806,27 +1090,6 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-  }
-
-  .scope-caption {
-    padding: 12px 14px;
-    border-radius: 11px;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-secondary);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .scope-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text-normal);
-  }
-
-  .scope-subtitle {
-    font-size: 12px;
-    color: var(--text-muted);
   }
 
   .overview-grid {
@@ -858,6 +1121,179 @@
     margin-top: 6px;
     font-size: 11px;
     color: var(--text-muted);
+  }
+
+  .material-insights-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .insight-section {
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .insight-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .insight-section-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-normal);
+  }
+
+  .insight-section-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .composition-chart-container {
+    width: 100%;
+    min-height: 280px;
+    border-radius: 10px;
+    background: var(--background-primary);
+  }
+
+  .composition-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+  }
+
+  .composition-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    font-size: 12px;
+    color: var(--text-normal);
+  }
+
+  .composition-legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+  }
+
+  .composition-legend-label {
+    font-weight: 600;
+    min-width: 0;
+  }
+
+  .composition-legend-value {
+    margin-left: auto;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .outcome-table-wrap {
+    overflow-x: auto;
+  }
+
+  .outcome-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .outcome-table th,
+  .outcome-table td {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .outcome-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .outcome-type-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--text-normal);
+    white-space: nowrap;
+  }
+
+  .outcome-highlight {
+    font-weight: 700;
+    color: var(--text-accent, var(--interactive-accent));
+  }
+
+  .top-materials-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .top-material-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+  }
+
+  .top-material-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .top-material-copy {
+    min-width: 0;
+  }
+
+  .top-material-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .top-material-subtitle {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .top-material-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
   }
 
   .chart-stage {
@@ -934,15 +1370,14 @@
     }
 
     .control-wrap,
-    .control-wrap--range {
+    .control-wrap--range,
+    .control-wrap--selection {
       flex: 1 1 0;
+      flex-direction: row;
+      align-items: center;
       width: 0;
       min-width: 0;
       margin-left: 0;
-    }
-
-    .control-wrap--selection {
-      flex: 1 1 0;
     }
 
     .toolbar-label {
@@ -1002,6 +1437,23 @@
     .chart-container,
     .chart-stage > .state-panel {
       min-height: 320px;
+    }
+
+    .composition-chart-container {
+      min-height: 420px;
+    }
+
+    .top-material-row {
+      flex-direction: column;
+    }
+
+    .top-material-stats {
+      justify-content: flex-start;
+    }
+
+    .outcome-table th,
+    .outcome-table td {
+      padding: 8px 6px;
     }
   }
 </style>

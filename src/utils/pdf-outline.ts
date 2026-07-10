@@ -198,16 +198,16 @@ async function loadPdfDocumentFromBinary(
 			cleanup: async () => {
 				try {
 					await Promise.resolve(pdfDocument.destroy?.());
-				} catch {}
+				} catch { /* ignored */ }
 				try {
 					await Promise.resolve(loadingTask?.destroy?.());
-				} catch {}
+				} catch { /* ignored */ }
 			},
 		};
 	} catch {
 		try {
 			await Promise.resolve(loadingTask?.destroy?.());
-		} catch {}
+		} catch { /* ignored */ }
 		return null;
 	}
 }

@@ -76,7 +76,7 @@ export class IRContinueReadingSuggestionsModalObsidian {
 
 		try {
 			this.containerEl?.remove();
-		} catch {}
+		} catch { /* ignored */ }
 		this.containerEl = null;
 		this.options.onClose?.();
 	}

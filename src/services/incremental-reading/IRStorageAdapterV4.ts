@@ -395,7 +395,7 @@ export class IRStorageAdapterV4 {
 					block.tags = allTags;
 				}
 			}
-		} catch {}
+		} catch { /* ignored */ }
 
 		return block;
 	}

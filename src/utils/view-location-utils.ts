@@ -24,8 +24,10 @@ export interface ViewSurfaceTokens {
 // 这样主题或容器对变量的覆盖仍能在具体 leaf 内继续生效，更接近官方视图的表现。
 const MAIN_SURFACE_BACKGROUND = "var(--background-primary)";
 const MAIN_ELEVATED_BACKGROUND = "var(--background-secondary)";
-const SIDEBAR_SURFACE_BACKGROUND = "var(--background-secondary)";
-const SIDEBAR_ELEVATED_BACKGROUND = "var(--background-primary)";
+// 侧边栏宿主背景应透明继承 Obsidian leaf，避免 --background-secondary 与真实侧栏底色不一致。
+const SIDEBAR_SURFACE_BACKGROUND = "transparent";
+const SIDEBAR_ELEVATED_BACKGROUND =
+	"var(--background-modifier-form-field, var(--background-primary))";
 
 /**
  * 获取当前 leaf 的位置

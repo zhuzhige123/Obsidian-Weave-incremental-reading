@@ -58,6 +58,7 @@ import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
 import { getSharedIRRefreshScheduler } from "./IRRefreshScheduler";
 import { getSharedIRScheduleImpactPreviewCoordinator } from "./IRScheduleImpactPreviewCoordinator";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
+import { getSharedIRAnalyticsService } from "./IRAnalyticsService";
 import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
 import { getIncrementalReadingPlugin } from "./ir-runtime";
 
@@ -104,6 +105,7 @@ export class IRStorageService {
 	}): void {
 		this.invalidateRuntimePointProjection();
 		getSharedIRWorkspaceSnapshotService(this.app).invalidate();
+		getSharedIRAnalyticsService(this.app).invalidateSnapshotCache();
 		if (!options?.skipScheduleIndex) {
 			getSharedIRScheduleIndexService(this.app).invalidate();
 		}
@@ -779,9 +781,7 @@ export class IRStorageService {
 					await adapter.mkdir(current);
 				}
 			}
-		} catch (_e) {
-			// 忽略错误，目录可能已存在
-		}
+		} catch { /* ignored */ }
 	}
 
 	/**
@@ -942,7 +942,6 @@ export class IRStorageService {
 		filePath?: string,
 	): Promise<void> {
 		const decks = await this.getAllDecks();
-		let _updatedCount = 0;
 
 		for (const deck of Object.values(decks)) {
 			if (deck.blockIds?.includes(blockId)) {
@@ -962,7 +961,6 @@ export class IRStorageService {
 				}
 
 				await this.saveDeck(deck);
-				_updatedCount++;
 			}
 		}
 
@@ -999,7 +997,6 @@ export class IRStorageService {
 	): Promise<void> {
 		const decks = await this.getAllDecks();
 		const idsToRemove = new Set(blockIds);
-		let _updatedCount = 0;
 
 		for (const deck of Object.values(decks)) {
 			const originalLength = deck.blockIds?.length || 0;
@@ -1018,7 +1015,6 @@ export class IRStorageService {
 				}
 
 				await this.saveDeck(deck);
-				_updatedCount++;
 			}
 		}
 
@@ -3268,7 +3264,7 @@ export class IRStorageService {
 			try {
 				await adapter.write(filePath, newContent);
 				updated++;
-			} catch {}
+			} catch { /* ignored */ }
 		}
 
 		return { updated, scanned };
@@ -3312,7 +3308,7 @@ export class IRStorageService {
 					try {
 						await adapter.remove(filePath);
 						removed++;
-					} catch {}
+					} catch { /* ignored */ }
 				}
 			} else if (yaml.includes("weave_type: ir-index")) {
 				const idMatch = yaml.match(/^source_id:\s*(["']?)([^\n"']+)\1\s*$/m);
@@ -3325,7 +3321,7 @@ export class IRStorageService {
 					try {
 						await adapter.remove(filePath);
 						removed++;
-					} catch {}
+					} catch { /* ignored */ }
 				}
 			}
 		}

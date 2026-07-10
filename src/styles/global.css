@@ -248,23 +248,20 @@
 /* ✅ 保留 !important：工具类设计意图是强制覆盖所有 display 值 */
 /* 参考：.augment/rules/core/04-anti-force-methods.md - 响应式隐藏是合理的 !important 使用场景 */
 @media (max-width: 768px) {
-  .weave-hide-mobile {
-    display: none !important;
+  .weave-app.weave-app .weave-hide-mobile {
+    display: none;
   }
 }
 
 @media (min-width: 769px) {
-  .weave-hide-desktop {
-    display: none !important;
+  .weave-app.weave-app .weave-hide-desktop {
+    display: none;
   }
 }
 
-/* 打印样式 */
-/* ✅ 保留 !important：工具类设计意图是强制隐藏打印内容 */
-/* 参考：.augment/rules/core/04-anti-force-methods.md - 工具类覆盖是合理的 !important 使用场景 */
 @media print {
-  .weave-no-print {
-    display: none !important;
+  .weave-app.weave-app .weave-no-print {
+    display: none;
   }
 }
 

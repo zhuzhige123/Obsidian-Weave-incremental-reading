@@ -1,7 +1,7 @@
-import type { Editor, EventRef, Menu, Plugin, Scope } from "obsidian";
+import type { EventRef, Menu, Plugin, Scope } from "obsidian";
 import type { CanvasMenuNode } from "./canvas-menu-node";
 
-type CodeMirrorLineHandle = unknown;
+type CodeMirrorLineHandle = object;
 
 type CodeMirrorEditorState = {
 	selection: { main: { from: number; to: number } };

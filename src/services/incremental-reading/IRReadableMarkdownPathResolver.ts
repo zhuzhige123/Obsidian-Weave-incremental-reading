@@ -64,7 +64,7 @@ function inferExistingVaultPathKind(
 			.constructor?.name;
 		if (ctorName === "TFile") return "file";
 		if (ctorName === "TFolder") return "folder";
-	} catch {}
+	} catch { /* ignored */ }
 
 	return null;
 }

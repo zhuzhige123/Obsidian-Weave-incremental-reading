@@ -1,7 +1,7 @@
 {
   "name": "weave-incremental-reading",
   "private": true,
-  "version": "0.5.13",
+  "version": "0.5.14",
   "description": "Standalone incremental reading workflow with topics, reading points, calendar scheduling, and source tracing",
   "main": "main.js",
   "type": "module",
@@ -117,7 +117,7 @@
     "@tanstack/svelte-virtual": "3.13.12",
     "@tanstack/table-core": "8.21.3",
     "@tanstack/virtual-core": "3.13.13",
-    "echarts": "6.0.0",
+    "echarts": "6.1.0",
     "monkey-around": "3.0.0",
     "pako": "^2.1.0"
   }

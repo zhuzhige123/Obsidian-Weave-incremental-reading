@@ -210,7 +210,7 @@ function detectObsidianLanguage(): SupportedLanguage {
 		}
 
 		return "en-US";
-	} catch (_e) {
+	} catch { /* ignored */
 		return defaultConfig.defaultLanguage;
 	}
 }

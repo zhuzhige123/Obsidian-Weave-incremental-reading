@@ -414,7 +414,8 @@
   }
 
   .node-children {
-    display: contents;
+    display: flex;
+    flex-direction: column;
   }
 
   .config-form {

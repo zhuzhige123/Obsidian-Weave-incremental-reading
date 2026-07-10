@@ -46,7 +46,7 @@
       {@const heatLevel = getHeatLevel(date)}
       {@const dayState = getCalendarDayVisualState(date)}
       <button
-        class="day-cell"
+        class="day-cell clickable-icon"
         class:other-month={otherMonth}
         class:today={isToday}
         class:selected={isSelected}

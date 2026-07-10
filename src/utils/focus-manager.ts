@@ -34,7 +34,7 @@ export class FocusManager {
 			window.__weaveFocusManagerCleanup = () => {
 				try {
 					(window.__weaveFocusManager as FocusManager | undefined)?.destroy();
-				} catch {}
+				} catch { /* ignored */ }
 
 				try {
 					window.__weaveFocusManager = undefined;
@@ -307,7 +307,7 @@ export class FocusManager {
 		for (const cleanup of this.trapCleanupFunctions.values()) {
 			try {
 				cleanup();
-			} catch {}
+			} catch { /* ignored */ }
 		}
 
 		this.trapCleanupFunctions.clear();

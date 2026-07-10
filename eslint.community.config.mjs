@@ -20,7 +20,6 @@ export default defineConfig([
 			"src/**/__tests__/**",
 			"src/demo/**",
 			"src/tests/**",
-			"src/**/*.d.ts",
 			"src/services/epub-integration/vendor/**",
 		],
 	},
@@ -81,14 +80,13 @@ export default defineConfig([
 				{
 					args: "after-used",
 					argsIgnorePattern: "^_",
-					varsIgnorePattern: "^_",
 					caughtErrorsIgnorePattern: "^_",
 				},
 			],
 			"no-useless-escape": "warn",
 			"@typescript-eslint/no-explicit-any": "warn",
 			"@typescript-eslint/no-deprecated": "warn",
-			"no-empty": ["error", { allowEmptyCatch: true }],
+			"no-empty": "error",
 		},
 	},
 ]);
