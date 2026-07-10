@@ -453,7 +453,7 @@ function main() {
 	assertStagedFiles(STAGING_DIR);
 	ensurePublishClone(remoteUrl);
 	replacePublishTreeFromStaging(STAGING_DIR);
-	runInDir(PUBLISH_DIR, "git", ["add", "-A"]);
+	runInDir(PUBLISH_DIR, "git", ["add", "-A", "-f"]);
 	console.log(runCaptureInDir(PUBLISH_DIR, "git", ["diff", "--cached", "--stat"]));
 	runInDir(PUBLISH_DIR, "git", [
 		"commit",
