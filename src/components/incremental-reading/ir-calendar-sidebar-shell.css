@@ -1,0 +1,327 @@
+/* IRCalendar sidebar shell, background wall, responsive layout */
+:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view) {
+  padding: 0;
+  overflow: hidden;
+  --weave-ir-calendar-host-background: var(--weave-surface-background, var(--background-primary));
+  background: var(--weave-ir-calendar-host-background);
+}
+
+:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view[data-weave-surface-context="sidebar"]) {
+  /* 侧边栏里尽量继承 Obsidian/主题提供的宿主背景，避免我们再叠一层“secondary”底色导致偏色。 */
+  --weave-ir-calendar-host-background: transparent;
+  background: transparent;
+}
+
+.ir-calendar-sidebar {
+  /*
+   * 与 EPUB 侧栏一致：优先继承 view-content 宿主背景，避免在特定主题（如 Composer）
+   * 被固定的 surface token（例如 background-secondary）拉出色差。
+   */
+  --weave-ir-sidebar-surface-background: var(
+    --weave-ir-calendar-host-background,
+    var(--weave-surface-background, var(--background-primary))
+  );
+  --weave-ir-sidebar-elevated-background: var(--weave-elevated-background, var(--background-primary));
+  --calendar-background-wall-fade-ratio: 0.72;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+  background: var(--weave-ir-sidebar-surface-background);
+  box-sizing: border-box;
+  container-type: inline-size;
+  overflow: hidden;
+  position: relative;
+  isolation: isolate;
+}
+
+.ir-calendar-sidebar > :not(.calendar-background-wall) {
+  position: relative;
+  z-index: 1;
+}
+
+.calendar-background-wall {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: min(58%, 420px);
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.calendar-background-wall__image,
+.calendar-background-wall__veil,
+.calendar-background-wall__mist {
+  position: absolute;
+  inset: 0;
+}
+
+.calendar-background-wall__image {
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: calc(1 - (var(--calendar-background-wall-fade-ratio) * 0.78));
+  transform: scale(calc(1 + (var(--calendar-background-wall-fade-ratio) * 0.04)));
+  filter:
+    saturate(calc(1 - (var(--calendar-background-wall-fade-ratio) * 0.1)))
+    contrast(calc(1 - (var(--calendar-background-wall-fade-ratio) * 0.04)));
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.78) 54%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.78) 54%, transparent 100%);
+}
+
+.calendar-background-wall__veil {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 18%), transparent) 0%,
+      color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 34%), transparent) 22%,
+      color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 62%), transparent) 58%,
+      var(--weave-ir-sidebar-surface-background) 100%
+    );
+}
+
+.calendar-background-wall__mist {
+  background:
+    radial-gradient(circle at 14% 14%, color-mix(in srgb, white calc(var(--calendar-background-wall-fade-ratio) * 12%), transparent) 0%, transparent 48%),
+    radial-gradient(circle at 86% 22%, color-mix(in srgb, white calc(var(--calendar-background-wall-fade-ratio) * 10%), transparent) 0%, transparent 42%),
+    linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 12%), transparent) 72%, transparent 100%);
+  opacity: calc(var(--calendar-background-wall-fade-ratio) * 0.78);
+}
+
+.ir-calendar-sidebar.has-background-wall .calendar-grid-container {
+  position: relative;
+}
+
+
+
+:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] .view-content.weave-ir-calendar-view .day-cell) {
+  border: 0 !important;
+  border-image: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] .view-content.weave-ir-calendar-view .day-cell:hover) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+
+.reading-tag-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 0 8px;
+  margin-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.reading-tag-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.reading-tag-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--weave-ir-sidebar-elevated-background);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reading-tag-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  color: var(--text-faint);
+  font-size: 10px;
+  padding: 0 4px;
+}
+
+.reading-tag-filter-chip.active {
+  border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--weave-ir-sidebar-surface-background));
+  color: var(--interactive-accent);
+}
+
+
+/* chrome styles moved to ir-calendar-sidebar-chrome.css */
+/* content styles moved to ir-calendar-sidebar-content.css */
+.day-load-trigger-btn--warning {
+  color: color-mix(in srgb, var(--color-yellow) 82%, var(--text-muted));
+}
+
+.day-load-trigger-btn--overloaded {
+  color: color-mix(in srgb, var(--color-orange) 86%, var(--text-muted));
+}
+
+.day-load-trigger-btn--warning:hover,
+.day-load-trigger-btn--overloaded:hover {
+  color: var(--text-normal);
+}
+
+@container (max-width: 340px) {
+  .ir-calendar-sidebar {
+    padding: 8px;
+  }
+
+  .calendar-top-tools {
+    padding-inline: 8px;
+  }
+
+  .calendar-header {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .month-title {
+    gap: 6px;
+  }
+
+  .month-title__month {
+    font-size: 16px;
+  }
+
+  .month-title__year {
+    font-size: 10px;
+  }
+
+  .calendar-tool-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .month-nav {
+    gap: 4px;
+    padding: 0;
+  }
+
+  .today-btn {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .calendar-sync-status__label {
+    display: none;
+  }
+
+  .calendar-sync-status {
+    max-width: none;
+    padding: 0 4px;
+  }
+
+  .calendar-grid-container {
+    padding: 0 0 6px;
+    margin-bottom: 6px;
+  }
+
+  .weekdays,
+  .calendar-grid {
+    gap: 6px;
+  }
+
+  .weekday {
+    font-size: 8px;
+  }
+
+  .day-number {
+    font-size: 11px;
+  }
+
+  .day-complete-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .day-surface,
+  .day-cell.has-tasks.today .day-surface,
+  .day-cell.has-tasks.selected .day-surface {
+    width: 24px;
+    height: 24px;
+    top: calc(50% - 1px);
+  }
+
+  .heat-dot {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+@container (max-width: 280px) {
+  .ir-calendar-sidebar {
+    padding: 6px;
+  }
+
+  .calendar-top-tools {
+    padding-inline: 6px;
+  }
+
+  .calendar-header {
+    gap: 4px;
+  }
+
+  .month-title {
+    gap: 4px;
+  }
+
+  .month-title__month {
+    font-size: 14px;
+  }
+
+  .month-title__year {
+    font-size: 10px;
+  }
+
+  .calendar-tool-btn {
+    width: 26px;
+    height: 26px;
+  }
+
+  .month-nav {
+    gap: 3px;
+  }
+
+  .today-btn {
+    height: 26px;
+    padding: 0 5px;
+    font-size: 9px;
+  }
+
+  .calendar-grid-container {
+    padding: 0 0 4px;
+  }
+
+  .day-number {
+    font-size: 10px;
+  }
+
+  .day-complete-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .day-surface,
+  .day-cell.has-tasks.today .day-surface,
+  .day-cell.has-tasks.selected .day-surface {
+    width: 22px;
+    height: 22px;
+    top: calc(50% - 1px);
+  }
+}
