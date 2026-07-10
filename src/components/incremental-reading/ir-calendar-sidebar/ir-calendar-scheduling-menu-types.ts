@@ -1,5 +1,5 @@
 import type { ScheduleItem } from "../../../services/incremental-reading/IRCalendarScheduleItem";
-import type { PreviewDetails } from "../IRScheduleImpactPreviewPanel.svelte";
+import type { PreviewDetails } from "../ir-schedule-impact-preview-types";
 
 export const IRCALENDAR_SCHEDULING_MENU_ACTIONS = [
 	"intensive",
@@ -30,8 +30,9 @@ export interface IRCalendarSchedulingMenuContext {
 	pinnedKey: string;
 }
 
-export type IRCalendarSchedulingPreviewByAction = Partial<
-	Record<IRCalendarSchedulingAction, PreviewDetails>
+export type IRCalendarSchedulingPreviewByAction = Record<
+	IRCalendarSchedulingAction,
+	PreviewDetails | null
 >;
 
 export type IRCalendarSchedulingDateByAction = Record<

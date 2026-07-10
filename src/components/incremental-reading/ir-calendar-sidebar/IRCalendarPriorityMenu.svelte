@@ -1,7 +1,8 @@
 <script lang="ts">
   import FloatingMenu from '../../ui/FloatingMenu.svelte';
   import IRPrioritySlider from '../IRPrioritySlider.svelte';
-  import IRScheduleImpactPreviewPanel, { type PreviewDetails } from '../IRScheduleImpactPreviewPanel.svelte';
+  import IRScheduleImpactPreviewPanel from '../IRScheduleImpactPreviewPanel.svelte';
+  import type { PreviewDetails } from '../ir-schedule-impact-preview-types';
   import type { ScheduleItem } from '../../../services/incremental-reading/IRCalendarScheduleItem';
 
   interface Props {

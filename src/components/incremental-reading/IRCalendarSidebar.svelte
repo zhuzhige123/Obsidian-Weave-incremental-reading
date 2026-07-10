@@ -82,7 +82,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { enqueueScheduleFinalize } from '../../services/incremental-reading/IRScheduleFinalizeCoordinator';
   import { getSharedIRWorkspaceSnapshotService } from '../../services/incremental-reading/IRWorkspaceSnapshotService';
   import { calculatePsi } from '../../services/incremental-reading/IRCoreAlgorithmsV4';
-  import { type PreviewDetails } from './IRScheduleImpactPreviewPanel.svelte';
+  import type { PreviewDetails } from './ir-schedule-impact-preview-types';
   import { MaterialImportModalObsidian } from './MaterialImportModalObsidian';
   import { AddReadingTargetModalObsidian } from './AddReadingTargetModalObsidian';
   import { canEditReadingPointLink, resolveReadingPointOpenLink } from '../../services/incremental-reading/reading-point-edit/IRReadingPointEditLinkResolver';
