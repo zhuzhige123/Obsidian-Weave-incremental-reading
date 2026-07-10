@@ -82,7 +82,7 @@
     },
     {
       label: t("irSettings.standalone.about.contacts.changelog"),
-      href: "https://github.com/zhuzhige123/weave-incremental-reading/blob/main/CHANGELOG.md",
+      href: "https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/CHANGELOG.md",
     },
     {
       label: t("irSettings.standalone.about.contacts.feedback"),

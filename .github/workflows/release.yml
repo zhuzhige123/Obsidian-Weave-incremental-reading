@@ -85,6 +85,25 @@ jobs:
         with:
           subject-path: dist/styles.css
 
+      - name: Read release notes
+        id: release_notes
+        shell: bash
+        run: |
+          if [ ! -f CHANGELOG.md ]; then
+            echo "CHANGELOG.md is missing"
+            exit 1
+          fi
+          NOTES=$(node scripts/extract-changelog-section.cjs "${{ steps.version.outputs.tag }}")
+          if [ -z "$NOTES" ]; then
+            echo "No changelog entry found for ${{ steps.version.outputs.tag }}"
+            exit 1
+          fi
+          {
+            echo "body<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -92,7 +111,8 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          body: ${{ steps.release_notes.outputs.body }}
+          generate_release_notes: false
           fail_on_unmatched_files: true
           files: |
             dist/main.js

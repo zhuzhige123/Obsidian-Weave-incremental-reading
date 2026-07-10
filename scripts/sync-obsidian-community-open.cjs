@@ -23,6 +23,7 @@ const DEFAULT_GITHUB_REPO = "zhuzhige123/Obsidian-Weave-incremental-reading";
 
 const ROOT_INCLUDE_FILES = new Set([
 	".npmrc",
+	"CHANGELOG.md",
 	"manifest.json",
 	"package.json",
 	"package-lock.json",
@@ -38,6 +39,7 @@ const ROOT_INCLUDE_FILES = new Set([
 ]);
 
 const SCRIPT_ALLOWLIST = new Set([
+	"extract-changelog-section.cjs",
 	"copy-manifest.cjs",
 	"kill-vite.cjs",
 	"hot-reload-utils.cjs",
