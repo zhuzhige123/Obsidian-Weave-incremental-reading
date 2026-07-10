@@ -22,6 +22,7 @@ const DEFAULT_BRANCH = "main";
 const DEFAULT_GITHUB_REPO = "zhuzhige123/Obsidian-Weave-incremental-reading";
 
 const ROOT_INCLUDE_FILES = new Set([
+	".npmrc",
 	"manifest.json",
 	"package.json",
 	"package-lock.json",
