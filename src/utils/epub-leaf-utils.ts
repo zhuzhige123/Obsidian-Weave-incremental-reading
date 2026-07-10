@@ -1,6 +1,6 @@
-import { TFile, type App, type WorkspaceLeaf } from "obsidian";
-import { EPUB_RUNTIME } from "../services/epub-integration/epub-runtime";
+import { type App, TFile, type WorkspaceLeaf } from "obsidian";
 import { isSupportedBookPath } from "../services/epub-integration/book-format";
+import { EPUB_RUNTIME } from "../services/epub-integration/epub-runtime";
 import { epubActiveDocumentStore } from "../stores/epub-active-document-store";
 import { getObsidianPluginAs } from "./obsidian-plugin-registry";
 import {
@@ -15,10 +15,12 @@ const KNOWN_EPUB_VIEW_TYPES = Array.from(
 		EPUB_RUNTIME.viewTypes.reader,
 		"weave-epub-reader",
 		"weave-epub-reader-standalone",
-	])
+	]),
 );
 
-function isCenterLeaf(leaf: WorkspaceLeaf | null | undefined): leaf is WorkspaceLeaf {
+function isCenterLeaf(
+	leaf: WorkspaceLeaf | null | undefined,
+): leaf is WorkspaceLeaf {
 	return !!leaf && getLeafLocation(leaf) === "center";
 }
 
@@ -32,7 +34,9 @@ export function getAllOpenEpubLeaves(app: App): WorkspaceLeaf[] {
 	return Array.from(leaves);
 }
 
-export function getOpenEpubFilePath(leaf: WorkspaceLeaf | null | undefined): string {
+export function getOpenEpubFilePath(
+	leaf: WorkspaceLeaf | null | undefined,
+): string {
 	if (!leaf) {
 		return "";
 	}
@@ -41,7 +45,10 @@ export function getOpenEpubFilePath(leaf: WorkspaceLeaf | null | undefined): str
 			getCurrentFilePath?: () => string;
 			getState?: () => Record<string, unknown>;
 		};
-		const fromView = typeof view?.getCurrentFilePath === "function" ? view.getCurrentFilePath() : "";
+		const fromView =
+			typeof view?.getCurrentFilePath === "function"
+				? view.getCurrentFilePath()
+				: "";
 		if (typeof fromView === "string" && fromView.trim()) {
 			return fromView;
 		}
@@ -57,8 +64,14 @@ export function getOpenEpubFilePath(leaf: WorkspaceLeaf | null | undefined): str
 	}
 }
 
-export function resolveRegisteredEpubViewType(app: App, filePath?: string): string | null {
-	const extension = String(filePath || "").split(".").pop() || "";
+export function resolveRegisteredEpubViewType(
+	app: App,
+	filePath?: string,
+): string | null {
+	const extension =
+		String(filePath || "")
+			.split(".")
+			.pop() || "";
 	const mappedViewType = getRegisteredViewTypeForExtension(app, extension);
 	if (mappedViewType && KNOWN_EPUB_VIEW_TYPES.includes(mappedViewType)) {
 		return mappedViewType;
@@ -71,7 +84,10 @@ export function resolveRegisteredEpubViewType(app: App, filePath?: string): stri
 	return null;
 }
 
-function isExistingEpubPath(app: App, filePath: string | null | undefined): filePath is string {
+function isExistingEpubPath(
+	app: App,
+	filePath: string | null | undefined,
+): filePath is string {
 	if (!filePath) {
 		return false;
 	}
@@ -80,7 +96,10 @@ function isExistingEpubPath(app: App, filePath: string | null | undefined): file
 	return file instanceof TFile && isSupportedBookPath(file.path);
 }
 
-export function findOpenEpubLeaf(app: App, filePath?: string): WorkspaceLeaf | null {
+export function findOpenEpubLeaf(
+	app: App,
+	filePath?: string,
+): WorkspaceLeaf | null {
 	const leaves = getAllOpenEpubLeaves(app);
 
 	if (filePath) {
@@ -93,7 +112,10 @@ export function findOpenEpubLeaf(app: App, filePath?: string): WorkspaceLeaf | n
 	return leaves.find((leaf) => isCenterLeaf(leaf)) ?? leaves[0] ?? null;
 }
 
-export function getPreferredEpubLeaf(app: App, filePath?: string): WorkspaceLeaf | null {
+export function getPreferredEpubLeaf(
+	app: App,
+	filePath?: string,
+): WorkspaceLeaf | null {
 	const matchedEpubLeaf = findOpenEpubLeaf(app, filePath);
 	if (matchedEpubLeaf) {
 		return matchedEpubLeaf;
@@ -113,7 +135,9 @@ export function getPreferredEpubLeaf(app: App, filePath?: string): WorkspaceLeaf
 		return recentLeaf;
 	}
 
-	const markdownLeaf = app.workspace.getLeavesOfType("markdown").find((leaf) => isCenterLeaf(leaf));
+	const markdownLeaf = app.workspace
+		.getLeavesOfType("markdown")
+		.find((leaf) => isCenterLeaf(leaf));
 	if (markdownLeaf) {
 		return markdownLeaf;
 	}
@@ -129,7 +153,7 @@ export function getPreferredEpubLeaf(app: App, filePath?: string): WorkspaceLeaf
 export async function openEpubInPreferredLeaf(
 	app: App,
 	filePath: string,
-	state: Record<string, unknown> = {}
+	state: Record<string, unknown> = {},
 ): Promise<WorkspaceLeaf | null> {
 	const viewType = resolveRegisteredEpubViewType(app, filePath);
 	if (!viewType) {
@@ -170,7 +194,10 @@ export async function resolveRecentEpubPath(app: App): Promise<string | null> {
 	const reader = getObsidianPluginAs<{
 		getEpubStorageService?: () => {
 			loadBooks?: () => Promise<
-				Record<string, { filePath: string; readingStats?: { lastReadTime?: number } }>
+				Record<
+					string,
+					{ filePath: string; readingStats?: { lastReadTime?: number } }
+				>
 			>;
 		};
 	}>(app, "weave-epub-reader");

@@ -21,7 +21,9 @@ export class StandaloneIRSettingsTab extends PluginSettingTab {
 		containerEl.empty();
 
 		const { mount } = await import("svelte");
-		const { default: Component } = await import("./StandaloneIRSettingsPanel.svelte");
+		const { default: Component } = await import(
+			"./StandaloneIRSettingsPanel.svelte"
+		);
 		mount(Component, {
 			target: containerEl,
 			props: {

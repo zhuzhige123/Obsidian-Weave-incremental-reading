@@ -2,7 +2,10 @@ import type { App } from "obsidian";
 import { IRStorageService } from "../IRStorageService";
 import { parseReadingTargetInput } from "../reading-target/IRReadingTargetParser";
 import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
-import type { IRReadingPointEditDraft, IRReadingPointEditSaveInput } from "./IRReadingPointEditTypes";
+import type {
+	IRReadingPointEditDraft,
+	IRReadingPointEditSaveInput,
+} from "./IRReadingPointEditTypes";
 
 export type ReadingPointSavePatch = Partial<{
 	title: string;
@@ -22,7 +25,7 @@ export function resolveParsedTargetForSave(
 	draft: IRReadingPointEditDraft,
 	linkInput: string,
 	originalLinkInput: string,
-	cached?: ParsedReadingTarget | null
+	cached?: ParsedReadingTarget | null,
 ): ParsedReadingTarget | null {
 	const trimmed = String(linkInput || "").trim();
 	if (!trimmed) {
@@ -44,7 +47,7 @@ export function buildSaveInputFromDraft(
 	options: {
 		parsedTarget?: ParsedReadingTarget | null;
 		preserveScheduleOnLinkChange?: boolean;
-	} = {}
+	} = {},
 ): IRReadingPointEditSaveInput {
 	const linkInput = patch.linkInput ?? draft.linkInput;
 	const originalLinkInput = draft.originalLinkInput;
@@ -75,7 +78,9 @@ export function buildSaveInputFromDraft(
 	};
 }
 
-export async function loadReadingPointDeckOptions(app: App): Promise<ReadingPointDeckOption[]> {
+export async function loadReadingPointDeckOptions(
+	app: App,
+): Promise<ReadingPointDeckOption[]> {
 	const storage = new IRStorageService(app);
 	await storage.initialize();
 	return Object.values(await storage.getAllDecks())

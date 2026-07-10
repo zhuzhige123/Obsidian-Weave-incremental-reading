@@ -2,17 +2,26 @@ import type { App } from "obsidian";
 import { logger } from "../../utils/logger";
 import { getSharedIRCalendarBackgroundLoadCoordinator } from "./IRCalendarBackgroundLoadCoordinator";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
+import type { ScheduleItem } from "./IRCalendarScheduleItem";
+import { getSharedIRHostCriticalWorkGuard } from "./IRHostCriticalWorkGuard";
 import {
-	getSharedIRProjectionRuntime,
 	type IRBackgroundReconcileOptions,
+	getSharedIRProjectionRuntime,
 } from "./IRProjectionRuntime";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { getSharedIRScheduleKernel } from "./IRScheduleKernel";
 import { IRTagGroupService } from "./IRTagGroupService";
 
-export type IRRefreshWorkKind = "calendar-reconcile" | "rebuild-vault" | "bootstrap";
+export type IRRefreshWorkKind =
+	| "calendar-reconcile"
+	| "rebuild-vault"
+	| "bootstrap";
 
-export type IRRuntimeBootstrapPhase = "idle" | "bootstrapping" | "ready" | "degraded";
+export type IRRuntimeBootstrapPhase =
+	| "idle"
+	| "bootstrapping"
+	| "ready"
+	| "degraded";
 
 export interface IRRefreshWorkUnit {
 	kind: IRRefreshWorkKind;
@@ -39,7 +48,7 @@ function getLocalTodayDateKey(): string {
 async function awaitWithTimeout<T>(
 	promise: Promise<T>,
 	timeoutMs: number,
-	label: string
+	label: string,
 ): Promise<T | null> {
 	let timeoutId: number | undefined;
 	try {
@@ -47,7 +56,9 @@ async function awaitWithTimeout<T>(
 			promise,
 			new Promise<null>((resolve) => {
 				timeoutId = window.setTimeout(() => {
-					logger.debug(`[IRRefreshScheduler] ${label} timed out after ${timeoutMs}ms`);
+					logger.debug(
+						`[IRRefreshScheduler] ${label} timed out after ${timeoutMs}ms`,
+					);
 					resolve(null);
 				}, timeoutMs);
 			}),
@@ -72,7 +83,7 @@ export class IRRefreshScheduler {
 
 	constructor(
 		private readonly app: App,
-		private readonly calendarDebounceMs = DEFAULT_CALENDAR_RECONCILE_DEBOUNCE_MS
+		private readonly calendarDebounceMs = DEFAULT_CALENDAR_RECONCILE_DEBOUNCE_MS,
 	) {}
 
 	getBootstrapPhase(): IRRuntimeBootstrapPhase {
@@ -80,7 +91,9 @@ export class IRRefreshScheduler {
 	}
 
 	isBootstrapReady(): boolean {
-		return this.bootstrapPhase === "ready" || this.bootstrapPhase === "degraded";
+		return (
+			this.bootstrapPhase === "ready" || this.bootstrapPhase === "degraded"
+		);
 	}
 
 	markBootstrapStale(): void {
@@ -92,15 +105,18 @@ export class IRRefreshScheduler {
 
 	scheduleCalendarReconcile(
 		options: IRBackgroundReconcileOptions & { reason?: string },
-		immediate = false
+		immediate = false,
 	): void {
 		void getSharedIRProjectionRuntime(this.app)
 			.shouldSkipBackgroundReconcile(options)
 			.then((skip) => {
 				if (skip) {
-					logger.debug("[IRRefreshScheduler] skipped calendar-reconcile (fresh projection)", {
-						reason: options.reason,
-					});
+					logger.debug(
+						"[IRRefreshScheduler] skipped calendar-reconcile (fresh projection)",
+						{
+							reason: options.reason,
+						},
+					);
 					return;
 				}
 				this.mergePendingCalendarReconcile({
@@ -117,11 +133,16 @@ export class IRRefreshScheduler {
 				this.scheduleCalendarDebounce();
 			})
 			.catch((error) => {
-				logger.warn("[IRRefreshScheduler] failed to evaluate reconcile skip:", error);
+				logger.warn(
+					"[IRRefreshScheduler] failed to evaluate reconcile skip:",
+					error,
+				);
 			});
 	}
 
-	scheduleVaultRebuild(options: IRBackgroundReconcileOptions & { reason?: string }): void {
+	scheduleVaultRebuild(
+		options: IRBackgroundReconcileOptions & { reason?: string },
+	): void {
 		this.cancelPendingCalendarReconcile();
 		getSharedIRProjectionRuntime(this.app).markStale();
 		this.mergePendingCalendarReconcile({
@@ -145,8 +166,16 @@ export class IRRefreshScheduler {
 		this.bootstrapPromise = new Promise<void>((resolve) => {
 			const run = (): void => {
 				void (async () => {
-					const coordinator = getSharedIRCalendarBackgroundLoadCoordinator(this.app);
-					if (coordinator.isHeavyLoadActive()) {
+					const coordinator = getSharedIRCalendarBackgroundLoadCoordinator(
+						this.app,
+					);
+					const hostCriticalWorkGuard = getSharedIRHostCriticalWorkGuard(
+						this.app,
+					);
+					if (
+						coordinator.isHeavyLoadActive() ||
+						hostCriticalWorkGuard.shouldDeferVaultBackgroundWork()
+					) {
 						window.setTimeout(run, BOOTSTRAP_DEFER_RETRY_MS);
 						return;
 					}
@@ -157,15 +186,20 @@ export class IRRefreshScheduler {
 					try {
 						await runtime.preloadColdStartCaches();
 						const todayKey = getLocalTodayDateKey();
-						const projectionFresh = await runtime.shouldSkipBackgroundReconcile({
-							priorityDateKeys: [todayKey],
-						});
+						const projectionFresh = await runtime.shouldSkipBackgroundReconcile(
+							{
+								priorityDateKeys: [todayKey],
+							},
+						);
 						if (projectionFresh) {
 							this.bootstrapPhase = "ready";
 							this.lastBootstrapAt = Date.now();
-							logger.info("[IRRefreshScheduler] bootstrap ready from cold projection cache", {
-								durationMs: Date.now() - startedAt,
-							});
+							logger.info(
+								"[IRRefreshScheduler] bootstrap ready from cold projection cache",
+								{
+									durationMs: Date.now() - startedAt,
+								},
+							);
 							return;
 						}
 
@@ -191,30 +225,37 @@ export class IRRefreshScheduler {
 									priorityDateKeys: [todayKey],
 								}),
 								BOOTSTRAP_LEAN_QUERY_TIMEOUT_MS,
-								"bootstrap lean calendar query"
+								"bootstrap lean calendar query",
 							);
 
 							const kernel = getSharedIRScheduleKernel(this.app);
 							if (!kernel.getCachedSchedule({ leanSchedule: true })) {
-								await kernel.recomputeScheduleForDeck("ui_refresh", { leanSchedule: true });
+								await kernel.recomputeScheduleForDeck("ui_refresh", {
+									leanSchedule: true,
+								});
 							}
 
 							if (!leanResult) {
 								this.bootstrapPhase = "degraded";
-								logger.warn("[IRRefreshScheduler] bootstrap finished in degraded mode", {
-									durationMs: Date.now() - startedAt,
-								});
+								logger.warn(
+									"[IRRefreshScheduler] bootstrap finished in degraded mode",
+									{
+										durationMs: Date.now() - startedAt,
+									},
+								);
 								return;
 							}
 
 							this.bootstrapPhase = "ready";
 							this.lastBootstrapAt = Date.now();
 							const scheduleFingerprint = String(
-								(await getSharedIRScheduleIndexService(this.app).peekScheduleFingerprint()) || ""
+								(await getSharedIRScheduleIndexService(
+									this.app,
+								).peekScheduleFingerprint()) || "",
 							).trim();
 							runtime.markBackgroundReconcileComplete(
 								{ priorityDateKeys: [todayKey] },
-								scheduleFingerprint || undefined
+								scheduleFingerprint || undefined,
 							);
 							logger.info("[IRRefreshScheduler] bootstrap ready", {
 								durationMs: Date.now() - startedAt,
@@ -234,8 +275,13 @@ export class IRRefreshScheduler {
 				})();
 			};
 
-			if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
-				window.requestIdleCallback(() => run(), { timeout: BOOTSTRAP_IDLE_TIMEOUT_MS });
+			if (
+				typeof window !== "undefined" &&
+				typeof window.requestIdleCallback === "function"
+			) {
+				window.requestIdleCallback(() => run(), {
+					timeout: BOOTSTRAP_IDLE_TIMEOUT_MS,
+				});
 				return;
 			}
 			window.setTimeout(run, BOOTSTRAP_FALLBACK_DELAY_MS);
@@ -268,15 +314,20 @@ export class IRRefreshScheduler {
 			return;
 		}
 
-		const mergedDateKeys = new Set(this.pendingCalendarReconcile.priorityDateKeys);
+		const mergedDateKeys = new Set(
+			this.pendingCalendarReconcile.priorityDateKeys,
+		);
 		for (const dateKey of unit.priorityDateKeys) {
 			mergedDateKeys.add(dateKey);
 		}
 		this.pendingCalendarReconcile = {
-			kind: unit.forceRecompute ? "rebuild-vault" : this.pendingCalendarReconcile.kind,
+			kind: unit.forceRecompute
+				? "rebuild-vault"
+				: this.pendingCalendarReconcile.kind,
 			deckIds: unit.deckIds ?? this.pendingCalendarReconcile.deckIds,
 			priorityDateKeys: Array.from(mergedDateKeys),
-			forceRecompute: unit.forceRecompute || this.pendingCalendarReconcile.forceRecompute,
+			forceRecompute:
+				unit.forceRecompute || this.pendingCalendarReconcile.forceRecompute,
 			reason: unit.reason ?? this.pendingCalendarReconcile.reason,
 		};
 	}
@@ -301,6 +352,15 @@ export class IRRefreshScheduler {
 		}
 		this.pendingCalendarReconcile = null;
 
+		const hostCriticalWorkGuard = getSharedIRHostCriticalWorkGuard(this.app);
+		if (hostCriticalWorkGuard.shouldDeferVaultBackgroundWork()) {
+			this.pendingCalendarReconcile = unit;
+			window.setTimeout(() => {
+				void this.flushCalendarReconcile();
+			}, BOOTSTRAP_DEFER_RETRY_MS);
+			return;
+		}
+
 		const runtime = getSharedIRProjectionRuntime(this.app);
 		if (unit.kind === "calendar-reconcile") {
 			const skip = await runtime.shouldSkipBackgroundReconcile({
@@ -314,11 +374,14 @@ export class IRRefreshScheduler {
 		}
 
 		const run = (async () => {
-			const coordinator = getSharedIRCalendarBackgroundLoadCoordinator(this.app);
+			const coordinator = getSharedIRCalendarBackgroundLoadCoordinator(
+				this.app,
+			);
 			const includeMaterials = unit.kind === "rebuild-vault";
+			let reconciledMaterialsByDate: Map<string, ScheduleItem[]> | undefined;
 			await coordinator.runHeavyLoad("sidebar-reconcile", async () => {
 				const queryService = getSharedIRCalendarQueryService(this.app);
-				await queryService.getCalendarQueryResult({
+				const queryResult = await queryService.getCalendarQueryResult({
 					deckIds: unit.deckIds,
 					forceRecompute: unit.forceRecompute === true,
 					reason: "ui_refresh",
@@ -326,16 +389,31 @@ export class IRRefreshScheduler {
 					preferDiskCache: unit.forceRecompute !== true,
 					priorityDateKeys: unit.priorityDateKeys,
 				});
+				reconciledMaterialsByDate = new Map(
+					unit.priorityDateKeys.map((dateKey) => [
+						dateKey,
+						queryResult.materialsByDate.get(dateKey) || [],
+					]),
+				);
 			});
-			runtime.markBackgroundReconcileComplete({
-				deckIds: unit.deckIds,
-				forceRecompute: unit.forceRecompute,
-				priorityDateKeys: unit.priorityDateKeys,
-			});
+			const scheduleFingerprint = String(
+				(await getSharedIRScheduleIndexService(
+					this.app,
+				).peekScheduleFingerprint()) || "",
+			).trim();
+			runtime.markBackgroundReconcileComplete(
+				{
+					deckIds: unit.deckIds,
+					forceRecompute: unit.forceRecompute,
+					priorityDateKeys: unit.priorityDateKeys,
+				},
+				scheduleFingerprint || undefined,
+			);
 			runtime.notify({
 				priorityDateKeys: unit.priorityDateKeys,
 				deckIds: unit.deckIds,
 				reason: unit.reason || unit.kind,
+				reconciledMaterialsByDate,
 			});
 		})();
 

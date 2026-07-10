@@ -3,8 +3,8 @@ import type { unmount } from "svelte";
 import type { WeavePlugin } from "../main";
 import { IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
 import type { ParagraphWorkbenchOpenInput } from "../services/incremental-reading/paragraph-workbench/types";
-import { logger } from "../utils/logger";
 import { i18n } from "../utils/i18n";
+import { logger } from "../utils/logger";
 import { getViewSurfaceTokens } from "../utils/view-location-utils";
 
 export const VIEW_TYPE_IR_PARAGRAPH_WORKBENCH = IR_RUNTIME.viewTypes.workbench;
@@ -31,7 +31,8 @@ export class IRParagraphWorkbenchView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		const title = this.openInput?.topicName || this.openInput?.sourcePath?.split("/").pop();
+		const title =
+			this.openInput?.topicName || this.openInput?.sourcePath?.split("/").pop();
 		return title
 			? `${title} · ${i18n.t("irViews.workbench.paragraphSuffix")}`
 			: i18n.t("irViews.workbench.defaultTitle");
@@ -51,7 +52,10 @@ export class IRParagraphWorkbenchView extends ItemView {
 		};
 	}
 
-	async setState(state: IRParagraphWorkbenchViewState, result: ViewStateResult): Promise<void> {
+	async setState(
+		state: IRParagraphWorkbenchViewState,
+		result: ViewStateResult,
+	): Promise<void> {
 		await super.setState(state, result);
 		const sourcePath = String(state?.sourcePath || "").trim();
 		if (!sourcePath) {
@@ -97,11 +101,19 @@ export class IRParagraphWorkbenchView extends ItemView {
 
 	private applySurfaceContext(): void {
 		const surfaceTokens = getViewSurfaceTokens(this.leaf);
-		const targets = [this.contentEl, this.contentEl.parentElement].filter(Boolean) as HTMLElement[];
+		const targets = [this.contentEl, this.contentEl.parentElement].filter(
+			Boolean,
+		) as HTMLElement[];
 		for (const target of targets) {
 			target.dataset.weaveSurfaceContext = surfaceTokens.context;
-			target.style.setProperty("--weave-surface-background", surfaceTokens.surfaceBackground);
-			target.style.setProperty("--weave-elevated-background", surfaceTokens.elevatedBackground);
+			target.style.setProperty(
+				"--weave-surface-background",
+				surfaceTokens.surfaceBackground,
+			);
+			target.style.setProperty(
+				"--weave-elevated-background",
+				surfaceTokens.elevatedBackground,
+			);
 		}
 	}
 
@@ -126,7 +138,10 @@ export class IRParagraphWorkbenchView extends ItemView {
 			});
 			logger.debug("[IRParagraphWorkbenchView] Workbench mounted");
 		} catch (error) {
-			logger.error("[IRParagraphWorkbenchView] Failed to mount workbench:", error);
+			logger.error(
+				"[IRParagraphWorkbenchView] Failed to mount workbench:",
+				error,
+			);
 			this.contentEl.empty();
 			this.contentEl.createDiv({
 				cls: "error",

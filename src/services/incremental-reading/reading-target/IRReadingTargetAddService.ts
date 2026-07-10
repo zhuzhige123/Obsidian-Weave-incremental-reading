@@ -1,29 +1,35 @@
-import { Notice, TFile, normalizePath, type App } from "obsidian";
+import { type App, Notice, TFile, normalizePath } from "obsidian";
 import { i18n } from "../../../utils/i18n";
+import { getIrEpubStorageService } from "../../epub-integration/ir-epub-storage-access";
+import {
+	IREpubBookmarkTaskService,
+	isEpubBookmarkTaskId,
+} from "../IREpubBookmarkTaskService";
+import { IRHostSharedService } from "../IRHostSharedService";
+import {
+	IRPdfBookmarkTaskService,
+	isPdfBookmarkTaskId,
+} from "../IRPdfBookmarkTaskService";
+import { IRPointStorageService } from "../IRPointStorageService";
+import { IRPointWriteService } from "../IRPointWriteService";
 import {
 	generateUniqueVaultFilePath,
 	resolveIRReadableMarkdownTargetFolder,
 } from "../IRReadableMarkdownPathResolver";
-import { IRHostSharedService } from "../IRHostSharedService";
-import { IRPointWriteService } from "../IRPointWriteService";
 import { recomputeAndBroadcastIRData } from "../IRScheduleRefreshService";
-import { getIrEpubStorageService } from "../../epub-integration/ir-epub-storage-access";
-import { IREpubBookmarkTaskService, isEpubBookmarkTaskId } from "../IREpubBookmarkTaskService";
-import { IRPdfBookmarkTaskService, isPdfBookmarkTaskId } from "../IRPdfBookmarkTaskService";
-import { IRPointStorageService } from "../IRPointStorageService";
 import { IRStorageService } from "../IRStorageService";
 import { buildWebReadingPointMarkdown } from "../ir-web-reading-point";
 import {
 	blockReferencesObsidianId,
 	buildObsidianEmbedBlockWikiLink,
 } from "../paragraph-workbench/paragraph-block-reference";
+import { resolveReadingTargetSchedulePin } from "./IRReadingTargetScheduleDate";
 import type {
 	IRReadingTargetAddInput,
 	IRReadingTargetAddResult,
 	IRReadingTargetSchedulePin,
 	ParsedReadingTarget,
 } from "./IRReadingTargetTypes";
-import { resolveReadingTargetSchedulePin } from "./IRReadingTargetScheduleDate";
 
 function resolveSchedulePin(scheduleDate: Date): IRReadingTargetSchedulePin {
 	return resolveReadingTargetSchedulePin(scheduleDate);
@@ -38,7 +44,8 @@ function sanitizeReadingPointFileName(title: string): string {
 }
 
 async function ensureFolderExists(app: App, folderPath: string): Promise<void> {
-	const normalizedFolder = normalizePath(String(folderPath || "").trim()) || "/";
+	const normalizedFolder =
+		normalizePath(String(folderPath || "").trim()) || "/";
 	if (normalizedFolder === "/") {
 		return;
 	}
@@ -56,7 +63,7 @@ async function attachBlockToDeck(
 	storage: IRStorageService,
 	deckId: string,
 	sourcePath: string,
-	blockId: string
+	blockId: string,
 ): Promise<void> {
 	const latestDeck = await storage.getDeckById(deckId);
 	if (!latestDeck) {
@@ -76,7 +83,7 @@ async function applyPointSchedulePin(
 	app: App,
 	pointId: string,
 	schedulePin: IRReadingTargetSchedulePin,
-	resumeLink?: string
+	resumeLink?: string,
 ): Promise<void> {
 	const storage = new IRStorageService(app);
 	await storage.initialize();
@@ -111,7 +118,9 @@ async function applyPointSchedulePin(
 			{
 				id: pointId,
 				topicId: String(snapshot.topicId || "").trim(),
-				title: String(snapshot.point.userData?.title || snapshot.point.id || pointId).trim(),
+				title: String(
+					snapshot.point.userData?.title || snapshot.point.id || pointId,
+				).trim(),
 				status: snapshot.point.schedule?.status || "new",
 				sourceType: "epub-bookmark",
 				sourcePath: String(snapshot.point.source?.path || "").trim(),
@@ -125,7 +134,7 @@ async function applyPointSchedulePin(
 					...(resumeLink ? { resumeLink } : {}),
 				},
 			},
-			{ preserveExisting: true }
+			{ preserveExisting: true },
 		);
 		return;
 	}
@@ -176,7 +185,7 @@ async function applyPointSchedulePin(
 				...(resumeLink ? { resumeLink } : {}),
 			},
 		},
-		{ preserveExisting: true }
+		{ preserveExisting: true },
 	);
 }
 
@@ -185,7 +194,7 @@ async function appendSourceBacklinkIfEnabled(
 	target: ParsedReadingTarget,
 	deckName: string,
 	title: string,
-	enabled: boolean
+	enabled: boolean,
 ): Promise<void> {
 	if (!enabled || !target.sourceFilePath || target.kind === "web") {
 		return;
@@ -211,7 +220,9 @@ export class IRReadingTargetAddService {
 		this.host = new IRHostSharedService(app);
 	}
 
-	async addReadingTarget(input: IRReadingTargetAddInput): Promise<IRReadingTargetAddResult> {
+	async addReadingTarget(
+		input: IRReadingTargetAddInput,
+	): Promise<IRReadingTargetAddResult> {
 		const title = this.host.cleanIRReadingPointTitle(input.title);
 		if (!title) {
 			throw new Error("reading-target-missing-title");
@@ -238,7 +249,9 @@ export class IRReadingTargetAddService {
 			const pointWriteService = new IRPointWriteService(this.app);
 			const sequenceGroup =
 				target.pdfPoints.length > 1
-					? `reading-target-batch:${deckId}:${anchorPin.dateKey}:${Date.now().toString(36)}`
+					? `reading-target-batch:${deckId}:${
+							anchorPin.dateKey
+					  }:${Date.now().toString(36)}`
 					: undefined;
 
 			for (let index = 0; index < target.pdfPoints.length; index += 1) {
@@ -255,10 +268,17 @@ export class IRReadingTargetAddService {
 					sourceSequenceAnchorDateKey: anchorPin.dateKey,
 				});
 				await attachBlockToDeck(storage, deckId, point.pdfPath, created.id);
-				await applyPointSchedulePin(this.app, created.id, schedulePin, point.resumeLink);
+				await applyPointSchedulePin(
+					this.app,
+					created.id,
+					schedulePin,
+					point.resumeLink,
+				);
 				ids.push(created.id);
 			}
-			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
+			await recomputeAndBroadcastIRData(this.app, "import_materials", {
+				deckIds: [deckId],
+			});
 			return { createdIds: ids, kind: target.kind, deckName: deck.name };
 		}
 
@@ -272,10 +292,26 @@ export class IRReadingTargetAddService {
 				sourceSequenceLocked: true,
 				sourceSequenceAnchorDateKey: schedulePin.dateKey,
 			});
-			await attachBlockToDeck(storage, deckId, target.sourceFilePath || target.pdfPath || "", created.id);
-			await applyPointSchedulePin(this.app, created.id, schedulePin, target.resumeLink);
-			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-			return { createdIds: [created.id], kind: target.kind, deckName: deck.name };
+			await attachBlockToDeck(
+				storage,
+				deckId,
+				target.sourceFilePath || target.pdfPath || "",
+				created.id,
+			);
+			await applyPointSchedulePin(
+				this.app,
+				created.id,
+				schedulePin,
+				target.resumeLink,
+			);
+			await recomputeAndBroadcastIRData(this.app, "import_materials", {
+				deckIds: [deckId],
+			});
+			return {
+				createdIds: [created.id],
+				kind: target.kind,
+				deckName: deck.name,
+			};
 		}
 
 		if (target.kind === "epub") {
@@ -289,7 +325,7 @@ export class IRReadingTargetAddService {
 			const epubStorage = getIrEpubStorageService(this.app);
 			const resolvedPath = await epubStorage.resolveSourceFilePath(
 				target.epubSourceId,
-				target.sourceFilePath || ""
+				target.sourceFilePath || "",
 			);
 			if (!resolvedPath) {
 				throw new Error("reading-target-epub-unresolved");
@@ -305,7 +341,7 @@ export class IRReadingTargetAddService {
 				return Boolean(
 					target.epubTocHref &&
 						task.tocHref === target.epubTocHref &&
-						task.title === title
+						task.title === title,
 				);
 			});
 			if (duplicate) {
@@ -314,11 +350,22 @@ export class IRReadingTargetAddService {
 					this.app,
 					duplicate.id,
 					schedulePin,
-					target.epubResumeLink || target.resumeLink
+					target.epubResumeLink || target.resumeLink,
 				);
-				await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-				new Notice(i18n.t("irServiceNotices.readingTarget.epubLocationExists", { deckName: deck.name }), 3000);
-				return { createdIds: [duplicate.id], kind: target.kind, deckName: deck.name };
+				await recomputeAndBroadcastIRData(this.app, "import_materials", {
+					deckIds: [deckId],
+				});
+				new Notice(
+					i18n.t("irServiceNotices.readingTarget.epubLocationExists", {
+						deckName: deck.name,
+					}),
+					3000,
+				);
+				return {
+					createdIds: [duplicate.id],
+					kind: target.kind,
+					deckName: deck.name,
+				};
 			}
 
 			const pointWriteService = new IRPointWriteService(this.app);
@@ -340,14 +387,27 @@ export class IRReadingTargetAddService {
 				this.app,
 				created.id,
 				schedulePin,
-				target.epubResumeLink || target.resumeLink
+				target.epubResumeLink || target.resumeLink,
 			);
-			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-			return { createdIds: [created.id], kind: target.kind, deckName: deck.name };
+			await recomputeAndBroadcastIRData(this.app, "import_materials", {
+				deckIds: [deckId],
+			});
+			return {
+				createdIds: [created.id],
+				kind: target.kind,
+				deckName: deck.name,
+			};
 		}
 
 		if (target.kind === "web" || input.createNote) {
-			return await this.createNoteBackedTarget(input, title, deck.id, deck.name, schedulePin, storage);
+			return await this.createNoteBackedTarget(
+				input,
+				title,
+				deck.id,
+				deck.name,
+				schedulePin,
+				storage,
+			);
 		}
 
 		return await this.createLightweightVaultTarget(
@@ -356,7 +416,7 @@ export class IRReadingTargetAddService {
 			deck.id,
 			deck.name,
 			schedulePin,
-			storage
+			storage,
 		);
 	}
 
@@ -365,8 +425,8 @@ export class IRReadingTargetAddService {
 		title: string,
 		deckId: string,
 		deckName: string,
-		schedulePin: IRReadingTargetSchedulePin,
-		storage: IRStorageService
+		_schedulePin: IRReadingTargetSchedulePin,
+		_storage: IRStorageService,
 	): Promise<IRReadingTargetAddResult> {
 		const target = input.target;
 		const folderPath =
@@ -374,37 +434,46 @@ export class IRReadingTargetAddService {
 				String(input.noteFolderPath || "").trim() ||
 					resolveIRReadableMarkdownTargetFolder(this.app, {
 						allowActiveFileFallback: false,
-					})
+					}),
 			) || "/";
 
 		await ensureFolderExists(this.app, folderPath);
 		const fileContent =
 			target.kind === "web" && target.webUrl
 				? buildWebReadingPointMarkdown(title, target.webUrl)
-				: `# ${title}\n\n${target.displayLink || `[[${target.resumeLink}|${title}]]`}\n`;
+				: `# ${title}\n\n${
+						target.displayLink || `[[${target.resumeLink}|${title}]]`
+				  }\n`;
 
 		const targetPath = await generateUniqueVaultFilePath(
 			this.app,
 			folderPath,
-			`${sanitizeReadingPointFileName(title)}.md`
+			`${sanitizeReadingPointFileName(title)}.md`,
 		);
 		const createdFile = await this.app.vault.create(targetPath, fileContent);
 
-		await this.host.ensureExternalDocumentChunkScheduled(createdFile, deckId, deckName, {
-			scheduleDate: input.scheduleDate,
-			resumeLink: target.webUrl || target.resumeLink,
-			webUrl: target.webUrl,
-		});
+		await this.host.ensureExternalDocumentChunkScheduled(
+			createdFile,
+			deckId,
+			deckName,
+			{
+				scheduleDate: input.scheduleDate,
+				resumeLink: target.webUrl || target.resumeLink,
+				webUrl: target.webUrl,
+			},
+		);
 
 		await appendSourceBacklinkIfEnabled(
 			this.app,
 			target,
 			deckName,
 			title,
-			Boolean(input.appendSourceBacklink)
+			Boolean(input.appendSourceBacklink),
 		);
 
-		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
+		await recomputeAndBroadcastIRData(this.app, "import_materials", {
+			deckIds: [deckId],
+		});
 		return {
 			createdIds: [createdFile.basename],
 			kind: target.kind,
@@ -418,36 +487,60 @@ export class IRReadingTargetAddService {
 		deckId: string,
 		deckName: string,
 		schedulePin: IRReadingTargetSchedulePin,
-		storage: IRStorageService
+		storage: IRStorageService,
 	): Promise<IRReadingTargetAddResult> {
 		const target = input.target;
-		const sourcePath = normalizePath(String(target.sourceFilePath || "").trim());
+		const sourcePath = normalizePath(
+			String(target.sourceFilePath || "").trim(),
+		);
 		if (!sourcePath) {
 			throw new Error("reading-target-missing-source");
 		}
 
-		const { createDefaultIRBlock, generateIRBlockId } = await import("../../../types/ir-types");
+		const { createDefaultIRBlock, generateIRBlockId } = await import(
+			"../../../types/ir-types"
+		);
 		const existingBlocks = await storage.getBlocksByFile(sourcePath);
 		if (target.blockId) {
 			const duplicate = existingBlocks.find((block) =>
-				blockReferencesObsidianId(block, target.blockId || "")
+				blockReferencesObsidianId(block, target.blockId || ""),
 			);
 			if (duplicate) {
 				await storage.addBlocksToDeck(deckId, [duplicate.id]);
-				await applyPointSchedulePin(this.app, duplicate.id, schedulePin, target.resumeLink);
-				await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-				new Notice(i18n.t("irServiceNotices.readingTarget.blockRefExists", { deckName }), 3000);
+				await applyPointSchedulePin(
+					this.app,
+					duplicate.id,
+					schedulePin,
+					target.resumeLink,
+				);
+				await recomputeAndBroadcastIRData(this.app, "import_materials", {
+					deckIds: [deckId],
+				});
+				new Notice(
+					i18n.t("irServiceNotices.readingTarget.blockRefExists", { deckName }),
+					3000,
+				);
 				return { createdIds: [duplicate.id], kind: target.kind, deckName };
 			}
 		}
 
 		const blockRefLink =
 			target.blockId && target.sourceFilePath
-				? buildObsidianEmbedBlockWikiLink(target.sourceFilePath, target.blockId, title)
+				? buildObsidianEmbedBlockWikiLink(
+						target.sourceFilePath,
+						target.blockId,
+						title,
+				  )
 				: target.displayLink || `[[${target.resumeLink}|${title}]]`;
 
 		const blockId = generateIRBlockId();
-		const block = createDefaultIRBlock(blockId, sourcePath, title ? [title] : [], 0, 0);
+		const block = createDefaultIRBlock(
+			blockId,
+			sourcePath,
+			title ? [title] : [],
+			0,
+			0,
+		);
 		block.headingText = title;
 		block.contentPreview = title;
 		block.deckPath = deckId;
@@ -458,17 +551,24 @@ export class IRReadingTargetAddService {
 
 		await storage.saveBlock(block);
 		await attachBlockToDeck(storage, deckId, sourcePath, block.id);
-		await applyPointSchedulePin(this.app, block.id, schedulePin, target.resumeLink);
+		await applyPointSchedulePin(
+			this.app,
+			block.id,
+			schedulePin,
+			target.resumeLink,
+		);
 
 		await appendSourceBacklinkIfEnabled(
 			this.app,
 			target,
 			deckName,
 			title,
-			Boolean(input.appendSourceBacklink)
+			Boolean(input.appendSourceBacklink),
 		);
 
-		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
+		await recomputeAndBroadcastIRData(this.app, "import_materials", {
+			deckIds: [deckId],
+		});
 		return { createdIds: [block.id], kind: target.kind, deckName };
 	}
 }

@@ -1,7 +1,16 @@
-import { App, FuzzySuggestModal, TFile, setIcon, type FuzzyMatch } from "obsidian";
-import { ensureSuggestModalTheme, markLatestSuggestionContainer } from "./suggestModalTheme";
-import { applyStyleProps } from "../utils/style-props";
+import {
+	App,
+	type FuzzyMatch,
+	FuzzySuggestModal,
+	TFile,
+	setIcon,
+} from "obsidian";
 import { i18n } from "../utils/i18n";
+import { applyStyleProps } from "../utils/style-props";
+import {
+	ensureSuggestModalTheme,
+	markLatestSuggestionContainer,
+} from "./suggestModalTheme";
 
 interface AnchorRect {
 	left: number;
@@ -58,7 +67,7 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 		this.showFilePath = options.showFilePath ?? true;
 
 		const files = (options.files ?? app.vault.getFiles()).filter((file) =>
-			options.filter ? options.filter(file) : true
+			options.filter ? options.filter(file) : true,
 		);
 
 		this.items = [
@@ -66,7 +75,9 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 				? [
 						{
 							kind: "empty" as const,
-							label: options.emptySelectionLabel ?? i18n.t("irModals.vaultFileSuggest.emptySelectionLabel"),
+							label:
+								options.emptySelectionLabel ??
+								i18n.t("irModals.vaultFileSuggest.emptySelectionLabel"),
 							description:
 								options.emptySelectionDescription ??
 								i18n.t("irModals.vaultFileSuggest.emptySelectionDescription"),
@@ -76,7 +87,9 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 			...files.map((file) => ({ kind: "file" as const, file })),
 		];
 
-		this.setPlaceholder(options.placeholder ?? i18n.t("irModals.vaultFileSuggest.placeholder"));
+		this.setPlaceholder(
+			options.placeholder ?? i18n.t("irModals.vaultFileSuggest.placeholder"),
+		);
 	}
 
 	onOpen(): void {
@@ -96,13 +109,18 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 		return item.kind === "file" ? item.file.path : item.label;
 	}
 
-	renderSuggestion(match: FuzzyMatch<VaultFileSuggestItem>, el: HTMLElement): void {
+	renderSuggestion(
+		match: FuzzyMatch<VaultFileSuggestItem>,
+		el: HTMLElement,
+	): void {
 		const item = match.item;
 		el.empty();
 
 		if (item.kind === "empty") {
 			const wrapper = el.createDiv({ cls: "weave-markdown-file-suggestion" });
-			const content = wrapper.createDiv({ cls: "weave-markdown-file-suggestion__content" });
+			const content = wrapper.createDiv({
+				cls: "weave-markdown-file-suggestion__content",
+			});
 			content.createDiv({
 				text: item.label,
 				cls: "weave-markdown-file-suggestion__title",
@@ -118,11 +136,15 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 
 		const wrapper = el.createDiv({ cls: "weave-markdown-file-suggestion" });
 		if (this.showFileIcon) {
-			const iconEl = wrapper.createSpan({ cls: "weave-markdown-file-suggestion__icon" });
+			const iconEl = wrapper.createSpan({
+				cls: "weave-markdown-file-suggestion__icon",
+			});
 			setIcon(iconEl, this.icon);
 		}
 
-		const content = wrapper.createDiv({ cls: "weave-markdown-file-suggestion__content" });
+		const content = wrapper.createDiv({
+			cls: "weave-markdown-file-suggestion__content",
+		});
 		content.createDiv({
 			text: this.getDisplayName(item.file),
 			cls: "weave-markdown-file-suggestion__title",
@@ -190,7 +212,11 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 	}
 
 	private getDisplayName(file: TFile): string {
-		return String((file as Partial<TFile> & { name?: string }).name || file.path.split("/").pop() || file.path);
+		return String(
+			(file as Partial<TFile> & { name?: string }).name ||
+				file.path.split("/").pop() ||
+				file.path,
+		);
 	}
 
 	private positionNearAnchor(): void {
@@ -209,8 +235,14 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 			const viewportWidth = window.innerWidth;
 			const viewportHeight = window.innerHeight;
 			const spacing = 8;
-			const preferredWidth = Math.min(this.preferredWidth ?? 520, viewportWidth - 24);
-			const maxHeight = Math.max(220, viewportHeight - anchorRect.bottom - spacing - 12);
+			const preferredWidth = Math.min(
+				this.preferredWidth ?? 520,
+				viewportWidth - 24,
+			);
+			const maxHeight = Math.max(
+				220,
+				viewportHeight - anchorRect.bottom - spacing - 12,
+			);
 
 			containerEl.classList.add("weave-suggest-modal-container--anchored");
 			modalEl.classList.add("weave-suggest-modal--anchored");
@@ -225,7 +257,10 @@ export class VaultFileSuggestModal extends FuzzySuggestModal<VaultFileSuggestIte
 			});
 
 			const modalRect = modalEl.getBoundingClientRect();
-			const left = Math.max(12, Math.min(anchorRect.left, viewportWidth - modalRect.width - 12));
+			const left = Math.max(
+				12,
+				Math.min(anchorRect.left, viewportWidth - modalRect.width - 12),
+			);
 			const top = Math.min(anchorRect.bottom + spacing, viewportHeight - 12);
 
 			applyStyleProps(modalEl, {

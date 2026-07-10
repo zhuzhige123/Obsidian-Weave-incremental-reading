@@ -1,31 +1,41 @@
 import type { Menu, Plugin, View } from "obsidian";
+import { i18n } from "../../utils/i18n";
+import { logger } from "../../utils/logger";
 import { OBSIDIAN_WEB_VIEWER_VIEW_TYPE } from "../obsidian/obsidian-open-web-url";
 import { getWebViewerPageContextFromView } from "../obsidian/web-viewer-context";
 import { PREMIUM_FEATURES } from "../premium/PremiumFeatureGuard";
-import { i18n } from "../../utils/i18n";
-import { logger } from "../../utils/logger";
 
 export interface WebViewerIrMenuHost {
 	shouldShowPremiumEntry(featureId: string): boolean;
-	ensurePremiumFeatureAccess(featureId: string, blockedMessage: string): boolean;
-	runWebPageToIRQuickCreate(context: { url: string; title: string }): Promise<void>;
+	ensurePremiumFeatureAccess(
+		featureId: string,
+		blockedMessage: string,
+	): boolean;
+	runWebPageToIRQuickCreate(context: {
+		url: string;
+		title: string;
+	}): Promise<void>;
 }
 
 const patchedPrototypes = new WeakSet<object>();
 
 export function registerWebViewerPaneMenuPatch(
 	plugin: Plugin,
-	host: WebViewerIrMenuHost
+	host: WebViewerIrMenuHost,
 ): void {
 	const tryPatchWebViewerViews = (): void => {
-		const leaves = plugin.app.workspace.getLeavesOfType(OBSIDIAN_WEB_VIEWER_VIEW_TYPE);
+		const leaves = plugin.app.workspace.getLeavesOfType(
+			OBSIDIAN_WEB_VIEWER_VIEW_TYPE,
+		);
 		for (const leaf of leaves) {
 			const view = leaf.view;
 			if (!view) {
 				continue;
 			}
 
-			const proto = Object.getPrototypeOf(view) as { onPaneMenu?: (menu: Menu, source: string) => void };
+			const proto = Object.getPrototypeOf(view) as {
+				onPaneMenu?: (menu: Menu, source: string) => void;
+			};
 			if (!proto || patchedPrototypes.has(proto)) {
 				continue;
 			}
@@ -36,7 +46,7 @@ export function registerWebViewerPaneMenuPatch(
 			proto.onPaneMenu = function patchedWebViewerOnPaneMenu(
 				this: View,
 				menu: Menu,
-				source: string
+				source: string,
 			) {
 				original?.call(this, menu, source);
 
@@ -46,7 +56,9 @@ export function registerWebViewerPaneMenuPatch(
 				if (this.getViewType?.() !== OBSIDIAN_WEB_VIEWER_VIEW_TYPE) {
 					return;
 				}
-				if (!host.shouldShowPremiumEntry(PREMIUM_FEATURES.INCREMENTAL_READING)) {
+				if (
+					!host.shouldShowPremiumEntry(PREMIUM_FEATURES.INCREMENTAL_READING)
+				) {
 					return;
 				}
 
@@ -64,7 +76,7 @@ export function registerWebViewerPaneMenuPatch(
 							if (
 								!host.ensurePremiumFeatureAccess(
 									PREMIUM_FEATURES.INCREMENTAL_READING,
-									i18n.t("irCommands.defaultIrName")
+									i18n.t("irCommands.defaultIrName"),
 								)
 							) {
 								return;
@@ -78,7 +90,9 @@ export function registerWebViewerPaneMenuPatch(
 			};
 
 			patchedPrototypes.add(proto);
-			logger.info("[Standalone IR] 已为官方 Web Viewer 注入「添加到增量阅读」菜单");
+			logger.info(
+				"[Standalone IR] 已为官方 Web Viewer 注入「添加到增量阅读」菜单",
+			);
 		}
 	};
 
@@ -87,13 +101,13 @@ export function registerWebViewerPaneMenuPatch(
 	plugin.registerEvent(
 		plugin.app.workspace.on("layout-change", () => {
 			tryPatchWebViewerViews();
-		})
+		}),
 	);
 	plugin.registerEvent(
 		plugin.app.workspace.on("active-leaf-change", (leaf) => {
 			if (leaf?.view?.getViewType?.() === OBSIDIAN_WEB_VIEWER_VIEW_TYPE) {
 				tryPatchWebViewerViews();
 			}
-		})
+		}),
 	);
 }

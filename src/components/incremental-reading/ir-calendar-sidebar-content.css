@@ -1,0 +1,288 @@
+/* IRCalendar sidebar content: reading list, batch toolbar, footer timer, day load popover */
+:global(.floating-menu.ir-calendar-day-load-popover) {
+  min-width: 240px;
+  max-width: min(360px, calc(100vw - 16px));
+  border-radius: var(--radius-m, 10px);
+  box-shadow:
+    0 10px 28px color-mix(in srgb, var(--background-modifier-border) 45%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.day-load-popover-panel {
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-normal);
+}
+
+.day-load-popover-panel--warning {
+  color: var(--text-normal);
+}
+
+.day-load-popover-panel--overloaded {
+  color: var(--text-normal);
+}
+
+.day-load-popover-panel__summary {
+  font-weight: 500;
+}
+
+.day-load-popover-panel__hint {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.day-load-popover-panel--warning .day-load-popover-panel__summary:first-child {
+  color: color-mix(in srgb, var(--color-yellow) 78%, var(--text-normal));
+}
+
+.day-load-popover-panel--overloaded .day-load-popover-panel__summary:first-child {
+  color: color-mix(in srgb, var(--color-orange) 82%, var(--text-normal));
+}
+
+.reading-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  /* 与 EPUB 目录修复策略一致：列表层不再单独刷底色，直接继承宿主表面，避免出现分层色差。 */
+  background: transparent;
+  padding: 0;
+  min-width: 0;
+}
+
+.history-mode-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-modifier-hover) 55%, transparent);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+}
+
+.history-mode-banner__title {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.history-empty-state {
+  text-align: center;
+  gap: 6px;
+}
+
+.history-empty-state__hint {
+  color: var(--text-faint);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+  max-width: 28rem;
+}
+
+.ir-calendar-sidebar.batch-selection-mode .reading-list {
+  padding-bottom: 56px;
+}
+
+.batch-floating-toolbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--weave-ir-sidebar-elevated-background) 92%, transparent);
+  box-shadow:
+    0 8px 24px color-mix(in srgb, var(--background-modifier-border) 55%, transparent),
+    0 1px 0 color-mix(in srgb, var(--background-modifier-border) 40%, transparent);
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+}
+
+.batch-floating-toolbar__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-modifier-hover));
+  color: var(--interactive-accent);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.batch-floating-toolbar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ir-calendar-sidebar button.batch-floating-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  border-radius: var(--clickable-icon-radius);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.ir-calendar-sidebar button.batch-floating-toolbar__btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.ir-calendar-sidebar button.batch-floating-toolbar__btn--primary {
+  color: var(--interactive-accent);
+}
+
+.ir-calendar-sidebar button.batch-floating-toolbar__btn--primary:hover {
+  color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.footer-timer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 32%, var(--background-modifier-border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--interactive-accent) 8%, var(--weave-ir-sidebar-elevated-background)),
+    var(--weave-ir-sidebar-surface-background)
+  );
+}
+
+.footer-timer-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.footer-timer-kicker {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.footer-timer-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer-timer-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.footer-timer-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--interactive-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.footer-timer-pause {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
+  background: var(--weave-ir-sidebar-elevated-background);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.footer-timer-pause:hover {
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.loading-state__message {
+  text-align: center;
+  line-height: 1.5;
+  max-width: min(320px, 100%);
+}
+
+.loading-state__progress {
+  width: min(280px, 100%);
+}
+
+.loading-state__percent {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.loading-state__hint {
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--text-faint);
+  max-width: min(320px, 100%);
+}
+
+.clear-tag-filter-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--clickable-icon-radius, 8px);
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.clear-tag-filter-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.search-empty-state {
+  text-align: center;
+  gap: 6px;
+}

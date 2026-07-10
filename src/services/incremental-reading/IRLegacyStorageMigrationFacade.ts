@@ -28,20 +28,25 @@ export class IRLegacyStorageMigrationFacade {
 
 		const tagGroupService = new IRTagGroupService(this.app);
 		await tagGroupService.initialize();
-		const legacyTagGroupInspection = await tagGroupService.inspectLegacyCatalogResidue();
+		const legacyTagGroupInspection =
+			await tagGroupService.inspectLegacyCatalogResidue();
 
 		const irStorageService = new IRStorageService(this.app);
 		await irStorageService.initialize();
 		const deletedReadableMarkdownInspection =
 			await irStorageService.inspectDeletedReadableMarkdownResidue();
 
-		const deletedReadableMarkdownCount = Number(deletedReadableMarkdownInspection.count || 0);
-		const legacyTagGroupFileCount = Number(legacyTagGroupInspection.legacyFileCount || 0);
+		const deletedReadableMarkdownCount = Number(
+			deletedReadableMarkdownInspection.count || 0,
+		);
+		const legacyTagGroupFileCount = Number(
+			legacyTagGroupInspection.legacyFileCount || 0,
+		);
 		const items = [...inspection.pendingItems];
 
 		if (Number(inspection.legacyChunkStorageFileCount || 0) > 0) {
 			items.push(
-				`legacy-chunks: ${Number(inspection.legacyChunkStorageFileCount || 0)}`
+				`legacy-chunks: ${Number(inspection.legacyChunkStorageFileCount || 0)}`,
 			);
 		}
 		if (deletedReadableMarkdownCount > 0) {
@@ -58,7 +63,9 @@ export class IRLegacyStorageMigrationFacade {
 				deletedReadableMarkdownCount +
 				legacyTagGroupFileCount,
 			pendingItems: items,
-			legacyChunkStorageFileCount: Number(inspection.legacyChunkStorageFileCount || 0),
+			legacyChunkStorageFileCount: Number(
+				inspection.legacyChunkStorageFileCount || 0,
+			),
 			deletedReadableMarkdownCount,
 			legacyTagGroupFileCount,
 		};
@@ -78,9 +85,10 @@ export class IRLegacyStorageMigrationFacade {
 
 		const tagGroupService = new IRTagGroupService(this.app);
 		await tagGroupService.initialize();
-		const legacyTagGroupMigration = await tagGroupService.migrateLegacyCatalogToPointFiles({
-			cleanupLegacyFiles: true,
-		});
+		const legacyTagGroupMigration =
+			await tagGroupService.migrateLegacyCatalogToPointFiles({
+				cleanupLegacyFiles: true,
+			});
 
 		const irStorageService = new IRStorageService(this.app);
 		await irStorageService.initialize();

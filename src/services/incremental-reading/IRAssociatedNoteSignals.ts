@@ -1,7 +1,10 @@
 import { normalizePath } from "obsidian";
 import type { Card } from "../../data/types";
 import type { ReadingMaterial } from "../../types/incremental-reading-types";
-import { extractAllSourcePaths, normalizePathForComparison } from "../../utils/source-path-matcher";
+import {
+	extractAllSourcePaths,
+	normalizePathForComparison,
+} from "../../utils/source-path-matcher";
 import { isLinkableVaultNotePath } from "./IRLinkedNotePolicy";
 
 export interface IRAssociatedNoteSignal {
@@ -68,11 +71,14 @@ function isMemoryCard(card: Card): boolean {
 }
 
 export function resolveAssociatedNotePrimaryPath(
-	material?:
-		| Pick<ReadingMaterial, "primaryAssociatedNotePath" | "associatedNotePath" | "associatedNotePaths">
-		| null
+	material?: Pick<
+		ReadingMaterial,
+		"primaryAssociatedNotePath" | "associatedNotePath" | "associatedNotePaths"
+	> | null,
 ): string | undefined {
-	const normalizedPrimary = normalizeNotePath(material?.primaryAssociatedNotePath);
+	const normalizedPrimary = normalizeNotePath(
+		material?.primaryAssociatedNotePath,
+	);
 	if (normalizedPrimary) {
 		return normalizedPrimary;
 	}
@@ -95,9 +101,10 @@ export function resolveAssociatedNotePrimaryPath(
 }
 
 export function resolveAssociatedNotePath(
-	material?:
-		| Pick<ReadingMaterial, "primaryAssociatedNotePath" | "associatedNotePath" | "associatedNotePaths">
-		| null
+	material?: Pick<
+		ReadingMaterial,
+		"primaryAssociatedNotePath" | "associatedNotePath" | "associatedNotePaths"
+	> | null,
 ): string | undefined {
 	return resolveAssociatedNotePrimaryPath(material);
 }
@@ -108,7 +115,9 @@ export function resolveAssociatedNotePaths(input: {
 }): string[] {
 	const ordered = new Map<string, string>();
 	const candidates = [
-		...(Array.isArray(input.associatedNotePaths) ? input.associatedNotePaths : []),
+		...(Array.isArray(input.associatedNotePaths)
+			? input.associatedNotePaths
+			: []),
 		input.associatedNotePath,
 	];
 
@@ -124,7 +133,11 @@ export function resolveAssociatedNotePaths(input: {
 				continue;
 			}
 			const existing = ordered.get(key);
-			if (existing && !/\.[^/.]+$/i.test(existing) && /\.[^/.]+$/i.test(normalized)) {
+			if (
+				existing &&
+				!/\.[^/.]+$/i.test(existing) &&
+				/\.[^/.]+$/i.test(normalized)
+			) {
 				ordered.set(key, normalized);
 			}
 			continue;
@@ -139,7 +152,7 @@ export function resolveAssociatedNotePaths(input: {
 export function remapAssociatedNotePath(
 	path: string | undefined | null,
 	oldPath: string,
-	newPath: string
+	newPath: string,
 ): string | null {
 	const normalizedPath = normalizeNotePath(path);
 	const normalizedOldPath = normalizeNotePath(oldPath);
@@ -152,7 +165,8 @@ export function remapAssociatedNotePath(
 		return normalizedNewPath;
 	}
 
-	return normalizePathForComparison(normalizedPath) === normalizePathForComparison(normalizedOldPath)
+	return normalizePathForComparison(normalizedPath) ===
+		normalizePathForComparison(normalizedOldPath)
 		? normalizedNewPath
 		: normalizedPath;
 }
@@ -160,7 +174,7 @@ export function remapAssociatedNotePath(
 export function remapAssociatedNotePaths(
 	notePaths: Array<string | null | undefined>,
 	oldPath: string,
-	newPath: string
+	newPath: string,
 ): string[] {
 	return resolveAssociatedNotePaths({
 		associatedNotePaths: notePaths
@@ -169,8 +183,13 @@ export function remapAssociatedNotePaths(
 	});
 }
 
-export function buildAssociatedNoteSignalIndex(cards: Card[]): IRAssociatedNoteSignalIndex {
-	const aggregates = new Map<string, { count: number; prioritySum: number; maxPriority: number }>();
+export function buildAssociatedNoteSignalIndex(
+	cards: Card[],
+): IRAssociatedNoteSignalIndex {
+	const aggregates = new Map<
+		string,
+		{ count: number; prioritySum: number; maxPriority: number }
+	>();
 
 	for (const card of cards) {
 		if (!isMemoryCard(card)) {
@@ -184,7 +203,11 @@ export function buildAssociatedNoteSignalIndex(cards: Card[]): IRAssociatedNoteS
 
 		const cardPriority = clampCardPriority(card.priority);
 		for (const noteKey of noteKeys) {
-			const current = aggregates.get(noteKey) ?? { count: 0, prioritySum: 0, maxPriority: 1 };
+			const current = aggregates.get(noteKey) ?? {
+				count: 0,
+				prioritySum: 0,
+				maxPriority: 1,
+			};
 			current.count += 1;
 			current.prioritySum += cardPriority;
 			current.maxPriority = Math.max(current.maxPriority, cardPriority);
@@ -197,14 +220,17 @@ export function buildAssociatedNoteSignalIndex(cards: Card[]): IRAssociatedNoteS
 		const averagePriority = aggregate.prioritySum / aggregate.count;
 		const blendedPriority = averagePriority * 0.7 + aggregate.maxPriority * 0.3;
 		const normalizedSignal = ((blendedPriority - 1) / 3) * 10;
-		const confidenceFactor = aggregate.count <= 1 ? 0.85 : aggregate.count === 2 ? 0.93 : 1;
+		const confidenceFactor =
+			aggregate.count <= 1 ? 0.85 : aggregate.count === 2 ? 0.93 : 1;
 
 		index.set(noteKey, {
 			notePath: noteKey,
 			cardCount: aggregate.count,
 			averagePriority: roundValue(averagePriority),
 			maxPriority: aggregate.maxPriority,
-			prioritySignal: roundValue(Math.max(0, Math.min(10, normalizedSignal * confidenceFactor))),
+			prioritySignal: roundValue(
+				Math.max(0, Math.min(10, normalizedSignal * confidenceFactor)),
+			),
 		});
 	}
 
@@ -213,7 +239,7 @@ export function buildAssociatedNoteSignalIndex(cards: Card[]): IRAssociatedNoteS
 
 export function getAssociatedNoteSignal(
 	index: IRAssociatedNoteSignalIndex,
-	notePath?: string | null
+	notePath?: string | null,
 ): IRAssociatedNoteSignal | undefined {
 	const noteKey = toAssociatedNoteKey(notePath);
 	if (!noteKey) {

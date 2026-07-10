@@ -26,7 +26,9 @@ export type CanvasViewLike = {
 	canvas?: CanvasRuntime;
 };
 
-export function readCanvasNodeElement(node: CanvasRuntimeNode): HTMLElement | null {
+export function readCanvasNodeElement(
+	node: CanvasRuntimeNode,
+): HTMLElement | null {
 	const candidates = [node.nodeEl, node.contentEl, node.containerEl, node.el];
 	for (const candidate of candidates) {
 		if (candidate instanceof HTMLElement) {

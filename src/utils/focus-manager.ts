@@ -139,7 +139,9 @@ export class FocusManager {
 		}
 
 		const firstElement = focusableElements[0] as HTMLElement;
-		const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+		const lastElement = focusableElements[
+			focusableElements.length - 1
+		] as HTMLElement;
 
 		// 设置初始焦点
 		window.setTimeout(() => {
@@ -230,7 +232,11 @@ export class FocusManager {
 		if (style.display === "none" || style.visibility === "hidden") return false;
 
 		// 检查元素是否被禁用
-		if ("disabled" in element && Boolean((element as HTMLButtonElement).disabled)) return false;
+		if (
+			"disabled" in element &&
+			Boolean((element as HTMLButtonElement).disabled)
+		)
+			return false;
 
 		// 检查tabindex
 		const tabindex = element.getAttribute("tabindex");
@@ -245,17 +251,19 @@ export class FocusManager {
 	private findDefaultFocusableElement(): HTMLElement | null {
 		// 优先查找主内容区域
 		const mainContent = activeDocument.querySelector(
-			".workspace-leaf.mod-active .view-content"
+			".workspace-leaf.mod-active .view-content",
 		) as HTMLElement;
 		if (mainContent) return mainContent;
 
 		// 查找任何激活的工作区
-		const activeLeaf = activeDocument.querySelector(".workspace-leaf.mod-active") as HTMLElement;
+		const activeLeaf = activeDocument.querySelector(
+			".workspace-leaf.mod-active",
+		) as HTMLElement;
 		if (activeLeaf) return activeLeaf;
 
 		// 查找主要的输入框或按钮
 		const primaryInput = activeDocument.querySelector(
-			"input:not([disabled]), button:not([disabled])"
+			"input:not([disabled]), button:not([disabled])",
 		) as HTMLElement;
 		if (primaryInput) return primaryInput;
 

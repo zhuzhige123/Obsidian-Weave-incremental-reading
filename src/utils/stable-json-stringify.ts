@@ -10,8 +10,12 @@ export function stableStringifyForMerge(value: unknown): string {
 		return `[${value.map((item) => stableStringifyForMerge(item)).join(",")}]`;
 	}
 	const record = value as Record<string, unknown>;
-	const keys = Object.keys(record).sort((left, right) => left.localeCompare(right, "en"));
+	const keys = Object.keys(record).sort((left, right) =>
+		left.localeCompare(right, "en"),
+	);
 	return `{${keys
-		.map((key) => `${JSON.stringify(key)}:${stableStringifyForMerge(record[key])}`)
+		.map(
+			(key) => `${JSON.stringify(key)}:${stableStringifyForMerge(record[key])}`,
+		)
 		.join(",")}}`;
 }

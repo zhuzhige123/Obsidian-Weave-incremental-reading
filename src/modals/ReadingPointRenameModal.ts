@@ -1,6 +1,6 @@
 import { App, Modal, Notice } from "obsidian";
-import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
 import { buildSaveInputFromDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditSaveBuilder";
+import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
 import type { IRReadingPointEditDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
 import { resolveReadingPointSaveErrorMessage } from "../services/incremental-reading/reading-point-edit/reading-point-modal-utils";
 import { i18n } from "../utils/i18n";
@@ -22,7 +22,7 @@ export class ReadingPointRenameModal extends Modal {
 
 	constructor(
 		app: App,
-		private readonly options: ReadingPointRenameModalOptions
+		private readonly options: ReadingPointRenameModalOptions,
 	) {
 		super(app);
 	}
@@ -31,7 +31,9 @@ export class ReadingPointRenameModal extends Modal {
 		this.setTitle(i18n.t("irModals.readingPointRename.title"));
 		this.modalEl.addClass("weave-reading-point-rename-modal");
 
-		const fieldEl = this.contentEl.createDiv({ cls: "weave-reading-point-rename-field" });
+		const fieldEl = this.contentEl.createDiv({
+			cls: "weave-reading-point-rename-field",
+		});
 		this.inputEl = fieldEl.createEl("input", {
 			type: "text",
 			cls: "weave-reading-point-rename-input",
@@ -43,14 +45,21 @@ export class ReadingPointRenameModal extends Modal {
 			cls: "setting-item-description weave-reading-point-rename-hint",
 		});
 
-		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
+		const buttonRow = this.contentEl.createDiv({
+			cls: "modal-button-container",
+		});
 
-		this.saveButtonEl = buttonRow.createEl("button", { text: i18n.t("irModals.common.save"), cls: "mod-cta" });
+		this.saveButtonEl = buttonRow.createEl("button", {
+			text: i18n.t("irModals.common.save"),
+			cls: "mod-cta",
+		});
 		this.saveButtonEl.onclick = () => {
 			void this.submit();
 		};
 
-		const cancelButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.cancel") });
+		const cancelButton = buttonRow.createEl("button", {
+			text: i18n.t("irModals.common.cancel"),
+		});
 		cancelButton.onclick = () => {
 			this.close();
 		};
@@ -83,7 +92,9 @@ export class ReadingPointRenameModal extends Modal {
 		this.hintEl.removeClass("mod-warning");
 		if (matches.length > 0) {
 			this.hintEl.setText(
-				i18n.t("irModals.readingPointRename.duplicateTitle", { title: matches[0].title })
+				i18n.t("irModals.readingPointRename.duplicateTitle", {
+					title: matches[0].title,
+				}),
 			);
 			this.hintEl.addClass("mod-warning");
 		}
@@ -115,7 +126,7 @@ export class ReadingPointRenameModal extends Modal {
 				buildSaveInputFromDraft(this.app, this.options.draft, {
 					title,
 					titleManuallyEdited: true,
-				})
+				}),
 			);
 
 			if (result.changed) {

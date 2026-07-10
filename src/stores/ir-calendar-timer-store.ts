@@ -18,7 +18,9 @@ export function getIRCalendarTimerRuntimeState(): Readonly<IRCalendarTimerRuntim
 	return runtimeState;
 }
 
-export function setIRCalendarTimerRuntimeState(patch: Partial<IRCalendarTimerRuntimeState>): void {
+export function setIRCalendarTimerRuntimeState(
+	patch: Partial<IRCalendarTimerRuntimeState>,
+): void {
 	runtimeState = {
 		...runtimeState,
 		...patch,

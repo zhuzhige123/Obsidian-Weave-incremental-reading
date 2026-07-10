@@ -12,7 +12,9 @@ import { IRChunkFileService } from "./IRChunkFileService";
 import { IRStorageService } from "./IRStorageService";
 
 /** 将块文件状态映射到内部调度状态。 */
-function mapChunkStatusToScheduleStatus(yamlStatus: ChunkFileStatus): IRBlockStatus {
+function mapChunkStatusToScheduleStatus(
+	yamlStatus: ChunkFileStatus,
+): IRBlockStatus {
 	switch (yamlStatus) {
 		case "active":
 			return "queued";
@@ -30,7 +32,9 @@ function mapChunkStatusToScheduleStatus(yamlStatus: ChunkFileStatus): IRBlockSta
 }
 
 /** 将内部调度状态映射回块文件状态。 */
-function mapScheduleStatusToChunkStatus(scheduleStatus: IRBlockStatus): ChunkFileStatus {
+function mapScheduleStatusToChunkStatus(
+	scheduleStatus: IRBlockStatus,
+): ChunkFileStatus {
 	switch (scheduleStatus) {
 		case "new":
 		case "queued":
@@ -65,7 +69,11 @@ type ChunkScheduleUpdates = Partial<
 	manualSchedulePinnedDateKey?: string | null;
 };
 
-const TERMINAL_CHUNK_STATUSES = new Set<ChunkFileStatus>(["done", "archived", "removed"]);
+const TERMINAL_CHUNK_STATUSES = new Set<ChunkFileStatus>([
+	"done",
+	"archived",
+	"removed",
+]);
 
 export class IRChunkScheduleAdapter {
 	private storage: IRStorageService;
@@ -82,10 +90,15 @@ export class IRChunkScheduleAdapter {
 		const schedulable: IRChunkFileData[] = [];
 
 		for (const chunk of Object.values(allChunks)) {
-			const yamlData = await this.chunkFileService.readChunkFileYAML(chunk.filePath);
+			const yamlData = await this.chunkFileService.readChunkFileYAML(
+				chunk.filePath,
+			);
 
 			if (yamlData) {
-				const { changed, isTerminal } = this.applyYamlStateToChunk(chunk, yamlData);
+				const { changed, isTerminal } = this.applyYamlStateToChunk(
+					chunk,
+					yamlData,
+				);
 
 				if (changed) {
 					chunk.updatedAt = Date.now();
@@ -118,7 +131,7 @@ export class IRChunkScheduleAdapter {
 	async updateChunkSchedule(
 		chunkId: string,
 		updates: ChunkScheduleUpdates,
-		options?: { skipScheduleCacheInvalidate?: boolean }
+		options?: { skipScheduleCacheInvalidate?: boolean },
 	): Promise<void> {
 		const chunk = await this.storage.getChunkData(chunkId);
 		if (!chunk) {
@@ -140,7 +153,7 @@ export class IRChunkScheduleAdapter {
 		updates: Array<{
 			chunkId: string;
 			data: ChunkScheduleUpdates;
-		}>
+		}>,
 	): Promise<number> {
 		if (updates.length === 0) return 0;
 
@@ -165,7 +178,9 @@ export class IRChunkScheduleAdapter {
 			await this.syncChunkYamlFields(chunk, data);
 		}
 
-		logger.debug(`[IRChunkScheduleAdapter] 批量更新 ${updatedChunks.length} 个块调度`);
+		logger.debug(
+			`[IRChunkScheduleAdapter] 批量更新 ${updatedChunks.length} 个块调度`,
+		);
 		return updatedChunks.length;
 	}
 
@@ -181,9 +196,13 @@ export class IRChunkScheduleAdapter {
 		chunk.updatedAt = Date.now();
 		await this.storage.saveChunkData(chunk);
 
-		const yamlData = await this.chunkFileService.readChunkFileYAML(chunk.filePath);
+		const yamlData = await this.chunkFileService.readChunkFileYAML(
+			chunk.filePath,
+		);
 		if (yamlData) {
-			await this.chunkFileService.updateChunkFileYAML(chunk.filePath, { status: "done" });
+			await this.chunkFileService.updateChunkFileYAML(chunk.filePath, {
+				status: "done",
+			});
 		}
 
 		logger.info(`[IRChunkScheduleAdapter] 块标记为完成: ${chunkId}`);
@@ -193,8 +212,12 @@ export class IRChunkScheduleAdapter {
 	async recordChunkInteraction(
 		chunkId: string,
 		readingTimeSec: number,
-		actions: { extracts?: number; cardsCreated?: number; notesWritten?: number } = {},
-		options?: { skipScheduleCacheInvalidate?: boolean }
+		actions: {
+			extracts?: number;
+			cardsCreated?: number;
+			notesWritten?: number;
+		} = {},
+		options?: { skipScheduleCacheInvalidate?: boolean },
 	): Promise<void> {
 		const chunk = await this.storage.getChunkData(chunkId);
 		if (!chunk) return;
@@ -243,7 +266,7 @@ export class IRChunkScheduleAdapter {
 	/** 把 YAML 中用户可编辑的调度字段合并回块数据。 */
 	private applyYamlStateToChunk(
 		chunk: IRChunkFileData,
-		yaml: IRChunkFileYAML
+		yaml: IRChunkFileYAML,
 	): { changed: boolean; isTerminal: boolean } {
 		let changed = false;
 
@@ -255,7 +278,8 @@ export class IRChunkScheduleAdapter {
 
 		if (
 			yaml.priority_ui !== undefined &&
-			(chunk.priorityUi === undefined || Math.abs(chunk.priorityUi - yaml.priority_ui) > 0.1)
+			(chunk.priorityUi === undefined ||
+				Math.abs(chunk.priorityUi - yaml.priority_ui) > 0.1)
 		) {
 			chunk.priorityUi = yaml.priority_ui;
 			changed = true;
@@ -278,28 +302,39 @@ export class IRChunkScheduleAdapter {
 		}
 
 		if (syncedCount > 0) {
-			logger.info(`[IRChunkScheduleAdapter] 从 YAML 同步了 ${syncedCount} 个块的状态`);
+			logger.info(
+				`[IRChunkScheduleAdapter] 从 YAML 同步了 ${syncedCount} 个块的状态`,
+			);
 		}
 
 		return syncedCount;
 	}
 
 	/** 把更新字段写回块数据对象。 */
-	private applyChunkUpdates(chunk: IRChunkFileData, updates: ChunkScheduleUpdates): void {
+	private applyChunkUpdates(
+		chunk: IRChunkFileData,
+		updates: ChunkScheduleUpdates,
+	): void {
 		if (updates.priorityUi !== undefined) chunk.priorityUi = updates.priorityUi;
-		if (updates.priorityEff !== undefined) chunk.priorityEff = updates.priorityEff;
-		if (updates.intervalDays !== undefined) chunk.intervalDays = updates.intervalDays;
-		if (updates.nextRepDate !== undefined) chunk.nextRepDate = updates.nextRepDate;
-		if (updates.scheduleStatus !== undefined) chunk.scheduleStatus = updates.scheduleStatus;
+		if (updates.priorityEff !== undefined)
+			chunk.priorityEff = updates.priorityEff;
+		if (updates.intervalDays !== undefined)
+			chunk.intervalDays = updates.intervalDays;
+		if (updates.nextRepDate !== undefined)
+			chunk.nextRepDate = updates.nextRepDate;
+		if (updates.scheduleStatus !== undefined)
+			chunk.scheduleStatus = updates.scheduleStatus;
 		if (updates.doneReason !== undefined) chunk.doneReason = updates.doneReason;
 		if (updates.doneAt !== undefined) chunk.doneAt = updates.doneAt;
 		if (updates.manualSchedulePinnedDateKey !== undefined) {
 			chunk.meta = { ...(chunk.meta || {}) };
-			const pinnedDateKey = String(updates.manualSchedulePinnedDateKey || "").trim();
+			const pinnedDateKey = String(
+				updates.manualSchedulePinnedDateKey || "",
+			).trim();
 			if (pinnedDateKey) {
 				chunk.meta.manualSchedulePinnedDateKey = pinnedDateKey;
 			} else {
-				delete chunk.meta.manualSchedulePinnedDateKey;
+				chunk.meta.manualSchedulePinnedDateKey = undefined;
 			}
 		}
 		chunk.updatedAt = Date.now();
@@ -308,19 +343,23 @@ export class IRChunkScheduleAdapter {
 	/** 把可落在 YAML 的字段同步回块文件。 */
 	private async syncChunkYamlFields(
 		chunk: IRChunkFileData,
-		updates: ChunkScheduleUpdates
+		updates: ChunkScheduleUpdates,
 	): Promise<void> {
-		const yamlData = await this.chunkFileService.readChunkFileYAML(chunk.filePath);
+		const yamlData = await this.chunkFileService.readChunkFileYAML(
+			chunk.filePath,
+		);
 		if (!yamlData) {
 			logger.debug(
-				`[IRChunkScheduleAdapter] 跳过 YAML 同步（非 chunk 文件或无法读取）: ${chunk.chunkId}`
+				`[IRChunkScheduleAdapter] 跳过 YAML 同步（非 chunk 文件或无法读取）: ${chunk.chunkId}`,
 			);
 			return;
 		}
 
 		if (updates.scheduleStatus !== undefined) {
 			const yamlStatus = mapScheduleStatusToChunkStatus(updates.scheduleStatus);
-			await this.chunkFileService.updateChunkFileYAML(chunk.filePath, { status: yamlStatus });
+			await this.chunkFileService.updateChunkFileYAML(chunk.filePath, {
+				status: yamlStatus,
+			});
 		}
 
 		if (updates.priorityUi !== undefined) {

@@ -25,7 +25,10 @@ import {
 	serializeReadingMaterialForStorage,
 } from "../../utils/ir-topic-compat";
 import { logger } from "../../utils/logger";
-import { remapAssociatedNotePaths, resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
+import {
+	remapAssociatedNotePaths,
+	resolveAssociatedNotePaths,
+} from "./IRAssociatedNoteSignals";
 
 type ReadingMaterialRuntimeStore = {
 	version: string;
@@ -56,7 +59,8 @@ export class ReadingMaterialStorage {
 		const v2Paths = getV2PathsFromApp(this.app);
 		const pluginPaths = getPluginPaths(this.app);
 		return {
-			RUNTIME_STATE: pluginPaths.state.incrementalReading.readingMaterialsRuntime,
+			RUNTIME_STATE:
+				pluginPaths.state.incrementalReading.readingMaterialsRuntime,
 			PLUGIN_STATE_ROOT: pluginPaths.state.root,
 			PLUGIN_IR_STATE_ROOT: pluginPaths.state.incrementalReading.root,
 			ANCHORS_CACHE: pluginPaths.cache.anchors,
@@ -133,7 +137,7 @@ export class ReadingMaterialStorage {
 				const content = await adapter.read(storagePaths.RUNTIME_STATE);
 				this.applyRuntimeStore(JSON.parse(content));
 				logger.info(
-					`[ReadingMaterialStorage] 已从插件本地状态加载 ${this.materialsCache.size} 个阅读材料`
+					`[ReadingMaterialStorage] 已从插件本地状态加载 ${this.materialsCache.size} 个阅读材料`,
 				);
 				return;
 			}
@@ -144,12 +148,14 @@ export class ReadingMaterialStorage {
 			if (this.materialsCache.size > 0 || this.sessionsCache.size > 0) {
 				await this.saveRuntimeStore();
 				logger.info(
-					`[ReadingMaterialStorage] 已将旧材料兼容状态迁入插件本地单文件: ${storagePaths.RUNTIME_STATE}`
+					`[ReadingMaterialStorage] 已将旧材料兼容状态迁入插件本地单文件: ${storagePaths.RUNTIME_STATE}`,
 				);
 				return;
 			}
 
-			logger.info("[ReadingMaterialStorage] 未检测到兼容材料状态，已使用空运行时缓存");
+			logger.info(
+				"[ReadingMaterialStorage] 未检测到兼容材料状态，已使用空运行时缓存",
+			);
 		} catch (error) {
 			logger.error("[ReadingMaterialStorage] 加载兼容运行时状态失败:", error);
 			this.materialsCache.clear();
@@ -183,22 +189,32 @@ export class ReadingMaterialStorage {
 
 					try {
 						const content = await adapter.read(filePath);
-						const parsed = JSON.parse(content) as { sessions?: ReadingSession[] };
+						const parsed = JSON.parse(content) as {
+							sessions?: ReadingSession[];
+						};
 						const fileName = filePath.split("/").pop() || "";
 						const materialId = fileName.replace(/\.json$/i, "").trim();
 						if (!materialId) {
 							continue;
 						}
-						store.sessionsByMaterial[materialId] = Array.isArray(parsed.sessions)
+						store.sessionsByMaterial[materialId] = Array.isArray(
+							parsed.sessions,
+						)
 							? parsed.sessions
 							: [];
 					} catch (error) {
-						logger.warn(`[ReadingMaterialStorage] 导入旧会话文件失败: ${filePath}`, error);
+						logger.warn(
+							`[ReadingMaterialStorage] 导入旧会话文件失败: ${filePath}`,
+							error,
+						);
 					}
 				}
 			}
 		} catch (error) {
-			logger.warn("[ReadingMaterialStorage] 导入旧 vault 兼容状态失败，将退回空缓存", error);
+			logger.warn(
+				"[ReadingMaterialStorage] 导入旧 vault 兼容状态失败，将退回空缓存",
+				error,
+			);
 		}
 
 		return store;
@@ -208,12 +224,20 @@ export class ReadingMaterialStorage {
 		const store = this.normalizeRuntimeStore(raw);
 		this.materialsCache.clear();
 		for (const [uuid, material] of Object.entries(store.materials)) {
-			this.materialsCache.set(uuid, normalizeReadingMaterialForRuntime(material));
+			this.materialsCache.set(
+				uuid,
+				normalizeReadingMaterialForRuntime(material),
+			);
 		}
 
 		this.sessionsCache.clear();
-		for (const [materialId, sessions] of Object.entries(store.sessionsByMaterial)) {
-			this.sessionsCache.set(materialId, Array.isArray(sessions) ? sessions : []);
+		for (const [materialId, sessions] of Object.entries(
+			store.sessionsByMaterial,
+		)) {
+			this.sessionsCache.set(
+				materialId,
+				Array.isArray(sessions) ? sessions : [],
+			);
 		}
 	}
 
@@ -229,16 +253,18 @@ export class ReadingMaterialStorage {
 					? candidate.version
 					: "2.0.0",
 			lastUpdated:
-				typeof candidate.lastUpdated === "string" && candidate.lastUpdated.trim()
+				typeof candidate.lastUpdated === "string" &&
+				candidate.lastUpdated.trim()
 					? candidate.lastUpdated
 					: new Date().toISOString(),
 			materials:
 				candidate.materials && typeof candidate.materials === "object"
-					? (candidate.materials)
+					? candidate.materials
 					: {},
 			sessionsByMaterial:
-				candidate.sessionsByMaterial && typeof candidate.sessionsByMaterial === "object"
-					? (candidate.sessionsByMaterial)
+				candidate.sessionsByMaterial &&
+				typeof candidate.sessionsByMaterial === "object"
+					? candidate.sessionsByMaterial
 					: {},
 		};
 	}
@@ -255,13 +281,16 @@ export class ReadingMaterialStorage {
 				Array.from(this.materialsCache.entries()).map(([uuid, material]) => [
 					uuid,
 					serializeReadingMaterialForStorage(material),
-				])
+				]),
 			),
 			sessionsByMaterial: Object.fromEntries(this.sessionsCache.entries()),
 		};
 
 		try {
-			await adapter.write(this.storagePaths.RUNTIME_STATE, JSON.stringify(store));
+			await adapter.write(
+				this.storagePaths.RUNTIME_STATE,
+				JSON.stringify(store),
+			);
 			logger.debug("[ReadingMaterialStorage] 插件本地兼容状态已保存");
 		} catch (error) {
 			logger.error("[ReadingMaterialStorage] 保存插件本地兼容状态失败:", error);
@@ -302,7 +331,10 @@ export class ReadingMaterialStorage {
 	 */
 	async saveMaterial(material: ReadingMaterial): Promise<void> {
 		material.modified = new Date().toISOString();
-		this.materialsCache.set(material.uuid, normalizeReadingMaterialForRuntime(material));
+		this.materialsCache.set(
+			material.uuid,
+			normalizeReadingMaterialForRuntime(material),
+		);
 		await this.saveRuntimeStore();
 		logger.debug(`[ReadingMaterialStorage] 保存材料: ${material.uuid}`);
 	}
@@ -327,25 +359,38 @@ export class ReadingMaterialStorage {
 		const now = new Date().toISOString();
 		for (const material of materials) {
 			material.modified = now;
-			this.materialsCache.set(material.uuid, normalizeReadingMaterialForRuntime(material));
+			this.materialsCache.set(
+				material.uuid,
+				normalizeReadingMaterialForRuntime(material),
+			);
 		}
 		await this.saveRuntimeStore();
-		logger.debug(`[ReadingMaterialStorage] 批量保存 ${materials.length} 个材料`);
+		logger.debug(
+			`[ReadingMaterialStorage] 批量保存 ${materials.length} 个材料`,
+		);
 	}
 
-	async remapAssociatedNoteFileReferences(oldPath: string, newPath: string): Promise<number> {
+	async remapAssociatedNoteFileReferences(
+		oldPath: string,
+		newPath: string,
+	): Promise<number> {
 		const updates: ReadingMaterial[] = [];
 
 		for (const material of this.materialsCache.values()) {
 			const currentPaths = resolveAssociatedNotePaths({
-				associatedNotePath: material.primaryAssociatedNotePath || material.associatedNotePath,
+				associatedNotePath:
+					material.primaryAssociatedNotePath || material.associatedNotePath,
 				associatedNotePaths: material.associatedNotePaths,
 			});
 			if (currentPaths.length === 0) {
 				continue;
 			}
 
-			const nextPaths = remapAssociatedNotePaths(currentPaths, oldPath, newPath);
+			const nextPaths = remapAssociatedNotePaths(
+				currentPaths,
+				oldPath,
+				newPath,
+			);
 			if (
 				nextPaths.length === currentPaths.length &&
 				nextPaths.every((path, index) => path === currentPaths[index])
@@ -367,7 +412,7 @@ export class ReadingMaterialStorage {
 
 		await this.saveMaterials(updates);
 		logger.debug(
-			`[ReadingMaterialStorage] 已重映射 ${updates.length} 个材料的关联笔记路径: ${oldPath} -> ${newPath}`
+			`[ReadingMaterialStorage] 已重映射 ${updates.length} 个材料的关联笔记路径: ${oldPath} -> ${newPath}`,
 		);
 		return updates.length;
 	}
@@ -386,7 +431,9 @@ export class ReadingMaterialStorage {
 	 */
 	async saveSession(session: ReadingSession): Promise<void> {
 		const sessions = [...(this.sessionsCache.get(session.materialId) || [])];
-		const existingIndex = sessions.findIndex((item) => item.uuid === session.uuid);
+		const existingIndex = sessions.findIndex(
+			(item) => item.uuid === session.uuid,
+		);
 		if (existingIndex >= 0) {
 			sessions[existingIndex] = session;
 		} else {
@@ -423,7 +470,10 @@ export class ReadingMaterialStorage {
 	/**
 	 * 更新锚点缓存
 	 */
-	async updateAnchorsCache(filePath: string, anchors: AnchorRecord[]): Promise<void> {
+	async updateAnchorsCache(
+		filePath: string,
+		anchors: AnchorRecord[],
+	): Promise<void> {
 		const adapter = this.app.vault.adapter;
 
 		try {
@@ -439,7 +489,10 @@ export class ReadingMaterialStorage {
 			cache.anchors[filePath] = anchors;
 			cache.lastUpdated = new Date().toISOString();
 
-			await adapter.write(this.storagePaths.ANCHORS_CACHE, JSON.stringify(cache));
+			await adapter.write(
+				this.storagePaths.ANCHORS_CACHE,
+				JSON.stringify(cache),
+			);
 		} catch (error) {
 			logger.warn("[ReadingMaterialStorage] 更新锚点缓存失败:", error);
 		}
@@ -475,8 +528,12 @@ export class ReadingMaterialStorage {
 	/**
 	 * 按分类获取材料
 	 */
-	getMaterialsByCategory(category: ReadingMaterial["category"]): ReadingMaterial[] {
-		return Array.from(this.materialsCache.values()).filter((material) => material.category === category);
+	getMaterialsByCategory(
+		category: ReadingMaterial["category"],
+	): ReadingMaterial[] {
+		return Array.from(this.materialsCache.values()).filter(
+			(material) => material.category === category,
+		);
 	}
 
 	/**
@@ -502,7 +559,10 @@ export class ReadingMaterialStorage {
 	/**
 	 * 获取指定日期范围的材料
 	 */
-	async getMaterialsInDateRange(startDate: Date, endDate: Date): Promise<ReadingMaterial[]> {
+	async getMaterialsInDateRange(
+		startDate: Date,
+		endDate: Date,
+	): Promise<ReadingMaterial[]> {
 		return Array.from(this.materialsCache.values()).filter((_m) => {
 			const dueAt = getReadingMaterialDueAt(_m);
 			if (!dueAt) return false;
@@ -563,7 +623,8 @@ export class ReadingMaterialStorage {
 			total: materials.length,
 			byCategory,
 			todayDue,
-			averageProgress: materials.length > 0 ? totalProgress / materials.length : 0,
+			averageProgress:
+				materials.length > 0 ? totalProgress / materials.length : 0,
 		};
 	}
 }

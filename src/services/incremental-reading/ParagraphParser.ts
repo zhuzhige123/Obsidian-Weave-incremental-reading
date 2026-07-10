@@ -206,7 +206,7 @@ export class ParagraphParser {
 						i - 1,
 						startOffset,
 						currentOffset - 1,
-						currentParagraphLines
+						currentParagraphLines,
 					);
 					paragraphs.push(paragraph);
 					currentParagraphLines = [];
@@ -234,7 +234,7 @@ export class ParagraphParser {
 				lines.length - 1,
 				startOffset,
 				content.length,
-				currentParagraphLines
+				currentParagraphLines,
 			);
 			paragraphs.push(paragraph);
 		}
@@ -252,7 +252,8 @@ export class ParagraphParser {
 	private parseByHeading(content: string): Paragraph[] {
 		const paragraphs: Paragraph[] = [];
 		const lines = content.split("\n");
-		const config = this.config.headingConfig || DEFAULT_PARSER_CONFIG.headingConfig!;
+		const config =
+			this.config.headingConfig || DEFAULT_PARSER_CONFIG.headingConfig!;
 
 		// 获取分割级别（优先使用 splitLevel，向后兼容 minLevel）
 		const splitLevel = config.splitLevel ?? config.minLevel ?? 2;
@@ -297,7 +298,7 @@ export class ParagraphParser {
 								currentOffset - 1,
 								currentLines,
 								currentHeadingLevel,
-								currentHeadingText
+								currentHeadingText,
 							);
 							paragraphs.push(paragraph);
 							currentLines = [];
@@ -339,7 +340,7 @@ export class ParagraphParser {
 				content.length,
 				currentLines,
 				currentHeadingLevel,
-				currentHeadingText
+				currentHeadingText,
 			);
 			paragraphs.push(paragraph);
 		}
@@ -354,7 +355,9 @@ export class ParagraphParser {
 	private parseByManualMarkers(content: string): Paragraph[] {
 		const paragraphs: Paragraph[] = [];
 		const lines = content.split("\n");
-		const config = this.config.manualMarkerConfig || DEFAULT_PARSER_CONFIG.manualMarkerConfig!;
+		const config =
+			this.config.manualMarkerConfig ||
+			DEFAULT_PARSER_CONFIG.manualMarkerConfig!;
 
 		let currentLines: string[] = [];
 		let startLine = 0;
@@ -378,7 +381,7 @@ export class ParagraphParser {
 						i - 1,
 						startOffset,
 						currentOffset - 1,
-						currentLines
+						currentLines,
 					);
 					paragraphs.push(paragraph);
 					currentLines = [];
@@ -400,7 +403,7 @@ export class ParagraphParser {
 						i - 1,
 						blockStartOffset,
 						currentOffset - 1,
-						currentLines
+						currentLines,
 					);
 					paragraphs.push(paragraph);
 					currentLines = [];
@@ -436,7 +439,7 @@ export class ParagraphParser {
 					lines.length - 1,
 					blockStartOffset,
 					content.length,
-					currentLines
+					currentLines,
 				);
 				paragraphs.push(paragraph);
 			} else {
@@ -446,7 +449,7 @@ export class ParagraphParser {
 					lines.length - 1,
 					startOffset,
 					content.length,
-					currentLines
+					currentLines,
 				);
 				paragraphs.push(paragraph);
 			}
@@ -462,9 +465,11 @@ export class ParagraphParser {
 	private parseCombined(content: string): Paragraph[] {
 		const paragraphs: Paragraph[] = [];
 		const lines = content.split("\n");
-		const headingConfig = this.config.headingConfig || DEFAULT_PARSER_CONFIG.headingConfig!;
+		const headingConfig =
+			this.config.headingConfig || DEFAULT_PARSER_CONFIG.headingConfig!;
 		const markerConfig =
-			this.config.manualMarkerConfig || DEFAULT_PARSER_CONFIG.manualMarkerConfig!;
+			this.config.manualMarkerConfig ||
+			DEFAULT_PARSER_CONFIG.manualMarkerConfig!;
 
 		// 获取分割级别（优先使用 splitLevel，向后兼容 minLevel）
 		const splitLevel = headingConfig.splitLevel ?? headingConfig.minLevel ?? 2;
@@ -505,7 +510,7 @@ export class ParagraphParser {
 							currentLines,
 							currentHeadingLevel,
 							currentHeadingText,
-							isManualBlock
+							isManualBlock,
 						);
 						paragraphs.push(paragraph);
 						currentLines = [];
@@ -532,7 +537,7 @@ export class ParagraphParser {
 							currentLines,
 							undefined,
 							undefined,
-							true
+							true,
 						);
 						paragraphs.push(paragraph);
 						currentLines = [];
@@ -567,7 +572,7 @@ export class ParagraphParser {
 									currentLines,
 									currentHeadingLevel,
 									currentHeadingText,
-									false
+									false,
 								);
 								paragraphs.push(paragraph);
 								currentLines = [];
@@ -610,7 +615,7 @@ export class ParagraphParser {
 				currentLines,
 				currentHeadingLevel,
 				currentHeadingText,
-				isManualBlock
+				isManualBlock,
 			);
 			paragraphs.push(paragraph);
 		}
@@ -629,7 +634,7 @@ export class ParagraphParser {
 		endOffset: number,
 		lines: string[],
 		headingLevel?: number,
-		headingText?: string
+		headingText?: string,
 	): Paragraph {
 		const content = lines.join("\n");
 		const anchorMatch = content.match(ANCHOR_REGEX);
@@ -657,7 +662,7 @@ export class ParagraphParser {
 		endLine: number,
 		startOffset: number,
 		endOffset: number,
-		lines: string[]
+		lines: string[],
 	): Paragraph {
 		const content = lines.join("\n");
 		const anchorMatch = content.match(ANCHOR_REGEX);
@@ -687,7 +692,7 @@ export class ParagraphParser {
 		lines: string[],
 		headingLevel?: number,
 		headingText?: string,
-		isManualBlock?: boolean
+		isManualBlock?: boolean,
 	): Paragraph {
 		const content = lines.join("\n");
 		const anchorMatch = content.match(ANCHOR_REGEX);
@@ -716,7 +721,7 @@ export class ParagraphParser {
 		endLine: number,
 		startOffset: number,
 		endOffset: number,
-		lines: string[]
+		lines: string[],
 	): Paragraph {
 		const content = lines.join("\n");
 		const anchorMatch = content.match(ANCHOR_REGEX);
@@ -801,7 +806,9 @@ export class ParagraphParser {
 
 		// 英文单词数（移除中文后按空格分割）
 		const englishText = content.replace(/[\u4e00-\u9fa5]/g, " ");
-		const englishWords = englishText.split(/\s+/).filter((w) => w.length > 0).length;
+		const englishWords = englishText
+			.split(/\s+/)
+			.filter((w) => w.length > 0).length;
 
 		return chineseChars + englishWords;
 	}
@@ -813,7 +820,10 @@ export class ParagraphParser {
 	 * @param paragraphIndex 段落索引
 	 * @returns 累计字数
 	 */
-	calculateCumulativeWordCount(paragraphs: Paragraph[], paragraphIndex: number): number {
+	calculateCumulativeWordCount(
+		paragraphs: Paragraph[],
+		paragraphIndex: number,
+	): number {
 		let totalWords = 0;
 		for (let i = 0; i <= paragraphIndex && i < paragraphs.length; i++) {
 			totalWords += this.calculateWordCount(paragraphs[i]);
@@ -828,6 +838,9 @@ export class ParagraphParser {
 	 * @returns 总字数
 	 */
 	calculateTotalWordCount(paragraphs: Paragraph[]): number {
-		return paragraphs.reduce((total, p) => total + this.calculateWordCount(p), 0);
+		return paragraphs.reduce(
+			(total, p) => total + this.calculateWordCount(p),
+			0,
+		);
 	}
 }

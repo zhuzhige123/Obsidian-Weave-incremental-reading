@@ -1,11 +1,16 @@
 import type { App, TAbstractFile, TFile, TFolder } from "obsidian";
-import { normalizePath, TFile as TFileClass, TFolder as TFolderClass } from "obsidian";
+import {
+	TFile as TFileClass,
+	TFolder as TFolderClass,
+	normalizePath,
+} from "obsidian";
 import type { IncrementalReadingFolderSubscriptionRule } from "../../types/plugin-settings.d";
 import { readString } from "../../utils/unknown-record";
 import { normalizeIncrementalReadingFolderSubscriptionPath } from "./folder-subscription-settings";
 
 function scanMarkdownFilesInFolder(app: App, folderPath: string): TFile[] {
-	const normalizedFolderPath = normalizeIncrementalReadingFolderSubscriptionPath(folderPath);
+	const normalizedFolderPath =
+		normalizeIncrementalReadingFolderSubscriptionPath(folderPath);
 	if (!normalizedFolderPath) {
 		return [];
 	}
@@ -39,13 +44,15 @@ function scanMarkdownFilesInFolder(app: App, folderPath: string): TFile[] {
  */
 export function collectMarkdownFilesForFolderSubscriptionRules(
 	app: App,
-	rules: IncrementalReadingFolderSubscriptionRule[]
+	rules: IncrementalReadingFolderSubscriptionRule[],
 ): TFile[] {
 	const seenPaths = new Set<string>();
 	const collected: TFile[] = [];
 
 	for (const rule of rules) {
-		const folderPath = normalizeIncrementalReadingFolderSubscriptionPath(String(rule.folderPath || ""));
+		const folderPath = normalizeIncrementalReadingFolderSubscriptionPath(
+			String(rule.folderPath || ""),
+		);
 		if (!folderPath) {
 			continue;
 		}
@@ -63,12 +70,14 @@ export function collectMarkdownFilesForFolderSubscriptionRules(
 }
 
 function hasFolderChildren(
-	file: TAbstractFile
+	file: TAbstractFile,
 ): file is TAbstractFile & { children: TAbstractFile[] } {
 	return "children" in file && Array.isArray(file.children);
 }
 
-function isVaultFolder(file: TAbstractFile | null | undefined): file is TFolder {
+function isVaultFolder(
+	file: TAbstractFile | null | undefined,
+): file is TFolder {
 	if (!file) {
 		return false;
 	}
@@ -79,5 +88,9 @@ function isVaultMarkdownFile(file: TAbstractFile): file is TFile {
 	if (file instanceof TFileClass) {
 		return true;
 	}
-	return "extension" in file && readString((file as { extension?: unknown }).extension).toLowerCase() === "md";
+	return (
+		"extension" in file &&
+		readString((file as { extension?: unknown }).extension).toLowerCase() ===
+			"md"
+	);
 }

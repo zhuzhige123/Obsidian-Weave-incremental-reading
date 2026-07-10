@@ -1,11 +1,17 @@
 import type { App } from "obsidian";
 import { normalizePath } from "obsidian";
-import { LEGACY_DOT_TUANKI, PATHS, getPluginPaths, getV2PathsFromApp } from "../../config/paths";
+import {
+	LEGACY_DOT_TUANKI,
+	PATHS,
+	getPluginPaths,
+	getV2PathsFromApp,
+} from "../../config/paths";
 
 export const DETACHED_EDITOR_TEMP_FILE_PREFIX = "weave-editor-";
 export const DETACHED_EDITOR_TEMP_FILE_SUFFIX = ".md";
 
-const MODAL_EDITOR_PERMANENT_FILE_PATTERN = /^modal-editor-permanent(?:-\d+)?\.md$/;
+const MODAL_EDITOR_PERMANENT_FILE_PATTERN =
+	/^modal-editor-permanent(?:-\d+)?\.md$/;
 const DETACHED_EDITOR_SOURCE_FILE_EXTENSIONS = new Set([
 	"md",
 	"markdown",
@@ -45,12 +51,17 @@ function getParentFolder(path: string): string {
 	return lastSlash >= 0 ? path.slice(0, lastSlash) : "";
 }
 
-function inferExistingVaultPathKind(app: App, normalizedPath: string): "file" | "folder" | null {
+function inferExistingVaultPathKind(
+	app: App,
+	normalizedPath: string,
+): "file" | "folder" | null {
 	try {
 		const abstractFile = app.vault.getAbstractFileByPath?.(normalizedPath);
 		if (!abstractFile) return null;
 
-		if (typeof (abstractFile as { extension?: unknown }).extension === "string") {
+		if (
+			typeof (abstractFile as { extension?: unknown }).extension === "string"
+		) {
 			return "file";
 		}
 
@@ -58,7 +69,8 @@ function inferExistingVaultPathKind(app: App, normalizedPath: string): "file" | 
 			return "folder";
 		}
 
-		const ctorName = (abstractFile as { constructor?: { name?: string } }).constructor?.name;
+		const ctorName = (abstractFile as { constructor?: { name?: string } })
+			.constructor?.name;
 		if (ctorName === "TFile") return "file";
 		if (ctorName === "TFolder") return "folder";
 	} catch {}
@@ -131,18 +143,28 @@ export function isDetachedEditorTempFilePath(path?: string | null): boolean {
 	return isDetachedEditorTempFileName(fileName);
 }
 
-export function resolveDetachedEditorTempFolder(app: App, sourcePath?: string): string {
+export function resolveDetachedEditorTempFolder(
+	app: App,
+	sourcePath?: string,
+): string {
 	const normalizedSourcePath = sanitizeDetachedEditorSourcePath(sourcePath);
 	if (!normalizedSourcePath) {
 		// 嵌入式编辑器最终依赖 TFile + openFile，缓冲区必须放在 Vault 可见目录。
 		return getVaultEditorTempDir(app);
 	}
 
-	if (!normalizedSourcePath || normalizedSourcePath === "." || normalizedSourcePath === "/") {
+	if (
+		!normalizedSourcePath ||
+		normalizedSourcePath === "." ||
+		normalizedSourcePath === "/"
+	) {
 		return getVaultEditorTempDir(app);
 	}
 
-	const existingPathKind = inferExistingVaultPathKind(app, normalizedSourcePath);
+	const existingPathKind = inferExistingVaultPathKind(
+		app,
+		normalizedSourcePath,
+	);
 	if (existingPathKind === "file") {
 		return getParentFolder(normalizedSourcePath);
 	}
@@ -158,7 +180,10 @@ export function resolveDetachedEditorTempFolder(app: App, sourcePath?: string): 
 	return normalizedSourcePath;
 }
 
-export function buildDetachedEditorTempFilePath(folderPath: string, fileName: string): string {
+export function buildDetachedEditorTempFilePath(
+	folderPath: string,
+	fileName: string,
+): string {
 	return folderPath ? normalizePath(`${folderPath}/${fileName}`) : fileName;
 }
 
@@ -179,7 +204,10 @@ export function isLegacyModalEditorPermanentFilePath(path: string): boolean {
 	return false;
 }
 
-export function isPluginCacheModalEditorPermanentFilePath(app: App, path: string): boolean {
+export function isPluginCacheModalEditorPermanentFilePath(
+	app: App,
+	path: string,
+): boolean {
 	const normalizedPath = normalizePath(path);
 	if (!isModalEditorPermanentFilePath(normalizedPath)) return false;
 

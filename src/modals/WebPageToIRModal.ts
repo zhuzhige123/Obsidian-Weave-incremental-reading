@@ -34,13 +34,18 @@ export class WebPageToIRModal extends Modal {
 
 	onOpen(): void {
 		this.titleEl.setText(i18n.t("irModals.webPageToIr.title"));
-		this.modalEl.addClass("weave-selection-to-ir-modal", "weave-web-page-to-ir-modal");
+		this.modalEl.addClass(
+			"weave-selection-to-ir-modal",
+			"weave-web-page-to-ir-modal",
+		);
 
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass("weave-selection-to-ir-modal-content");
 
-		const urlPanelEl = contentEl.createDiv({ cls: "weave-selection-to-ir-panel" });
+		const urlPanelEl = contentEl.createDiv({
+			cls: "weave-selection-to-ir-panel",
+		});
 		urlPanelEl.createDiv({
 			cls: "setting-item-name",
 			text: i18n.t("irModals.webPageToIr.webLink"),
@@ -50,22 +55,35 @@ export class WebPageToIRModal extends Modal {
 			text: this.options.url,
 		});
 
-		const selectedText = String(this.options.selectedText || "").replace(/\r\n?/g, "\n").trim();
+		const selectedText = String(this.options.selectedText || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
 		if (selectedText) {
-			const selectionPanelEl = contentEl.createDiv({ cls: "weave-selection-to-ir-panel" });
+			const selectionPanelEl = contentEl.createDiv({
+				cls: "weave-selection-to-ir-panel",
+			});
 			selectionPanelEl.createDiv({
 				cls: "setting-item-name",
 				text: i18n.t("irModals.webPageToIr.selectionExcerpt"),
 			});
 			selectionPanelEl.createEl("div", {
 				cls: "setting-item-description weave-web-page-to-ir-selection",
-				text: selectedText.length > 280 ? `${selectedText.slice(0, 280)}…` : selectedText,
+				text:
+					selectedText.length > 280
+						? `${selectedText.slice(0, 280)}…`
+						: selectedText,
 			});
 		}
 
-		const headerPanelEl = contentEl.createDiv({ cls: "weave-selection-to-ir-panel" });
-		const deckToolbarEl = headerPanelEl.createDiv({ cls: "weave-selection-to-ir-toolbar" });
-		const deckInfoEl = deckToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
+		const headerPanelEl = contentEl.createDiv({
+			cls: "weave-selection-to-ir-panel",
+		});
+		const deckToolbarEl = headerPanelEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar",
+		});
+		const deckInfoEl = deckToolbarEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar-info",
+		});
 		deckInfoEl.createDiv({
 			text: i18n.t("irModals.webPageToIr.deckName"),
 			cls: "setting-item-name",
@@ -88,15 +106,17 @@ export class WebPageToIRModal extends Modal {
 				? i18n.t("irModals.webPageToIr.titleFromSelectionDetected")
 				: i18n.t("irModals.webPageToIr.titleFromSelectionFallback")
 			: this.options.titleDetected
-				? i18n.t("irModals.webPageToIr.titleFromPageDetected")
-				: i18n.t("irModals.webPageToIr.titleFromPageFallback");
+			? i18n.t("irModals.webPageToIr.titleFromPageDetected")
+			: i18n.t("irModals.webPageToIr.titleFromPageFallback");
 
 		new Setting(contentEl)
 			.setName(i18n.t("irModals.webPageToIr.readingPointName"))
 			.setDesc(titleDesc)
 			.addText((text) => {
 				text.setValue(this.draftTitle);
-				text.setPlaceholder(i18n.t("irModals.webPageToIr.readingPointNamePlaceholder"));
+				text.setPlaceholder(
+					i18n.t("irModals.webPageToIr.readingPointNamePlaceholder"),
+				);
 				text.inputEl.addClass("weave-selection-to-ir-title-input");
 				this.titleInputEl = text.inputEl;
 				text.onChange((value) => {
@@ -105,11 +125,17 @@ export class WebPageToIRModal extends Modal {
 				});
 			});
 
-		const footerEl = contentEl.createDiv({ cls: "weave-selection-to-ir-footer" });
-		const cancelButton = footerEl.createEl("button", { text: i18n.t("irModals.common.cancel") });
+		const footerEl = contentEl.createDiv({
+			cls: "weave-selection-to-ir-footer",
+		});
+		const cancelButton = footerEl.createEl("button", {
+			text: i18n.t("irModals.common.cancel"),
+		});
 		cancelButton.addEventListener("click", () => this.close());
 
-		this.createButtonEl = footerEl.createEl("button", { text: i18n.t("irModals.webPageToIr.confirmAdd") });
+		this.createButtonEl = footerEl.createEl("button", {
+			text: i18n.t("irModals.webPageToIr.confirmAdd"),
+		});
 		this.createButtonEl.classList.add("mod-cta");
 		this.createButtonEl.addEventListener("click", () => {
 			void this.handleCreate();
@@ -134,7 +160,9 @@ export class WebPageToIRModal extends Modal {
 	}
 
 	private getDeckButtonText(): string {
-		const selectedDeck = this.options.deckOptions.find((deck) => deck.id === this.selectedDeckId);
+		const selectedDeck = this.options.deckOptions.find(
+			(deck) => deck.id === this.selectedDeckId,
+		);
 		return selectedDeck
 			? i18n.t("irModals.common.topicLabel", { name: selectedDeck.name })
 			: i18n.t("irModals.common.selectTopic");
@@ -193,7 +221,9 @@ export class WebPageToIRModal extends Modal {
 		} finally {
 			this.creating = false;
 			if (this.createButtonEl) {
-				this.createButtonEl.textContent = i18n.t("irModals.webPageToIr.confirmAdd");
+				this.createButtonEl.textContent = i18n.t(
+					"irModals.webPageToIr.confirmAdd",
+				);
 			}
 			this.syncCreateButtonState();
 		}
@@ -205,6 +235,7 @@ export class WebPageToIRModal extends Modal {
 		}
 
 		const title = (this.titleInputEl?.value ?? this.draftTitle).trim();
-		this.createButtonEl.disabled = this.creating || !this.selectedDeckId || !title;
+		this.createButtonEl.disabled =
+			this.creating || !this.selectedDeckId || !title;
 	}
 }

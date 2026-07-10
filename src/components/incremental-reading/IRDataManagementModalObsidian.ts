@@ -27,7 +27,7 @@ export class IRDataManagementModalObsidian extends Modal {
 			contentClass: "weave-ir-data-management-modal-content",
 		});
 
-        this.component = mount(IRDataManagementModal, {
+		this.component = mount(IRDataManagementModal, {
 			target: this.contentEl,
 			props: {
 				plugin: this.options.plugin,

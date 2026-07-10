@@ -19,7 +19,7 @@ export interface IRReadingPointStoredSchedule {
 
 export async function resolveReadingPointStoredSchedule(
 	app: App,
-	pointId: string
+	pointId: string,
 ): Promise<IRReadingPointStoredSchedule | null> {
 	const normalizedPointId = String(pointId || "").trim();
 	if (!normalizedPointId) {
@@ -69,7 +69,9 @@ export async function resolveReadingPointStoredSchedule(
 		return {
 			priority: Number(chunk.priorityUi ?? chunk.priorityEff ?? 5),
 			nextRepDate: Number(chunk.nextRepDate || 0),
-			deckId: String(topicIds[0] || chunk.topicIds?.[0] || chunk.deckIds?.[0] || "").trim(),
+			deckId: String(
+				topicIds[0] || chunk.topicIds?.[0] || chunk.deckIds?.[0] || "",
+			).trim(),
 		};
 	}
 
@@ -88,11 +90,15 @@ export async function resolveReadingPointStoredSchedule(
 	}
 
 	return {
-		priority: Number(snapshot.point.schedule.manualPriority ?? snapshot.point.schedule.priorityScore ?? 5),
+		priority: Number(
+			snapshot.point.schedule.manualPriority ??
+				snapshot.point.schedule.priorityScore ??
+				5,
+		),
 		nextRepDate: Number(
 			snapshot.point.schedule.nextReviewAt
 				? Date.parse(snapshot.point.schedule.nextReviewAt)
-				: 0
+				: 0,
 		),
 		deckId: String(topicIds[0] || snapshot.topicId || "").trim(),
 	};

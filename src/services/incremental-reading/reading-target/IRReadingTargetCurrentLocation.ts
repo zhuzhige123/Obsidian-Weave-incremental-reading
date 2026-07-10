@@ -1,4 +1,10 @@
-import { MarkdownView, normalizePath, type App, type EditorPosition, type TFile } from "obsidian";
+import {
+	type App,
+	type EditorPosition,
+	MarkdownView,
+	type TFile,
+	normalizePath,
+} from "obsidian";
 import {
 	buildObsidianBlockWikiLink,
 	buildObsidianEmbedBlockWikiLink,
@@ -15,11 +21,7 @@ export interface IRReadingTargetCurrentLocationContext {
 	target: ParsedReadingTarget;
 }
 
-function findBlockIdAtLine(
-	app: App,
-	file: TFile,
-	line: number
-): string | null {
+function findBlockIdAtLine(app: App, file: TFile, line: number): string | null {
 	const cache = app.metadataCache.getFileCache(file);
 	const blocks = cache?.blocks;
 	if (!blocks) {
@@ -38,7 +40,9 @@ function readLineText(editor: MarkdownView["editor"], line: number): string {
 	return String(editor.getLine(line) || "").trim();
 }
 
-export function getCurrentEditorReadingTargetContext(app: App): IRReadingTargetCurrentLocationContext | null {
+export function getCurrentEditorReadingTargetContext(
+	app: App,
+): IRReadingTargetCurrentLocationContext | null {
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
 	if (!view?.file || view.file.extension !== "md") {
 		return null;
@@ -65,7 +69,11 @@ export function getCurrentEditorReadingTargetContext(app: App): IRReadingTargetC
 		sourceLink = buildObsidianEmbedBlockWikiLink(sourcePath, blockId);
 		target = parseReadingTargetInput(app, sourceLink, sourcePath);
 	} else if (selection) {
-		sourceLink = buildObsidianBlockWikiLink(sourcePath, "pending", selection.slice(0, 40));
+		sourceLink = buildObsidianBlockWikiLink(
+			sourcePath,
+			"pending",
+			selection.slice(0, 40),
+		);
 		target = {
 			kind: "vault-link",
 			rawInput: selection,
@@ -87,12 +95,23 @@ export function getCurrentEditorReadingTargetContext(app: App): IRReadingTargetC
 	};
 }
 
-export function buildReadingTargetPreviewMarkdown(target: ParsedReadingTarget, title: string): string {
+export function buildReadingTargetPreviewMarkdown(
+	target: ParsedReadingTarget,
+	title: string,
+): string {
 	if (target.kind === "pdf" || target.kind === "pdf-batch") {
 		return buildPdfReadingTargetEmbedMarkdown(target);
 	}
-	if (target.kind === "vault-block" && target.sourceFilePath && target.blockId) {
-		return buildObsidianEmbedBlockWikiLink(target.sourceFilePath, target.blockId, title);
+	if (
+		target.kind === "vault-block" &&
+		target.sourceFilePath &&
+		target.blockId
+	) {
+		return buildObsidianEmbedBlockWikiLink(
+			target.sourceFilePath,
+			target.blockId,
+			title,
+		);
 	}
 	if (target.kind === "epub") {
 		const link = target.epubResumeLink || target.resumeLink;
@@ -101,7 +120,11 @@ export function buildReadingTargetPreviewMarkdown(target: ParsedReadingTarget, t
 	if (target.displayLink) {
 		return target.displayLink.startsWith("!")
 			? target.displayLink
-			: `!${target.displayLink.startsWith("[[") ? target.displayLink : `[[${target.displayLink}]]`}`;
+			: `!${
+					target.displayLink.startsWith("[[")
+						? target.displayLink
+						: `[[${target.displayLink}]]`
+			  }`;
 	}
 	if (target.kind === "web" && target.webUrl) {
 		return `[${title}](${target.webUrl})`;
@@ -109,7 +132,9 @@ export function buildReadingTargetPreviewMarkdown(target: ParsedReadingTarget, t
 	return target.resumeLink ? `\`${target.resumeLink}\`` : "";
 }
 
-function buildPdfReadingTargetEmbedMarkdown(target: ParsedReadingTarget): string {
+function buildPdfReadingTargetEmbedMarkdown(
+	target: ParsedReadingTarget,
+): string {
 	const raw = String(target.rawInput || "").trim();
 	if (raw.startsWith("!")) {
 		return raw;
@@ -117,7 +142,11 @@ function buildPdfReadingTargetEmbedMarkdown(target: ParsedReadingTarget): string
 	if (target.displayLink) {
 		return target.displayLink.startsWith("!")
 			? target.displayLink
-			: `!${target.displayLink.startsWith("[[") ? target.displayLink : `[[${target.displayLink}]]`}`;
+			: `!${
+					target.displayLink.startsWith("[[")
+						? target.displayLink
+						: `[[${target.displayLink}]]`
+			  }`;
 	}
 	if (target.resumeLink) {
 		return `![[${target.resumeLink}]]`;

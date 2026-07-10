@@ -7,8 +7,14 @@
  * @version 1.0.0
  */
 
-import type { ContentBlock, RuleSplitConfig } from "../types/content-split-types";
-import { SPLIT_MARKER_REGEX, generateSplitMarkerId } from "../types/content-split-types";
+import type {
+	ContentBlock,
+	RuleSplitConfig,
+} from "../types/content-split-types";
+import {
+	SPLIT_MARKER_REGEX,
+	generateSplitMarkerId,
+} from "../types/content-split-types";
 import { i18n } from "./i18n";
 import { extractBodyContent, parseYAMLFromContent } from "./yaml-utils";
 
@@ -63,7 +69,10 @@ function buildLineSegments(content: string): LineSegment[] {
 	return segments;
 }
 
-function normalizeBlockContent(rawBlockContent: string, config: RuleSplitConfig): string {
+function normalizeBlockContent(
+	rawBlockContent: string,
+	config: RuleSplitConfig,
+): string {
 	let blockContent = rawBlockContent.replace(/\r\n?/g, "\n");
 
 	if (config.enableSymbolSplit && config.splitSymbol.trim()) {
@@ -100,7 +109,10 @@ function extractTitle(content: string, preserveHeading: boolean): string {
 	return headingFallback || untitledChunkLabel();
 }
 
-export function deriveFileTitleFromContent(content: string, defaultTitle?: string): string {
+export function deriveFileTitleFromContent(
+	content: string,
+	defaultTitle?: string,
+): string {
 	const yaml = parseYAMLFromContent(content);
 	const yamlTitle = typeof yaml.title === "string" ? yaml.title.trim() : "";
 	if (yamlTitle) return yamlTitle;
@@ -135,7 +147,7 @@ export function deriveFileTitleFromContent(content: string, defaultTitle?: strin
 export function splitByRules(
 	content: string,
 	config: RuleSplitConfig,
-	options?: { defaultTitle?: string }
+	options?: { defaultTitle?: string },
 ): ContentBlock[] {
 	const normalizedContent = normalizeSplitContent(content);
 	if (!normalizedContent.trim()) {
@@ -160,7 +172,9 @@ export function splitByRules(
 
 	const splitPoints = new Set<number>([0]);
 	const lineSegments = buildLineSegments(normalizedContent);
-	const normalizedSymbol = config.enableSymbolSplit ? config.splitSymbol.trim() : "";
+	const normalizedSymbol = config.enableSymbolSplit
+		? config.splitSymbol.trim()
+		: "";
 
 	for (let i = 0; i < lineSegments.length; i++) {
 		const segment = lineSegments[i];
@@ -178,7 +192,11 @@ export function splitByRules(
 		}
 
 		// 按空行拆分：在满足阈值的空行段之后开始新块
-		if (config.enableBlankLineSplit && config.blankLineCount > 0 && trimmed === "") {
+		if (
+			config.enableBlankLineSplit &&
+			config.blankLineCount > 0 &&
+			trimmed === ""
+		) {
 			let j = i;
 			while (j < lineSegments.length && lineSegments[j].text.trim() === "") {
 				j++;
@@ -210,7 +228,7 @@ export function splitByRules(
 		const endOffset = sortedPoints[i + 1];
 		const blockContent = normalizeBlockContent(
 			normalizedContent.substring(startOffset, endOffset),
-			config
+			config,
 		);
 
 		if (config.filterEmptyBlocks && !blockContent) {
@@ -273,7 +291,9 @@ export function parseManualSplitMarkers(content: string): ContentBlock[] {
 			endOffset = markers[i].index;
 		}
 
-		let blockContent = normalizedContent.substring(startOffset, endOffset).trim();
+		let blockContent = normalizedContent
+			.substring(startOffset, endOffset)
+			.trim();
 		blockContent = blockContent.replace(SPLIT_MARKER_REGEX, "").trim();
 
 		if (!blockContent) {
@@ -297,7 +317,7 @@ export function parseManualSplitMarkers(content: string): ContentBlock[] {
 
 		if (lastContent) {
 			const alreadyAdded = blocks.some(
-				(b) => b.content === lastContent || b.startOffset === lastStartOffset
+				(b) => b.content === lastContent || b.startOffset === lastStartOffset,
 			);
 
 			if (!alreadyAdded) {
@@ -319,7 +339,10 @@ export function parseManualSplitMarkers(content: string): ContentBlock[] {
 /**
  * 将内容块转换为带标记的内容
  */
-export function blocksToMarkedContent(originalContent: string, blocks: ContentBlock[]): string {
+export function blocksToMarkedContent(
+	originalContent: string,
+	blocks: ContentBlock[],
+): string {
 	if (blocks.length <= 1) {
 		return originalContent;
 	}

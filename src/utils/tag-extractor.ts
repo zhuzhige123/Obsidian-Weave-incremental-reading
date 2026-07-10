@@ -19,7 +19,10 @@ export class TagExtractor {
 		cleanedContent = cleanedContent.replace(FENCED_CODE_BLOCK_REGEX, "");
 		cleanedContent = cleanedContent.replace(INLINE_CODE_REGEX, "");
 		cleanedContent = cleanedContent.replace(WIKILINK_REGEX, "");
-		cleanedContent = cleanedContent.replace(MARKDOWN_LINK_URL_REGEX, "](removed)");
+		cleanedContent = cleanedContent.replace(
+			MARKDOWN_LINK_URL_REGEX,
+			"](removed)",
+		);
 		cleanedContent = cleanedContent.replace(HTML_COMMENT_REGEX, "");
 		cleanedContent = cleanedContent.replace(HTML_TAG_REGEX, "");
 		return cleanedContent;
@@ -57,7 +60,7 @@ export class TagExtractor {
 	static mergeTags(
 		content: string,
 		existingTags: string[] = [],
-		mode: "replace" | "append" | "smart" = "smart"
+		mode: "replace" | "append" | "smart" = "smart",
 	): string[] {
 		const extractedTags = this.extractTagsExcludingCode(content);
 

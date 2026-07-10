@@ -1,10 +1,10 @@
 import type { App } from "obsidian";
-import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
+import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import { formatDueDateKeyFromTimestamp } from "./IRDueDateIndexService";
+import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { assembleScheduleItemsForDailyQueue } from "./IRScheduleItemSort";
 import { patchCalendarProjectionDaySlices } from "./IRScheduleRefreshService";
-import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 
 export interface PatchDayQueueInput {
 	dateKey: string;
@@ -21,7 +21,10 @@ export interface PatchDayQueueInput {
  * `items` 必须是当日完整队列（未完成 + 已完成），不可仅传 pinned/已完成切片。
  * due 倒排索引由 L0 mutator 唯一维护。
  */
-export async function patchDayQueue(app: App, input: PatchDayQueueInput): Promise<void> {
+export async function patchDayQueue(
+	app: App,
+	input: PatchDayQueueInput,
+): Promise<void> {
 	const dateKey = String(input.dateKey || "").trim();
 	if (!dateKey || input.items.length === 0) {
 		return;
@@ -35,11 +38,15 @@ export async function patchDayQueue(app: App, input: PatchDayQueueInput): Promis
 	const queryService = getSharedIRCalendarQueryService(app);
 	const scheduleFingerprint =
 		String(input.scheduleFingerprint || "").trim() ||
-		(await getSharedIRScheduleIndexService(app).getScheduleSources()).scheduleFingerprint;
+		(await getSharedIRScheduleIndexService(app).getScheduleSources())
+			.scheduleFingerprint;
 	const dayPatches = new Map<string, ScheduleItem[]>([[dateKey, assembled]]);
 
 	await patchCalendarProjectionDaySlices(app, {
-		cacheKey: queryService.buildQueryCacheKeyForDeckIds(input.deckIds, undefined),
+		cacheKey: queryService.buildQueryCacheKeyForDeckIds(
+			input.deckIds,
+			undefined,
+		),
 		settingsFingerprint: queryService.getSettingsFingerprint(),
 		scheduleFingerprint,
 		dayPatches,
@@ -50,9 +57,11 @@ export async function patchDayQueue(app: App, input: PatchDayQueueInput): Promis
 export function collectDueDateKeysForScheduleMutation(
 	previousNextRepDate: number | undefined,
 	nextRepDate: number | undefined,
-	pinnedDateKey: string
+	pinnedDateKey: string,
 ): string[] {
-	const keys = new Set<string>([String(pinnedDateKey || "").trim()].filter(Boolean));
+	const keys = new Set<string>(
+		[String(pinnedDateKey || "").trim()].filter(Boolean),
+	);
 	const previousKey = formatDueDateKeyFromTimestamp(previousNextRepDate);
 	const nextKey = formatDueDateKeyFromTimestamp(nextRepDate);
 	if (previousKey) {

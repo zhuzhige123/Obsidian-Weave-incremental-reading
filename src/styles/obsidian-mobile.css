@@ -7,57 +7,37 @@
 
 /* ==================== 移动端设计令牌 (.is-mobile) ==================== */
 
-body.is-mobile .weave-main-editor-mode,
-body.is-mobile .weave-create-card-modal-container,
-body.is-mobile .resizable-modal.weave-create-card-modal,
-body.is-mobile .weave-edit-card-modal-container,
-body.is-mobile .weave-view-card-modal-container,
-body.is-mobile .weave-modal-container,
-body.is-mobile .weave-modal-backdrop,
-body.is-mobile .weave-modal-overlay,
-body.is-mobile .weave-modal-content {
+body.is-mobile .weave-app .weave-modal-container,
+body.is-mobile .weave-app .weave-modal-backdrop,
+body.is-mobile .weave-app .weave-modal-overlay,
+body.is-mobile .weave-app .weave-modal-content {
   /* 编辑器内容区：移动端减少左右留白，提高有效行宽 */
   --weave-editor-padding-y: 14px;
   --weave-editor-padding-x: 12px;
 }
 
-body.is-phone .weave-main-editor-mode,
-body.is-phone .weave-create-card-modal-container,
-body.is-phone .resizable-modal.weave-create-card-modal,
-body.is-phone .weave-edit-card-modal-container,
-body.is-phone .weave-view-card-modal-container,
-body.is-phone .weave-modal-container,
-body.is-phone .weave-modal-backdrop,
-body.is-phone .weave-modal-overlay,
-body.is-phone .weave-modal-content {
+body.is-phone .weave-app .weave-modal-container,
+body.is-phone .weave-app .weave-modal-backdrop,
+body.is-phone .weave-app .weave-modal-overlay,
+body.is-phone .weave-app .weave-modal-content {
   /* 手机上进一步减少左右留白 */
   --weave-editor-padding-y: 12px;
   --weave-editor-padding-x: 10px;
 }
 
-body.is-mobile.weave-line-numbers-on .weave-main-editor-mode,
-body.is-mobile.weave-line-numbers-on .weave-create-card-modal-container,
-body.is-mobile.weave-line-numbers-on .resizable-modal.weave-create-card-modal,
-body.is-mobile.weave-line-numbers-on .weave-edit-card-modal-container,
-body.is-mobile.weave-line-numbers-on .weave-view-card-modal-container,
-body.is-mobile.weave-line-numbers-on .weave-modal-container,
-body.is-mobile.weave-line-numbers-on .weave-modal-backdrop,
-body.is-mobile.weave-line-numbers-on .weave-modal-overlay,
-body.is-mobile.weave-line-numbers-on .weave-modal-content {
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-container,
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-backdrop,
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-overlay,
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-content {
   --weave-editor-padding-x: 10px;
   --weave-editor-padding-left: 6px;
   --weave-editor-padding-right: 10px;
 }
 
-body.is-phone.weave-line-numbers-on .weave-main-editor-mode,
-body.is-phone.weave-line-numbers-on .weave-create-card-modal-container,
-body.is-phone.weave-line-numbers-on .resizable-modal.weave-create-card-modal,
-body.is-phone.weave-line-numbers-on .weave-edit-card-modal-container,
-body.is-phone.weave-line-numbers-on .weave-view-card-modal-container,
-body.is-phone.weave-line-numbers-on .weave-modal-container,
-body.is-phone.weave-line-numbers-on .weave-modal-backdrop,
-body.is-phone.weave-line-numbers-on .weave-modal-overlay,
-body.is-phone.weave-line-numbers-on .weave-modal-content {
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-container,
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-backdrop,
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-overlay,
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-content {
   --weave-editor-padding-x: 8px;
   --weave-editor-padding-left: 4px;
   --weave-editor-padding-right: 8px;
@@ -268,7 +248,7 @@ body.is-phone .weave-settings .label-with-desc .desc {
 body.is-phone .weave-settings .setting-item,
 body.is-phone .weave-settings .row {
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 8px;
 }
 
@@ -341,38 +321,53 @@ body.is-phone .weave-settings .row {
    align-items: flex-start;
  }
 
- /* 📱 手机端：下拉/选择类设置项保持横排对齐（控件在标题行右侧） */
- body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger),
- body.is-phone .weave-settings .row:has(select) {
+ /* 📱 手机端：仅标题的下拉项保持横排（控件在标题行右侧） */
+ body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger):not(:has(.label-with-desc)),
+ body.is-phone .weave-settings .row:has(select):not(:has(.label-with-desc)) {
    flex-direction: row;
    align-items: center;
    justify-content: space-between;
  }
 
- body.is-phone .weave-settings .row:has(.label-with-desc):has(.obsidian-dropdown-trigger),
- body.is-phone .weave-settings .row:has(.label-with-desc):has(select) {
-   align-items: flex-start;
- }
-
- body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger) > label:first-child,
- body.is-phone .weave-settings .row:has(select) > label:first-child {
+ body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger):not(:has(.label-with-desc)) > label:first-child,
+ body.is-phone .weave-settings .row:has(select):not(:has(.label-with-desc)) > label:first-child {
    width: auto;
    flex: 1;
    min-width: 0;
  }
 
- body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger) .obsidian-dropdown-trigger,
- body.is-phone .weave-settings .row:has(select) select {
+ body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger):not(:has(.label-with-desc)) .obsidian-dropdown-trigger,
+ body.is-phone .weave-settings .row:has(select):not(:has(.label-with-desc)) select {
    width: auto;
    max-width: none;
    align-self: center;
    margin-left: auto;
  }
 
+ /* 📱 手机端：带标题+说明的下拉项改为上下堆叠，避免文字挤在左侧窄列 */
+ body.is-phone .weave-settings .row:has(.label-with-desc):has(.obsidian-dropdown-trigger),
+ body.is-phone .weave-settings .row:has(.label-with-desc):has(select) {
+   flex-direction: column;
+   align-items: stretch;
+   gap: 10px;
+ }
+
+ body.is-phone .weave-settings .row:has(.label-with-desc) .ir-dropdown-compact,
+ body.is-phone .weave-settings .row:has(.label-with-desc) .settings-dropdown-compact {
+   flex: 1 1 auto;
+   width: 100%;
+   max-width: 100%;
+   min-width: 0;
+   margin-left: 0;
+   align-self: stretch;
+ }
+
  body.is-phone .weave-settings .row:has(.label-with-desc):has(.obsidian-dropdown-trigger) .obsidian-dropdown-trigger,
  body.is-phone .weave-settings .row:has(.label-with-desc):has(select) select {
-   align-self: flex-start;
-   margin-top: 2px;
+   width: 100%;
+   max-width: 100%;
+   margin-left: 0;
+   align-self: stretch;
  }
 
  body.is-phone .weave-settings .row:has(.modern-switch) > label:first-child,
@@ -405,9 +400,9 @@ body.is-phone .weave-settings .row input[type="number"] {
   max-width: 100%;
 }
 
- /* 📱 手机端：下拉/选择类设置项不使用 100% 宽度（保持控件在标题行右侧） */
- body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger) .obsidian-dropdown-trigger,
- body.is-phone .weave-settings .row:has(select) select {
+ /* 📱 手机端：无说明的下拉项不使用 100% 宽度（保持控件在标题行右侧） */
+ body.is-phone .weave-settings .row:has(.obsidian-dropdown-trigger):not(:has(.label-with-desc)) .obsidian-dropdown-trigger,
+ body.is-phone .weave-settings .row:has(select):not(:has(.label-with-desc)) select {
    width: auto;
    max-width: none;
  }
@@ -452,6 +447,41 @@ body.is-phone .weave-settings .slider-container .slider-value {
 
 body.is-phone .weave-settings .group-title {
   font-size: 0.9375rem;
+}
+
+/* 独立 IR 设置页：防止分组标题/说明与存储行文字竖排或挤在窄列 */
+body.is-phone .standalone-ir-settings-root .standalone-ir-settings-group-title,
+body.is-phone .standalone-ir-settings-root .standalone-ir-settings-group-description,
+body.is-phone .standalone-ir-settings-root .standalone-ir-storage-name,
+body.is-phone .standalone-ir-settings-root .standalone-ir-storage-desc,
+body.is-phone .standalone-ir-settings-root .group-title,
+body.is-phone .standalone-ir-settings-root .group-description {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+body.is-phone .standalone-ir-settings-root .standalone-ir-premium-preview-setting-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+body.is-phone .standalone-ir-settings-root .standalone-ir-premium-preview-setting-row .modern-switch {
+  align-self: flex-end;
+}
+
+body.is-phone .standalone-ir-settings-root .standalone-ir-storage-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+body.is-phone .standalone-ir-settings-root .standalone-ir-storage-control {
+  width: 100%;
+  max-width: 100%;
+  flex-basis: auto;
 }
 
 /* 平板设置界面横排 */
@@ -755,8 +785,8 @@ body.is-mobile .weave-app {
 
 /* ==================== 设置界面移动端布局修复 ==================== */
 
-/* Fix 1: 下拉框容器在手机端自适应宽度并靠右对齐 */
-body.is-phone .weave-settings .settings-dropdown-compact {
+/* Fix 1: 无说明的下拉框容器在手机端靠右对齐；带说明的由上下堆叠规则铺满整行 */
+body.is-phone .weave-settings .row:not(:has(.label-with-desc)) .settings-dropdown-compact {
   flex: 0 1 auto;
   width: auto;
   max-width: none;

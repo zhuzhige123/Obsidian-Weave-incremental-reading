@@ -8,13 +8,21 @@ export type FolderSubscriptionVaultEvent = "create" | "rename";
 
 function hasMatchingRule(
 	path: string | undefined,
-	settingsOrRules?: IncrementalReadingFolderSubscriptionSettings | IncrementalReadingFolderSubscriptionRule[] | null
+	settingsOrRules?:
+		| IncrementalReadingFolderSubscriptionSettings
+		| IncrementalReadingFolderSubscriptionRule[]
+		| null,
 ): boolean {
 	const normalizedPath = String(path || "").trim();
 	if (!normalizedPath) {
 		return false;
 	}
-	return Boolean(resolveIncrementalReadingFolderSubscriptionRuleForFile(normalizedPath, settingsOrRules));
+	return Boolean(
+		resolveIncrementalReadingFolderSubscriptionRuleForFile(
+			normalizedPath,
+			settingsOrRules,
+		),
+	);
 }
 
 /**
@@ -27,7 +35,10 @@ export function shouldTriggerFolderSubscriptionResyncForVaultEvent(options: {
 	eventType: FolderSubscriptionVaultEvent;
 	nextPath: string;
 	previousPath?: string;
-	settingsOrRules?: IncrementalReadingFolderSubscriptionSettings | IncrementalReadingFolderSubscriptionRule[] | null;
+	settingsOrRules?:
+		| IncrementalReadingFolderSubscriptionSettings
+		| IncrementalReadingFolderSubscriptionRule[]
+		| null;
 }): boolean {
 	const { eventType, nextPath, previousPath, settingsOrRules } = options;
 	const nextMatched = hasMatchingRule(nextPath, settingsOrRules);

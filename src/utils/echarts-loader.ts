@@ -13,7 +13,13 @@ import * as echarts from "echarts/core";
 import type { EChartsType } from "echarts/core";
 
 // 引入需要的图表类型
-import { BarChart, HeatmapChart, LineChart, PieChart, ScatterChart } from "echarts/charts";
+import {
+	BarChart,
+	HeatmapChart,
+	LineChart,
+	PieChart,
+	ScatterChart,
+} from "echarts/charts";
 
 // 引入需要的组件
 import {

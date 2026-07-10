@@ -26,7 +26,7 @@ describe("IRScheduleFingerprint", () => {
 			buildScheduleFingerprint({
 				...base,
 				history: { sessions: [{ blockId: "x", duration: 99 }] },
-			} as any)
+			} as any),
 		).toBe(buildScheduleFingerprint(base as any));
 	});
 
@@ -41,7 +41,9 @@ describe("IRScheduleFingerprint", () => {
 		]);
 		expect(left).toBe(right);
 
-		const withoutNotes = buildExternalBookmarkTasksRevision([{ id: "a", updatedAt: 1 }]);
+		const withoutNotes = buildExternalBookmarkTasksRevision([
+			{ id: "a", updatedAt: 1 },
+		]);
 		const withNotes = buildExternalBookmarkTasksRevision([
 			{ id: "a", updatedAt: 1, meta: { associatedNotePaths: ["Notes/A.md"] } },
 		]);
@@ -73,7 +75,9 @@ describe("IRScheduleFingerprint", () => {
 			],
 		};
 
-		expect(buildScheduleFingerprint(base as any)).not.toBe(buildScheduleFingerprint(updated as any));
+		expect(buildScheduleFingerprint(base as any)).not.toBe(
+			buildScheduleFingerprint(updated as any),
+		);
 	});
 
 	it("builds stable point-files index revision independent of file order", () => {

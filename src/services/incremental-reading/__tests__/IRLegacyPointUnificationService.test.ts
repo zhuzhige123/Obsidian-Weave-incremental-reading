@@ -146,7 +146,7 @@ describe("IRLegacyPointUnificationService", () => {
 				id: "legacy-1",
 				pointType: "chunk-entry",
 				sourceType: "ir-chunk",
-			})
+			}),
 		);
 	});
 });

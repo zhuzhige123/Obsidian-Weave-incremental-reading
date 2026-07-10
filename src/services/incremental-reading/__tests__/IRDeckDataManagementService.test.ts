@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
-import { IRDeckDataManagementService } from "../IRDeckDataManagementService";
 import type { IRVaultPointFileEntry } from "../../../types/ir-data-management-types";
 import { IR_POINT_STORAGE_VERSION } from "../../../types/ir-point-storage-types";
+import { IRDeckDataManagementService } from "../IRDeckDataManagementService";
 
 describe("IRDeckDataManagementService helpers", () => {
 	const service = {
 		buildDuplicateGroups(files: IRVaultPointFileEntry[]) {
-			return new IRDeckDataManagementService({} as any).buildDuplicateGroups(files);
+			return new IRDeckDataManagementService({} as any).buildDuplicateGroups(
+				files,
+			);
 		},
 		buildNormalizeMovePlan(files: IRVaultPointFileEntry[], targetDir: string) {
-			return new IRDeckDataManagementService({} as any).buildNormalizeMovePlan(files, targetDir);
+			return new IRDeckDataManagementService({} as any).buildNormalizeMovePlan(
+				files,
+				targetDir,
+			);
 		},
 	};
 
@@ -50,15 +55,17 @@ describe("IRDeckDataManagementService helpers", () => {
 	it("builds move plan only for files outside canonical directory", () => {
 		const plan = service.buildNormalizeMovePlan(
 			sampleFiles,
-			"weave/incremental-reading/points"
+			"weave/incremental-reading/points",
 		);
 		expect(plan).toHaveLength(2);
 		expect(plan.map((item) => item.sourcePath)).toEqual(
-			expect.arrayContaining(["Topics/A.irdeck", "Topics/B.irdeck"])
+			expect.arrayContaining(["Topics/A.irdeck", "Topics/B.irdeck"]),
 		);
-		expect(plan.every((item) => item.targetPath.startsWith("weave/incremental-reading/points/"))).toBe(
-			true
-		);
+		expect(
+			plan.every((item) =>
+				item.targetPath.startsWith("weave/incremental-reading/points/"),
+			),
+		).toBe(true);
 	});
 
 	it("uses part suffix when moving multiple files for the same topic into one folder", () => {
@@ -80,10 +87,17 @@ describe("IRDeckDataManagementService helpers", () => {
 				isInCanonicalDir: false,
 			},
 		];
-		const plan = service.buildNormalizeMovePlan(outsideOnly, "weave/incremental-reading/points");
+		const plan = service.buildNormalizeMovePlan(
+			outsideOnly,
+			"weave/incremental-reading/points",
+		);
 		expect(plan).toHaveLength(2);
-		expect(plan[0]?.targetPath).toBe("weave/incremental-reading/points/Topic.irdeck");
-		expect(plan[1]?.targetPath).toBe("weave/incremental-reading/points/Topic.part2.irdeck");
+		expect(plan[0]?.targetPath).toBe(
+			"weave/incremental-reading/points/Topic.irdeck",
+		);
+		expect(plan[1]?.targetPath).toBe(
+			"weave/incremental-reading/points/Topic.part2.irdeck",
+		);
 	});
 
 	it("flags legacy schema and empty points in format inspection", async () => {
@@ -105,14 +119,20 @@ describe("IRDeckDataManagementService helpers", () => {
 			vault: { adapter },
 		} as any);
 
-		const report = await service.inspectPointFileFormat("weave/incremental-reading/points/Legacy.irdeck");
+		const report = await service.inspectPointFileFormat(
+			"weave/incremental-reading/points/Legacy.irdeck",
+		);
 		expect(report.isEmpty).toBe(true);
 		expect(report.needsMigration).toBe(true);
-		expect(report.issues.some((issue) => issue.code === "schema_version")).toBe(true);
-		expect(report.issues.some((issue) => issue.code === "empty_points")).toBe(true);
-		expect(report.issues.find((issue) => issue.code === "schema_version")?.message).toContain(
-			String(IR_POINT_STORAGE_VERSION)
+		expect(report.issues.some((issue) => issue.code === "schema_version")).toBe(
+			true,
 		);
+		expect(report.issues.some((issue) => issue.code === "empty_points")).toBe(
+			true,
+		);
+		expect(
+			report.issues.find((issue) => issue.code === "schema_version")?.message,
+		).toContain(String(IR_POINT_STORAGE_VERSION));
 	});
 
 	it("refuses to recover backup orphan when target path already exists", async () => {
@@ -131,7 +151,10 @@ describe("IRDeckDataManagementService helpers", () => {
 			],
 		]);
 		const adapter = {
-			exists: vi.fn(async (path: string) => files.has(path) || path === existingTarget || path === targetDir),
+			exists: vi.fn(
+				async (path: string) =>
+					files.has(path) || path === existingTarget || path === targetDir,
+			),
 			read: vi.fn(async (path: string) => files.get(path) || ""),
 			write: vi.fn(async (path: string, content: string) => {
 				files.set(path, content);
@@ -153,8 +176,8 @@ describe("IRDeckDataManagementService helpers", () => {
 					backupRoot: "plugins/weave-incremental-reading/backups",
 					relativePath: "Topic.irdeck",
 				},
-				targetDir
-			)
+				targetDir,
+			),
 		).rejects.toThrow("库内已存在同名专题文件");
 		expect(adapter.write).not.toHaveBeenCalled();
 	});

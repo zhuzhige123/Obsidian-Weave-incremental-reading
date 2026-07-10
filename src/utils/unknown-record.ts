@@ -15,12 +15,13 @@ export function readStringArray(value: unknown): string[] {
 	if (!Array.isArray(value)) {
 		return [];
 	}
-	return value
-		.map((entry) => readString(entry))
-		.filter(Boolean);
+	return value.map((entry) => readString(entry)).filter(Boolean);
 }
 
-export function readRecordProp(record: Record<string, unknown>, key: string): unknown {
+export function readRecordProp(
+	record: Record<string, unknown>,
+	key: string,
+): unknown {
 	return record[key];
 }
 

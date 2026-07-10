@@ -1,7 +1,10 @@
 import type { App } from "obsidian";
 
 /** 会触发全库快照 / 调度重算的月历后台任务来源。 */
-export type IRCalendarHeavyLoadOwner = "warmup" | "sidebar-load" | "sidebar-reconcile";
+export type IRCalendarHeavyLoadOwner =
+	| "warmup"
+	| "sidebar-load"
+	| "sidebar-reconcile";
 
 /**
  * 串行化月历重查询，避免 warmup、首屏 load、后台 reconcile 并行触发多路全库扫描。
@@ -19,10 +22,16 @@ export class IRCalendarBackgroundLoadCoordinator {
 	}
 
 	shouldDeferWarmup(): boolean {
-		return this.activeOwner === "sidebar-load" || this.activeOwner === "sidebar-reconcile";
+		return (
+			this.activeOwner === "sidebar-load" ||
+			this.activeOwner === "sidebar-reconcile"
+		);
 	}
 
-	runHeavyLoad<T>(owner: IRCalendarHeavyLoadOwner, task: () => Promise<T>): Promise<T> {
+	runHeavyLoad<T>(
+		owner: IRCalendarHeavyLoadOwner,
+		task: () => Promise<T>,
+	): Promise<T> {
 		const run = this.chain.then(async () => {
 			this.activeOwner = owner;
 			try {
@@ -35,16 +44,19 @@ export class IRCalendarBackgroundLoadCoordinator {
 		});
 		this.chain = run.then(
 			() => undefined,
-			() => undefined
+			() => undefined,
 		);
 		return run;
 	}
 }
 
-const coordinatorByApp = new WeakMap<App, IRCalendarBackgroundLoadCoordinator>();
+const coordinatorByApp = new WeakMap<
+	App,
+	IRCalendarBackgroundLoadCoordinator
+>();
 
 export function getSharedIRCalendarBackgroundLoadCoordinator(
-	app: App
+	app: App,
 ): IRCalendarBackgroundLoadCoordinator {
 	let coordinator = coordinatorByApp.get(app);
 	if (!coordinator) {

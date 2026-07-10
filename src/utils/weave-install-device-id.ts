@@ -7,7 +7,8 @@ const DEVICE_ID_FILE_NAME = "weave-install-device-id";
 
 function getObsidianUserDataPath(): string {
 	try {
-		const req = (window as unknown as { require?: (id: string) => unknown }).require;
+		const req = (window as unknown as { require?: (id: string) => unknown })
+			.require;
 		const electron = req?.("electron") as
 			| { app?: { getPath?: (name: string) => string } }
 			| undefined;
@@ -28,12 +29,12 @@ export function getOrCreateCrossPluginDeviceId(): string {
 	}
 
 	try {
-		const fs = (window as unknown as { require?: (id: string) => typeof import("fs") }).require?.(
-			"fs"
-		);
-		const path = (window as unknown as { require?: (id: string) => typeof import("path") }).require?.(
-			"path"
-		);
+		const fs = (
+			window as unknown as { require?: (id: string) => typeof import("fs") }
+		).require?.("fs");
+		const path = (
+			window as unknown as { require?: (id: string) => typeof import("path") }
+		).require?.("path");
 		if (!fs || !path) {
 			return "";
 		}

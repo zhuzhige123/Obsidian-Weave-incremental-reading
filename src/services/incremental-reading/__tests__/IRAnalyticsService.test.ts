@@ -1,17 +1,20 @@
 import {
+	type IRAnalyticsSelectionUnit,
 	buildAnalyticsForecastFromProjectedSummary,
 	buildAnalyticsSelectionOptions,
 	calculateUrgencyScore,
 	filterAnalyticsSelectionUnits,
 	normalizeAnalyticsTags,
-	type IRAnalyticsSelectionUnit,
 } from "../IRAnalyticsService";
 import type {
 	IRProjectedScheduleItem,
 	IRProjectedScheduleSummary,
 } from "../IRProjectedScheduleSummary";
 
-function createUnit(partial: Partial<IRAnalyticsSelectionUnit> & Pick<IRAnalyticsSelectionUnit, "id">): IRAnalyticsSelectionUnit {
+function createUnit(
+	partial: Partial<IRAnalyticsSelectionUnit> &
+		Pick<IRAnalyticsSelectionUnit, "id">,
+): IRAnalyticsSelectionUnit {
 	return {
 		id: partial.id,
 		status: partial.status ?? "active",
@@ -31,8 +34,12 @@ describe("calculateUrgencyScore", () => {
 		const dueToday = new Date("2026-04-10T12:00:00.000Z").getTime();
 		const future = new Date("2026-04-20T12:00:00.000Z").getTime();
 
-		expect(calculateUrgencyScore(overdue, now)).toBeGreaterThan(calculateUrgencyScore(dueToday, now));
-		expect(calculateUrgencyScore(dueToday, now)).toBeGreaterThan(calculateUrgencyScore(future, now));
+		expect(calculateUrgencyScore(overdue, now)).toBeGreaterThan(
+			calculateUrgencyScore(dueToday, now),
+		);
+		expect(calculateUrgencyScore(dueToday, now)).toBeGreaterThan(
+			calculateUrgencyScore(future, now),
+		);
 	});
 
 	it("gives unscheduled items a mid-high urgency instead of collapsing them to zero", () => {
@@ -43,14 +50,30 @@ describe("calculateUrgencyScore", () => {
 
 describe("normalizeAnalyticsTags", () => {
 	it("keeps manual tags, trims whitespace, preserves first display casing, and deduplicates case-insensitively", () => {
-		expect(normalizeAnalyticsTags(["  Research  ", "research", "Deep/Work", "", "   "])).toEqual([
+		expect(
+			normalizeAnalyticsTags([
+				"  Research  ",
+				"research",
+				"Deep/Work",
+				"",
+				"   ",
+			]),
+		).toEqual([
 			{ key: "research", label: "Research" },
 			{ key: "deep/work", label: "Deep/Work" },
 		]);
 	});
 
 	it("filters out system ir tags from analytics tag mode", () => {
-		expect(normalizeAnalyticsTags(["#ir", "IR_queue", "topic-a", "  #IR-tag  ", "Focus"])).toEqual([
+		expect(
+			normalizeAnalyticsTags([
+				"#ir",
+				"IR_queue",
+				"topic-a",
+				"  #IR-tag  ",
+				"Focus",
+			]),
+		).toEqual([
 			{ key: "topic-a", label: "topic-a" },
 			{ key: "focus", label: "Focus" },
 		]);
@@ -94,54 +117,118 @@ describe("buildAnalyticsForecastFromProjectedSummary", () => {
 				version: 1,
 				deckIds: ["deck-1"],
 				days: [
-					{ dateKey: "2026-04-10", items: [], totalEstimatedMinutes: 0, overloadLevel: "normal" },
-					{ dateKey: "2026-04-11", items: [], totalEstimatedMinutes: 0, overloadLevel: "warning" },
+					{
+						dateKey: "2026-04-10",
+						items: [],
+						totalEstimatedMinutes: 0,
+						overloadLevel: "normal",
+					},
+					{
+						dateKey: "2026-04-11",
+						items: [],
+						totalEstimatedMinutes: 0,
+						overloadLevel: "warning",
+					},
 				],
 				itemsByDate: new Map(),
 				triggerReason: "ui_refresh",
 			},
 			dayLoadsByDate: new Map([
-				["2026-04-10", { dateKey: "2026-04-10", items: [todayItem], totalEstimatedMinutes: 12 }],
-				["2026-04-11", { dateKey: "2026-04-11", items: [tomorrowItem], totalEstimatedMinutes: 8 }],
+				[
+					"2026-04-10",
+					{
+						dateKey: "2026-04-10",
+						items: [todayItem],
+						totalEstimatedMinutes: 12,
+					},
+				],
+				[
+					"2026-04-11",
+					{
+						dateKey: "2026-04-11",
+						items: [tomorrowItem],
+						totalEstimatedMinutes: 8,
+					},
+				],
 			]),
 			dayLoadsByDeckId: new Map(),
 		};
 
-		const overall = buildAnalyticsForecastFromProjectedSummary(summary, new Set());
+		const overall = buildAnalyticsForecastFromProjectedSummary(
+			summary,
+			new Set(),
+		);
 		expect(overall).toEqual([
-			expect.objectContaining({ dateKey: "2026-04-10", itemCount: 1, totalEstimatedMinutes: 12 }),
-			expect.objectContaining({ dateKey: "2026-04-11", itemCount: 1, totalEstimatedMinutes: 8, overloadLevel: "warning" }),
+			expect.objectContaining({
+				dateKey: "2026-04-10",
+				itemCount: 1,
+				totalEstimatedMinutes: 12,
+			}),
+			expect.objectContaining({
+				dateKey: "2026-04-11",
+				itemCount: 1,
+				totalEstimatedMinutes: 8,
+				overloadLevel: "warning",
+			}),
 		]);
 
-		const filtered = buildAnalyticsForecastFromProjectedSummary(summary, new Set(["legacy-1"]));
+		const filtered = buildAnalyticsForecastFromProjectedSummary(
+			summary,
+			new Set(["legacy-1"]),
+		);
 		expect(filtered).toEqual([
-			expect.objectContaining({ dateKey: "2026-04-10", itemCount: 1, totalEstimatedMinutes: 12 }),
-			expect.objectContaining({ dateKey: "2026-04-11", itemCount: 0, totalEstimatedMinutes: 0, overloadLevel: "normal" }),
+			expect.objectContaining({
+				dateKey: "2026-04-10",
+				itemCount: 1,
+				totalEstimatedMinutes: 12,
+			}),
+			expect.objectContaining({
+				dateKey: "2026-04-11",
+				itemCount: 0,
+				totalEstimatedMinutes: 0,
+				overloadLevel: "normal",
+			}),
 		]);
 	});
 });
 
 describe("filterAnalyticsSelectionUnits", () => {
 	const units: IRAnalyticsSelectionUnit[] = [
-		createUnit({ id: "u1", topicKeys: ["deck-a", "deck-b"], tagKeys: ["tag-x", "tag-y"] }),
+		createUnit({
+			id: "u1",
+			topicKeys: ["deck-a", "deck-b"],
+			tagKeys: ["tag-x", "tag-y"],
+		}),
 		createUnit({ id: "u2", topicKeys: ["deck-b"], tagKeys: ["tag-y"] }),
 		createUnit({ id: "u3", topicKeys: ["deck-c"], tagKeys: ["tag-z"] }),
 	];
 
 	it("returns all units for overall mode without double counting", () => {
-		expect(filterAnalyticsSelectionUnits(units, "overall").map((unit) => unit.id)).toEqual(["u1", "u2", "u3"]);
+		expect(
+			filterAnalyticsSelectionUnits(units, "overall").map((unit) => unit.id),
+		).toEqual(["u1", "u2", "u3"]);
 	});
 
 	it("supports multi-belonging visibility in topic mode", () => {
-		expect(filterAnalyticsSelectionUnits(units, "topic", "deck-b").map((unit) => unit.id)).toEqual(["u1", "u2"]);
+		expect(
+			filterAnalyticsSelectionUnits(units, "topic", "deck-b").map(
+				(unit) => unit.id,
+			),
+		).toEqual(["u1", "u2"]);
 	});
 
 	it("supports tag projection views independent from topic membership", () => {
-		expect(filterAnalyticsSelectionUnits(units, "tag", "TAG-y").map((unit) => unit.id)).toEqual(["u1", "u2"]);
+		expect(
+			filterAnalyticsSelectionUnits(units, "tag", "TAG-y").map(
+				(unit) => unit.id,
+			),
+		).toEqual(["u1", "u2"]);
 	});
 
 	it("returns empty when the requested topic or tag is missing", () => {
-		expect(filterAnalyticsSelectionUnits(units, "topic", "missing")).toEqual([]);
+		expect(filterAnalyticsSelectionUnits(units, "topic", "missing")).toEqual(
+			[],
+		);
 		expect(filterAnalyticsSelectionUnits(units, "tag", "")).toEqual([]);
 	});
 });
@@ -151,13 +238,39 @@ describe("buildAnalyticsSelectionOptions", () => {
 		const now = new Date();
 		now.setHours(12, 0, 0, 0);
 		const overdue = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).getTime();
-		const dueToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 0, 0, 0).getTime();
+		const dueToday = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+			20,
+			0,
+			0,
+			0,
+		).getTime();
 		const future = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000).getTime();
 
 		const units: IRAnalyticsSelectionUnit[] = [
-			createUnit({ id: "u1", topicKeys: ["deck-a", "deck-b"], nextRepDate: overdue, readingHours: 2, priorityEff: 8 }),
-			createUnit({ id: "u2", topicKeys: ["deck-b"], nextRepDate: dueToday, readingHours: 1.5, priorityEff: 6 }),
-			createUnit({ id: "u3", topicKeys: ["deck-c"], nextRepDate: future, readingHours: 3, priorityEff: 9 }),
+			createUnit({
+				id: "u1",
+				topicKeys: ["deck-a", "deck-b"],
+				nextRepDate: overdue,
+				readingHours: 2,
+				priorityEff: 8,
+			}),
+			createUnit({
+				id: "u2",
+				topicKeys: ["deck-b"],
+				nextRepDate: dueToday,
+				readingHours: 1.5,
+				priorityEff: 6,
+			}),
+			createUnit({
+				id: "u3",
+				topicKeys: ["deck-c"],
+				nextRepDate: future,
+				readingHours: 3,
+				priorityEff: 9,
+			}),
 		];
 
 		const labelByKey = new Map([
@@ -168,7 +281,11 @@ describe("buildAnalyticsSelectionOptions", () => {
 
 		const options = buildAnalyticsSelectionOptions(units, "topic", labelByKey);
 
-		expect(options.map((option) => option.key)).toEqual(["deck-b", "deck-a", "deck-c"]);
+		expect(options.map((option) => option.key)).toEqual([
+			"deck-b",
+			"deck-a",
+			"deck-c",
+		]);
 		expect(options[0]).toMatchObject({
 			key: "deck-b",
 			label: "专题 B",
@@ -184,13 +301,40 @@ describe("buildAnalyticsSelectionOptions", () => {
 	it("aggregates tag options and sorts by active count then due count", () => {
 		const now = new Date();
 		now.setHours(12, 0, 0, 0);
-		const dueToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0, 0).getTime();
+		const dueToday = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+			18,
+			0,
+			0,
+			0,
+		).getTime();
 		const future = new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000).getTime();
 
 		const units: IRAnalyticsSelectionUnit[] = [
-			createUnit({ id: "u1", tagKeys: ["alpha", "beta"], nextRepDate: dueToday, readingHours: 1, priorityEff: 7 }),
-			createUnit({ id: "u2", tagKeys: ["alpha"], nextRepDate: future, readingHours: 1.5, priorityEff: 5 }),
-			createUnit({ id: "u3", tagKeys: ["gamma"], nextRepDate: dueToday, status: "done", readingHours: 2, priorityEff: 9 }),
+			createUnit({
+				id: "u1",
+				tagKeys: ["alpha", "beta"],
+				nextRepDate: dueToday,
+				readingHours: 1,
+				priorityEff: 7,
+			}),
+			createUnit({
+				id: "u2",
+				tagKeys: ["alpha"],
+				nextRepDate: future,
+				readingHours: 1.5,
+				priorityEff: 5,
+			}),
+			createUnit({
+				id: "u3",
+				tagKeys: ["gamma"],
+				nextRepDate: dueToday,
+				status: "done",
+				readingHours: 2,
+				priorityEff: 9,
+			}),
 		];
 
 		const labelByKey = new Map([
@@ -201,7 +345,11 @@ describe("buildAnalyticsSelectionOptions", () => {
 
 		const options = buildAnalyticsSelectionOptions(units, "tag", labelByKey);
 
-		expect(options.map((option) => option.key)).toEqual(["alpha", "beta", "gamma"]);
+		expect(options.map((option) => option.key)).toEqual([
+			"alpha",
+			"beta",
+			"gamma",
+		]);
 		expect(options[0]).toMatchObject({
 			key: "alpha",
 			label: "Alpha",

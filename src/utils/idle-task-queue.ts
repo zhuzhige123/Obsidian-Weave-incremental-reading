@@ -12,7 +12,10 @@ export interface IdleTaskQueueOptions {
 
 function yieldToMainThread(): Promise<void> {
 	return new Promise((resolve) => {
-		if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+		if (
+			typeof window !== "undefined" &&
+			typeof window.requestIdleCallback === "function"
+		) {
 			window.requestIdleCallback(() => resolve(), { timeout: 32 });
 			return;
 		}
@@ -26,7 +29,7 @@ function yieldToMainThread(): Promise<void> {
 export async function runIdleBatchedTasks<T, R>(
 	items: T[],
 	processItem: (item: T, index: number) => Promise<R>,
-	options: IdleTaskQueueOptions = {}
+	options: IdleTaskQueueOptions = {},
 ): Promise<R[]> {
 	const chunkSize = Math.max(1, Math.floor(options.chunkSize ?? 12));
 	const budgetMs = Math.max(4, Math.floor(options.budgetMs ?? 10));

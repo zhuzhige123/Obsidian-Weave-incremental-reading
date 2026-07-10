@@ -38,7 +38,11 @@ function createPlannedItem(input: {
 describe("IRHorizonLoadPlanner", () => {
 	test("spreadBunchedDueDates distributes items across horizon days", () => {
 		const anchor = new Date("2026-06-18T00:00:00").getTime();
-		const items = [{ nextRepDate: anchor }, { nextRepDate: anchor }, { nextRepDate: anchor }];
+		const items = [
+			{ nextRepDate: anchor },
+			{ nextRepDate: anchor },
+			{ nextRepDate: anchor },
+		];
 		const spread = spreadBunchedDueDates(items, 3, anchor);
 
 		expect(spread.map((item) => item.nextRepDate)).toEqual([
@@ -59,9 +63,27 @@ describe("IRHorizonLoadPlanner", () => {
 			dailyReadingPointCap: 15,
 		});
 		const items = [
-			createPlannedItem({ id: "high", dayOffset: 0, priority: 9, estimatedMinutes: 20, anchor: today }),
-			createPlannedItem({ id: "mid", dayOffset: 0, priority: 7, estimatedMinutes: 20, anchor: today }),
-			createPlannedItem({ id: "low", dayOffset: 0, priority: 3, estimatedMinutes: 20, anchor: today }),
+			createPlannedItem({
+				id: "high",
+				dayOffset: 0,
+				priority: 9,
+				estimatedMinutes: 20,
+				anchor: today,
+			}),
+			createPlannedItem({
+				id: "mid",
+				dayOffset: 0,
+				priority: 7,
+				estimatedMinutes: 20,
+				anchor: today,
+			}),
+			createPlannedItem({
+				id: "low",
+				dayOffset: 0,
+				priority: 3,
+				estimatedMinutes: 20,
+				anchor: today,
+			}),
 		];
 
 		const result = smoothHorizonLoad(items, today, policy);

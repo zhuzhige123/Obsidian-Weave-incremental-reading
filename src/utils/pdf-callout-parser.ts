@@ -53,11 +53,13 @@ export function parsePdfCallouts(text: string): ParsedReadingPoint[] {
 
 		// 解析 wikilink 内容
 		const pipeIdx = wikilinkContent.indexOf("|");
-		const linkPart = pipeIdx >= 0 ? wikilinkContent.substring(0, pipeIdx) : wikilinkContent;
+		const linkPart =
+			pipeIdx >= 0 ? wikilinkContent.substring(0, pipeIdx) : wikilinkContent;
 
 		// 提取文件路径和 fragment
 		const hashIdx = linkPart.indexOf("#");
-		const pdfFilePath = hashIdx >= 0 ? linkPart.substring(0, hashIdx) : linkPart;
+		const pdfFilePath =
+			hashIdx >= 0 ? linkPart.substring(0, hashIdx) : linkPart;
 		const fragment = hashIdx >= 0 ? linkPart.substring(hashIdx + 1) : "";
 
 		// 提取页码
@@ -168,7 +170,7 @@ export function inferHierarchy(points: ParsedReadingPoint[]): void {
 export function resolveParentIds(
 	points: ParsedReadingPoint[],
 	rootParentId: string,
-	createdIds: string[]
+	createdIds: string[],
 ): string[] {
 	const parentIds: string[] = [];
 	// 栈：[level, materialId]

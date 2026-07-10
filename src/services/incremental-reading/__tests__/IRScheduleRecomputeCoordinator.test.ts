@@ -71,6 +71,8 @@ describe("IRScheduleRecomputeCoordinator", () => {
 		});
 		(globalThis as any).window = {
 			dispatchEvent: vi.fn(),
+			setTimeout: globalThis.setTimeout.bind(globalThis),
+			clearTimeout: globalThis.clearTimeout.bind(globalThis),
 		};
 		(globalThis as any).CustomEvent = class TestCustomEvent<T = unknown> {
 			type: string;
@@ -88,16 +90,24 @@ describe("IRScheduleRecomputeCoordinator", () => {
 
 	it("merges multiple complete_block requests into one recompute", async () => {
 		const app = {} as any;
-		const first = scheduleDebouncedRecomputeAndBroadcastIRData(app, "complete_block", {
-			deckIds: ["deck-1"],
-			priorityDateKeys: ["2026-06-18"],
-			leanSchedule: true,
-		});
-		const second = scheduleDebouncedRecomputeAndBroadcastIRData(app, "complete_block", {
-			deckIds: ["deck-1"],
-			priorityDateKeys: ["2026-06-19"],
-			leanSchedule: true,
-		});
+		const first = scheduleDebouncedRecomputeAndBroadcastIRData(
+			app,
+			"complete_block",
+			{
+				deckIds: ["deck-1"],
+				priorityDateKeys: ["2026-06-18"],
+				leanSchedule: true,
+			},
+		);
+		const second = scheduleDebouncedRecomputeAndBroadcastIRData(
+			app,
+			"complete_block",
+			{
+				deckIds: ["deck-1"],
+				priorityDateKeys: ["2026-06-19"],
+				leanSchedule: true,
+			},
+		);
 
 		await vi.advanceTimersByTimeAsync(750);
 
@@ -109,7 +119,7 @@ describe("IRScheduleRecomputeCoordinator", () => {
 				deckIds: ["deck-1"],
 				priorityDateKeys: expect.arrayContaining(["2026-06-18", "2026-06-19"]),
 				leanSchedule: true,
-			})
+			}),
 		);
 		expect(firstDetail.generatedAt).toBe(999);
 		expect(secondDetail.generatedAt).toBe(999);
@@ -117,9 +127,13 @@ describe("IRScheduleRecomputeCoordinator", () => {
 
 	it("does not debounce import_materials", async () => {
 		const app = {} as any;
-		await scheduleDebouncedRecomputeAndBroadcastIRData(app, "import_materials", {
-			deckIds: ["deck-2"],
-		});
+		await scheduleDebouncedRecomputeAndBroadcastIRData(
+			app,
+			"import_materials",
+			{
+				deckIds: ["deck-2"],
+			},
+		);
 		expect(recomputeScheduleForDeckMock).toHaveBeenCalledTimes(1);
 	});
 });

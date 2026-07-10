@@ -1,7 +1,13 @@
 import { normalizePath } from "obsidian";
 import type { Card } from "../../data/types";
-import { extractAllSourcePaths, normalizePathForComparison } from "../../utils/source-path-matcher";
-import { parseObsidianLink, parseYAMLFromContent } from "../../utils/yaml-utils";
+import {
+	extractAllSourcePaths,
+	normalizePathForComparison,
+} from "../../utils/source-path-matcher";
+import {
+	parseObsidianLink,
+	parseYAMLFromContent,
+} from "../../utils/yaml-utils";
 import { EpubLinkService } from "../epub-integration/EpubLinkService";
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 
@@ -55,7 +61,9 @@ function normalizeLooseValue(value: string | undefined | null): string | null {
 	return normalized.trim() || null;
 }
 
-export function detectTraceSourceKind(path: string | undefined | null): IRTraceSourceKind {
+export function detectTraceSourceKind(
+	path: string | undefined | null,
+): IRTraceSourceKind {
 	const normalized = normalizeLooseValue(path);
 	if (!normalized) {
 		return "unknown";
@@ -75,7 +83,7 @@ export function detectTraceSourceKind(path: string | undefined | null): IRTraceS
 
 export function normalizeTraceDocumentKey(
 	path: string | undefined | null,
-	kind?: IRTraceSourceKind
+	kind?: IRTraceSourceKind,
 ): string | null {
 	const normalized = normalizeLooseValue(path);
 	if (!normalized) {
@@ -91,7 +99,9 @@ export function normalizeTraceDocumentKey(
 	return normalizePath(normalized).toLowerCase() || null;
 }
 
-export function normalizeTraceSubunitKey(value: string | undefined | null): string | null {
+export function normalizeTraceSubunitKey(
+	value: string | undefined | null,
+): string | null {
 	const normalized = normalizeLooseValue(value);
 	return normalized ? normalized.toLowerCase() : null;
 }
@@ -100,19 +110,23 @@ function appendUniqueSource(
 	sources: IRTraceSourceDescriptor[],
 	sourceKind: IRTraceSourceKind,
 	sourceDocumentKey: string | null,
-	sourceSubunitKey?: string | null
+	sourceSubunitKey?: string | null,
 ): void {
 	if (!sourceDocumentKey) {
 		return;
 	}
 
-	const normalizedSubunitKey = normalizeTraceSubunitKey(sourceSubunitKey) || undefined;
-	const dedupeKey = `${sourceKind}::${sourceDocumentKey}::${normalizedSubunitKey || ""}`;
+	const normalizedSubunitKey =
+		normalizeTraceSubunitKey(sourceSubunitKey) || undefined;
+	const dedupeKey = `${sourceKind}::${sourceDocumentKey}::${
+		normalizedSubunitKey || ""
+	}`;
 	if (
 		sources.some(
 			(source) =>
-				`${source.sourceKind}::${source.sourceDocumentKey}::${source.sourceSubunitKey || ""}` ===
-				dedupeKey
+				`${source.sourceKind}::${source.sourceDocumentKey}::${
+					source.sourceSubunitKey || ""
+				}` === dedupeKey,
 		)
 	) {
 		return;
@@ -135,22 +149,30 @@ function extractYamlSourceValues(card: Card): string[] {
 		if (!yaml?.we_source) {
 			return [];
 		}
-		return (Array.isArray(yaml.we_source) ? yaml.we_source : [yaml.we_source]).filter(
-			(value): value is string => typeof value === "string" && value.trim().length > 0
+		return (
+			Array.isArray(yaml.we_source) ? yaml.we_source : [yaml.we_source]
+		).filter(
+			(value): value is string =>
+				typeof value === "string" && value.trim().length > 0,
 		);
 	} catch {
 		return [];
 	}
 }
 
-function buildDescriptorFromExplicitCardFields(card: Card): IRTraceSourceDescriptor | null {
+function buildDescriptorFromExplicitCardFields(
+	card: Card,
+): IRTraceSourceDescriptor | null {
 	const explicitSourcePath =
 		card.sourceDocumentKey ||
 		card.sourceFile ||
 		(card.customFields?.obsidianFilePath as string | undefined);
 	const sourceKind =
 		card.sourceKind ?? detectTraceSourceKind(explicitSourcePath);
-	const sourceDocumentKey = normalizeTraceDocumentKey(explicitSourcePath, sourceKind);
+	const sourceDocumentKey = normalizeTraceDocumentKey(
+		explicitSourcePath,
+		sourceKind,
+	);
 	if (!sourceDocumentKey) {
 		return null;
 	}
@@ -158,21 +180,29 @@ function buildDescriptorFromExplicitCardFields(card: Card): IRTraceSourceDescrip
 	return {
 		sourceKind,
 		sourceDocumentKey,
-		sourceSubunitKey: normalizeTraceSubunitKey(card.sourceSubunitKey) || undefined,
+		sourceSubunitKey:
+			normalizeTraceSubunitKey(card.sourceSubunitKey) || undefined,
 	};
 }
 
-function buildDescriptorFromYamlSource(rawSource: string): IRTraceSourceDescriptor | null {
+function buildDescriptorFromYamlSource(
+	rawSource: string,
+): IRTraceSourceDescriptor | null {
 	const epubSource = EpubLinkService.parseLinkMarkup(rawSource);
 	if (epubSource?.filePath) {
-		const sourceDocumentKey = normalizeTraceDocumentKey(epubSource.filePath, "epub");
+		const sourceDocumentKey = normalizeTraceDocumentKey(
+			epubSource.filePath,
+			"epub",
+		);
 		if (!sourceDocumentKey) {
 			return null;
 		}
 		return {
 			sourceKind: "epub",
 			sourceDocumentKey,
-			sourceSubunitKey: normalizeTraceSubunitKey(epubSource.sourceId || epubSource.cfi) || undefined,
+			sourceSubunitKey:
+				normalizeTraceSubunitKey(epubSource.sourceId || epubSource.cfi) ||
+				undefined,
 		};
 	}
 
@@ -184,7 +214,11 @@ function buildDescriptorFromYamlSource(rawSource: string): IRTraceSourceDescript
 	}
 
 	let sourceSubunitKey: string | undefined;
-	if (sourceKind === "pdf" && /\.pdf/i.test(rawSource) && rawSource.includes("#")) {
+	if (
+		sourceKind === "pdf" &&
+		/\.pdf/i.test(rawSource) &&
+		rawSource.includes("#")
+	) {
 		sourceSubunitKey = normalizeTraceSubunitKey(rawSource) || undefined;
 	}
 
@@ -204,7 +238,7 @@ export function collectCardTraceSources(card: Card): IRTraceSourceDescriptor[] {
 			sources,
 			explicitDescriptor.sourceKind,
 			explicitDescriptor.sourceDocumentKey,
-			explicitDescriptor.sourceSubunitKey
+			explicitDescriptor.sourceSubunitKey,
 		);
 	}
 
@@ -217,7 +251,7 @@ export function collectCardTraceSources(card: Card): IRTraceSourceDescriptor[] {
 			sources,
 			descriptor.sourceKind,
 			descriptor.sourceDocumentKey,
-			descriptor.sourceSubunitKey
+			descriptor.sourceSubunitKey,
 		);
 	}
 
@@ -227,7 +261,7 @@ export function collectCardTraceSources(card: Card): IRTraceSourceDescriptor[] {
 			sources,
 			sourceKind,
 			normalizeTraceDocumentKey(sourcePath, sourceKind),
-			undefined
+			undefined,
 		);
 	}
 
@@ -248,7 +282,9 @@ function isExtractCard(card: Card, extractCardIds: Set<string>): boolean {
 	return extractCardIds.has(card.uuid);
 }
 
-function buildUnitSelectorMap(units: IRTraceSourceUnit[]): Map<string, Set<string>> {
+function buildUnitSelectorMap(
+	units: IRTraceSourceUnit[],
+): Map<string, Set<string>> {
 	const selectors = new Map<string, Set<string>>();
 	for (const unit of units) {
 		if (!unit.sourceDocumentKey) {
@@ -264,7 +300,10 @@ function buildUnitSelectorMap(units: IRTraceSourceUnit[]): Map<string, Set<strin
 	return selectors;
 }
 
-function cardMatchesAnyTraceUnit(card: Card, selectorMap: Map<string, Set<string>>): boolean {
+function cardMatchesAnyTraceUnit(
+	card: Card,
+	selectorMap: Map<string, Set<string>>,
+): boolean {
 	if (selectorMap.size === 0) {
 		return false;
 	}
@@ -279,7 +318,10 @@ function cardMatchesAnyTraceUnit(card: Card, selectorMap: Map<string, Set<string
 			return true;
 		}
 
-		if (!source.sourceSubunitKey || selectedSubunits.has(source.sourceSubunitKey)) {
+		if (
+			!source.sourceSubunitKey ||
+			selectedSubunits.has(source.sourceSubunitKey)
+		) {
 			return true;
 		}
 	}

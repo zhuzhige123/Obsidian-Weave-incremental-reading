@@ -1,4 +1,3 @@
-
 import {
 	destroyMobileModalAdaptation,
 	getWorkspaceBounds,
@@ -29,7 +28,10 @@ const originalGetComputedStyle = window.getComputedStyle.bind(window);
 
 let getComputedStyleSpy: { mockRestore: () => void } | null = null;
 
-function setViewportSize(width = VIEWPORT_WIDTH, height = VIEWPORT_HEIGHT): MockVisualViewport {
+function setViewportSize(
+	width = VIEWPORT_WIDTH,
+	height = VIEWPORT_HEIGHT,
+): MockVisualViewport {
 	Object.defineProperty(window, "innerWidth", {
 		configurable: true,
 		value: width,
@@ -68,19 +70,27 @@ function setViewportSize(width = VIEWPORT_WIDTH, height = VIEWPORT_HEIGHT): Mock
 	return visualViewport;
 }
 
-function installSafeAreaMock(top = SAFE_AREA_TOP, bottom = SAFE_AREA_BOTTOM): void {
-	getComputedStyleSpy = vi.spyOn(window, "getComputedStyle").mockImplementation((element: Element) => {
-		const computed = originalGetComputedStyle(element);
-		if (element instanceof HTMLElement && element.dataset.weaveSafeAreaProbe === "true") {
-			return {
-				...computed,
-				paddingTop: `${top}px`,
-				paddingBottom: `${bottom}px`,
-			} as CSSStyleDeclaration;
-		}
+function installSafeAreaMock(
+	top = SAFE_AREA_TOP,
+	bottom = SAFE_AREA_BOTTOM,
+): void {
+	getComputedStyleSpy = vi
+		.spyOn(window, "getComputedStyle")
+		.mockImplementation((element: Element) => {
+			const computed = originalGetComputedStyle(element);
+			if (
+				element instanceof HTMLElement &&
+				element.dataset.weaveSafeAreaProbe === "true"
+			) {
+				return {
+					...computed,
+					paddingTop: `${top}px`,
+					paddingBottom: `${bottom}px`,
+				} as CSSStyleDeclaration;
+			}
 
-		return computed;
-	});
+			return computed;
+		});
 }
 
 function mockRect(element: HTMLElement, input: RectInput): void {
@@ -154,7 +164,11 @@ describe("mobile-modal-bounds", () => {
 		const appShell = document.createElement("div");
 		appShell.className = "app-container";
 		appShell.style.position = "fixed";
-		mockRect(appShell, { top: 0, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT });
+		mockRect(appShell, {
+			top: 0,
+			width: VIEWPORT_WIDTH,
+			height: VIEWPORT_HEIGHT,
+		});
 
 		document.body.append(appShell);
 
@@ -162,7 +176,9 @@ describe("mobile-modal-bounds", () => {
 
 		expect(bounds.top).toBe(SAFE_AREA_TOP);
 		expect(bounds.bottom).toBe(SAFE_AREA_BOTTOM);
-		expect(bounds.height).toBe(VIEWPORT_HEIGHT - SAFE_AREA_TOP - SAFE_AREA_BOTTOM);
+		expect(bounds.height).toBe(
+			VIEWPORT_HEIGHT - SAFE_AREA_TOP - SAFE_AREA_BOTTOM,
+		);
 	});
 
 	it("在类名变化时仍可通过几何启发式识别悬浮底栏", () => {
@@ -183,7 +199,11 @@ describe("mobile-modal-bounds", () => {
 	it("忽略 EPUB 阅读器内部的底部翻页栏，避免污染工作区底部偏移", () => {
 		const epubRoot = document.createElement("div");
 		epubRoot.className = "epub-reader-root";
-		mockRect(epubRoot, { top: 0, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT });
+		mockRect(epubRoot, {
+			top: 0,
+			width: VIEWPORT_WIDTH,
+			height: VIEWPORT_HEIGHT,
+		});
 
 		const bottomNavSlot = document.createElement("div");
 		bottomNavSlot.className = "epub-bottom-nav-slot";
@@ -212,7 +232,9 @@ describe("mobile-modal-bounds", () => {
 		await flushObservers();
 
 		expect(
-			document.documentElement.style.getPropertyValue("--weave-workspace-bottom-offset")
+			document.documentElement.style.getPropertyValue(
+				"--weave-workspace-bottom-offset",
+			),
 		).toBe("84px");
 
 		mockRect(toolbar, { top: 720, left: 24, width: 342, height: 56 });
@@ -221,7 +243,9 @@ describe("mobile-modal-bounds", () => {
 		await flushObservers();
 
 		expect(
-			document.documentElement.style.getPropertyValue("--weave-workspace-bottom-offset")
+			document.documentElement.style.getPropertyValue(
+				"--weave-workspace-bottom-offset",
+			),
 		).toBe("124px");
 	});
 });

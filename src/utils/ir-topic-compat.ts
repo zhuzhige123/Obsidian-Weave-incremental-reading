@@ -1,5 +1,10 @@
 import type { ReadingMaterial } from "../types/incremental-reading-types";
-import type { IRChunkFileData, IRDeck, IRSession, IRStudySession } from "../types/ir-types";
+import type {
+	IRChunkFileData,
+	IRDeck,
+	IRSession,
+	IRStudySession,
+} from "../types/ir-types";
 
 export const IR_LEGACY_TOPICS_FILE = "topics.json";
 export const IR_LEGACY_DECKS_FILE = "decks.json";
@@ -43,7 +48,11 @@ function normalizeDueAtValue(value: unknown): string | undefined {
 }
 
 function getLegacyReadingMaterialDueAt(
-	material: Partial<ReadingMaterial> | Record<string, unknown> | null | undefined
+	material:
+		| Partial<ReadingMaterial>
+		| Record<string, unknown>
+		| null
+		| undefined,
 ): string | undefined {
 	const fsrs = (material as Record<string, unknown> | null | undefined)?.fsrs;
 	if (!fsrs || typeof fsrs !== "object") {
@@ -54,17 +63,22 @@ function getLegacyReadingMaterialDueAt(
 }
 
 export function getReadingMaterialDueAt(
-	material: Partial<ReadingMaterial> | Record<string, unknown> | null | undefined
+	material:
+		| Partial<ReadingMaterial>
+		| Record<string, unknown>
+		| null
+		| undefined,
 ): string | undefined {
 	return (
-		normalizeDueAtValue((material as Record<string, unknown> | null | undefined)?.nextDueAt) ||
-		getLegacyReadingMaterialDueAt(material)
+		normalizeDueAtValue(
+			(material as Record<string, unknown> | null | undefined)?.nextDueAt,
+		) || getLegacyReadingMaterialDueAt(material)
 	);
 }
 
 export function setReadingMaterialDueAt<T extends Partial<ReadingMaterial>>(
 	material: T,
-	dueAt: string | number | Date | null | undefined
+	dueAt: string | number | Date | null | undefined,
 ): T {
 	const normalizedDueAt = normalizeDueAtValue(dueAt);
 	const updated = { ...material } as Record<string, unknown>;
@@ -82,16 +96,24 @@ export function setReadingMaterialDueAt<T extends Partial<ReadingMaterial>>(
 }
 
 export function getReadingTopicId(
-	material: Partial<ReadingMaterial> | Record<string, unknown> | null | undefined
+	material:
+		| Partial<ReadingMaterial>
+		| Record<string, unknown>
+		| null
+		| undefined,
 ): string | undefined {
 	return (
-		normalizeString((material as Record<string, unknown> | null | undefined)?.topicId) ||
-		normalizeString((material as Record<string, unknown> | null | undefined)?.readingDeckId)
+		normalizeString(
+			(material as Record<string, unknown> | null | undefined)?.topicId,
+		) ||
+		normalizeString(
+			(material as Record<string, unknown> | null | undefined)?.readingDeckId,
+		)
 	);
 }
 
 export function extractReadingTopicIdFromFrontmatter(
-	frontmatter: Record<string, unknown> | null | undefined
+	frontmatter: Record<string, unknown> | null | undefined,
 ): string | undefined {
 	return (
 		normalizeString(frontmatter?.[READING_TOPIC_YAML_KEY]) ||
@@ -99,9 +121,9 @@ export function extractReadingTopicIdFromFrontmatter(
 	);
 }
 
-export function normalizeReadingMaterialForRuntime<T extends Partial<ReadingMaterial>>(
-	material: T
-): T {
+export function normalizeReadingMaterialForRuntime<
+	T extends Partial<ReadingMaterial>,
+>(material: T): T {
 	const topicId = getReadingTopicId(material);
 	const dueAt = getReadingMaterialDueAt(material);
 	const normalized = { ...material } as Record<string, unknown>;
@@ -126,9 +148,9 @@ export function normalizeReadingMaterialForRuntime<T extends Partial<ReadingMate
 	return normalized as T;
 }
 
-export function serializeReadingMaterialForStorage<T extends Partial<ReadingMaterial>>(
-	material: T
-): T {
+export function serializeReadingMaterialForStorage<
+	T extends Partial<ReadingMaterial>,
+>(material: T): T {
 	const topicId = getReadingTopicId(material);
 	const dueAt = getReadingMaterialDueAt(material);
 	const serialized = { ...material } as Record<string, unknown>;
@@ -158,17 +180,25 @@ export function serializeReadingMaterialForStorage<T extends Partial<ReadingMate
 }
 
 export function getTaskTopicId(
-	task: { topicId?: string; deckId?: string } | Record<string, unknown> | null | undefined
+	task:
+		| { topicId?: string; deckId?: string }
+		| Record<string, unknown>
+		| null
+		| undefined,
 ): string | undefined {
 	return (
-		normalizeString((task as Record<string, unknown> | null | undefined)?.topicId) ||
-		normalizeString((task as Record<string, unknown> | null | undefined)?.deckId)
+		normalizeString(
+			(task as Record<string, unknown> | null | undefined)?.topicId,
+		) ||
+		normalizeString(
+			(task as Record<string, unknown> | null | undefined)?.deckId,
+		)
 	);
 }
 
-export function normalizeBookmarkTaskForRuntime<T extends { topicId?: string; deckId?: string }>(
-	task: T
-): T {
+export function normalizeBookmarkTaskForRuntime<
+	T extends { topicId?: string; deckId?: string },
+>(task: T): T {
 	const topicId = getTaskTopicId(task);
 	if (!topicId) {
 		return { ...task };
@@ -181,9 +211,9 @@ export function normalizeBookmarkTaskForRuntime<T extends { topicId?: string; de
 	} as T;
 }
 
-export function serializeBookmarkTaskForStorage<T extends { topicId?: string; deckId?: string }>(
-	task: T
-): T {
+export function serializeBookmarkTaskForStorage<
+	T extends { topicId?: string; deckId?: string },
+>(task: T): T {
 	const topicId = getTaskTopicId(task);
 	const serialized = { ...task } as Record<string, unknown>;
 
@@ -198,28 +228,36 @@ export function serializeBookmarkTaskForStorage<T extends { topicId?: string; de
 }
 
 export function getChunkTopicIds(
-	chunk: Partial<IRChunkFileData> | Record<string, unknown> | null | undefined
+	chunk: Partial<IRChunkFileData> | Record<string, unknown> | null | undefined,
 ): string[] {
 	const topicIds = normalizeStringArray(
-		(chunk as Record<string, unknown> | null | undefined)?.topicIds
+		(chunk as Record<string, unknown> | null | undefined)?.topicIds,
 	);
 	if (topicIds.length > 0) {
 		return topicIds;
 	}
 
-	return normalizeStringArray((chunk as Record<string, unknown> | null | undefined)?.deckIds);
-}
-
-export function getChunkTopicTag(
-	chunk: Partial<IRChunkFileData> | Record<string, unknown> | null | undefined
-): string | undefined {
-	return (
-		normalizeString((chunk as Record<string, unknown> | null | undefined)?.topicTag) ||
-		normalizeString((chunk as Record<string, unknown> | null | undefined)?.deckTag)
+	return normalizeStringArray(
+		(chunk as Record<string, unknown> | null | undefined)?.deckIds,
 	);
 }
 
-export function normalizeChunkForRuntime<T extends Partial<IRChunkFileData>>(chunk: T): T {
+export function getChunkTopicTag(
+	chunk: Partial<IRChunkFileData> | Record<string, unknown> | null | undefined,
+): string | undefined {
+	return (
+		normalizeString(
+			(chunk as Record<string, unknown> | null | undefined)?.topicTag,
+		) ||
+		normalizeString(
+			(chunk as Record<string, unknown> | null | undefined)?.deckTag,
+		)
+	);
+}
+
+export function normalizeChunkForRuntime<T extends Partial<IRChunkFileData>>(
+	chunk: T,
+): T {
 	const topicIds = getChunkTopicIds(chunk);
 	const topicTag = getChunkTopicTag(chunk);
 	const normalized = { ...chunk } as Record<string, unknown>;
@@ -243,7 +281,9 @@ export function normalizeChunkForRuntime<T extends Partial<IRChunkFileData>>(chu
 	return normalized as T;
 }
 
-export function serializeChunkForStorage<T extends Partial<IRChunkFileData>>(chunk: T): T {
+export function serializeChunkForStorage<T extends Partial<IRChunkFileData>>(
+	chunk: T,
+): T {
 	const topicIds = getChunkTopicIds(chunk);
 	const topicTag = getChunkTopicTag(chunk);
 	const serialized = { ...chunk } as Record<string, unknown>;
@@ -266,7 +306,7 @@ export function serializeChunkForStorage<T extends Partial<IRChunkFileData>>(chu
 }
 
 function getSessionTopicName(
-	session: { topicName?: string; deckName?: string } | Record<string, unknown>
+	session: { topicName?: string; deckName?: string } | Record<string, unknown>,
 ): string | undefined {
 	return (
 		normalizeString((session as Record<string, unknown>).topicName) ||
@@ -274,8 +314,12 @@ function getSessionTopicName(
 	);
 }
 
-export function normalizeStudySessionForRuntime<T extends Partial<IRStudySession>>(session: T): T {
-	const topicId = getTaskTopicId(session as { topicId?: string; deckId?: string });
+export function normalizeStudySessionForRuntime<
+	T extends Partial<IRStudySession>,
+>(session: T): T {
+	const topicId = getTaskTopicId(
+		session as { topicId?: string; deckId?: string },
+	);
 	const topicName = getSessionTopicName(session as Record<string, unknown>);
 	const normalized = { ...session } as Record<string, unknown>;
 
@@ -292,8 +336,12 @@ export function normalizeStudySessionForRuntime<T extends Partial<IRStudySession
 	return normalized as T;
 }
 
-export function serializeStudySessionForStorage<T extends Partial<IRStudySession>>(session: T): T {
-	const topicId = getTaskTopicId(session as { topicId?: string; deckId?: string });
+export function serializeStudySessionForStorage<
+	T extends Partial<IRStudySession>,
+>(session: T): T {
+	const topicId = getTaskTopicId(
+		session as { topicId?: string; deckId?: string },
+	);
 	const topicName = getSessionTopicName(session as Record<string, unknown>);
 	const serialized = { ...session } as Record<string, unknown>;
 
@@ -314,8 +362,12 @@ export function serializeStudySessionForStorage<T extends Partial<IRStudySession
 	return serialized as T;
 }
 
-export function normalizeIRSessionForRuntime<T extends Partial<IRSession>>(session: T): T {
-	const topicId = getTaskTopicId(session as { topicId?: string; deckId?: string });
+export function normalizeIRSessionForRuntime<T extends Partial<IRSession>>(
+	session: T,
+): T {
+	const topicId = getTaskTopicId(
+		session as { topicId?: string; deckId?: string },
+	);
 	if (!topicId) {
 		return { ...session };
 	}
@@ -327,8 +379,12 @@ export function normalizeIRSessionForRuntime<T extends Partial<IRSession>>(sessi
 	} as T;
 }
 
-export function serializeIRSessionForStorage<T extends Partial<IRSession>>(session: T): T {
-	const topicId = getTaskTopicId(session as { topicId?: string; deckId?: string });
+export function serializeIRSessionForStorage<T extends Partial<IRSession>>(
+	session: T,
+): T {
+	const topicId = getTaskTopicId(
+		session as { topicId?: string; deckId?: string },
+	);
 	const serialized = { ...session } as Record<string, unknown>;
 
 	if (topicId) {
@@ -341,7 +397,9 @@ export function serializeIRSessionForStorage<T extends Partial<IRSession>>(sessi
 	return serialized as T;
 }
 
-export function normalizeTopicStoreRecords(raw: unknown): Record<string, IRDeck> {
+export function normalizeTopicStoreRecords(
+	raw: unknown,
+): Record<string, IRDeck> {
 	if (!raw || typeof raw !== "object") {
 		return {};
 	}
@@ -360,7 +418,7 @@ export function normalizeTopicStoreRecords(raw: unknown): Record<string, IRDeck>
 
 export function buildTopicStore(
 	topics: Record<string, IRDeck>,
-	version: string
+	version: string,
 ): { version: string; topics: Record<string, IRDeck> } {
 	return {
 		version,

@@ -3,12 +3,12 @@ import type WeavePlugin from "../../../main";
 import { ReadingPointRenameModal } from "../../../modals/ReadingPointRenameModal";
 import { ReadingPointTagsPrompt } from "../../../modals/ReadingPointTagsPrompt";
 import { ReadingPointTraceLinkPrompt } from "../../../modals/ReadingPointTraceLinkPrompt";
+import { i18n } from "../../../utils/i18n";
+import { logger } from "../../../utils/logger";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import { canEditReadingPointLink } from "./IRReadingPointEditLinkResolver";
-import type { IRReadingPointEditSaveResult } from "./IRReadingPointEditTypes";
 import { IRReadingPointEditService } from "./IRReadingPointEditService";
-import { logger } from "../../../utils/logger";
-import { i18n } from "../../../utils/i18n";
+import type { IRReadingPointEditSaveResult } from "./IRReadingPointEditTypes";
 
 let activePrompt: Modal | null = null;
 
@@ -28,7 +28,10 @@ export function closeActiveReadingPointPrompt(): void {
 	if (!activePrompt) {
 		return;
 	}
-	if (activePrompt instanceof ReadingPointTraceLinkPrompt || activePrompt instanceof ReadingPointTagsPrompt) {
+	if (
+		activePrompt instanceof ReadingPointTraceLinkPrompt ||
+		activePrompt instanceof ReadingPointTagsPrompt
+	) {
 		activePrompt.forceClose();
 	} else {
 		activePrompt.close();
@@ -49,7 +52,7 @@ async function loadDraftOrNotify(app: App, material: ScheduleItem) {
 export async function promptRenameReadingPoint(
 	app: App,
 	material: ScheduleItem,
-	onSaved?: () => void
+	onSaved?: () => void,
 ): Promise<void> {
 	try {
 		const draft = await loadDraftOrNotify(app, material);
@@ -69,23 +72,33 @@ export async function promptRenameReadingPoint(
 export async function openReadingPointTraceLinkPrompt(
 	plugin: WeavePlugin,
 	material: ScheduleItem,
-	onSaved?: (result: IRReadingPointEditSaveResult) => void
+	onSaved?: (result: IRReadingPointEditSaveResult) => void,
 ): Promise<void> {
 	try {
 		if (!canEditReadingPointLink(material)) {
-			new Notice(i18n.t("irServiceNotices.quickEdit.traceLinkUnsupported"), 3000);
+			new Notice(
+				i18n.t("irServiceNotices.quickEdit.traceLinkUnsupported"),
+				3000,
+			);
 			return;
 		}
 
 		const draft = await loadDraftOrNotify(plugin.app, material);
 		if (!draft || !draft.canEditLink) {
 			if (draft && !draft.canEditLink) {
-				new Notice(i18n.t("irServiceNotices.quickEdit.traceLinkUnsupported"), 3000);
+				new Notice(
+					i18n.t("irServiceNotices.quickEdit.traceLinkUnsupported"),
+					3000,
+				);
 			}
 			return;
 		}
 
-		const modal = new ReadingPointTraceLinkPrompt(plugin.app, { plugin, draft, onSaved });
+		const modal = new ReadingPointTraceLinkPrompt(plugin.app, {
+			plugin,
+			draft,
+			onSaved,
+		});
 		trackPrompt(modal);
 		modal.open();
 	} catch (error) {
@@ -97,7 +110,7 @@ export async function openReadingPointTraceLinkPrompt(
 export async function openReadingPointTagsPrompt(
 	app: App,
 	material: ScheduleItem,
-	onSaved?: () => void
+	onSaved?: () => void,
 ): Promise<void> {
 	try {
 		const draft = await loadDraftOrNotify(app, material);

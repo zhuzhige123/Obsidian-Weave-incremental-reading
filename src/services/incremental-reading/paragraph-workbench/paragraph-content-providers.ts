@@ -1,15 +1,15 @@
 import { App, TFile, normalizePath } from "obsidian";
-import { ParagraphParser } from "../ParagraphParser";
+import { readOptionalString } from "../../../utils/unknown-record";
 import { normalizeCanvasNodeId } from "../../ui/canvas-source-locate";
-import {
-	extractObsidianBlockIdFromText,
-	formatObsidianBlockId,
-} from "./paragraph-block-reference";
+import { ParagraphParser } from "../ParagraphParser";
 import {
 	getEpubParagraphSnapshot,
 	navigateEpubParagraphRelative,
 } from "./epub-paragraph-bridge";
-import { readOptionalString } from "../../../utils/unknown-record";
+import {
+	extractObsidianBlockIdFromText,
+	formatObsidianBlockId,
+} from "./paragraph-block-reference";
 import type {
 	ParagraphWorkbenchOpenInput,
 	ParagraphWorkbenchSegment,
@@ -29,7 +29,10 @@ function normalizeSegmentIndex(index: number, total: number): number {
 	return Math.max(0, Math.min(index, total - 1));
 }
 
-async function loadMarkdownSegments(app: App, filePath: string): Promise<ParagraphWorkbenchSegment[]> {
+async function loadMarkdownSegments(
+	app: App,
+	filePath: string,
+): Promise<ParagraphWorkbenchSegment[]> {
 	const file = app.vault.getAbstractFileByPath(normalizePath(filePath));
 	if (!(file instanceof TFile)) {
 		return [];
@@ -42,8 +45,8 @@ async function loadMarkdownSegments(app: App, filePath: string): Promise<Paragra
 		const blockRef = obsidianBlockId
 			? formatObsidianBlockId(obsidianBlockId)
 			: paragraph.anchorId
-				? String(paragraph.anchorId)
-				: `line-${paragraph.startLine + 1}`;
+			? String(paragraph.anchorId)
+			: `line-${paragraph.startLine + 1}`;
 		return {
 			id: obsidianBlockId || String(paragraph.anchorId || paragraph.index),
 			index: paragraph.index,
@@ -62,7 +65,7 @@ async function loadMarkdownSegments(app: App, filePath: string): Promise<Paragra
 async function loadCanvasSegments(
 	app: App,
 	filePath: string,
-	canvasNodeId?: string
+	canvasNodeId?: string,
 ): Promise<ParagraphWorkbenchSegment[]> {
 	const file = app.vault.getAbstractFileByPath(normalizePath(filePath));
 	if (!(file instanceof TFile)) {
@@ -70,18 +73,24 @@ async function loadCanvasSegments(
 	}
 	let parsed: { nodes?: CanvasNodeRecord[] } | null = null;
 	try {
-		parsed = JSON.parse(await app.vault.read(file)) as { nodes?: CanvasNodeRecord[] };
+		parsed = JSON.parse(await app.vault.read(file)) as {
+			nodes?: CanvasNodeRecord[];
+		};
 	} catch {
 		return [];
 	}
 	const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
-	const textNodes = nodes.filter((node) => node?.type === "text" && String(node.text || "").trim());
+	const textNodes = nodes.filter(
+		(node) => node?.type === "text" && String(node.text || "").trim(),
+	);
 	const segments = textNodes.map((node, index) => ({
 		id: normalizeCanvasNodeId(node.id) || String(index),
 		index,
 		title: undefined,
 		text: String(node.text || "").trim(),
-		sourceLink: `${filePath}?node=${encodeURIComponent(normalizeCanvasNodeId(node.id) || String(index))}`,
+		sourceLink: `${filePath}?node=${encodeURIComponent(
+			normalizeCanvasNodeId(node.id) || String(index),
+		)}`,
 		metadata: {
 			canvasNodeId: normalizeCanvasNodeId(node.id),
 		},
@@ -91,12 +100,18 @@ async function loadCanvasSegments(
 	}
 	const normalizedTarget = normalizeCanvasNodeId(canvasNodeId);
 	const targetIndex = segments.findIndex(
-		(segment) => normalizeCanvasNodeId(String(segment.metadata?.canvasNodeId || segment.id)) === normalizedTarget
+		(segment) =>
+			normalizeCanvasNodeId(
+				String(segment.metadata?.canvasNodeId || segment.id),
+			) === normalizedTarget,
 	);
 	if (targetIndex <= 0) {
 		return segments;
 	}
-	return [...segments.slice(targetIndex), ...segments.slice(0, targetIndex)].map((segment, index) => ({
+	return [
+		...segments.slice(targetIndex),
+		...segments.slice(0, targetIndex),
+	].map((segment, index) => ({
 		...segment,
 		index,
 	}));
@@ -104,28 +119,31 @@ async function loadCanvasSegments(
 
 async function loadEpubSession(
 	app: App,
-	input: ParagraphWorkbenchOpenInput
+	input: ParagraphWorkbenchOpenInput,
 ): Promise<ParagraphWorkbenchSession | null> {
 	const snapshot = getEpubParagraphSnapshot(app, input.sourcePath);
 	if (!snapshot) {
 		return null;
 	}
-	const segments: ParagraphWorkbenchSegment[] = Array.from({ length: snapshot.paragraphTotal }, (_, index) => {
-		const isCurrent = index === snapshot.paragraphIndex;
-		return {
-			id: isCurrent ? snapshot.paragraphId : `epub-segment-${index}`,
-			index,
-			chapterTitle: snapshot.chapterTitle,
-			title: snapshot.chapterTitle,
-			text: isCurrent ? snapshot.paragraphText : "",
-			html: isCurrent ? snapshot.paragraphHtml : undefined,
-			sourceLink: snapshot.cfiRange,
-			metadata: {
-				cfiRange: isCurrent ? snapshot.cfiRange : undefined,
-				chapterHref: snapshot.chapterHref,
-			},
-		};
-	});
+	const segments: ParagraphWorkbenchSegment[] = Array.from(
+		{ length: snapshot.paragraphTotal },
+		(_, index) => {
+			const isCurrent = index === snapshot.paragraphIndex;
+			return {
+				id: isCurrent ? snapshot.paragraphId : `epub-segment-${index}`,
+				index,
+				chapterTitle: snapshot.chapterTitle,
+				title: snapshot.chapterTitle,
+				text: isCurrent ? snapshot.paragraphText : "",
+				html: isCurrent ? snapshot.paragraphHtml : undefined,
+				sourceLink: snapshot.cfiRange,
+				metadata: {
+					cfiRange: isCurrent ? snapshot.cfiRange : undefined,
+					chapterHref: snapshot.chapterHref,
+				},
+			};
+		},
+	);
 	return {
 		sourceType: "epub",
 		sourcePath: input.sourcePath,
@@ -134,7 +152,10 @@ async function loadEpubSession(
 		topicName: input.topicName,
 		pointId: input.pointId,
 		segments,
-		currentIndex: normalizeSegmentIndex(input.segmentIndex ?? snapshot.paragraphIndex, segments.length),
+		currentIndex: normalizeSegmentIndex(
+			input.segmentIndex ?? snapshot.paragraphIndex,
+			segments.length,
+		),
 		bookPercent: snapshot.bookPercent,
 		remainingMs: snapshot.remainingBookMs,
 	};
@@ -142,7 +163,7 @@ async function loadEpubSession(
 
 export async function createParagraphWorkbenchSession(
 	app: App,
-	input: ParagraphWorkbenchOpenInput
+	input: ParagraphWorkbenchOpenInput,
 ): Promise<ParagraphWorkbenchSession | null> {
 	const sourcePath = normalizePath(String(input.sourcePath || "").trim());
 	if (!sourcePath) {
@@ -172,18 +193,27 @@ export async function createParagraphWorkbenchSession(
 		topicName: input.topicName,
 		pointId: input.pointId,
 		segments,
-		currentIndex: normalizeSegmentIndex(input.segmentIndex ?? 0, segments.length),
-		bookPercent: Math.round(((input.segmentIndex ?? 0) + 1) / segments.length * 100),
+		currentIndex: normalizeSegmentIndex(
+			input.segmentIndex ?? 0,
+			segments.length,
+		),
+		bookPercent: Math.round(
+			(((input.segmentIndex ?? 0) + 1) / segments.length) * 100,
+		),
 	};
 }
 
 export async function navigateParagraphWorkbenchSession(
 	app: App,
 	session: ParagraphWorkbenchSession,
-	direction: -1 | 1
+	direction: -1 | 1,
 ): Promise<ParagraphWorkbenchSession | null> {
 	if (session.sourceType === "epub") {
-		const moved = await navigateEpubParagraphRelative(app, session.sourcePath, direction);
+		const moved = await navigateEpubParagraphRelative(
+			app,
+			session.sourcePath,
+			direction,
+		);
 		if (!moved) {
 			return null;
 		}
@@ -209,18 +239,22 @@ export async function navigateParagraphWorkbenchSession(
 }
 
 export function getCurrentWorkbenchSegment(
-	session: ParagraphWorkbenchSession | null
+	session: ParagraphWorkbenchSession | null,
 ): ParagraphWorkbenchSegment | null {
 	if (!session || session.segments.length === 0) {
 		return null;
 	}
-	return session.segments[normalizeSegmentIndex(session.currentIndex, session.segments.length)] ?? null;
+	return (
+		session.segments[
+			normalizeSegmentIndex(session.currentIndex, session.segments.length)
+		] ?? null
+	);
 }
 
 /** 重新从源文件加载段落列表，保留当前会话上下文（专题、索引等）。 */
 export async function reloadParagraphWorkbenchSession(
 	app: App,
-	session: ParagraphWorkbenchSession
+	session: ParagraphWorkbenchSession,
 ): Promise<ParagraphWorkbenchSession | null> {
 	const currentIndex = session.currentIndex;
 	const reloaded = await createParagraphWorkbenchSession(app, {
@@ -232,7 +266,9 @@ export async function reloadParagraphWorkbenchSession(
 		pointId: session.pointId,
 		canvasNodeId:
 			session.sourceType === "canvas"
-				? readOptionalString(session.segments[currentIndex]?.metadata?.canvasNodeId)
+				? readOptionalString(
+						session.segments[currentIndex]?.metadata?.canvasNodeId,
+				  )
 				: undefined,
 		epubCfi:
 			session.sourceType === "epub"

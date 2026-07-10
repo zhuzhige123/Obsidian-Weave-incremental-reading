@@ -1,9 +1,11 @@
 <script lang="ts">
+  import type { App } from 'obsidian';
   import { tr } from '../../../utils/i18n';
   import type {
     IncrementalReadingFolderSubscriptionInitialScheduleMode,
     IncrementalReadingFolderSubscriptionRule
   } from '../../../types/plugin-settings.d';
+  import FolderSearchInput from '../../ui/FolderSearchInput.svelte';
   import ObsidianDropdown from '../../ui/ObsidianDropdown.svelte';
   import ObsidianIcon from '../../ui/ObsidianIcon.svelte';
 
@@ -11,19 +13,19 @@
   type SubscriptionDeckOption = { id: string; label: string; description: string };
 
   interface Props {
+    app: App;
     showSection?: boolean;
     rules: IncrementalReadingFolderSubscriptionRule[];
     initialScheduleModeOptions: ScheduleModeOption[];
-    getFolderSubscriptionRuleLabel: (rule: IncrementalReadingFolderSubscriptionRule) => string;
     getSubscriptionDeckOptionsForRule: (
       rule: IncrementalReadingFolderSubscriptionRule
     ) => SubscriptionDeckOption[];
     getFolderSubscriptionInitialScheduleMode: () => IncrementalReadingFolderSubscriptionInitialScheduleMode;
     getFolderSubscriptionImportConfirmThreshold: () => number;
     handleAddFolderSubscriptionRule: () => Promise<void>;
-    chooseFolderSubscriptionFolder: (
+    handleFolderSubscriptionFolderPathChange: (
       ruleId: string,
-      triggerEl?: HTMLElement | null
+      folderPath: string
     ) => Promise<void>;
     handleFolderSubscriptionDeckChange: (ruleId: string, value: string) => Promise<void>;
     handleFolderSubscriptionEnabledChange: (ruleId: string, event: Event) => Promise<void>;
@@ -38,15 +40,15 @@
   }
 
   let {
+    app,
     showSection = true,
     rules,
     initialScheduleModeOptions,
-    getFolderSubscriptionRuleLabel,
     getSubscriptionDeckOptionsForRule,
     getFolderSubscriptionInitialScheduleMode,
     getFolderSubscriptionImportConfirmThreshold,
     handleAddFolderSubscriptionRule,
-    chooseFolderSubscriptionFolder,
+    handleFolderSubscriptionFolderPathChange,
     handleFolderSubscriptionDeckChange,
     handleFolderSubscriptionEnabledChange,
     removeFolderSubscriptionRule,
@@ -94,13 +96,15 @@
           <div class="subscription-rules-item">
             <div class="subscription-rules-item-folder">
               <div class="subscription-rules-mobile-label">{t('irSettings.autoSubscribeTableFolderHeader')}</div>
-              <button
-                type="button"
-                class="subscription-folder-trigger"
-                onclick={(event) => void chooseFolderSubscriptionFolder(String(rule.id || ''), event.currentTarget as HTMLElement)}
-              >
-                <span class:placeholder={!rule.folderPath}>{getFolderSubscriptionRuleLabel(rule)}</span>
-              </button>
+              <FolderSearchInput
+                {app}
+                value={rule.folderPath || ''}
+                savedValue={rule.folderPath || ''}
+                placeholder={t('irSettings.autoSubscribeFolderEmpty')}
+                onCommit={(folderPath) => {
+                  void handleFolderSubscriptionFolderPathChange(String(rule.id || ''), folderPath);
+                }}
+              />
             </div>
 
             <div class="subscription-rules-cell subscription-rules-cell-deck">
@@ -308,39 +312,6 @@
     color: var(--text-muted);
     font-size: var(--ir-font-caption, var(--font-ui-smaller));
     font-weight: 600;
-  }
-
-  .subscription-folder-trigger {
-    width: 100%;
-    min-height: 36px;
-    padding: var(--size-4-2) var(--size-4-3);
-    border: none;
-    border-radius: var(--input-radius);
-    background: color-mix(in srgb, var(--background-primary) 85%, transparent);
-    color: var(--text-normal);
-    text-align: left;
-    box-shadow: none;
-    overflow: hidden;
-  }
-
-  .subscription-folder-trigger span {
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .subscription-folder-trigger span.placeholder {
-    color: var(--text-muted);
-  }
-
-  .subscription-folder-trigger:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 80%, transparent);
-  }
-
-  .subscription-folder-trigger:focus-visible {
-    outline: 2px solid var(--interactive-accent);
-    outline-offset: 2px;
   }
 
   .subscription-rule-delete-btn {

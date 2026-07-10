@@ -17,7 +17,9 @@ function cloneDefaultGroup(): IRTagGroup {
 	};
 }
 
-function cloneDefaultProfile(groupId = DEFAULT_TAG_GROUP_PROFILE.groupId): IRTagGroupProfile {
+function cloneDefaultProfile(
+	groupId = DEFAULT_TAG_GROUP_PROFILE.groupId,
+): IRTagGroupProfile {
 	return {
 		...DEFAULT_TAG_GROUP_PROFILE,
 		groupId,
@@ -29,7 +31,7 @@ function buildGroup(
 	id: string,
 	name: string,
 	matchAnyTags: string[],
-	updatedAt = "2026-04-17T00:00:00.000Z"
+	updatedAt = "2026-04-17T00:00:00.000Z",
 ): IRTagGroup {
 	return {
 		id,
@@ -49,7 +51,7 @@ function buildGroup(
 
 function buildProfile(
 	groupId: string,
-	overrides: Partial<IRTagGroupProfile> = {}
+	overrides: Partial<IRTagGroupProfile> = {},
 ): IRTagGroupProfile {
 	return {
 		...cloneDefaultProfile(groupId),
@@ -163,53 +165,58 @@ describe("IRTagGroupService", () => {
 		const v2Paths = getV2Paths("");
 		const paperGroup = buildGroup("paper", "论文", ["paper"]);
 		const paperProfile = buildProfile("paper", { intervalFactorBase: 1.9 });
-		const novelGroup = buildGroup("novel", "小说", ["fiction"], "2026-04-17T01:00:00.000Z");
+		const novelGroup = buildGroup(
+			"novel",
+			"小说",
+			["fiction"],
+			"2026-04-17T01:00:00.000Z",
+		);
 		const novelProfile = buildProfile("novel", { intervalFactorBase: 1.4 });
 		const { app } = createMemoryApp({
 			initialFiles: {
 				[v2Paths.ir.pointFilesIndex]: JSON.stringify({
-				schemaVersion: IR_POINT_STORAGE_VERSION,
-				updatedAt: "2026-04-17T00:00:00.000Z",
-				files: [
-					{
-						topicId: "topic-a",
-						topicName: "专题 A",
-						file: "points/专题 A.irdeck",
-						pointCount: 0,
-						updatedAt: "2026-04-17T00:00:00.000Z",
-					},
-					{
-						topicId: "topic-b",
-						topicName: "专题 B",
-						file: "points/专题 B.irdeck",
-						pointCount: 0,
-						updatedAt: "2026-04-17T00:00:00.000Z",
-					},
-				],
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					updatedAt: "2026-04-17T00:00:00.000Z",
+					files: [
+						{
+							topicId: "topic-a",
+							topicName: "专题 A",
+							file: "points/专题 A.irdeck",
+							pointCount: 0,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+						{
+							topicId: "topic-b",
+							topicName: "专题 B",
+							file: "points/专题 B.irdeck",
+							pointCount: 0,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+					],
 				}),
 				[`${v2Paths.ir.root}/points/专题 A.irdeck`]: buildPointFile({
-				topicId: "topic-a",
-				topicName: "专题 A",
-				tagGroups: {
-					default: cloneDefaultGroup(),
-					paper: paperGroup,
-				},
-				tagGroupProfiles: {
-					default: cloneDefaultProfile(),
-					paper: paperProfile,
-				},
+					topicId: "topic-a",
+					topicName: "专题 A",
+					tagGroups: {
+						default: cloneDefaultGroup(),
+						paper: paperGroup,
+					},
+					tagGroupProfiles: {
+						default: cloneDefaultProfile(),
+						paper: paperProfile,
+					},
 				}),
 				[`${v2Paths.ir.root}/points/专题 B.irdeck`]: buildPointFile({
-				topicId: "topic-b",
-				topicName: "专题 B",
-				tagGroups: {
-					default: cloneDefaultGroup(),
-					novel: novelGroup,
-				},
-				tagGroupProfiles: {
-					default: cloneDefaultProfile(),
-					novel: novelProfile,
-				},
+					topicId: "topic-b",
+					topicName: "专题 B",
+					tagGroups: {
+						default: cloneDefaultGroup(),
+						novel: novelGroup,
+					},
+					tagGroupProfiles: {
+						default: cloneDefaultProfile(),
+						novel: novelProfile,
+					},
 				}),
 			},
 		});
@@ -218,7 +225,11 @@ describe("IRTagGroupService", () => {
 		const groups = await service.getAllGroups();
 		const deckScopes = await service.getDeckScopes();
 
-		expect(groups.map((group) => group.id)).toEqual(["paper", "novel", "default"]);
+		expect(groups.map((group) => group.id)).toEqual([
+			"paper",
+			"novel",
+			"default",
+		]);
 		expect(deckScopes).toEqual([
 			{ topicId: "topic-a", topicName: "专题 A" },
 			{ topicId: "topic-b", topicName: "专题 B" },
@@ -231,41 +242,46 @@ describe("IRTagGroupService", () => {
 	it("ignores legacy tag-group files for runtime reads until an explicit migration runs", async () => {
 		const v2Paths = getV2Paths("");
 		const legacyGroup = buildGroup("paper", "论文", ["paper"]);
-		const legacyProfile = buildProfile("paper", { intervalFactorBase: 2.1, sampleCount: 8 });
-		const pointFilePath = normalizeTestPath(`${v2Paths.ir.root}/points/专题 A.irdeck`);
+		const legacyProfile = buildProfile("paper", {
+			intervalFactorBase: 2.1,
+			sampleCount: 8,
+		});
+		const pointFilePath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/专题 A.irdeck`,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[v2Paths.ir.tagGroups]: JSON.stringify({
-				version: "1.0.0",
-				groups: {
-					paper: legacyGroup,
-				},
+					version: "1.0.0",
+					groups: {
+						paper: legacyGroup,
+					},
 				}),
 				[v2Paths.ir.tagGroupProfiles]: JSON.stringify({
-				version: "1.0.0",
-				profiles: {
-					paper: legacyProfile,
-				},
+					version: "1.0.0",
+					profiles: {
+						paper: legacyProfile,
+					},
 				}),
 				[v2Paths.ir.pointFilesIndex]: JSON.stringify({
-				schemaVersion: IR_POINT_STORAGE_VERSION,
-				updatedAt: "2026-04-17T00:00:00.000Z",
-				files: [
-					{
-						topicId: "topic-a",
-						topicName: "专题 A",
-						file: "points/专题 A.irdeck",
-						pointCount: 0,
-						updatedAt: "2026-04-17T00:00:00.000Z",
-					},
-				],
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					updatedAt: "2026-04-17T00:00:00.000Z",
+					files: [
+						{
+							topicId: "topic-a",
+							topicName: "专题 A",
+							file: "points/专题 A.irdeck",
+							pointCount: 0,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+					],
 				}),
 				[pointFilePath]: JSON.stringify({
-				schemaVersion: IR_POINT_STORAGE_VERSION,
-				topicId: "topic-a",
-				topicName: "专题 A",
-				updatedAt: "2026-04-17T00:00:00.000Z",
-				points: [],
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					topicId: "topic-a",
+					topicName: "专题 A",
+					updatedAt: "2026-04-17T00:00:00.000Z",
+					points: [],
 				}),
 			},
 		});
@@ -283,8 +299,13 @@ describe("IRTagGroupService", () => {
 	it("migrates legacy tag-group files into .irdeck files only through the explicit migration API", async () => {
 		const v2Paths = getV2Paths("");
 		const legacyGroup = buildGroup("paper", "论文", ["paper"]);
-		const legacyProfile = buildProfile("paper", { intervalFactorBase: 2.1, sampleCount: 8 });
-		const pointFilePath = normalizeTestPath(`${v2Paths.ir.root}/points/专题 A.irdeck`);
+		const legacyProfile = buildProfile("paper", {
+			intervalFactorBase: 2.1,
+			sampleCount: 8,
+		});
+		const pointFilePath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/专题 A.irdeck`,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[v2Paths.ir.tagGroups]: JSON.stringify({
@@ -344,50 +365,71 @@ describe("IRTagGroupService", () => {
 			sampleCount: 8,
 		});
 		expect(files.has(normalizeTestPath(v2Paths.ir.tagGroups))).toBe(false);
-		expect(files.has(normalizeTestPath(v2Paths.ir.tagGroupProfiles))).toBe(false);
+		expect(files.has(normalizeTestPath(v2Paths.ir.tagGroupProfiles))).toBe(
+			false,
+		);
 	});
 
 	it("writes group and profile back only to selected .irdeck files", async () => {
 		const v2Paths = getV2Paths("");
-		const topicAPath = normalizeTestPath(`${v2Paths.ir.root}/points/专题 A.irdeck`);
-		const topicBPath = normalizeTestPath(`${v2Paths.ir.root}/points/专题 B.irdeck`);
+		const topicAPath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/专题 A.irdeck`,
+		);
+		const topicBPath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/专题 B.irdeck`,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[v2Paths.ir.pointFilesIndex]: JSON.stringify({
-				schemaVersion: IR_POINT_STORAGE_VERSION,
-				updatedAt: "2026-04-17T00:00:00.000Z",
-				files: [
-					{
-						topicId: "topic-a",
-						topicName: "专题 A",
-						file: "points/专题 A.irdeck",
-						pointCount: 0,
-						updatedAt: "2026-04-17T00:00:00.000Z",
-					},
-					{
-						topicId: "topic-b",
-						topicName: "专题 B",
-						file: "points/专题 B.irdeck",
-						pointCount: 0,
-						updatedAt: "2026-04-17T00:00:00.000Z",
-					},
-				],
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					updatedAt: "2026-04-17T00:00:00.000Z",
+					files: [
+						{
+							topicId: "topic-a",
+							topicName: "专题 A",
+							file: "points/专题 A.irdeck",
+							pointCount: 0,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+						{
+							topicId: "topic-b",
+							topicName: "专题 B",
+							file: "points/专题 B.irdeck",
+							pointCount: 0,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+					],
 				}),
-				[topicAPath]: buildPointFile({ topicId: "topic-a", topicName: "专题 A" }),
-				[topicBPath]: buildPointFile({ topicId: "topic-b", topicName: "专题 B" }),
+				[topicAPath]: buildPointFile({
+					topicId: "topic-a",
+					topicName: "专题 A",
+				}),
+				[topicBPath]: buildPointFile({
+					topicId: "topic-b",
+					topicName: "专题 B",
+				}),
 			},
 		});
 		const service = new IRTagGroupService(app as any);
 		const group = buildGroup("paper", "论文", ["paper"]);
-		const profile = buildProfile("paper", { intervalFactorBase: 2.2, sampleCount: 6 });
+		const profile = buildProfile("paper", {
+			intervalFactorBase: 2.2,
+			sampleCount: 6,
+		});
 
-		const groupResult = await service.saveGroup(group, { targetTopicIds: ["topic-b"] });
-		const profileResult = await service.saveProfile(profile, { targetTopicIds: ["topic-b"] });
+		const groupResult = await service.saveGroup(group, {
+			targetTopicIds: ["topic-b"],
+		});
+		const profileResult = await service.saveProfile(profile, {
+			targetTopicIds: ["topic-b"],
+		});
 		const topicAFile = JSON.parse(files.get(topicAPath) || "{}");
 		const topicBFile = JSON.parse(files.get(topicBPath) || "{}");
 
 		expect(groupResult.affectedTopicIds).toEqual(["topic-b"]);
-		expect(new Set(profileResult.affectedTopicIds)).toEqual(new Set(["topic-b"]));
+		expect(new Set(profileResult.affectedTopicIds)).toEqual(
+			new Set(["topic-b"]),
+		);
 		expect(topicAFile.tagGroups.paper).toBeUndefined();
 		expect(topicAFile.tagGroupProfiles.paper).toBeUndefined();
 		expect(topicBFile.tagGroups.paper).toMatchObject({
@@ -406,55 +448,59 @@ describe("IRTagGroupService", () => {
 		const v2Paths = getV2Paths("");
 		const group = buildGroup("paper", "论文", ["paper"]);
 		const profile = buildProfile("paper");
-		const topicAPath = normalizeTestPath(`${v2Paths.ir.root}/points/专题 A.irdeck`);
-		const topicBPath = normalizeTestPath(`${v2Paths.ir.root}/points/专题 B.irdeck`);
+		const topicAPath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/专题 A.irdeck`,
+		);
+		const topicBPath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/专题 B.irdeck`,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[v2Paths.ir.pointFilesIndex]: JSON.stringify({
-				schemaVersion: IR_POINT_STORAGE_VERSION,
-				updatedAt: "2026-04-17T00:00:00.000Z",
-				files: [
-					{
-						topicId: "topic-a",
-						topicName: "专题 A",
-						file: "points/专题 A.irdeck",
-						pointCount: 1,
-						updatedAt: "2026-04-17T00:00:00.000Z",
-					},
-					{
-						topicId: "topic-b",
-						topicName: "专题 B",
-						file: "points/专题 B.irdeck",
-						pointCount: 1,
-						updatedAt: "2026-04-17T00:00:00.000Z",
-					},
-				],
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					updatedAt: "2026-04-17T00:00:00.000Z",
+					files: [
+						{
+							topicId: "topic-a",
+							topicName: "专题 A",
+							file: "points/专题 A.irdeck",
+							pointCount: 1,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+						{
+							topicId: "topic-b",
+							topicName: "专题 B",
+							file: "points/专题 B.irdeck",
+							pointCount: 1,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+					],
 				}),
 				[topicAPath]: buildPointFile({
-				topicId: "topic-a",
-				topicName: "专题 A",
-				tagGroups: {
-					default: cloneDefaultGroup(),
-					paper: group,
-				},
-				tagGroupProfiles: {
-					default: cloneDefaultProfile(),
-					paper: profile,
-				},
-				points: [buildPoint("point-a", "paper")],
+					topicId: "topic-a",
+					topicName: "专题 A",
+					tagGroups: {
+						default: cloneDefaultGroup(),
+						paper: group,
+					},
+					tagGroupProfiles: {
+						default: cloneDefaultProfile(),
+						paper: profile,
+					},
+					points: [buildPoint("point-a", "paper")],
 				}),
 				[topicBPath]: buildPointFile({
-				topicId: "topic-b",
-				topicName: "专题 B",
-				tagGroups: {
-					default: cloneDefaultGroup(),
-					paper: group,
-				},
-				tagGroupProfiles: {
-					default: cloneDefaultProfile(),
-					paper: profile,
-				},
-				points: [buildPoint("point-b", "paper")],
+					topicId: "topic-b",
+					topicName: "专题 B",
+					tagGroups: {
+						default: cloneDefaultGroup(),
+						paper: group,
+					},
+					tagGroupProfiles: {
+						default: cloneDefaultProfile(),
+						paper: profile,
+					},
+					points: [buildPoint("point-b", "paper")],
 				}),
 			},
 		});

@@ -19,7 +19,9 @@ describe("loadEpubTocForIrImport", () => {
 		const loadPublicationTocItems = vi.fn(async () => [
 			{ id: "1", label: "Chapter 1", href: "chapter1.xhtml", level: 1 },
 		]);
-		vi.mocked(getEpubReaderInteropHost).mockReturnValue({ loadPublicationTocItems });
+		vi.mocked(getEpubReaderInteropHost).mockReturnValue({
+			loadPublicationTocItems,
+		});
 
 		const items = await loadEpubTocForIrImport({} as never, "Books/demo.epub");
 
@@ -28,11 +30,17 @@ describe("loadEpubTocForIrImport", () => {
 	});
 
 	it("throws EpubError when reader is installed but API is missing", async () => {
-		vi.mocked(getEpubReaderInteropHost).mockReturnValue({ openEpubReader: vi.fn() } as never);
+		vi.mocked(getEpubReaderInteropHost).mockReturnValue({
+			openEpubReader: vi.fn(),
+		} as never);
 		vi.mocked(resolveEpubReaderInteropFailure).mockReturnValue("api-missing");
-		vi.mocked(getEpubReaderInteropFailureMessage).mockReturnValue("请更新阅读器插件");
+		vi.mocked(getEpubReaderInteropFailureMessage).mockReturnValue(
+			"请更新阅读器插件",
+		);
 
-		await expect(loadEpubTocForIrImport({} as never, "Books/demo.epub")).rejects.toMatchObject({
+		await expect(
+			loadEpubTocForIrImport({} as never, "Books/demo.epub"),
+		).rejects.toMatchObject({
 			code: "reader_interop_unavailable",
 			message: "请更新阅读器插件",
 		} satisfies Partial<EpubError>);

@@ -7,11 +7,31 @@ import { t } from "../../../utils/i18n";
 
 export function getModalSizePresets() {
 	return {
-		small: { width: 600, height: 400, label: t("settingsConstants.modalSize.small") },
-		medium: { width: 700, height: 500, label: t("settingsConstants.modalSize.medium") },
-		large: { width: 800, height: 600, label: t("settingsConstants.modalSize.large") },
-		"extra-large": { width: 1000, height: 700, label: t("settingsConstants.modalSize.extraLarge") },
-		custom: { width: 800, height: 600, label: t("settingsConstants.modalSize.custom") },
+		small: {
+			width: 600,
+			height: 400,
+			label: t("settingsConstants.modalSize.small"),
+		},
+		medium: {
+			width: 700,
+			height: 500,
+			label: t("settingsConstants.modalSize.medium"),
+		},
+		large: {
+			width: 800,
+			height: 600,
+			label: t("settingsConstants.modalSize.large"),
+		},
+		"extra-large": {
+			width: 1000,
+			height: 700,
+			label: t("settingsConstants.modalSize.extraLarge"),
+		},
+		custom: {
+			width: 800,
+			height: 600,
+			label: t("settingsConstants.modalSize.custom"),
+		},
 	};
 }
 

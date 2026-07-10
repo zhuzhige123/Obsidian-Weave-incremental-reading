@@ -1,11 +1,11 @@
-
 vi.mock("obsidian", async () => {
-	const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
-		"../../../tests/mocks/obsidian"
-	);
+	const actual = await vi.importActual<
+		typeof import("../../../tests/mocks/obsidian")
+	>("../../../tests/mocks/obsidian");
 	return {
 		...actual,
-		normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/{2,}/g, "/"),
+		normalizePath: (path: string) =>
+			path.replace(/\\/g, "/").replace(/\/{2,}/g, "/"),
 	};
 });
 
@@ -41,7 +41,7 @@ const pdfSpies = {
 	updateTask: vi.fn(),
 };
 
-	const epubSpies = {
+const epubSpies = {
 	initialize: vi.fn(),
 	createTask: vi.fn(),
 	batchCreateTasks: vi.fn(),
@@ -61,7 +61,14 @@ vi.mock("../IRPointTagService", () => ({
 		matchGroupForTags = pointTagSpies.matchGroupForTags;
 	},
 	normalizeReadingPointTags: (tags: string[]) =>
-		Array.from(new Map(tags.map((tag) => [String(tag).trim().toLowerCase(), String(tag).trim()])).values()).filter(Boolean),
+		Array.from(
+			new Map(
+				tags.map((tag) => [
+					String(tag).trim().toLowerCase(),
+					String(tag).trim(),
+				]),
+			).values(),
+		).filter(Boolean),
 }));
 
 vi.mock("../IRStorageService", () => ({
@@ -73,7 +80,8 @@ vi.mock("../IRStorageService", () => ({
 		deleteChunkData = storageSpies.deleteChunkData;
 		deleteBlock = storageSpies.deleteBlock;
 		deleteLegacyPointById = storageSpies.deleteLegacyPointById;
-		invalidateScheduleRuntimeCaches = storageSpies.invalidateScheduleRuntimeCaches;
+		invalidateScheduleRuntimeCaches =
+			storageSpies.invalidateScheduleRuntimeCaches;
 		saveBlock = storageSpies.saveBlock;
 		saveChunkData = storageSpies.saveChunkData;
 		updateChunkDecks = storageSpies.updateChunkDecks;
@@ -121,7 +129,9 @@ describe("IRPointWriteService", () => {
 		storageSpies.deleteChunkData.mockResolvedValue(undefined);
 		storageSpies.deleteBlock.mockResolvedValue(undefined);
 		storageSpies.deleteLegacyPointById.mockResolvedValue(false);
-		storageSpies.invalidateScheduleRuntimeCaches.mockImplementation(() => undefined);
+		storageSpies.invalidateScheduleRuntimeCaches.mockImplementation(
+			() => undefined,
+		);
 		storageSpies.saveBlock.mockResolvedValue(undefined);
 		storageSpies.saveChunkData.mockResolvedValue(undefined);
 		storageSpies.updateChunkDecks.mockResolvedValue(undefined);
@@ -159,10 +169,13 @@ describe("IRPointWriteService", () => {
 
 		const result = await service.updateTags(
 			{ uuid: "pdf-task:1", metadata: {} } as any,
-			["Alpha", "alpha", "Beta"]
+			["Alpha", "alpha", "Beta"],
 		);
 
-		expect(pointTagSpies.savePdfTaskTags).toHaveBeenCalledWith("pdf-task:1", ["alpha", "Beta"]);
+		expect(pointTagSpies.savePdfTaskTags).toHaveBeenCalledWith("pdf-task:1", [
+			"alpha",
+			"Beta",
+		]);
 		expect(result).toEqual({
 			kind: "pdf",
 			sourceDocumentPath: "Books/Demo.pdf",
@@ -181,10 +194,12 @@ describe("IRPointWriteService", () => {
 				kind: "chunk",
 				sourceDocumentPath: "Inbox\\Chunk.md",
 			},
-			["Gamma", "gamma"]
+			["Gamma", "gamma"],
 		);
 
-		expect(pointTagSpies.saveChunkTags).toHaveBeenCalledWith("chunk-1", ["gamma"]);
+		expect(pointTagSpies.saveChunkTags).toHaveBeenCalledWith("chunk-1", [
+			"gamma",
+		]);
 		expect(result).toEqual({
 			kind: "chunk",
 			sourceDocumentPath: "Inbox/Chunk.md",
@@ -208,7 +223,7 @@ describe("IRPointWriteService", () => {
 				metadata: { irBlock: true },
 				ir_source_document_key: "Inbox\\block.md",
 			} as any,
-			7
+			7,
 		);
 
 		expect(storageSpies.saveBlock).toHaveBeenCalledWith(
@@ -216,7 +231,7 @@ describe("IRPointWriteService", () => {
 				priority: 1,
 				priorityUi: 7,
 				priorityEff: 7,
-			})
+			}),
 		);
 		expect(result).toEqual({
 			kind: "block",
@@ -237,7 +252,7 @@ describe("IRPointWriteService", () => {
 				metadata: { irChunk: true },
 				ir_source_document_key: "Inbox/chunk.md",
 			} as any,
-			["Notes/Topic.md"]
+			["Notes/Topic.md"],
 		);
 
 		expect(result).toBeNull();
@@ -252,7 +267,7 @@ describe("IRPointWriteService", () => {
 
 		const result = await service.updateAssociatedNotes(
 			{ uuid: "epub-task:1", metadata: {} } as any,
-			["Notes/Topic", "Notes/Extra.md", "Notes/Topic.md"]
+			["Notes/Topic", "Notes/Extra.md", "Notes/Topic.md"],
 		);
 
 		expect(epubSpies.updateTask).toHaveBeenCalledWith(
@@ -263,7 +278,7 @@ describe("IRPointWriteService", () => {
 					associatedNotePath: "Notes/Topic.md",
 					associatedNotePaths: ["Notes/Topic.md", "Notes/Extra.md"],
 				}),
-			})
+			}),
 		);
 		expect(result).toEqual({
 			kind: "epub",
@@ -284,10 +299,12 @@ describe("IRPointWriteService", () => {
 				metadata: { irChunk: true },
 				ir_source_document_key: "Inbox\\chunk.md",
 			} as any,
-			["deck-a", "deck-a", "deck-b"]
+			["deck-a", "deck-a", "deck-b"],
 		);
 
-		expect(storageSpies.updateChunkDecks).toHaveBeenCalledWith("chunk-1", ["deck-a"]);
+		expect(storageSpies.updateChunkDecks).toHaveBeenCalledWith("chunk-1", [
+			"deck-a",
+		]);
 		expect(result).toEqual({
 			kind: "chunk",
 			sourceDocumentPath: "Inbox/chunk.md",
@@ -429,10 +446,20 @@ describe("IRPointWriteService", () => {
 		epubSpies.deleteTasksByDeckIdentifiers.mockResolvedValue(3);
 		const service = new IRPointWriteService({} as any);
 
-		const result = await service.deletePointsByDeckIdentifiers(["deck-a", "deck-a", "deck-b"]);
+		const result = await service.deletePointsByDeckIdentifiers([
+			"deck-a",
+			"deck-a",
+			"deck-b",
+		]);
 
-		expect(pdfSpies.deleteTasksByDeckIdentifiers).toHaveBeenCalledWith(["deck-a", "deck-b"]);
-		expect(epubSpies.deleteTasksByDeckIdentifiers).toHaveBeenCalledWith(["deck-a", "deck-b"]);
+		expect(pdfSpies.deleteTasksByDeckIdentifiers).toHaveBeenCalledWith([
+			"deck-a",
+			"deck-b",
+		]);
+		expect(epubSpies.deleteTasksByDeckIdentifiers).toHaveBeenCalledWith([
+			"deck-a",
+			"deck-b",
+		]);
 		expect(result).toBe(5);
 	});
 
@@ -440,9 +467,15 @@ describe("IRPointWriteService", () => {
 		pdfSpies.deleteTasksByPdfPaths.mockResolvedValue(2);
 		const service = new IRPointWriteService({} as any);
 
-		const result = await service.deletePdfPointsByPaths(["Books\\A.pdf", "Books/A.pdf", ""]);
+		const result = await service.deletePdfPointsByPaths([
+			"Books\\A.pdf",
+			"Books/A.pdf",
+			"",
+		]);
 
-		expect(pdfSpies.deleteTasksByPdfPaths).toHaveBeenCalledWith(["Books/A.pdf"]);
+		expect(pdfSpies.deleteTasksByPdfPaths).toHaveBeenCalledWith([
+			"Books/A.pdf",
+		]);
 		expect(result).toBe(2);
 	});
 
@@ -450,9 +483,15 @@ describe("IRPointWriteService", () => {
 		epubSpies.deleteTasksByEpubPaths.mockResolvedValue(3);
 		const service = new IRPointWriteService({} as any);
 
-		const result = await service.deleteEpubPointsByPaths(["Books\\Novel.epub", "Books/Novel.epub", ""]);
+		const result = await service.deleteEpubPointsByPaths([
+			"Books\\Novel.epub",
+			"Books/Novel.epub",
+			"",
+		]);
 
-		expect(epubSpies.deleteTasksByEpubPaths).toHaveBeenCalledWith(["Books/Novel.epub"]);
+		expect(epubSpies.deleteTasksByEpubPaths).toHaveBeenCalledWith([
+			"Books/Novel.epub",
+		]);
 		expect(result).toBe(3);
 	});
 
@@ -463,10 +502,16 @@ describe("IRPointWriteService", () => {
 		});
 		const service = new IRPointWriteService({} as any);
 
-		const result = await service.updateEpubResumePoint("epub-task:1", "epubcfi(/6/4)");
+		const result = await service.updateEpubResumePoint(
+			"epub-task:1",
+			"epubcfi(/6/4)",
+		);
 
 		expect(epubSpies.getTask).toHaveBeenCalledWith("epub-task:1");
-		expect(epubSpies.setResumePoint).toHaveBeenCalledWith("epub-task:1", "epubcfi(/6/4)");
+		expect(epubSpies.setResumePoint).toHaveBeenCalledWith(
+			"epub-task:1",
+			"epubcfi(/6/4)",
+		);
 		expect(result).toEqual({
 			kind: "epub",
 			sourceDocumentPath: "Books/Novel.epub",
@@ -499,7 +544,9 @@ describe("IRPointWriteService", () => {
 		});
 
 		expect(storageSpies.deleteChunkData).not.toHaveBeenCalled();
-		expect(storageSpies.deleteLegacyPointById).toHaveBeenCalledWith("chunk-q4t5dnb4p3yg");
+		expect(storageSpies.deleteLegacyPointById).toHaveBeenCalledWith(
+			"chunk-q4t5dnb4p3yg",
+		);
 		expect(result).toBe(true);
 	});
 

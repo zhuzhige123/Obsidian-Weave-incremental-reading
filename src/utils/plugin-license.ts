@@ -42,13 +42,16 @@ export interface LicenseCapablePluginLike {
 }
 
 export function getPluginLicensedProduct(
-	plugin: LicenseCapablePluginLike | null | undefined
+	plugin: LicenseCapablePluginLike | null | undefined,
 ): LicensedProduct {
-	return plugin?.getLicensedProductId?.() ?? getProductFromPluginId(plugin?.manifest?.id);
+	return (
+		plugin?.getLicensedProductId?.() ??
+		getProductFromPluginId(plugin?.manifest?.id)
+	);
 }
 
 export function getPluginLocalLicenses(
-	plugin: LicenseCapablePluginLike | null | undefined
+	plugin: LicenseCapablePluginLike | null | undefined,
 ): LicenseInfo[] {
 	if (!plugin) {
 		return [];
@@ -58,12 +61,14 @@ export function getPluginLocalLicenses(
 		return plugin.getLocalLicenses();
 	}
 
-	return normalizeLicenseStore(plugin.settings?.license, plugin.settings?.licenseState)
-		.localLicenses;
+	return normalizeLicenseStore(
+		plugin.settings?.license,
+		plugin.settings?.licenseState,
+	).localLicenses;
 }
 
 export function getPluginEffectiveLicenseState(
-	plugin: LicenseCapablePluginLike | null | undefined
+	plugin: LicenseCapablePluginLike | null | undefined,
 ): EffectiveLicenseState {
 	if (plugin?.getEffectiveLicenseState) {
 		return plugin.getEffectiveLicenseState();
@@ -76,7 +81,7 @@ export function getPluginEffectiveLicenseState(
 }
 
 export function syncPluginLicenseSettings(
-	plugin: LicenseCapablePluginLike | null | undefined
+	plugin: LicenseCapablePluginLike | null | undefined,
 ): void {
 	if (!plugin?.settings) {
 		return;
@@ -84,15 +89,17 @@ export function syncPluginLicenseSettings(
 
 	const normalizedStore = normalizeLicenseStore(
 		plugin.settings.license,
-		plugin.settings.licenseState
+		plugin.settings.licenseState,
 	);
 	plugin.settings.licenseState = normalizedStore;
-	plugin.settings.license = getLegacyPrimaryLicense(normalizedStore.localLicenses);
+	plugin.settings.license = getLegacyPrimaryLicense(
+		normalizedStore.localLicenses,
+	);
 }
 
 export function upsertPluginLocalLicense(
 	plugin: LicenseCapablePluginLike | null | undefined,
-	license: LicenseInfo
+	license: LicenseInfo,
 ): void {
 	if (!plugin?.settings) {
 		return;
@@ -100,7 +107,8 @@ export function upsertPluginLocalLicense(
 
 	const existingLicenses = getPluginLocalLicenses(plugin);
 	const nextLicenses = existingLicenses.filter(
-		(existingLicense) => existingLicense.activationCode !== license.activationCode
+		(existingLicense) =>
+			existingLicense.activationCode !== license.activationCode,
 	);
 	nextLicenses.unshift(license);
 
@@ -112,7 +120,7 @@ export function upsertPluginLocalLicense(
 }
 
 export function markPluginLocalLicensesCleared(
-	plugin: LicenseCapablePluginLike | null | undefined
+	plugin: LicenseCapablePluginLike | null | undefined,
 ): void {
 	if (!plugin?.settings) {
 		return;
@@ -132,7 +140,7 @@ export function markPluginLocalLicensesCleared(
 
 export function getPluginActivationRemovalKind(
 	plugin: LicenseCapablePluginLike | null | undefined,
-	options?: RemovePluginActivationOptions
+	options?: RemovePluginActivationOptions,
 ): PluginActivationRemovalKind {
 	const hasLocalLicenses = getPluginLocalLicenses(plugin).length > 0;
 	const effectiveState = getPluginEffectiveLicenseState(plugin);
@@ -141,7 +149,7 @@ export function getPluginActivationRemovalKind(
 			plugin?.settings &&
 			typeof plugin.settings.allowInheritedLicenses === "boolean" &&
 			plugin.settings.allowInheritedLicenses !== false &&
-			effectiveState.inheritedLicenses.length > 0
+			effectiveState.inheritedLicenses.length > 0,
 	);
 
 	if (hasLocalLicenses && canDisableInheritedLicenses) {
@@ -161,7 +169,7 @@ export function getPluginActivationRemovalKind(
 
 export function removePluginActivation(
 	plugin: LicenseCapablePluginLike | null | undefined,
-	options?: RemovePluginActivationOptions
+	options?: RemovePluginActivationOptions,
 ): RemovePluginActivationResult {
 	const removalKind = getPluginActivationRemovalKind(plugin, options);
 
@@ -173,7 +181,8 @@ export function removePluginActivation(
 	}
 
 	if (
-		(removalKind === "inherited-only" || removalKind === "local-and-inherited") &&
+		(removalKind === "inherited-only" ||
+			removalKind === "local-and-inherited") &&
 		plugin?.settings &&
 		typeof plugin.settings.allowInheritedLicenses === "boolean"
 	) {
@@ -191,7 +200,7 @@ export function removePluginActivation(
 }
 
 export function clearPluginLocalLicenses(
-	plugin: LicenseCapablePluginLike | null | undefined
+	plugin: LicenseCapablePluginLike | null | undefined,
 ): void {
 	markPluginLocalLicensesCleared(plugin);
 }

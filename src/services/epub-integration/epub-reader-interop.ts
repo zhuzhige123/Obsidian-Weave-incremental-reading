@@ -5,8 +5,8 @@ import {
 	getEpubReaderPluginAvailability,
 	getEpubReaderUnavailableMessage,
 } from "../../utils/epub-reader-access";
-import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
 import { i18n } from "../../utils/i18n";
+import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
 import type { IrEpubStorageLike } from "./ir-epub-storage-types";
 import type { TocItem } from "./types";
 
@@ -20,18 +20,20 @@ export interface EpubReaderInteropHost {
 	navigateToPublicationChapter?: (
 		filePath: string,
 		tocHref: string,
-		options?: { sourceId?: string; sourceMarkdownPath?: string }
+		options?: { sourceId?: string; sourceMarkdownPath?: string },
 	) => Promise<void>;
 	buildPublicationChapterMarkdownLink?: (
 		filePath: string,
 		tocHref: string,
 		chapterTitle?: string,
 		sourceId?: string,
-		chapterIndex?: number
+		chapterIndex?: number,
 	) => string;
 }
 
-export function getEpubReaderInteropHost(app: App): EpubReaderInteropHost | null {
+export function getEpubReaderInteropHost(
+	app: App,
+): EpubReaderInteropHost | null {
 	return getObsidianPluginAs<EpubReaderInteropHost>(app, EPUB_READER_PLUGIN_ID);
 }
 
@@ -52,7 +54,7 @@ export type EpubReaderInteropFailureReason =
 	| "api-missing";
 
 export function resolveEpubReaderInteropFailure(
-	app: App
+	app: App,
 ): EpubReaderInteropFailureReason | null {
 	if (hasEpubReaderTocInterop(app)) {
 		return null;
@@ -67,7 +69,7 @@ export function resolveEpubReaderInteropFailure(
 
 export function getEpubReaderInteropFailureMessage(
 	app: App,
-	reason: EpubReaderInteropFailureReason
+	reason: EpubReaderInteropFailureReason,
 ): string {
 	if (reason === "api-missing") {
 		return i18n.t("irMain.epubReader.unavailableOutdated", {

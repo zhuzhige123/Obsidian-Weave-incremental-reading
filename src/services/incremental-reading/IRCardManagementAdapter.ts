@@ -1,4 +1,4 @@
-import { TFile, type App } from "obsidian";
+import { type App, TFile } from "obsidian";
 import { i18n } from "../../utils/i18n";
 import type { IRTraceSourceKind } from "./IRSourceTraceStats";
 import { detectTraceSourceKind } from "./IRSourceTraceStats";
@@ -31,7 +31,7 @@ export interface IRTableFieldParams {
 
 export function getIRSourceDocumentLabel(
 	sourceFile: string,
-	sourceDocumentKey?: string
+	sourceDocumentKey?: string,
 ): string {
 	const raw = sourceFile || sourceDocumentKey || "";
 	if (!raw) return i18n.t("irServiceNotices.defaults.unnamedSource");
@@ -41,7 +41,7 @@ export function getIRSourceDocumentLabel(
 
 export function getIRSourceSubunitLabel(
 	value: string | undefined,
-	sourceKind: IRTraceSourceKind
+	sourceKind: IRTraceSourceKind,
 ): string {
 	if (sourceKind !== "pdf" && sourceKind !== "epub") {
 		return "";
@@ -74,7 +74,8 @@ export function buildIRTableFields(params: IRTableFieldParams) {
 		ir_source_document_key: params.sourceDocumentKey || params.sourceFile,
 		ir_source_document_label:
 			params.sourceDocumentLabel || getIRSourceDocumentLabel(params.sourceFile),
-		ir_source_kind: params.sourceKind || detectTraceSourceKind(params.sourceFile),
+		ir_source_kind:
+			params.sourceKind || detectTraceSourceKind(params.sourceFile),
 		ir_source_subunit: params.sourceSubunitLabel || "",
 		ir_deck: params.deckName || "未分配",
 		ir_deck_ids: params.deckIds || [],
@@ -97,9 +98,7 @@ export function buildIRTableFields(params: IRTableFieldParams) {
 	};
 }
 
-export async function createIRTagGroupNameResolver(
-	app: App
-): Promise<
+export async function createIRTagGroupNameResolver(app: App): Promise<
 	(options: {
 		explicitGroupId?: string;
 		documentPath?: string;
@@ -109,14 +108,18 @@ export async function createIRTagGroupNameResolver(
 	const tagGroupService = new IRTagGroupService(app);
 	await tagGroupService.initialize();
 	const tagGroups = await tagGroupService.getAllGroups();
-	const tagGroupNameById = new Map(tagGroups.map((group) => [group.id, group.name]));
+	const tagGroupNameById = new Map(
+		tagGroups.map((group) => [group.id, group.name]),
+	);
 	const tagGroupByDocumentCache = new Map<string, string>();
 	const tagGroupByTagsCache = new Map<string, string>();
 
 	return async (options) => {
 		const explicitGroupId = options.explicitGroupId?.trim();
 		if (explicitGroupId) {
-			return getIRTagGroupLabel(tagGroupNameById.get(explicitGroupId) || explicitGroupId);
+			return getIRTagGroupLabel(
+				tagGroupNameById.get(explicitGroupId) || explicitGroupId,
+			);
 		}
 
 		const documentPath = options.documentPath?.trim();
@@ -128,8 +131,11 @@ export async function createIRTagGroupNameResolver(
 
 			const abstractFile = app.vault.getAbstractFileByPath(documentPath);
 			if (abstractFile instanceof TFile && abstractFile.extension === "md") {
-				const groupId = await tagGroupService.matchGroupForDocument(documentPath);
-				const groupName = getIRTagGroupLabel(tagGroupNameById.get(groupId) || groupId);
+				const groupId =
+					await tagGroupService.matchGroupForDocument(documentPath);
+				const groupName = getIRTagGroupLabel(
+					tagGroupNameById.get(groupId) || groupId,
+				);
 				tagGroupByDocumentCache.set(documentPath, groupName);
 				return groupName;
 			}
@@ -145,7 +151,9 @@ export async function createIRTagGroupNameResolver(
 		}
 
 		const groupId = await tagGroupService.matchGroupForTags(options.tags || []);
-		const groupName = getIRTagGroupLabel(tagGroupNameById.get(groupId) || groupId);
+		const groupName = getIRTagGroupLabel(
+			tagGroupNameById.get(groupId) || groupId,
+		);
 		tagGroupByTagsCache.set(normalizedTagsKey, groupName);
 		return groupName;
 	};

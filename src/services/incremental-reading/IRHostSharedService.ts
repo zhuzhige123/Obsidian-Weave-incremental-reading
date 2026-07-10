@@ -1,15 +1,14 @@
-import { Notice, TFile, type App } from "obsidian";
+import { type App, Notice, TFile } from "obsidian";
 import { IRDeckSelectorModal } from "../../modals/IRDeckSelectorModal";
-import { i18n } from "../../utils/i18n";
-import { getTaskTopicId } from "../../utils/ir-topic-compat";
 import type { IRBlockMeta, IRChunkFileData } from "../../types/ir-types";
 import {
-	createDefaultChunkFileData,
 	DEFAULT_IR_BLOCK_META,
+	createDefaultChunkFileData,
 	generateChunkId,
 	generateSourceId,
 } from "../../types/ir-types";
-import type { ExistingChunkLike } from "./folder-subscription-sync-state";
+import { i18n } from "../../utils/i18n";
+import { getTaskTopicId } from "../../utils/ir-topic-compat";
 import { logger } from "../../utils/logger";
 import { getIrEpubStorageService } from "../epub-integration/ir-epub-storage-access";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
@@ -18,9 +17,10 @@ import {
 	resolveIRReadableMarkdownTargetFolder,
 } from "./IRReadableMarkdownPathResolver";
 import { recomputeAndBroadcastIRData } from "./IRScheduleRefreshService";
-import { IRV4SchedulerService } from "./IRV4SchedulerService";
-import { IR_WEB_CHUNK_META_URL_KEY } from "./ir-web-reading-point";
 import { IRStorageService } from "./IRStorageService";
+import { IRV4SchedulerService } from "./IRV4SchedulerService";
+import type { ExistingChunkLike } from "./folder-subscription-sync-state";
+import { IR_WEB_CHUNK_META_URL_KEY } from "./ir-web-reading-point";
 
 export interface IRSelectionQuickCreatePreferencesLike {
 	selectionQuickCreateLastFolder?: string;
@@ -85,20 +85,28 @@ export class IRHostSharedService {
 		title: string;
 		titleDetected: boolean;
 	} {
-		const normalized = String(selectedText || "").replace(/\r\n?/g, "\n").trim();
+		const normalized = String(selectedText || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
 		const lines = normalized.split("\n");
-		const firstNonEmptyLine = lines.find((line) => line.trim().length > 0) || normalized;
+		const firstNonEmptyLine =
+			lines.find((line) => line.trim().length > 0) || normalized;
 		const headingMatch = firstNonEmptyLine.trim().match(/^#{1,6}\s+(.+)$/);
 		if (headingMatch?.[1]) {
 			return {
-				title: this.cleanIRReadingPointTitle(headingMatch[1]) || i18n.t("irMain.defaults.unnamedReadingPoint"),
+				title:
+					this.cleanIRReadingPointTitle(headingMatch[1]) ||
+					i18n.t("irMain.defaults.unnamedReadingPoint"),
 				titleDetected: true,
 			};
 		}
 
 		const cleanedLine = this.cleanIRReadingPointTitle(firstNonEmptyLine);
 		return {
-			title: cleanedLine.length > 80 ? `${cleanedLine.slice(0, 80).trim()}...` : cleanedLine || i18n.t("irMain.defaults.unnamedReadingPoint"),
+			title:
+				cleanedLine.length > 80
+					? `${cleanedLine.slice(0, 80).trim()}...`
+					: cleanedLine || i18n.t("irMain.defaults.unnamedReadingPoint"),
 			titleDetected: false,
 		};
 	}
@@ -109,7 +117,7 @@ export class IRHostSharedService {
 
 	getSelectionQuickCreateFolderConfig(
 		settings: IRSelectionQuickCreatePreferencesLike | null | undefined,
-		contextPath?: string
+		contextPath?: string,
 	): { initialFolder: string } {
 		return {
 			initialFolder: this.normalizeSelectionQuickCreateFolderPath(
@@ -117,14 +125,14 @@ export class IRHostSharedService {
 					lastSelectedFolder: settings?.selectionQuickCreateLastFolder,
 					contextPath,
 					allowActiveFileFallback: true,
-				})
+				}),
 			),
 		};
 	}
 
 	getUpdatedSelectionQuickCreatePreferences(
 		settings: IRSelectionQuickCreatePreferencesLike,
-		update: { folderPath?: string }
+		update: { folderPath?: string },
 	): IRSelectionQuickCreatePreferencesLike {
 		if (update.folderPath === undefined) {
 			return settings;
@@ -132,7 +140,8 @@ export class IRHostSharedService {
 
 		return {
 			...settings,
-			selectionQuickCreateLastFolder: this.normalizeSelectionQuickCreateFolderPath(update.folderPath),
+			selectionQuickCreateLastFolder:
+				this.normalizeSelectionQuickCreateFolderPath(update.folderPath),
 		};
 	}
 
@@ -147,12 +156,15 @@ export class IRHostSharedService {
 	}
 
 	getIncrementalReadingDateKey(date: Date): string {
-		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-			date.getDate()
-		).padStart(2, "0")}`;
+		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+			2,
+			"0",
+		)}-${String(date.getDate()).padStart(2, "0")}`;
 	}
 
-	async getAvailableEpubIncrementalReadingTopics(): Promise<Array<{ id: string; name: string }>> {
+	async getAvailableEpubIncrementalReadingTopics(): Promise<
+		Array<{ id: string; name: string }>
+	> {
 		try {
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
@@ -165,7 +177,10 @@ export class IRHostSharedService {
 				}))
 				.filter((deck) => deck.id && deck.name);
 		} catch (error) {
-			logger.error("[IRHostSharedService] 获取 EPUB 增量阅读专题列表失败:", error);
+			logger.error(
+				"[IRHostSharedService] 获取 EPUB 增量阅读专题列表失败:",
+				error,
+			);
 			return [];
 		}
 	}
@@ -194,7 +209,9 @@ export class IRHostSharedService {
 		}
 	}
 
-	async getIRDeckIdentifiers(deck: { id: string; path?: string }): Promise<string[]> {
+	async getIRDeckIdentifiers(deck: { id: string; path?: string }): Promise<
+		string[]
+	> {
 		const identifiers = new Set<string>();
 		const deckId = String(deck?.id || "").trim();
 		const deckPath = String(deck?.path || "").trim();
@@ -249,7 +266,9 @@ export class IRHostSharedService {
 				const modal = new IRDeckSelectorModal(this.app, decks, (deck) => {
 					settle({ id: deck.id, name: deck.name, path: deck.path });
 				});
-				const originalOnClose = (modal as { onClose?: () => void }).onClose?.bind(modal);
+				const originalOnClose = (
+					modal as { onClose?: () => void }
+				).onClose?.bind(modal);
 				(modal as { onClose?: () => void }).onClose = () => {
 					try {
 						originalOnClose?.();
@@ -274,9 +293,11 @@ export class IRHostSharedService {
 	async scheduleEpubChapterForIncrementalReading(
 		options: IREpubScheduleChapterOptions,
 		resolveDeck?: (deckId: string) => Promise<IRTopicRef | null>,
-		pickDeck?: () => Promise<IRTopicRef | null>
+		pickDeck?: () => Promise<IRTopicRef | null>,
 	): Promise<void> {
-		const sourceFile = this.app.vault.getAbstractFileByPath(String(options.filePath || "").trim());
+		const sourceFile = this.app.vault.getAbstractFileByPath(
+			String(options.filePath || "").trim(),
+		);
 		if (!(sourceFile instanceof TFile) || sourceFile.extension !== "epub") {
 			new Notice(i18n.t("irServiceNotices.host.epubFileNotFound"), 3000);
 			return;
@@ -284,31 +305,49 @@ export class IRHostSharedService {
 
 		const normalizedHref = this.normalizeEpubBookmarkHref(options.tocHref);
 		if (!normalizedHref) {
-			new Notice(i18n.t("irServiceNotices.host.epubChapterLocationFailed"), 3000);
+			new Notice(
+				i18n.t("irServiceNotices.host.epubChapterLocationFailed"),
+				3000,
+			);
 			return;
 		}
 
 		const picked =
-			(await (resolveDeck ?? this.resolveIRDeckById.bind(this))(String(options.deckId || "").trim())) ??
-			(await (pickDeck ?? this.pickIRDeck.bind(this))());
+			(await (resolveDeck ?? this.resolveIRDeckById.bind(this))(
+				String(options.deckId || "").trim(),
+			)) ?? (await (pickDeck ?? this.pickIRDeck.bind(this))());
 		if (!picked) {
 			return;
 		}
 
 		const service = await this.ensureIREpubBookmarkTaskServiceReady();
 		const epubStorageService = getIrEpubStorageService(this.app);
-		const sourceEntry = await epubStorageService.ensureSourceIdentity(sourceFile.path);
-		const existingTasks = await service.getTasksByDeckIdentifiers(await this.getIRDeckIdentifiers(picked));
-		const title = this.cleanIRReadingPointTitle(options.title) || sourceFile.basename || "EPUB 章节";
+		const sourceEntry = await epubStorageService.ensureSourceIdentity(
+			sourceFile.path,
+		);
+		const existingTasks = await service.getTasksByDeckIdentifiers(
+			await this.getIRDeckIdentifiers(picked),
+		);
+		const title =
+			this.cleanIRReadingPointTitle(options.title) ||
+			sourceFile.basename ||
+			"EPUB 章节";
 
 		const duplicateTask = existingTasks.find(
 			(task) =>
 				(String(task.epubFilePath || "").trim() === sourceFile.path ||
-					(Boolean(sourceEntry?.sourceId) && task.sourceId === sourceEntry?.sourceId)) &&
-				this.normalizeEpubBookmarkHref(task.tocHref) === normalizedHref
+					(Boolean(sourceEntry?.sourceId) &&
+						task.sourceId === sourceEntry?.sourceId)) &&
+				this.normalizeEpubBookmarkHref(task.tocHref) === normalizedHref,
 		);
 		if (duplicateTask) {
-			new Notice(i18n.t("irServiceNotices.host.chapterAlreadyInDeck", { title, deckName: picked.name }), 3500);
+			new Notice(
+				i18n.t("irServiceNotices.host.chapterAlreadyInDeck", {
+					title,
+					deckName: picked.name,
+				}),
+				3500,
+			);
 			return;
 		}
 
@@ -328,12 +367,18 @@ export class IRHostSharedService {
 		await recomputeAndBroadcastIRData(this.app, "import_materials", {
 			deckIds: [picked.id],
 		});
-		new Notice(i18n.t("irServiceNotices.host.chapterAddedToDeck", { title, deckName: picked.name }), 3500);
+		new Notice(
+			i18n.t("irServiceNotices.host.chapterAddedToDeck", {
+				title,
+				deckName: picked.name,
+			}),
+			3500,
+		);
 	}
 
 	async markEpubResumePointFromReader(
 		options: IREpubResumePointOptions,
-		resolveDeck?: (deckId: string) => Promise<IRTopicRef | null>
+		resolveDeck?: (deckId: string) => Promise<IRTopicRef | null>,
 	): Promise<void> {
 		const normalizedFilePath = String(options.filePath || "").trim();
 		const normalizedCfi = String(options.cfi || "").trim();
@@ -343,10 +388,17 @@ export class IRHostSharedService {
 		}
 
 		const service = await this.ensureIREpubBookmarkTaskServiceReady();
-		const resolvedDeck = await (resolveDeck ?? this.resolveIRDeckById.bind(this))(String(options.deckId || "").trim());
+		const resolvedDeck = await (
+			resolveDeck ?? this.resolveIRDeckById.bind(this)
+		)(String(options.deckId || "").trim());
 		const tasks = resolvedDeck
-			? (await service.getTasksByDeckIdentifiers(await this.getIRDeckIdentifiers(resolvedDeck))).filter(
-					(task) => String(task.epubFilePath || "").trim() === normalizedFilePath
+			? (
+					await service.getTasksByDeckIdentifiers(
+						await this.getIRDeckIdentifiers(resolvedDeck),
+					)
+			  ).filter(
+					(task) =>
+						String(task.epubFilePath || "").trim() === normalizedFilePath,
 			  )
 			: await service.getTasksByEpub(normalizedFilePath);
 		if (tasks.length === 0) {
@@ -354,8 +406,10 @@ export class IRHostSharedService {
 			return;
 		}
 
-		const normalizedChapterHref = this.normalizeEpubBookmarkHref(String(options.chapterHref || ""));
-		let matchedTask =
+		const normalizedChapterHref = this.normalizeEpubBookmarkHref(
+			String(options.chapterHref || ""),
+		);
+		const matchedTask =
 			tasks.find((task) => {
 				const normalizedTaskHref = this.normalizeEpubBookmarkHref(task.tocHref);
 				if (!normalizedChapterHref || !normalizedTaskHref) {
@@ -371,7 +425,7 @@ export class IRHostSharedService {
 		new Notice(
 			i18n.t("irServiceNotices.host.resumeSaved", {
 				title: String(options.chapterTitle || "").trim() || matchedTask.title,
-			})
+			}),
 		);
 	}
 
@@ -379,24 +433,38 @@ export class IRHostSharedService {
 		file: TFile,
 		deckId: string,
 		deckName: string,
-		options?: IREnsureExternalDocumentChunkScheduledOptions
+		options?: IREnsureExternalDocumentChunkScheduledOptions,
 	): Promise<boolean> {
 		const storage = options?.storage ?? new IRStorageService(this.app);
 		await storage.initialize();
-		const chunks = options?.existingChunk === undefined ? await storage.getAllChunkData() : undefined;
-		const existing =
-			(options?.existingChunk ??
-				Object.values(chunks || {}).find((chunk) => String(chunk.filePath || "").trim() === file.path) ??
-				null) as IRChunkFileData | null;
+		const chunks =
+			options?.existingChunk === undefined
+				? await storage.getAllChunkData()
+				: undefined;
+		const existing = (options?.existingChunk ??
+			Object.values(chunks || {}).find(
+				(chunk) => String(chunk.filePath || "").trim() === file.path,
+			) ??
+			null) as IRChunkFileData | null;
 		const now = Date.now();
 		const nextAutoSubscribedAt = String(options?.autoSubscribedAt || "").trim();
-		const nextAutoSubscribedFolderPath = String(options?.autoSubscribedFolderPath || "").trim();
+		const nextAutoSubscribedFolderPath = String(
+			options?.autoSubscribedFolderPath || "",
+		).trim();
 		const readingMaterialId = String(options?.readingMaterialId || "").trim();
-		const nextResumeLink = String(options?.resumeLink || options?.webUrl || "").trim();
-		const nextWebUrl = String(options?.webUrl || options?.resumeLink || "").trim();
-		const nextWebSelectionExcerpt = String(options?.webSelectionExcerpt || "").trim();
+		const nextResumeLink = String(
+			options?.resumeLink || options?.webUrl || "",
+		).trim();
+		const nextWebUrl = String(
+			options?.webUrl || options?.resumeLink || "",
+		).trim();
+		const nextWebSelectionExcerpt = String(
+			options?.webSelectionExcerpt || "",
+		).trim();
 		const pinToToday = options?.pinToToday === true;
-		const scheduleDate = options?.scheduleDate ? new Date(options.scheduleDate) : null;
+		const scheduleDate = options?.scheduleDate
+			? new Date(options.scheduleDate)
+			: null;
 		if (scheduleDate) {
 			scheduleDate.setHours(0, 0, 0, 0);
 		}
@@ -406,19 +474,23 @@ export class IRHostSharedService {
 		const pinnedStartMs = scheduleDate
 			? scheduleDate.getTime()
 			: pinToToday
-				? todayStartMs
-				: now;
+			? todayStartMs
+			: now;
 		const pinnedDateKey = scheduleDate
 			? this.getIncrementalReadingDateKey(scheduleDate)
 			: pinToToday
-				? todayDateKey
-				: "";
+			? todayDateKey
+			: "";
 		const shouldPinSchedule = Boolean(scheduleDate) || pinToToday;
 		const deckTag = `#IR_deck_${deckName}`;
 
 		if (existing) {
-			const existingDeckIds = Array.isArray(existing.deckIds) ? existing.deckIds : [];
-			const existingTopicIds = Array.isArray(existing.topicIds) ? existing.topicIds : [];
+			const existingDeckIds = Array.isArray(existing.deckIds)
+				? existing.deckIds
+				: [];
+			const existingTopicIds = Array.isArray(existing.topicIds)
+				? existing.topicIds
+				: [];
 			const existingStatus = String(existing.scheduleStatus || "").trim();
 			const shouldResetDueAt =
 				shouldPinSchedule ||
@@ -449,7 +521,10 @@ export class IRHostSharedService {
 				existing.deckTag = deckTag;
 				changed = true;
 			}
-			if (shouldResetDueAt && existing.nextRepDate !== (shouldPinSchedule ? pinnedStartMs : now)) {
+			if (
+				shouldResetDueAt &&
+				existing.nextRepDate !== (shouldPinSchedule ? pinnedStartMs : now)
+			) {
 				existing.nextRepDate = shouldPinSchedule ? pinnedStartMs : now;
 				changed = true;
 			}
@@ -465,11 +540,17 @@ export class IRHostSharedService {
 				existingMeta.externalDocument = true;
 				changed = true;
 			}
-			if (readingMaterialId && existingMeta.readingMaterialId !== readingMaterialId) {
+			if (
+				readingMaterialId &&
+				existingMeta.readingMaterialId !== readingMaterialId
+			) {
 				existingMeta.readingMaterialId = readingMaterialId;
 				changed = true;
 			}
-			if (nextAutoSubscribedAt && existingMeta.autoSubscribedAt !== nextAutoSubscribedAt) {
+			if (
+				nextAutoSubscribedAt &&
+				existingMeta.autoSubscribedAt !== nextAutoSubscribedAt
+			) {
 				existingMeta.autoSubscribedAt = nextAutoSubscribedAt;
 				changed = true;
 			}
@@ -496,25 +577,38 @@ export class IRHostSharedService {
 				existingMeta.resumeLink = nextResumeLink;
 				changed = true;
 			}
-			if (nextWebUrl && existingMeta[IR_WEB_CHUNK_META_URL_KEY] !== nextWebUrl) {
+			if (
+				nextWebUrl &&
+				existingMeta[IR_WEB_CHUNK_META_URL_KEY] !== nextWebUrl
+			) {
 				existingMeta[IR_WEB_CHUNK_META_URL_KEY] = nextWebUrl;
 				changed = true;
 			}
-			if (nextWebSelectionExcerpt && existingMeta.notes !== nextWebSelectionExcerpt) {
+			if (
+				nextWebSelectionExcerpt &&
+				existingMeta.notes !== nextWebSelectionExcerpt
+			) {
 				existingMeta.notes = nextWebSelectionExcerpt;
 				changed = true;
 			}
-			if (!shouldPinSchedule && existingMeta.sourceSequenceLocked !== undefined) {
-				delete existingMeta.sourceSequenceLocked;
+			if (
+				!shouldPinSchedule &&
+				existingMeta.sourceSequenceLocked !== undefined
+			) {
+				existingMeta.sourceSequenceLocked = undefined;
 				changed = true;
 			}
-			if (!shouldPinSchedule && existingMeta.sourceSequenceAnchorDateKey !== undefined) {
-				delete existingMeta.sourceSequenceAnchorDateKey;
+			if (
+				!shouldPinSchedule &&
+				existingMeta.sourceSequenceAnchorDateKey !== undefined
+			) {
+				existingMeta.sourceSequenceAnchorDateKey = undefined;
 				changed = true;
 			}
 			if (nextAutoSubscribedAt) {
 				existingMeta.autoSubscribedBadgeUntil = new Date(
-					Date.parse(nextAutoSubscribedAt) + IR_FOLDER_SUBSCRIPTION_NEW_BADGE_WINDOW_MS
+					Date.parse(nextAutoSubscribedAt) +
+						IR_FOLDER_SUBSCRIPTION_NEW_BADGE_WINDOW_MS,
 				).toISOString();
 			}
 			if (!changed) {
@@ -527,7 +621,11 @@ export class IRHostSharedService {
 			return true;
 		}
 
-		const chunk = createDefaultChunkFileData(generateChunkId(), generateSourceId(), file.path);
+		const chunk = createDefaultChunkFileData(
+			generateChunkId(),
+			generateSourceId(),
+			file.path,
+		);
 		chunk.topicIds = [deckId];
 		chunk.deckIds = [deckId];
 		chunk.topicTag = deckTag;
@@ -553,7 +651,8 @@ export class IRHostSharedService {
 						autoSubscribedAt: nextAutoSubscribedAt,
 						autoSubscribedFolderPath: nextAutoSubscribedFolderPath || undefined,
 						autoSubscribedBadgeUntil: new Date(
-							Date.parse(nextAutoSubscribedAt) + IR_FOLDER_SUBSCRIPTION_NEW_BADGE_WINDOW_MS
+							Date.parse(nextAutoSubscribedAt) +
+								IR_FOLDER_SUBSCRIPTION_NEW_BADGE_WINDOW_MS,
 						).toISOString(),
 				  }
 				: {}),
@@ -580,9 +679,11 @@ export class IRHostSharedService {
 
 	private async resolveMatchingEpubTask(
 		filePath: string,
-		chapterHref?: string
+		chapterHref?: string,
 	): Promise<{
-		task: Awaited<ReturnType<IREpubBookmarkTaskService["getTask"]>> extends infer T
+		task: Awaited<
+			ReturnType<IREpubBookmarkTaskService["getTask"]>
+		> extends infer T
 			? Exclude<T, null>
 			: never;
 		block: ReturnType<IREpubBookmarkTaskService["toBlockV4"]>;
@@ -599,10 +700,14 @@ export class IRHostSharedService {
 			return null;
 		}
 
-		const normalizedChapterHref = this.normalizeEpubBookmarkHref(String(chapterHref || ""));
+		const normalizedChapterHref = this.normalizeEpubBookmarkHref(
+			String(chapterHref || ""),
+		);
 		const task =
 			tasks.find((candidate) => {
-				const normalizedTaskHref = this.normalizeEpubBookmarkHref(candidate.tocHref);
+				const normalizedTaskHref = this.normalizeEpubBookmarkHref(
+					candidate.tocHref,
+				);
 				if (!normalizedChapterHref || !normalizedTaskHref) {
 					return false;
 				}

@@ -13,7 +13,11 @@ vi.mock("../IRScheduleIndexService", () => ({
 			const storage = new IRStorageService(app);
 			const pdfService = new IRPdfBookmarkTaskService(app);
 			const epubService = new IREpubBookmarkTaskService(app);
-			await Promise.all([storage.initialize(), pdfService.initialize(), epubService.initialize()]);
+			await Promise.all([
+				storage.initialize(),
+				pdfService.initialize(),
+				epubService.initialize(),
+			]);
 			return {
 				chunks: Object.values((await storage.getAllChunkData()) || {}),
 				blocks: Object.values(await storage.getAllBlocks()),
@@ -29,7 +33,10 @@ vi.mock("../IRScheduleIndexService", () => ({
 
 vi.mock("../../epub-integration/ir-epub-storage-access", () => ({
 	getIrEpubStorageService: () => ({
-		async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+		async ensureSourceIdentity(
+			filePath: string,
+			options?: { preferredSourceId?: string },
+		) {
 			return {
 				sourceId: options?.preferredSourceId || `src-${filePath}`,
 				filePath,
@@ -116,7 +123,9 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-04-17T09:00:00.000Z"));
 		vi.restoreAllMocks();
-		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(undefined);
+		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(
+			undefined,
+		);
 		vi.spyOn(IRStorageService.prototype, "getAllDecks").mockResolvedValue({
 			"deck-1": {
 				id: "deck-1",
@@ -125,7 +134,9 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 				blockIds: [],
 			} as any,
 		});
-		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({});
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue(
+			{},
+		);
 	});
 
 	afterEach(() => {
@@ -163,7 +174,10 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 		const epubItem = items.find((item) => item.id === "epubbm-1");
 
 		expect(plan.deckIds).toEqual(["deck-1"]);
-		expect(items.map((item) => item.id).sort()).toEqual(["epubbm-1", "pdfbm-1"]);
+		expect(items.map((item) => item.id).sort()).toEqual([
+			"epubbm-1",
+			"pdfbm-1",
+		]);
 		expect(pdfItem).toMatchObject({
 			id: "pdfbm-1",
 			deckId: "deck-1",
@@ -194,7 +208,11 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 				nextRepDate: 0,
 				scheduleStatus: "queued",
 				meta: {
-					associatedNotePaths: ["Notes/Point", "Notes/Point.md", "Notes/Appendix.md"],
+					associatedNotePaths: [
+						"Notes/Point",
+						"Notes/Point.md",
+						"Notes/Appendix.md",
+					],
 				},
 				stats: {
 					impressions: 1,
@@ -232,7 +250,9 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 			deckIds: ["deck-1"],
 			horizonDays: 7,
 		});
-		const item = plan.days.flatMap((day) => day.items).find((entry) => entry.id === "chunk-array-only");
+		const item = plan.days
+			.flatMap((day) => day.items)
+			.find((entry) => entry.id === "chunk-array-only");
 
 		expect(item).toMatchObject({
 			id: "chunk-array-only",
@@ -271,7 +291,7 @@ describe("IRScheduleKernel migrated point compatibility", () => {
 			{
 				deckIds: ["deck-1"],
 				horizonDays: 7,
-			}
+			},
 		);
 
 		expect(preview.beforeItem).toMatchObject({

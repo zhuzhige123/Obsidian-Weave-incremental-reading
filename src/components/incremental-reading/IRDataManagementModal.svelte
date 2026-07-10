@@ -875,11 +875,11 @@
             <div class="ir-data-mgmt__table-wrap">
               <table class="ir-data-mgmt__table">
                 <thead>
-                  <tr>
+                  <svelte:element this={"tr"}>
                     <th>{t('irDataMgmt.columns.topic')}</th>
                     <th>{t('irDataMgmt.columns.path')}</th>
                     <th>{t('irDataMgmt.columns.points')}</th>
-                  </tr>
+                  </svelte:element>
                 </thead>
                 <tbody>
                   {#each invalidSourcePathScan.affectedFiles as file (file.absolutePath)}
@@ -887,14 +887,14 @@
                       file.absolutePath,
                       scanResult.canonicalPointsDir
                     )}
-                    <tr>
+                    <svelte:element this={"tr"}>
                       <td>
                         <div class="ir-data-mgmt__cell-title">{file.topicName || file.topicId}</div>
                         <div class="ir-data-mgmt__cell-sub">{file.topicId}</div>
                       </td>
                       <td><code class="ir-data-mgmt__path" title={pathInfo.full}>{pathInfo.display}</code></td>
                       <td>{file.invalidPointCount}</td>
-                    </tr>
+                    </svelte:element>
                   {/each}
                 </tbody>
               </table>
@@ -918,17 +918,17 @@
           <div class="ir-data-mgmt__table-wrap">
             <table class="ir-data-mgmt__table">
               <thead>
-                <tr>
+                <svelte:element this={"tr"}>
                   <th>{t('irDataMgmt.columns.topic')}</th>
                   <th>{t('irDataMgmt.columns.path')}</th>
                   <th>{t('irDataMgmt.columns.issues')}</th>
                   <th>{t('irDataMgmt.columns.actions')}</th>
-                </tr>
+                    </svelte:element>
               </thead>
               <tbody>
                 {#each scanResult.needsMigrationFiles as report (report.absolutePath)}
                   {@const pathInfo = formatIRDataManagementPathLabel(report.absolutePath, scanResult.canonicalPointsDir)}
-                  <tr>
+                  <svelte:element this={"tr"}>
                     <td>
                       <div class="ir-data-mgmt__cell-title">{report.topicName || report.topicId}</div>
                       <div class="ir-data-mgmt__cell-sub">{report.topicId}</div>
@@ -946,7 +946,7 @@
                         {t('irDataMgmt.format.migrate')}
                       </button>
                     </td>
-                  </tr>
+                  </svelte:element>
                 {/each}
               </tbody>
             </table>
@@ -962,16 +962,16 @@
           <div class="ir-data-mgmt__table-wrap">
             <table class="ir-data-mgmt__table">
               <thead>
-                <tr>
+                <svelte:element this={"tr"}>
                   <th>{t('irDataMgmt.columns.topic')}</th>
                   <th>{t('irDataMgmt.columns.path')}</th>
                   <th>{t('irDataMgmt.columns.actions')}</th>
-                </tr>
+                    </svelte:element>
               </thead>
               <tbody>
                 {#each scanResult.emptyPointFiles as file (file.absolutePath)}
                   {@const pathInfo = formatIRDataManagementPathLabel(file.absolutePath, scanResult.canonicalPointsDir)}
-                  <tr>
+                  <svelte:element this={"tr"}>
                     <td>
                       <div class="ir-data-mgmt__cell-title">{file.topicName}</div>
                       <div class="ir-data-mgmt__cell-sub">{file.topicId}</div>
@@ -982,7 +982,7 @@
                         {t('irDataMgmt.format.deleteEmpty')}
                       </button>
                     </td>
-                  </tr>
+                  </svelte:element>
                 {/each}
               </tbody>
             </table>
@@ -1024,17 +1024,17 @@
       <div class="ir-data-mgmt__table-wrap">
         <table class="ir-data-mgmt__table">
           <thead>
-            <tr>
+            <svelte:element this={"tr"}>
               <th>{t('irDataMgmt.columns.topic')}</th>
               <th>{t('irDataMgmt.columns.path')}</th>
               <th>{t('irDataMgmt.columns.points')}</th>
               <th>{t('irDataMgmt.columns.status')}</th>
-            </tr>
+                    </svelte:element>
           </thead>
           <tbody>
             {#each scanResult.vaultFiles as file (file.absolutePath)}
               {@const pathInfo = formatIRDataManagementPathLabel(file.absolutePath, scanResult.canonicalPointsDir)}
-              <tr>
+              <svelte:element this={"tr"}>
                 <td>
                   <div class="ir-data-mgmt__cell-title">{file.topicName}</div>
                   <div class="ir-data-mgmt__cell-sub">{file.topicId}</div>
@@ -1048,7 +1048,7 @@
                     <span class="ir-data-mgmt__tag is-pending">{t('irDataMgmt.vault.statusPending')}</span>
                   {/if}
                 </td>
-              </tr>
+                    </svelte:element>
             {/each}
           </tbody>
         </table>
@@ -1227,16 +1227,16 @@
         <div class="ir-data-mgmt__table-wrap">
           <table class="ir-data-mgmt__table">
             <thead>
-              <tr>
+              <svelte:element this={"tr"}>
                 <th>{t('irDataMgmt.columns.topic')}</th>
                 <th>{t('irDataMgmt.columns.backupPath')}</th>
                 <th>{t('irDataMgmt.columns.points')}</th>
                 <th>{t('irDataMgmt.columns.actions')}</th>
-              </tr>
+                    </svelte:element>
             </thead>
             <tbody>
               {#each scanResult.backupOrphans as entry (entry.absolutePath)}
-                <tr>
+                <svelte:element this={"tr"}>
                   <td>
                     <div class="ir-data-mgmt__cell-title">{entry.topicName}</div>
                     <div class="ir-data-mgmt__cell-sub">{entry.topicId}</div>
@@ -1256,7 +1256,7 @@
                       {t('irDataMgmt.backups.deleteWithoutRecover')}
                     </button>
                   </td>
-                </tr>
+                    </svelte:element>
               {/each}
             </tbody>
           </table>
@@ -1364,10 +1364,6 @@
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     line-height: 1.55;
-  }
-
-  .ir-data-mgmt__help-popover code {
-    font-size: var(--font-ui-smaller);
   }
 
   .ir-data-mgmt__legacy-banner {

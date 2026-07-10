@@ -37,7 +37,7 @@ export function resolveCardSourceDocumentPath(card: Card): string | undefined {
 		card.ir_source_document_key ??
 			card.sourceDocumentKey ??
 			card.sourceFile ??
-			card.ir_source_file
+			card.ir_source_file,
 	);
 	return rawPath || undefined;
 }
@@ -70,7 +70,7 @@ export function buildPointWriteCardStub(target: {
 
 export function mergeBlockMeta(
 	existing: IRBlockMeta,
-	updates: Partial<IRBlockMeta>
+	updates: Partial<IRBlockMeta>,
 ): IRBlockMeta {
 	return {
 		...existing,

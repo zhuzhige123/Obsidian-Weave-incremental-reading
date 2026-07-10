@@ -10,7 +10,6 @@
 
 import type { App, Editor, TFile } from "obsidian";
 import { MarkdownView, Notice } from "obsidian";
-import { i18n } from "../../utils/i18n";
 import type {
 	AnchorRecord,
 	ReadingMaterial,
@@ -21,6 +20,7 @@ import {
 	ANCHOR_REGEX,
 	ReadingCategory,
 } from "../../types/incremental-reading-types";
+import { i18n } from "../../utils/i18n";
 import { logger } from "../../utils/logger";
 import {
 	countWords,
@@ -67,7 +67,11 @@ export class AnchorManager {
 	private storage: ReadingMaterialStorage;
 	private yamlManager: YAMLFrontmatterManager;
 
-	constructor(app: App, storage: ReadingMaterialStorage, yamlManager: YAMLFrontmatterManager) {
+	constructor(
+		app: App,
+		storage: ReadingMaterialStorage,
+		yamlManager: YAMLFrontmatterManager,
+	) {
 		this.app = app;
 		this.storage = storage;
 		this.yamlManager = yamlManager;
@@ -79,7 +83,8 @@ export class AnchorManager {
 		}
 
 		try {
-			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+			const frontmatter =
+				this.app.metadataCache.getFileCache(file)?.frontmatter;
 			const fmType =
 				frontmatter && typeof frontmatter.weave_type === "string"
 					? frontmatter.weave_type
@@ -118,7 +123,10 @@ export class AnchorManager {
 	 * @param view Markdown视图
 	 * @returns 插入结果
 	 */
-	async insertAnchorAtCursor(editor: Editor, view: MarkdownView): Promise<AnchorInsertResult> {
+	async insertAnchorAtCursor(
+		editor: Editor,
+		view: MarkdownView,
+	): Promise<AnchorInsertResult> {
 		try {
 			const file = view.file;
 			if (!file) {
@@ -145,7 +153,9 @@ export class AnchorManager {
 
 			editor.replaceRange(anchorText, insertPosition);
 
-			logger.debug(`[AnchorManager] 插入锚点: ${anchorId} at line ${cursor.line}`);
+			logger.debug(
+				`[AnchorManager] 插入锚点: ${anchorId} at line ${cursor.line}`,
+			);
 
 			// 检查是否需要创建阅读材料
 			let materialCreated = false;
@@ -179,7 +189,10 @@ export class AnchorManager {
 	/**
 	 * 为文件创建阅读材料
 	 */
-	private async createMaterialForFile(file: TFile, anchorId: string): Promise<ReadingMaterial> {
+	private async createMaterialForFile(
+		file: TFile,
+		anchorId: string,
+	): Promise<ReadingMaterial> {
 		const now = new Date().toISOString();
 		const uuid = generateReadingUUID();
 
@@ -189,7 +202,8 @@ export class AnchorManager {
 
 		// 解析锚点位置
 		const anchorPosition = this.findAnchorPosition(content, anchorId);
-		const readWords = anchorPosition > 0 ? countWordsUpToPosition(content, anchorPosition) : 0;
+		const readWords =
+			anchorPosition > 0 ? countWordsUpToPosition(content, anchorPosition) : 0;
 
 		const material: ReadingMaterial = {
 			uuid,
@@ -209,7 +223,8 @@ export class AnchorManager {
 						wordCount: readWords,
 					},
 				],
-				percentage: totalWords > 0 ? Math.round((readWords / totalWords) * 100) : 0,
+				percentage:
+					totalWords > 0 ? Math.round((readWords / totalWords) * 100) : 0,
 				totalWords,
 				readWords,
 				estimatedTimeRemaining: estimateReadingTime(totalWords - readWords),
@@ -225,7 +240,12 @@ export class AnchorManager {
 		await this.storage.saveMaterial(material);
 
 		// 更新文件的YAML frontmatter
-		await this.yamlManager.initializeReadingFields(file, uuid, ReadingCategory.Later, 50);
+		await this.yamlManager.initializeReadingFields(
+			file,
+			uuid,
+			ReadingCategory.Later,
+			50,
+		);
 
 		logger.info(`[AnchorManager] 创建阅读材料: ${uuid} for ${file.path}`);
 
@@ -238,7 +258,7 @@ export class AnchorManager {
 	private async updateMaterialAnchor(
 		material: ReadingMaterial,
 		file: TFile,
-		anchorId: string
+		anchorId: string,
 	): Promise<void> {
 		const now = new Date().toISOString();
 
@@ -248,7 +268,8 @@ export class AnchorManager {
 
 		// 解析锚点位置
 		const anchorPosition = this.findAnchorPosition(content, anchorId);
-		const readWords = anchorPosition > 0 ? countWordsUpToPosition(content, anchorPosition) : 0;
+		const readWords =
+			anchorPosition > 0 ? countWordsUpToPosition(content, anchorPosition) : 0;
 
 		// 创建锚点记录
 		const anchorRecord: AnchorRecord = {
@@ -263,8 +284,11 @@ export class AnchorManager {
 		material.progress.anchorHistory.push(anchorRecord);
 		material.progress.totalWords = totalWords;
 		material.progress.readWords = readWords;
-		material.progress.percentage = totalWords > 0 ? Math.round((readWords / totalWords) * 100) : 0;
-		material.progress.estimatedTimeRemaining = estimateReadingTime(totalWords - readWords);
+		material.progress.percentage =
+			totalWords > 0 ? Math.round((readWords / totalWords) * 100) : 0;
+		material.progress.estimatedTimeRemaining = estimateReadingTime(
+			totalWords - readWords,
+		);
 
 		// 更新访问时间
 		material.lastAccessed = now;
@@ -273,7 +297,9 @@ export class AnchorManager {
 		// 保存更新
 		await this.storage.saveMaterial(material);
 
-		logger.debug(`[AnchorManager] 更新锚点: ${anchorId}, 进度: ${material.progress.percentage}%`);
+		logger.debug(
+			`[AnchorManager] 更新锚点: ${anchorId}, 进度: ${material.progress.percentage}%`,
+		);
 	}
 
 	/**
@@ -342,7 +368,7 @@ export class AnchorManager {
 
 		// 返回时间戳最大的锚点
 		return anchors.reduce((latest, current) =>
-			current.timestamp > latest.timestamp ? current : latest
+			current.timestamp > latest.timestamp ? current : latest,
 		);
 	}
 
@@ -383,7 +409,7 @@ export class AnchorManager {
 						from: { line: Math.max(0, anchor.lineNumber - 3), ch: 0 },
 						to: { line: anchor.lineNumber + 3, ch: 0 },
 					},
-					true
+					true,
 				);
 
 				// 添加高亮效果
@@ -409,7 +435,11 @@ export class AnchorManager {
 			if (!cm) return;
 
 			// 添加高亮类
-			const lineHandle = cm.addLineClass(lineNumber, "wrap", "weave-anchor-highlight");
+			const lineHandle = cm.addLineClass(
+				lineNumber,
+				"wrap",
+				"weave-anchor-highlight",
+			);
 
 			// 2秒后移除高亮
 			window.setTimeout(() => {
@@ -424,7 +454,10 @@ export class AnchorManager {
 			logger.debug("[AnchorManager] CodeMirror高亮不可用，使用选中效果");
 			const line = editor.getLine(lineNumber);
 			if (line) {
-				editor.setSelection({ line: lineNumber, ch: 0 }, { line: lineNumber, ch: line.length });
+				editor.setSelection(
+					{ line: lineNumber, ch: 0 },
+					{ line: lineNumber, ch: line.length },
+				);
 				// 1秒后取消选中
 				window.setTimeout(() => {
 					editor.setCursor({ line: lineNumber, ch: 0 });
@@ -463,7 +496,10 @@ export class AnchorManager {
 	 * @param material 阅读材料
 	 * @returns 更新后的进度
 	 */
-	async calculateProgress(file: TFile, material: ReadingMaterial): Promise<ReadingProgress> {
+	async calculateProgress(
+		file: TFile,
+		material: ReadingMaterial,
+	): Promise<ReadingProgress> {
 		const content = await this.app.vault.read(file);
 		const totalWords = countWords(content);
 		const anchors = this.parseAnchorsFromContent(content);
@@ -472,7 +508,7 @@ export class AnchorManager {
 		const latestAnchor =
 			anchors.length > 0
 				? anchors.reduce((latest, current) =>
-						current.timestamp > latest.timestamp ? current : latest
+						current.timestamp > latest.timestamp ? current : latest,
 				  )
 				: null;
 
@@ -481,7 +517,8 @@ export class AnchorManager {
 			readWords = countWordsUpToPosition(content, latestAnchor.position);
 		}
 
-		const percentage = totalWords > 0 ? Math.round((readWords / totalWords) * 100) : 0;
+		const percentage =
+			totalWords > 0 ? Math.round((readWords / totalWords) * 100) : 0;
 
 		return {
 			currentAnchor: latestAnchor?.anchorId,
@@ -511,7 +548,7 @@ export class AnchorManager {
 export function createAnchorManager(
 	app: App,
 	storage: ReadingMaterialStorage,
-	yamlManager: YAMLFrontmatterManager
+	yamlManager: YAMLFrontmatterManager,
 ): AnchorManager {
 	return new AnchorManager(app, storage, yamlManager);
 }

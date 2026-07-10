@@ -45,9 +45,16 @@ export class IRParagraphAddToTopicModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("weave-ir-paragraph-add-to-topic-modal-content");
 
-		const deckToolbarEl = contentEl.createDiv({ cls: "weave-selection-to-ir-toolbar" });
-		const deckInfoEl = deckToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
-		deckInfoEl.createDiv({ text: i18n.t("irModals.paragraphAddToTopic.deckName"), cls: "setting-item-name" });
+		const deckToolbarEl = contentEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar",
+		});
+		const deckInfoEl = deckToolbarEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar-info",
+		});
+		deckInfoEl.createDiv({
+			text: i18n.t("irModals.paragraphAddToTopic.deckName"),
+			cls: "setting-item-name",
+		});
 		deckInfoEl.createDiv({
 			text: i18n.t("irModals.paragraphAddToTopic.deckDesc"),
 			cls: "setting-item-description",
@@ -61,11 +68,15 @@ export class IRParagraphAddToTopicModal extends Modal {
 			this.showDeckMenu(evt as MouseEvent);
 		});
 
-		const newDeckRow = contentEl.createDiv({ cls: "weave-ir-paragraph-new-deck-row" });
+		const newDeckRow = contentEl.createDiv({
+			cls: "weave-ir-paragraph-new-deck-row",
+		});
 		if (this.showNewDeckInput) {
 			this.renderNewDeckInput(newDeckRow);
 		} else {
-			const createDeckBtn = newDeckRow.createEl("button", { text: i18n.t("irModals.paragraphAddToTopic.newTopic") });
+			const createDeckBtn = newDeckRow.createEl("button", {
+				text: i18n.t("irModals.paragraphAddToTopic.newTopic"),
+			});
 			createDeckBtn.addClass("mod-cta");
 			createDeckBtn.addEventListener("click", () => {
 				this.showNewDeckInput = true;
@@ -83,7 +94,9 @@ export class IRParagraphAddToTopicModal extends Modal {
 			.setDesc(titleDesc)
 			.addText((text) => {
 				text.setValue(this.draftTitle);
-				text.setPlaceholder(i18n.t("irModals.paragraphAddToTopic.titlePlaceholder"));
+				text.setPlaceholder(
+					i18n.t("irModals.paragraphAddToTopic.titlePlaceholder"),
+				);
 				this.titleInputEl = text.inputEl;
 				text.onChange((value) => {
 					this.draftTitle = value;
@@ -91,11 +104,17 @@ export class IRParagraphAddToTopicModal extends Modal {
 				});
 			});
 
-		const footerEl = contentEl.createDiv({ cls: "weave-selection-to-ir-footer" });
-		const cancelButton = footerEl.createEl("button", { text: i18n.t("irModals.common.cancel") });
+		const footerEl = contentEl.createDiv({
+			cls: "weave-selection-to-ir-footer",
+		});
+		const cancelButton = footerEl.createEl("button", {
+			text: i18n.t("irModals.common.cancel"),
+		});
 		cancelButton.addEventListener("click", () => this.close());
 
-		this.submitButtonEl = footerEl.createEl("button", { text: i18n.t("irModals.paragraphAddToTopic.submit") });
+		this.submitButtonEl = footerEl.createEl("button", {
+			text: i18n.t("irModals.paragraphAddToTopic.submit"),
+		});
 		this.submitButtonEl.classList.add("mod-cta");
 		this.submitButtonEl.addEventListener("click", () => {
 			void this.handleSubmit();
@@ -114,7 +133,9 @@ export class IRParagraphAddToTopicModal extends Modal {
 
 	private renderNewDeckInput(container: HTMLElement): void {
 		container.empty();
-		const inputWrap = container.createDiv({ cls: "weave-ir-paragraph-new-deck-input-wrap" });
+		const inputWrap = container.createDiv({
+			cls: "weave-ir-paragraph-new-deck-input-wrap",
+		});
 		this.newDeckInputEl = inputWrap.createEl("input", {
 			type: "text",
 			placeholder: i18n.t("irModals.paragraphAddToTopic.newTopicPlaceholder"),
@@ -126,13 +147,17 @@ export class IRParagraphAddToTopicModal extends Modal {
 			}
 		});
 
-		const createBtn = container.createEl("button", { text: i18n.t("irModals.common.create") });
+		const createBtn = container.createEl("button", {
+			text: i18n.t("irModals.common.create"),
+		});
 		createBtn.addClass("mod-cta");
 		createBtn.addEventListener("click", () => {
 			void this.handleCreateDeck();
 		});
 
-		const cancelBtn = container.createEl("button", { text: i18n.t("irModals.common.cancel") });
+		const cancelBtn = container.createEl("button", {
+			text: i18n.t("irModals.common.cancel"),
+		});
 		cancelBtn.addEventListener("click", () => {
 			this.showNewDeckInput = false;
 			this.newDeckInputEl = null;
@@ -143,7 +168,9 @@ export class IRParagraphAddToTopicModal extends Modal {
 	}
 
 	private getDeckButtonText(): string {
-		const selectedDeck = this.deckOptions.find((deck) => deck.id === this.selectedDeckId);
+		const selectedDeck = this.deckOptions.find(
+			(deck) => deck.id === this.selectedDeckId,
+		);
 		return selectedDeck
 			? i18n.t("irModals.common.topicLabel", { name: selectedDeck.name })
 			: i18n.t("irModals.common.selectTopic");
@@ -188,7 +215,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 		try {
 			const created = await this.options.onCreateDeck(name);
 			this.deckOptions = [...this.deckOptions, created].sort((left, right) =>
-				left.name.localeCompare(right.name)
+				left.name.localeCompare(right.name),
 			);
 			this.selectedDeckId = created.id;
 			this.showNewDeckInput = false;
@@ -206,7 +233,9 @@ export class IRParagraphAddToTopicModal extends Modal {
 			return;
 		}
 
-		this.draftTitle = String(this.titleInputEl?.value || this.draftTitle).trim();
+		this.draftTitle = String(
+			this.titleInputEl?.value || this.draftTitle,
+		).trim();
 		if (!this.draftTitle) {
 			this.syncSubmitButtonState();
 			return;
@@ -227,7 +256,9 @@ export class IRParagraphAddToTopicModal extends Modal {
 		} finally {
 			this.submitting = false;
 			if (this.submitButtonEl) {
-				this.submitButtonEl.textContent = i18n.t("irModals.paragraphAddToTopic.submit");
+				this.submitButtonEl.textContent = i18n.t(
+					"irModals.paragraphAddToTopic.submit",
+				);
 			}
 			this.syncSubmitButtonState();
 		}
@@ -238,6 +269,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 			return;
 		}
 		const title = String(this.titleInputEl?.value ?? this.draftTitle).trim();
-		this.submitButtonEl.disabled = this.submitting || !this.selectedDeckId || !title;
+		this.submitButtonEl.disabled =
+			this.submitting || !this.selectedDeckId || !title;
 	}
 }

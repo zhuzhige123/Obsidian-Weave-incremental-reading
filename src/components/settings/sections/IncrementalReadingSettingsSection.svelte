@@ -20,7 +20,6 @@
   import {
     normalizeIncrementalReadingFolderSubscriptionPath,
   } from '../../../services/incremental-reading/folder-subscription-settings';
-  import { VaultFolderSuggestModal } from '../../../modals/VaultFolderSuggestModal';
   import IRAdvancedSchedulingSettingsSection from './IRAdvancedSchedulingSettingsSection.svelte';
   import IRAutoSubscribeSettingsSection from './IRAutoSubscribeSettingsSection.svelte';
   import IRCoreSchedulingSettingsSection from './IRCoreSchedulingSettingsSection.svelte';
@@ -192,14 +191,6 @@
     return settingsEditor.getFolderSubscriptionInitialScheduleMode();
   }
 
-  function getFolderSubscriptionRuleLabel(rule: IncrementalReadingFolderSubscriptionRule): string {
-    const folderPath = String(rule.folderPath || '').trim();
-    if (!folderPath) {
-      return t('irSettings.autoSubscribeFolderEmpty');
-    }
-    return folderPath === '/' ? '/（Vault 根目录）' : folderPath;
-  }
-
   function getSubscriptionDeckOptionsForRule(rule: IncrementalReadingFolderSubscriptionRule) {
     const options = [...subscriptionDeckOptions];
     const deckId = String(rule.deckId || '').trim();
@@ -282,16 +273,13 @@
     saveSettings();
   }
 
-  async function chooseFolderSubscriptionFolder(ruleId: string, triggerEl?: HTMLElement | null) {
+  async function handleFolderSubscriptionFolderPathChange(ruleId: string, folderPath: string) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)) {
       return;
     }
-    const picker = new VaultFolderSuggestModal(plugin.app, {
-      placeholder: '选择要监听的 Markdown 文件夹...',
-      anchorRect: triggerEl?.getBoundingClientRect?.() || undefined
-    });
-    const folderPath = await picker.openAndSelect();
-    if (!folderPath) {
+    const normalizedFolderPath = normalizeIncrementalReadingFolderSubscriptionPath(folderPath);
+    const currentRule = getFolderSubscriptionRules().find((rule) => rule.id === ruleId);
+    if ((currentRule?.folderPath || '') === normalizedFolderPath) {
       return;
     }
 
@@ -299,7 +287,7 @@
       ...current,
       rules: (current.rules || []).map((rule) =>
         rule.id === ruleId
-          ? { ...rule, folderPath: normalizeIncrementalReadingFolderSubscriptionPath(folderPath) }
+          ? { ...rule, folderPath: normalizedFolderPath }
           : rule
       )
     }));
@@ -612,6 +600,7 @@
     {#if visibleTab === 'auto-subscribe'}
       <div class="incremental-reading-tab-content">
         <IRAutoSubscribeSettingsSection
+          app={plugin.app}
           showSection={canUsePremiumFeature(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)}
           showTitle={autoSubscribeShowTitle}
           titleText={premiumTitle(t('irSettings.autoSubscribeTitle'), PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)}
@@ -620,12 +609,11 @@
           confirmThresholdLabel={premiumTitle(t('irSettings.autoSubscribeConfirmThresholdLabel'), PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)}
           rules={getFolderSubscriptionRules()}
           initialScheduleModeOptions={AUTO_SUBSCRIBE_INITIAL_SCHEDULE_MODE_OPTIONS}
-          {getFolderSubscriptionRuleLabel}
           {getSubscriptionDeckOptionsForRule}
           {getFolderSubscriptionInitialScheduleMode}
           {getFolderSubscriptionImportConfirmThreshold}
           {handleAddFolderSubscriptionRule}
-          {chooseFolderSubscriptionFolder}
+          {handleFolderSubscriptionFolderPathChange}
           {handleFolderSubscriptionDeckChange}
           {handleFolderSubscriptionEnabledChange}
           {removeFolderSubscriptionRule}

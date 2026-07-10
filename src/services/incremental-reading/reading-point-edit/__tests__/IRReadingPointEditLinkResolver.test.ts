@@ -33,7 +33,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 			resolveReadingPointLinkInputFromParts(mockApp, {
 				material: { ...material, resumeLink: "[[Doc.pdf#page=3]]" },
 				pdfTask: { link: "[[Doc.pdf#page=2]]" } as any,
-			})
+			}),
 		).toBe("[[Doc.pdf#page=2]]");
 	});
 
@@ -51,7 +51,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 					filePath: "Notes/chunk.md",
 					meta: { resumeLink: "new-link" },
 				} as any,
-			})
+			}),
 		).toBe("new-link");
 	});
 
@@ -73,7 +73,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 						trace: { locator: { resumeLink: "Books/demo.epub#chapter-1" } },
 					},
 				} as any,
-			})
+			}),
 		).toBe("Notes/demo.md#^new-block");
 	});
 
@@ -92,7 +92,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 						trace: { locator: { resumeLink: "locator-link" } },
 					},
 				} as any,
-			})
+			}),
 		).toBe("stored-link");
 	});
 
@@ -102,7 +102,7 @@ describe("IRReadingPointEditLinkResolver", () => {
 				kind: "unknown",
 				rawInput: "附件/book.epub",
 				resumeLink: "",
-			})
+			}),
 		).toBe("附件/book.epub");
 	});
 

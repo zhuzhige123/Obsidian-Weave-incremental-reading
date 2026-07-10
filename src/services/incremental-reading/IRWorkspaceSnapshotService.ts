@@ -12,13 +12,13 @@ import { logger } from "../../utils/logger";
 import { readStringArrayFromUnknown } from "../../utils/unknown-record";
 import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
-import {
-	getProjectedDayLoad,
-	getProjectedScheduleSummary,
-	type IRProjectedScheduleSummary,
-} from "./IRProjectedScheduleSummary";
 import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
+import {
+	type IRProjectedScheduleSummary,
+	getProjectedDayLoad,
+	getProjectedScheduleSummary,
+} from "./IRProjectedScheduleSummary";
 import { IRStorageService } from "./IRStorageService";
 
 type DeckOverviewOptions = {
@@ -55,7 +55,10 @@ export class IRWorkspaceSnapshotService {
 	private inflightWorkspaceData: Promise<IRWorkspaceDataSnapshot> | null = null;
 	private inflightWorkspaceDataVersion = -1;
 	private deckOverviewCache = new Map<string, IRDeckOverviewSnapshot>();
-	private inflightDeckOverview = new Map<string, Promise<IRDeckOverviewSnapshot>>();
+	private inflightDeckOverview = new Map<
+		string,
+		Promise<IRDeckOverviewSnapshot>
+	>();
 	private cacheVersion = 0;
 
 	constructor(app: App) {
@@ -103,11 +106,18 @@ export class IRWorkspaceSnapshotService {
 		}
 	}
 
-	getCachedDeckOverview(options: DeckOverviewOptions = {}): IRDeckOverviewSnapshot | null {
-		return this.deckOverviewCache.get(this.buildDeckOverviewCacheKey(options)) || null;
+	getCachedDeckOverview(
+		options: DeckOverviewOptions = {},
+	): IRDeckOverviewSnapshot | null {
+		return (
+			this.deckOverviewCache.get(this.buildDeckOverviewCacheKey(options)) ||
+			null
+		);
 	}
 
-	async getDeckOverview(options: DeckOverviewOptions = {}): Promise<IRDeckOverviewSnapshot> {
+	async getDeckOverview(
+		options: DeckOverviewOptions = {},
+	): Promise<IRDeckOverviewSnapshot> {
 		const cacheKey = this.buildDeckOverviewCacheKey(options);
 		const cached = this.deckOverviewCache.get(cacheKey);
 		if (cached) {
@@ -120,7 +130,11 @@ export class IRWorkspaceSnapshotService {
 		}
 
 		const requestVersion = this.cacheVersion;
-		const snapshotPromise = this.buildDeckOverview(options, cacheKey, requestVersion);
+		const snapshotPromise = this.buildDeckOverview(
+			options,
+			cacheKey,
+			requestVersion,
+		);
 		this.inflightDeckOverview.set(cacheKey, snapshotPromise);
 		try {
 			return await snapshotPromise;
@@ -144,7 +158,7 @@ export class IRWorkspaceSnapshotService {
 	private async buildDeckOverview(
 		options: DeckOverviewOptions,
 		cacheKey: string,
-		requestVersion: number
+		requestVersion: number,
 	): Promise<IRDeckOverviewSnapshot> {
 		const startedAt = Date.now();
 		const {
@@ -159,7 +173,10 @@ export class IRWorkspaceSnapshotService {
 		const decks = Object.values(decksRecord);
 		const blocks = Object.values(blocksRecord);
 		const chunks = Object.values(chunksRecord);
-		const safeLearnAheadDays = Math.min(Math.max(options.learnAheadDays ?? 3, 1), 14);
+		const safeLearnAheadDays = Math.min(
+			Math.max(options.learnAheadDays ?? 3, 1),
+			14,
+		);
 		const dailyNewLimit = options.dailyNewLimit ?? 20;
 		const dailyReviewLimit = options.dailyReviewLimit ?? 50;
 		const dailyBudget = options.dailyTimeBudgetMinutes ?? 30;
@@ -175,10 +192,27 @@ export class IRWorkspaceSnapshotService {
 
 		const ignoreTagByFile = new Map<string, boolean>();
 		const deckKeysByIdentifier = this.buildDeckKeysByIdentifier(decks);
-		const blocksByDeckKey = this.buildBlocksByDeckKey(decks, blocks, deckKeysByIdentifier);
-		const chunksByDeckKey = this.buildChunksByDeckKey(decks, chunks, deckKeysByIdentifier, ignoreTagByFile);
-		const pdfTasksByDeckKey = this.buildTasksByDeckKey(decks, pdfTasks, deckKeysByIdentifier);
-		const epubTasksByDeckKey = this.buildTasksByDeckKey(decks, epubTasks, deckKeysByIdentifier);
+		const blocksByDeckKey = this.buildBlocksByDeckKey(
+			decks,
+			blocks,
+			deckKeysByIdentifier,
+		);
+		const chunksByDeckKey = this.buildChunksByDeckKey(
+			decks,
+			chunks,
+			deckKeysByIdentifier,
+			ignoreTagByFile,
+		);
+		const pdfTasksByDeckKey = this.buildTasksByDeckKey(
+			decks,
+			pdfTasks,
+			deckKeysByIdentifier,
+		);
+		const epubTasksByDeckKey = this.buildTasksByDeckKey(
+			decks,
+			epubTasks,
+			deckKeysByIdentifier,
+		);
 		const allFiles = new Set<string>();
 
 		for (const deck of decks) {
@@ -199,7 +233,9 @@ export class IRWorkspaceSnapshotService {
 			}
 		}
 
-		const questionStatsByFile = await this.buildQuestionStatsByFile(Array.from(allFiles));
+		const questionStatsByFile = await this.buildQuestionStatsByFile(
+			Array.from(allFiles),
+		);
 		const deckStats: Record<string, IRDeckStats> = {};
 		const startOfToday = new Date();
 		startOfToday.setHours(0, 0, 0, 0);
@@ -273,7 +309,11 @@ export class IRWorkspaceSnapshotService {
 			for (let dayOffset = 0; dayOffset < safeLearnAheadDays; dayOffset++) {
 				const targetDate = new Date(startOfToday);
 				targetDate.setDate(startOfToday.getDate() + dayOffset);
-				const projectedDayLoad = getProjectedDayLoad(projectedSummary, targetDate, [deckKey]);
+				const projectedDayLoad = getProjectedDayLoad(
+					projectedSummary,
+					targetDate,
+					[deckKey],
+				);
 				if (dayOffset === 0) {
 					dueToday += projectedDayLoad.items.length;
 				}
@@ -296,7 +336,10 @@ export class IRWorkspaceSnapshotService {
 				dueToday,
 				dueWithinDays,
 				totalCount:
-					deckBlocks.length + deckChunks.length + activePdfTasks.length + activeEpubTasks.length,
+					deckBlocks.length +
+					deckChunks.length +
+					activePdfTasks.length +
+					activeEpubTasks.length,
 				fileCount: deckFiles.size,
 				questionCount,
 				completedQuestionCount,
@@ -305,11 +348,11 @@ export class IRWorkspaceSnapshotService {
 				loadRatePercent:
 					dailyBudget > 0
 						? this.calculateDeckLoadRatePercent({
-							projectedSummary,
-							deckIds: [deckKey],
-							dailyBudget,
-							loadRateDays,
-						})
+								projectedSummary,
+								deckIds: [deckKey],
+								dailyBudget,
+								loadRateDays,
+						  })
 						: undefined,
 			};
 		}
@@ -333,7 +376,9 @@ export class IRWorkspaceSnapshotService {
 		return snapshot;
 	}
 
-	private async buildWorkspaceData(requestVersion: number): Promise<IRWorkspaceDataSnapshot> {
+	private async buildWorkspaceData(
+		requestVersion: number,
+	): Promise<IRWorkspaceDataSnapshot> {
 		const startedAt = Date.now();
 		await Promise.all([
 			this.storage.initialize(),
@@ -351,7 +396,9 @@ export class IRWorkspaceSnapshotService {
 			epubTasks,
 		] = await Promise.all([
 			this.storage.getAllDecks(),
-			Promise.resolve({} as Record<string, import("../../types/ir-types").IRBlock>),
+			Promise.resolve(
+				{} as Record<string, import("../../types/ir-types").IRBlock>,
+			),
 			this.storage.getAllChunkData(),
 			this.storage.getAllSources(),
 			this.storage.getHistory(),
@@ -388,9 +435,13 @@ export class IRWorkspaceSnapshotService {
 		return String(deck.id || deck.path || "").trim();
 	}
 
-	private normalizeIdentifiers(values: Array<string | null | undefined>): string[] {
+	private normalizeIdentifiers(
+		values: Array<string | null | undefined>,
+	): string[] {
 		return Array.from(
-			new Set(values.map((value) => String(value || "").trim()).filter(Boolean))
+			new Set(
+				values.map((value) => String(value || "").trim()).filter(Boolean),
+			),
 		);
 	}
 
@@ -399,7 +450,10 @@ export class IRWorkspaceSnapshotService {
 		for (const deck of decks) {
 			const deckKey = this.getDeckKey(deck);
 			if (!deckKey) continue;
-			for (const identifier of this.normalizeIdentifiers([deck.id, deck.path])) {
+			for (const identifier of this.normalizeIdentifiers([
+				deck.id,
+				deck.path,
+			])) {
 				const set = deckKeysByIdentifier.get(identifier) || new Set<string>();
 				set.add(deckKey);
 				deckKeysByIdentifier.set(identifier, set);
@@ -411,7 +465,7 @@ export class IRWorkspaceSnapshotService {
 	private buildBlocksByDeckKey(
 		decks: IRDeck[],
 		blocks: IRBlock[],
-		deckKeysByIdentifier: Map<string, Set<string>>
+		deckKeysByIdentifier: Map<string, Set<string>>,
 	): Map<string, IRBlock[]> {
 		const map = new Map<string, IRBlock[]>();
 		for (const deck of decks) {
@@ -437,7 +491,9 @@ export class IRWorkspaceSnapshotService {
 				}
 				continue;
 			}
-			for (const deckKey of deckKeysByIdentifier.get(String(block.deckPath || "").trim()) || []) {
+			for (const deckKey of deckKeysByIdentifier.get(
+				String(block.deckPath || "").trim(),
+			) || []) {
 				map.get(deckKey)?.push(block);
 			}
 		}
@@ -448,10 +504,14 @@ export class IRWorkspaceSnapshotService {
 	private shouldIncludeLegacyBlock(block: IRBlock): boolean {
 		if (block.state === "suspended") return false;
 		const tags = Array.isArray(block.tags) ? block.tags : [];
-		if (tags.some((tag) => {
-			const normalized = String(tag || "").trim().toLowerCase();
-			return normalized === "ignore" || normalized === "#ignore";
-		})) {
+		if (
+			tags.some((tag) => {
+				const normalized = String(tag || "")
+					.trim()
+					.toLowerCase();
+				return normalized === "ignore" || normalized === "#ignore";
+			})
+		) {
 			return false;
 		}
 		return !/#ignore\b/i.test(String(block.contentPreview || ""));
@@ -461,7 +521,7 @@ export class IRWorkspaceSnapshotService {
 		decks: IRDeck[],
 		chunks: IRChunkFileData[],
 		deckKeysByIdentifier: Map<string, Set<string>>,
-		ignoreTagByFile: Map<string, boolean>
+		ignoreTagByFile: Map<string, boolean>,
 	): Map<string, IRChunkFileData[]> {
 		const map = new Map<string, IRChunkFileData[]>();
 		const deckKeysByTag = new Map<string, string>();
@@ -496,7 +556,7 @@ export class IRWorkspaceSnapshotService {
 	private buildTasksByDeckKey<T extends { deckId?: string; topicId?: string }>(
 		decks: IRDeck[],
 		tasks: T[],
-		deckKeysByIdentifier: Map<string, Set<string>>
+		deckKeysByIdentifier: Map<string, Set<string>>,
 	): Map<string, T[]> {
 		const map = new Map<string, T[]>();
 		for (const deck of decks) {
@@ -504,7 +564,9 @@ export class IRWorkspaceSnapshotService {
 		}
 
 		for (const task of tasks) {
-			const identifier = String(getTaskTopicId(task) || task.deckId || "").trim();
+			const identifier = String(
+				getTaskTopicId(task) || task.deckId || "",
+			).trim();
 			if (!identifier) continue;
 			for (const deckKey of deckKeysByIdentifier.get(identifier) || []) {
 				map.get(deckKey)?.push(task);
@@ -517,11 +579,16 @@ export class IRWorkspaceSnapshotService {
 	private filterActiveTasks<T extends { status?: string }>(tasks: T[]): T[] {
 		return tasks.filter((task) => {
 			const status = String(task.status || "new");
-			return status !== "done" && status !== "suspended" && status !== "removed";
+			return (
+				status !== "done" && status !== "suspended" && status !== "removed"
+			);
 		});
 	}
 
-	private hasIgnoreTagInFile(filePath: string, cache: Map<string, boolean>): boolean {
+	private hasIgnoreTagInFile(
+		filePath: string,
+		cache: Map<string, boolean>,
+	): boolean {
 		const normalizedPath = String(filePath || "").trim();
 		if (!normalizedPath) return false;
 		if (cache.has(normalizedPath)) {
@@ -532,14 +599,21 @@ export class IRWorkspaceSnapshotService {
 		const file = this.app.vault.getAbstractFileByPath(normalizedPath);
 		if (file instanceof TFile) {
 			const fileCache = this.app.metadataCache.getFileCache(file);
-			const inlineTags = fileCache?.tags?.map((tag) => String(tag.tag || "").replace(/^#/, "").toLowerCase()) || [];
-			const frontmatterTags = readStringArrayFromUnknown(fileCache?.frontmatter?.tags).map((tag) =>
-				tag.toLowerCase()
-			);
+			const inlineTags =
+				fileCache?.tags?.map((tag) =>
+					String(tag.tag || "")
+						.replace(/^#/, "")
+						.toLowerCase(),
+				) || [];
+			const frontmatterTags = readStringArrayFromUnknown(
+				fileCache?.frontmatter?.tags,
+			).map((tag) => tag.toLowerCase());
 			ignored =
 				inlineTags.includes("ignore") ||
 				frontmatterTags.includes("ignore") ||
-				JSON.stringify(fileCache?.frontmatter || {}).toLowerCase().includes("ignore");
+				JSON.stringify(fileCache?.frontmatter || {})
+					.toLowerCase()
+					.includes("ignore");
 		}
 
 		cache.set(normalizedPath, ignored);
@@ -547,7 +621,7 @@ export class IRWorkspaceSnapshotService {
 	}
 
 	private async buildQuestionStatsByFile(
-		filePaths: string[]
+		filePaths: string[],
 	): Promise<Map<string, { total: number; completed: number }>> {
 		const result = new Map<string, { total: number; completed: number }>();
 		const completedQuestionRegex = /^[-*]\s*\[x\]\s*.+[?？]/gim;
@@ -561,10 +635,14 @@ export class IRWorkspaceSnapshotService {
 				const completedMatches = content.match(completedQuestionRegex);
 				const uncompletedMatches = content.match(uncompletedQuestionRegex);
 				const completed = completedMatches ? completedMatches.length : 0;
-				const total = completed + (uncompletedMatches ? uncompletedMatches.length : 0);
+				const total =
+					completed + (uncompletedMatches ? uncompletedMatches.length : 0);
 				result.set(filePath, { total, completed });
 			} catch (error) {
-				logger.debug("[IRWorkspaceSnapshotService] question stats skipped", { filePath, error });
+				logger.debug("[IRWorkspaceSnapshotService] question stats skipped", {
+					filePath,
+					error,
+				});
 			}
 		}
 
@@ -587,7 +665,7 @@ export class IRWorkspaceSnapshotService {
 			const dayMinutes = getProjectedDayLoad(
 				input.projectedSummary,
 				targetDate,
-				input.deckIds
+				input.deckIds,
 			).totalEstimatedMinutes;
 
 			maxRatio = Math.max(maxRatio, dayMinutes / input.dailyBudget);
@@ -599,7 +677,9 @@ export class IRWorkspaceSnapshotService {
 
 const snapshotServiceByApp = new WeakMap<App, IRWorkspaceSnapshotService>();
 
-export function getSharedIRWorkspaceSnapshotService(app: App): IRWorkspaceSnapshotService {
+export function getSharedIRWorkspaceSnapshotService(
+	app: App,
+): IRWorkspaceSnapshotService {
 	let service = snapshotServiceByApp.get(app);
 	if (!service) {
 		service = new IRWorkspaceSnapshotService(app);

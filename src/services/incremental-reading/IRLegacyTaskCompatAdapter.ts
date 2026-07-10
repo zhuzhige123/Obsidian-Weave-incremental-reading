@@ -1,11 +1,22 @@
 import type { IRPointSnapshot } from "../../types/ir-point-storage-types";
-import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
-import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
-import type { IRBlock, IRBlockStatus, IRChunkFileData, IRSourceFileMeta } from "../../types/ir-types";
-import { DEFAULT_IR_BLOCK_META, DEFAULT_IR_BLOCK_STATS } from "../../types/ir-types";
-import { resolveAssociatedNotePath, resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
-import { supportsPointLinkedNotes } from "./IRLinkedNotePolicy";
+import type {
+	IRBlock,
+	IRBlockStatus,
+	IRChunkFileData,
+	IRSourceFileMeta,
+} from "../../types/ir-types";
+import {
+	DEFAULT_IR_BLOCK_META,
+	DEFAULT_IR_BLOCK_STATS,
+} from "../../types/ir-types";
 import { sanitizeUserReadingSourcePath } from "../../utils/ir-internal-data-path";
+import {
+	resolveAssociatedNotePath,
+	resolveAssociatedNotePaths,
+} from "./IRAssociatedNoteSignals";
+import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
+import { supportsPointLinkedNotes } from "./IRLinkedNotePolicy";
+import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 
 function toTimestamp(value: string | null | undefined): number {
 	if (!value) {
@@ -15,22 +26,36 @@ function toTimestamp(value: string | null | undefined): number {
 	return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getPointMetadataString(snapshot: IRPointSnapshot, key: string): string | undefined {
+function getPointMetadataString(
+	snapshot: IRPointSnapshot,
+	key: string,
+): string | undefined {
 	const value = snapshot.point.metadata?.[key];
 	return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-function getPointMetadataNumber(snapshot: IRPointSnapshot, key: string): number | undefined {
+function getPointMetadataNumber(
+	snapshot: IRPointSnapshot,
+	key: string,
+): number | undefined {
 	const value = snapshot.point.metadata?.[key];
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
 }
 
-function getPointMetadataBoolean(snapshot: IRPointSnapshot, key: string): boolean | undefined {
+function getPointMetadataBoolean(
+	snapshot: IRPointSnapshot,
+	key: string,
+): boolean | undefined {
 	const value = snapshot.point.metadata?.[key];
 	return typeof value === "boolean" ? value : undefined;
 }
 
-function getPointMetadataStringArray(snapshot: IRPointSnapshot, key: string): string[] | undefined {
+function getPointMetadataStringArray(
+	snapshot: IRPointSnapshot,
+	key: string,
+): string[] | undefined {
 	const value = snapshot.point.metadata?.[key];
 	if (!Array.isArray(value)) {
 		return undefined;
@@ -42,7 +67,10 @@ function getPointMetadataStringArray(snapshot: IRPointSnapshot, key: string): st
 }
 
 function snapshotSupportsPointLinkedNotes(snapshot: IRPointSnapshot): boolean {
-	if (snapshot.point.id.startsWith("pdfbm-") || snapshot.point.id.startsWith("epubbm-")) {
+	if (
+		snapshot.point.id.startsWith("pdfbm-") ||
+		snapshot.point.id.startsWith("epubbm-")
+	) {
 		return true;
 	}
 
@@ -56,11 +84,17 @@ function snapshotSupportsPointLinkedNotes(snapshot: IRPointSnapshot): boolean {
 		return true;
 	}
 
-	if (snapshot.point.pointType === "selection-entry" && snapshot.point.source?.type === "pdf") {
+	if (
+		snapshot.point.pointType === "selection-entry" &&
+		snapshot.point.source?.type === "pdf"
+	) {
 		return true;
 	}
 
-	return snapshot.point.pointType === "chapter-entry" && snapshot.point.source?.type === "epub";
+	return (
+		snapshot.point.pointType === "chapter-entry" &&
+		snapshot.point.source?.type === "epub"
+	);
 }
 
 function resolvePointAssociatedNotePaths(snapshot: IRPointSnapshot): string[] {
@@ -69,7 +103,9 @@ function resolvePointAssociatedNotePaths(snapshot: IRPointSnapshot): string[] {
 	}
 
 	return resolveAssociatedNotePaths({
-		associatedNotePaths: Array.isArray(snapshot.point.relations?.linkedNotePaths)
+		associatedNotePaths: Array.isArray(
+			snapshot.point.relations?.linkedNotePaths,
+		)
 			? snapshot.point.relations?.linkedNotePaths
 			: undefined,
 	});
@@ -95,14 +131,16 @@ function getTaskTopicId(snapshot: IRPointSnapshot): string {
 function getPointStats(snapshot: IRPointSnapshot) {
 	const readingSeconds = Math.max(
 		0,
-		Math.round(Number(snapshot.point.stats.totalReadingTimeMs || 0) / 1000)
+		Math.round(Number(snapshot.point.stats.totalReadingTimeMs || 0) / 1000),
 	);
-	const lastInteractionAt = toTimestamp(snapshot.point.timestamps.lastInteractionAt);
+	const lastInteractionAt = toTimestamp(
+		snapshot.point.timestamps.lastInteractionAt,
+	);
 	return {
 		...DEFAULT_IR_BLOCK_STATS,
 		impressions: Math.max(
 			Number(snapshot.point.stats.impressionCount || 0),
-			Number(snapshot.point.stats.reviewCount || 0)
+			Number(snapshot.point.stats.reviewCount || 0),
 		),
 		totalReadingTimeSec: readingSeconds,
 		effectiveReadingTimeSec: readingSeconds,
@@ -116,30 +154,55 @@ function getPointStats(snapshot: IRPointSnapshot) {
 
 function getPointMeta(snapshot: IRPointSnapshot) {
 	const linkedNotePaths = resolvePointAssociatedNotePaths(snapshot);
-	const primaryAssociatedNotePath = resolveAssociatedNotePath({ associatedNotePaths: linkedNotePaths });
+	const primaryAssociatedNotePath = resolveAssociatedNotePath({
+		associatedNotePaths: linkedNotePaths,
+	});
 	return {
 		...DEFAULT_IR_BLOCK_META,
-		tagGroup: getPointMetadataString(snapshot, "tagGroupId") || DEFAULT_IR_BLOCK_META.tagGroup,
+		tagGroup:
+			getPointMetadataString(snapshot, "tagGroupId") ||
+			DEFAULT_IR_BLOCK_META.tagGroup,
 		primaryAssociatedNotePath,
 		associatedNotePath: primaryAssociatedNotePath,
 		associatedNotePaths: linkedNotePaths,
 		...(getPointMetadataString(snapshot, "autoSubscribedAt")
-			? { autoSubscribedAt: getPointMetadataString(snapshot, "autoSubscribedAt") }
+			? {
+					autoSubscribedAt: getPointMetadataString(
+						snapshot,
+						"autoSubscribedAt",
+					),
+			  }
 			: {}),
 		...(getPointMetadataString(snapshot, "autoSubscribedFolderPath")
-			? { autoSubscribedFolderPath: getPointMetadataString(snapshot, "autoSubscribedFolderPath") }
+			? {
+					autoSubscribedFolderPath: getPointMetadataString(
+						snapshot,
+						"autoSubscribedFolderPath",
+					),
+			  }
 			: {}),
 		...(getPointMetadataString(snapshot, "autoSubscribedBadgeUntil")
-			? { autoSubscribedBadgeUntil: getPointMetadataString(snapshot, "autoSubscribedBadgeUntil") }
+			? {
+					autoSubscribedBadgeUntil: getPointMetadataString(
+						snapshot,
+						"autoSubscribedBadgeUntil",
+					),
+			  }
 			: {}),
 		...(getPointMetadataBoolean(snapshot, "externalDocument") !== undefined
-			? { externalDocument: getPointMetadataBoolean(snapshot, "externalDocument") }
+			? {
+					externalDocument: getPointMetadataBoolean(
+						snapshot,
+						"externalDocument",
+					),
+			  }
 			: {}),
 		...(getPointMetadataString(snapshot, "pointTitle")
 			? { pointTitle: getPointMetadataString(snapshot, "pointTitle") }
-			: typeof snapshot.point.userData?.title === "string" && snapshot.point.userData.title.trim()
-				? { pointTitle: snapshot.point.userData.title.trim() }
-				: {}),
+			: typeof snapshot.point.userData?.title === "string" &&
+			  snapshot.point.userData.title.trim()
+			? { pointTitle: snapshot.point.userData.title.trim() }
+			: {}),
 		...(getPointMetadataString(snapshot, "resumeLink")
 			? { resumeLink: getPointMetadataString(snapshot, "resumeLink") }
 			: {}),
@@ -147,24 +210,51 @@ function getPointMeta(snapshot: IRPointSnapshot) {
 			? { canvasNodeId: getPointMetadataString(snapshot, "canvasNodeId") }
 			: {}),
 		...(getPointMetadataStringArray(snapshot, "canvasTextCandidates")
-			? { canvasTextCandidates: getPointMetadataStringArray(snapshot, "canvasTextCandidates") }
+			? {
+					canvasTextCandidates: getPointMetadataStringArray(
+						snapshot,
+						"canvasTextCandidates",
+					),
+			  }
 			: {}),
 		...(getPointMetadataString(snapshot, "sourceSequenceGroup")
-			? { sourceSequenceGroup: getPointMetadataString(snapshot, "sourceSequenceGroup") }
+			? {
+					sourceSequenceGroup: getPointMetadataString(
+						snapshot,
+						"sourceSequenceGroup",
+					),
+			  }
 			: {}),
 		...(getPointMetadataNumber(snapshot, "sourceSequenceOrder") !== undefined
-			? { sourceSequenceOrder: getPointMetadataNumber(snapshot, "sourceSequenceOrder") }
+			? {
+					sourceSequenceOrder: getPointMetadataNumber(
+						snapshot,
+						"sourceSequenceOrder",
+					),
+			  }
 			: {}),
 		...(getPointMetadataBoolean(snapshot, "sourceSequenceLocked") !== undefined
-			? { sourceSequenceLocked: getPointMetadataBoolean(snapshot, "sourceSequenceLocked") }
+			? {
+					sourceSequenceLocked: getPointMetadataBoolean(
+						snapshot,
+						"sourceSequenceLocked",
+					),
+			  }
 			: {}),
 		...(getPointMetadataString(snapshot, "sourceSequenceAnchorDateKey")
-			? { sourceSequenceAnchorDateKey: getPointMetadataString(snapshot, "sourceSequenceAnchorDateKey") }
+			? {
+					sourceSequenceAnchorDateKey: getPointMetadataString(
+						snapshot,
+						"sourceSequenceAnchorDateKey",
+					),
+			  }
 			: {}),
 	};
 }
 
-export function getStoredPointKind(snapshot: IRPointSnapshot): "pdf" | "epub" | "chunk" | null {
+export function getStoredPointKind(
+	snapshot: IRPointSnapshot,
+): "pdf" | "epub" | "chunk" | null {
 	const point = snapshot.point;
 	if (point.id.startsWith("pdfbm-")) {
 		return "pdf";
@@ -217,7 +307,9 @@ function toLegacyPriority(priority: number): 1 | 2 | 3 {
 	return 3;
 }
 
-function toLegacyBlockState(status: string | null | undefined): IRBlock["state"] {
+function toLegacyBlockState(
+	status: string | null | undefined,
+): IRBlock["state"] {
 	switch (String(status || "").trim()) {
 		case "queued":
 		case "active":
@@ -235,15 +327,17 @@ function toLegacyBlockState(status: string | null | undefined): IRBlock["state"]
 
 function readNumberRecordValue(
 	record: Record<string, unknown> | undefined,
-	key: string
+	key: string,
 ): number | undefined {
 	const value = record?.[key];
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
 }
 
 function readStringRecordValue(
 	record: Record<string, unknown> | undefined,
-	key: string
+	key: string,
 ): string | undefined {
 	const value = record?.[key];
 	return typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -251,19 +345,26 @@ function readStringRecordValue(
 
 function readStringArrayRecordValue(
 	record: Record<string, unknown> | undefined,
-	key: string
+	key: string,
 ): string[] {
 	const value = record?.[key];
 	return Array.isArray(value)
-		? value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean)
+		? value
+				.map((item) => (typeof item === "string" ? item.trim() : ""))
+				.filter(Boolean)
 		: [];
 }
 
 export function isLegacyBlockPointSnapshot(snapshot: IRPointSnapshot): boolean {
-	return getStoredPointKind(snapshot) === null && snapshot.point.source?.type === "markdown";
+	return (
+		getStoredPointKind(snapshot) === null &&
+		snapshot.point.source?.type === "markdown"
+	);
 }
 
-export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IRBlock | null {
+export function buildLegacyBlockFromPointSnapshot(
+	snapshot: IRPointSnapshot,
+): IRBlock | null {
 	if (!isLegacyBlockPointSnapshot(snapshot)) {
 		return null;
 	}
@@ -281,11 +382,11 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 
 	const metadata =
 		point.metadata && typeof point.metadata === "object"
-			? (point.metadata)
+			? point.metadata
 			: undefined;
 	const locator =
 		point.trace?.locator && typeof point.trace.locator === "object"
-			? (point.trace.locator)
+			? point.trace.locator
 			: undefined;
 	const filePath = sanitizeUserReadingSourcePath(
 		readStringRecordValue(metadata, "sourcePath") ||
@@ -293,13 +394,16 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 			readStringRecordValue(locator, "filePath") ||
 			point.source?.path ||
 			snapshot.material?.source.path ||
-			""
+			"",
 	);
 	if (!filePath) {
 		return null;
 	}
 
-	const explicitHeadingPath = readStringArrayRecordValue(metadata, "headingPath");
+	const explicitHeadingPath = readStringArrayRecordValue(
+		metadata,
+		"headingPath",
+	);
 	const locatorHeadingPath = readStringArrayRecordValue(locator, "headingPath");
 	const title =
 		readStringRecordValue(userData, "title") ||
@@ -311,10 +415,10 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 		explicitHeadingPath.length > 0
 			? explicitHeadingPath
 			: locatorHeadingPath.length > 0
-				? locatorHeadingPath
-				: title
-					? [title]
-					: [];
+			? locatorHeadingPath
+			: title
+			? [title]
+			: [];
 	const headingText = headingPath[headingPath.length - 1] || title || point.id;
 	const startLine =
 		readNumberRecordValue(metadata, "startLine") ??
@@ -328,21 +432,27 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 		readNumberRecordValue(metadata, "headingLevel") ??
 		readNumberRecordValue(locator, "headingLevel") ??
 		1;
-	const priorityUi = Number(readNumberRecordValue(schedule, "manualPriority") || 0);
-	const priorityEff = Number(readNumberRecordValue(schedule, "priorityScore") || priorityUi || 0);
+	const priorityUi = Number(
+		readNumberRecordValue(schedule, "manualPriority") || 0,
+	);
+	const priorityEff = Number(
+		readNumberRecordValue(schedule, "priorityScore") || priorityUi || 0,
+	);
 	const tagGroupId =
 		getPointMetadataString(snapshot, "tagGroupId") ||
 		getPointMetadataString(snapshot, "tagGroup") ||
 		DEFAULT_IR_BLOCK_META.tagGroup;
 	const associatedNotePaths = resolvePointAssociatedNotePaths(snapshot);
-	const primaryAssociatedNotePath = resolveAssociatedNotePath({ associatedNotePaths });
+	const primaryAssociatedNotePath = resolveAssociatedNotePath({
+		associatedNotePaths,
+	});
 	const linkedNoteMeta =
 		primaryAssociatedNotePath && associatedNotePaths.length > 0
 			? {
 					primaryAssociatedNotePath,
 					associatedNotePath: primaryAssociatedNotePath,
 					associatedNotePaths,
-				}
+			  }
 			: {};
 
 	return {
@@ -354,7 +464,10 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 		endLine: Math.max(0, Math.round(endLine || startLine || 0)),
 		priority: toLegacyPriority(priorityUi || priorityEff),
 		state: toLegacyBlockState(scheduleStatus),
-		interval: Math.max(0, Math.round(Number(readNumberRecordValue(schedule, "intervalDays") || 0))),
+		interval: Math.max(
+			0,
+			Math.round(Number(readNumberRecordValue(schedule, "intervalDays") || 0)),
+		),
 		intervalFactor:
 			readNumberRecordValue(metadata, "intervalFactor") ??
 			readNumberRecordValue(locator, "intervalFactor") ??
@@ -362,7 +475,7 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 		nextReview: readStringRecordValue(schedule, "nextReviewAt") || null,
 		reviewCount: Math.max(
 			Number(readNumberRecordValue(stats, "reviewCount") || 0),
-			Number(readNumberRecordValue(stats, "impressionCount") || 0)
+			Number(readNumberRecordValue(stats, "impressionCount") || 0),
 		),
 		lastReview:
 			readStringRecordValue(schedule, "lastReviewedAt") ||
@@ -379,13 +492,17 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 			: [],
 		totalReadingTime: Math.max(
 			0,
-			Math.round(Number(readNumberRecordValue(stats, "totalReadingTimeMs") || 0) / 1000)
+			Math.round(
+				Number(readNumberRecordValue(stats, "totalReadingTimeMs") || 0) / 1000,
+			),
 		),
 		firstReadAt: readStringRecordValue(timestamps, "createdAt") || null,
 		priorityUi,
 		priorityEff,
 		tagGroupId,
-		createdAt: readStringRecordValue(timestamps, "createdAt") || new Date(0).toISOString(),
+		createdAt:
+			readStringRecordValue(timestamps, "createdAt") ||
+			new Date(0).toISOString(),
 		updatedAt:
 			readStringRecordValue(timestamps, "updatedAt") ||
 			readStringRecordValue(timestamps, "createdAt") ||
@@ -399,7 +516,8 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 			headingText,
 		primaryAssociatedNotePath,
 		associatedNotePath: primaryAssociatedNotePath,
-		associatedNotePaths: associatedNotePaths.length > 0 ? associatedNotePaths : undefined,
+		associatedNotePaths:
+			associatedNotePaths.length > 0 ? associatedNotePaths : undefined,
 		meta: {
 			...DEFAULT_IR_BLOCK_META,
 			tagGroup: tagGroupId,
@@ -408,7 +526,9 @@ export function buildLegacyBlockFromPointSnapshot(snapshot: IRPointSnapshot): IR
 	} as IRBlock;
 }
 
-export function getLegacyBookmarkTaskKind(snapshot: IRPointSnapshot): "pdf" | "epub" | null {
+export function getLegacyBookmarkTaskKind(
+	snapshot: IRPointSnapshot,
+): "pdf" | "epub" | null {
 	const kind = getStoredPointKind(snapshot);
 	return kind === "pdf" || kind === "epub" ? kind : null;
 }
@@ -418,7 +538,9 @@ export function buildLegacyChunkFromPointSnapshot(snapshot: IRPointSnapshot): {
 	source: IRSourceFileMeta;
 } {
 	const topicIds = Array.isArray(snapshot.point.relations?.topicIds)
-		? snapshot.point.relations?.topicIds.map((value) => String(value || "").trim()).filter(Boolean)
+		? snapshot.point.relations?.topicIds
+				.map((value) => String(value || "").trim())
+				.filter(Boolean)
 		: [];
 	const locator = snapshot.point.trace.locator || {};
 	const userData = toUnknownRecord(snapshot.point.userData);
@@ -426,26 +548,29 @@ export function buildLegacyChunkFromPointSnapshot(snapshot: IRPointSnapshot): {
 		typeof userData?.sourceFilePath === "string"
 			? userData.sourceFilePath.trim()
 			: typeof snapshot.point.metadata?.chunkFilePath === "string"
-				? snapshot.point.metadata.chunkFilePath.trim()
-				: typeof locator.chunkFilePath === "string" && locator.chunkFilePath.trim()
-					? locator.chunkFilePath.trim()
-					: snapshot.point.source?.path || snapshot.material?.source.path || ""
+			? snapshot.point.metadata.chunkFilePath.trim()
+			: typeof locator.chunkFilePath === "string" &&
+			  locator.chunkFilePath.trim()
+			? locator.chunkFilePath.trim()
+			: snapshot.point.source?.path || snapshot.material?.source.path || "",
 	);
 	const sourcePath = sanitizeUserReadingSourcePath(
 		typeof snapshot.point.metadata?.sourcePath === "string" &&
 		snapshot.point.metadata.sourcePath.trim()
 			? snapshot.point.metadata.sourcePath.trim()
 			: typeof snapshot.point.metadata?.rawFilePath === "string" &&
-				snapshot.point.metadata.rawFilePath.trim()
-				? snapshot.point.metadata.rawFilePath.trim()
-				: typeof locator.sourcePath === "string" && locator.sourcePath.trim()
-					? locator.sourcePath.trim()
-					: snapshot.point.source?.path || snapshot.material?.source.path || chunkFilePath
+			  snapshot.point.metadata.rawFilePath.trim()
+			? snapshot.point.metadata.rawFilePath.trim()
+			: typeof locator.sourcePath === "string" && locator.sourcePath.trim()
+			? locator.sourcePath.trim()
+			: snapshot.point.source?.path ||
+			  snapshot.material?.source.path ||
+			  chunkFilePath,
 	);
 	const rawFilePath = sanitizeUserReadingSourcePath(
 		(typeof snapshot.point.metadata?.rawFilePath === "string" &&
 			snapshot.point.metadata.rawFilePath.trim()) ||
-			sourcePath
+			sourcePath,
 	);
 	const indexFilePath =
 		(typeof snapshot.point.metadata?.indexFilePath === "string" &&
@@ -478,7 +603,9 @@ export function buildLegacyChunkFromPointSnapshot(snapshot: IRPointSnapshot): {
 				snapshot.point.schedule.doneReason === "completed"
 					? snapshot.point.schedule.doneReason
 					: undefined,
-			doneAt: toTimestamp(snapshot.point.schedule.lastReviewedAt || null) || undefined,
+			doneAt:
+				toTimestamp(snapshot.point.schedule.lastReviewedAt || null) ||
+				undefined,
 			stats: getPointStats(snapshot),
 			meta: getPointMeta(snapshot),
 			createdAt: toTimestamp(snapshot.point.timestamps.createdAt),
@@ -491,21 +618,25 @@ export function buildLegacyChunkFromPointSnapshot(snapshot: IRPointSnapshot): {
 			indexFilePath,
 			chunkIds: [snapshot.point.id],
 			title: sourceTitle,
-			tagGroup: getPointMetadataString(snapshot, "tagGroupId") || DEFAULT_IR_BLOCK_META.tagGroup,
+			tagGroup:
+				getPointMetadataString(snapshot, "tagGroupId") ||
+				DEFAULT_IR_BLOCK_META.tagGroup,
 			createdAt: toTimestamp(snapshot.point.timestamps.createdAt),
 			updatedAt: toTimestamp(snapshot.point.timestamps.updatedAt),
 		},
 	};
 }
 
-export function buildLegacyPdfTaskFromPointSnapshot(snapshot: IRPointSnapshot): IRPdfBookmarkTask {
+export function buildLegacyPdfTaskFromPointSnapshot(
+	snapshot: IRPointSnapshot,
+): IRPdfBookmarkTask {
 	const topicId = getTaskTopicId(snapshot);
 	const locator = snapshot.point.trace.locator || {};
 	const pdfPath = sanitizeUserReadingSourcePath(
 		(typeof locator.pdfPath === "string" && locator.pdfPath.trim()) ||
 			snapshot.point.source?.path ||
 			snapshot.material?.source.path ||
-			""
+			"",
 	);
 
 	return {
@@ -520,7 +651,10 @@ export function buildLegacyPdfTaskFromPointSnapshot(snapshot: IRPointSnapshot): 
 			snapshot.material?.bibliography.title ||
 			snapshot.point.id,
 		link: typeof locator.link === "string" ? locator.link : "",
-		annotationId: typeof locator.annotationId === "string" ? locator.annotationId : undefined,
+		annotationId:
+			typeof locator.annotationId === "string"
+				? locator.annotationId
+				: undefined,
 		status: snapshot.point.schedule.status as IRPdfBookmarkTask["status"],
 		priorityUi: Number(snapshot.point.schedule.manualPriority || 0),
 		priorityEff: Number(snapshot.point.schedule.priorityScore || 0),
@@ -528,14 +662,18 @@ export function buildLegacyPdfTaskFromPointSnapshot(snapshot: IRPointSnapshot): 
 		nextRepDate: toTimestamp(snapshot.point.schedule.nextReviewAt || null),
 		stats: getPointStats(snapshot),
 		meta: getPointMeta(snapshot),
-		tags: Array.isArray(snapshot.point.userData.tags) ? [...snapshot.point.userData.tags] : [],
+		tags: Array.isArray(snapshot.point.userData.tags)
+			? [...snapshot.point.userData.tags]
+			: [],
 		favorite: Boolean(snapshot.point.userData.isStarred),
 		createdAt: toTimestamp(snapshot.point.timestamps.createdAt),
 		updatedAt: toTimestamp(snapshot.point.timestamps.updatedAt),
 	};
 }
 
-export function buildLegacyEpubTaskFromPointSnapshot(snapshot: IRPointSnapshot): IREpubBookmarkTask {
+export function buildLegacyEpubTaskFromPointSnapshot(
+	snapshot: IRPointSnapshot,
+): IREpubBookmarkTask {
 	const topicId = getTaskTopicId(snapshot);
 	const locator = snapshot.point.trace.locator || {};
 	return {
@@ -544,7 +682,7 @@ export function buildLegacyEpubTaskFromPointSnapshot(snapshot: IRPointSnapshot):
 		deckId: topicId,
 		sourceId: snapshot.point.materialId,
 		epubFilePath: sanitizeUserReadingSourcePath(
-			snapshot.point.source?.path || snapshot.material?.source.path || ""
+			snapshot.point.source?.path || snapshot.material?.source.path || "",
 		),
 		title:
 			snapshot.point.userData.title ||
@@ -553,7 +691,8 @@ export function buildLegacyEpubTaskFromPointSnapshot(snapshot: IRPointSnapshot):
 			snapshot.point.id,
 		tocHref: typeof locator.tocHref === "string" ? locator.tocHref : "",
 		tocLevel: typeof locator.tocLevel === "number" ? locator.tocLevel : 0,
-		resumeCfi: typeof locator.resumeCfi === "string" ? locator.resumeCfi : undefined,
+		resumeCfi:
+			typeof locator.resumeCfi === "string" ? locator.resumeCfi : undefined,
 		resumeUpdatedAt: toTimestamp(snapshot.point.timestamps.lastInteractionAt),
 		status: snapshot.point.schedule.status as IREpubBookmarkTask["status"],
 		priorityUi: Number(snapshot.point.schedule.manualPriority || 0),
@@ -562,7 +701,9 @@ export function buildLegacyEpubTaskFromPointSnapshot(snapshot: IRPointSnapshot):
 		nextRepDate: toTimestamp(snapshot.point.schedule.nextReviewAt || null),
 		stats: getPointStats(snapshot),
 		meta: getPointMeta(snapshot),
-		tags: Array.isArray(snapshot.point.userData.tags) ? [...snapshot.point.userData.tags] : [],
+		tags: Array.isArray(snapshot.point.userData.tags)
+			? [...snapshot.point.userData.tags]
+			: [],
 		createdAt: toTimestamp(snapshot.point.timestamps.createdAt),
 		updatedAt: toTimestamp(snapshot.point.timestamps.updatedAt),
 	};

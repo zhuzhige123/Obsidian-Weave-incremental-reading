@@ -15,22 +15,26 @@ function isVisibleSuggestionContainer(element: HTMLElement): boolean {
 	return style.display !== "none" && style.visibility !== "hidden";
 }
 
-function isOwnedByOtherWeaveSuggest(element: HTMLElement, className: string): boolean {
+function isOwnedByOtherWeaveSuggest(
+	element: HTMLElement,
+	className: string,
+): boolean {
 	return WEAVE_SUGGEST_OWNERSHIP_CLASSES.some(
-		(ownedClass) => ownedClass !== className && element.classList.contains(ownedClass)
+		(ownedClass) =>
+			ownedClass !== className && element.classList.contains(ownedClass),
 	);
 }
 
 export function resolveSuggestionContainerForAnchor(
 	anchor: HTMLElement,
-	options: { scopeEl?: ParentNode | null } = {}
+	options: { scopeEl?: ParentNode | null } = {},
 ): HTMLElement | null {
-	if (typeof document === "undefined") {
+	if (typeof activeDocument === "undefined") {
 		return null;
 	}
 
 	const anchorRect = anchor.getBoundingClientRect();
-	const roots = options.scopeEl ? [options.scopeEl] : [document];
+	const roots = options.scopeEl ? [options.scopeEl] : [activeDocument];
 	const candidates: HTMLElement[] = [];
 
 	for (const root of roots) {
@@ -65,7 +69,7 @@ export function resolveSuggestionContainerForAnchor(
 
 export function markSuggestionContainer(
 	className: string,
-	options: { scopeEl?: ParentNode | null; anchorEl?: HTMLElement | null } = {}
+	options: { scopeEl?: ParentNode | null; anchorEl?: HTMLElement | null } = {},
 ): void {
 	if (typeof document === "undefined") {
 		return;
@@ -73,18 +77,20 @@ export function markSuggestionContainer(
 
 	window.requestAnimationFrame(() => {
 		const scopedContainers = options.scopeEl
-			? Array.from(options.scopeEl.querySelectorAll(".suggestion-container")).filter(
-					(node): node is HTMLElement => node.instanceOf(HTMLElement)
-			  )
+			? Array.from(
+					options.scopeEl.querySelectorAll(".suggestion-container"),
+			  ).filter((node): node is HTMLElement => node.instanceOf(HTMLElement))
 			: [];
 
-		let target =
+		const target =
 			(options.anchorEl
 				? resolveSuggestionContainerForAnchor(options.anchorEl, {
 						scopeEl: options.scopeEl ?? undefined,
 				  })
 				: null) ??
-			(scopedContainers.at(-1)?.instanceOf(HTMLElement) ? scopedContainers.at(-1)! : null);
+			(scopedContainers.at(-1)?.instanceOf(HTMLElement)
+				? scopedContainers.at(-1)!
+				: null);
 
 		if (!target) {
 			return;

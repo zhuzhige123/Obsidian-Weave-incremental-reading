@@ -1,38 +1,47 @@
 import type { App } from "obsidian";
 import { normalizePath } from "obsidian";
-import { readString } from "../../utils/unknown-record";
 import type { Card } from "../../data/types";
+import type { ReadingMaterial } from "../../types/incremental-reading-types";
 import type {
 	IRBlock,
 	IRBlockStats,
 	IRChunkFileData,
 	IRDeck,
 	IRSession,
-	IRStudySession,
 	IRSourceFileMeta,
+	IRStudySession,
 } from "../../types/ir-types";
 import { migrateToIRBlockV4 } from "../../types/ir-types";
-import type { ReadingMaterial } from "../../types/incremental-reading-types";
-import { type IREpubBookmarkTask, IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
-import { resolveAssociatedNotePath, resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
-import { getIRPriorityValue } from "./IRCardManagementAdapter";
-import { IRMonitoringService } from "./IRMonitoringService";
-import { type IRPdfBookmarkTask, IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
-import { getIncrementalReadingPlugin } from "./ir-runtime";
-import { IRStorageService } from "./IRStorageService";
+import { readString } from "../../utils/unknown-record";
 import {
+	resolveAssociatedNotePath,
+	resolveAssociatedNotePaths,
+} from "./IRAssociatedNoteSignals";
+import { getIRPriorityValue } from "./IRCardManagementAdapter";
+import {
+	type IREpubBookmarkTask,
+	IREpubBookmarkTaskService,
+} from "./IREpubBookmarkTaskService";
+import { IRMonitoringService } from "./IRMonitoringService";
+import {
+	type IRPdfBookmarkTask,
+	IRPdfBookmarkTaskService,
+} from "./IRPdfBookmarkTaskService";
+import {
+	type IRProjectedScheduleSummary,
 	buildProjectedDayLoadMap,
 	getProjectedScheduleSummary,
-	type IRProjectedScheduleSummary,
 } from "./IRProjectedScheduleSummary";
 import {
+	type IRTraceSourceKind,
 	buildIRTraceOverviewStats,
 	collectTraceCardMatches,
 	detectTraceSourceKind,
 	normalizeTraceDocumentKey,
 	normalizeTraceSubunitKey,
-	type IRTraceSourceKind,
 } from "./IRSourceTraceStats";
+import { IRStorageService } from "./IRStorageService";
+import { getIncrementalReadingPlugin } from "./ir-runtime";
 
 export type IRAnalyticsMode = "overall" | "topic" | "tag";
 export type IRAnalyticsSourceKind = "topic" | "tag";
@@ -278,9 +287,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const CLOSED_STATUSES = new Set(["done", "suspended", "removed"]);
 const STUDY_SESSION_MIN_DURATION_SECONDS = 60;
 const HEATMAP_LOOKBACK_DAYS = 365;
-const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const;
+const WEEKDAY_LABELS = [
+	"周日",
+	"周一",
+	"周二",
+	"周三",
+	"周四",
+	"周五",
+	"周六",
+] as const;
 
-export const IR_TIMING_BUCKET_LABELS: Record<IRAnalyticsTimingBucketKey, string> = {
+export const IR_TIMING_BUCKET_LABELS: Record<
+	IRAnalyticsTimingBucketKey,
+	string
+> = {
 	overdue_7_plus: "逾期 7 天以上",
 	overdue_2_7: "逾期 2-7 天",
 	overdue_lt_2: "逾期 2 天内",
@@ -308,9 +328,10 @@ const TIMING_BUCKET_KEYS = [
 
 function formatDateKeyFromMs(ms: number): string {
 	const date = new Date(ms);
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-		date.getDate()
-	).padStart(2, "0")}`;
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function formatDateKeyFromDate(date: Date): string {
@@ -373,7 +394,9 @@ function isClosedStatus(status: string): boolean {
 	return CLOSED_STATUSES.has(String(status || "").toLowerCase());
 }
 
-function toCloseTimestamp(unit: Pick<IRAnalyticsUnit, "doneAt" | "updatedAt" | "status">): number {
+function toCloseTimestamp(
+	unit: Pick<IRAnalyticsUnit, "doneAt" | "updatedAt" | "status">,
+): number {
 	if (unit.doneAt > 0) return unit.doneAt;
 	return isClosedStatus(unit.status) ? unit.updatedAt : 0;
 }
@@ -397,7 +420,9 @@ function estimateReadingHours(stats: IRBlockStats): number {
 	return (stats.totalReadingTimeSec || 0) / 3600;
 }
 
-function buildSessionSecondsByBlockId(sessions: IRSession[]): Map<string, number> {
+function buildSessionSecondsByBlockId(
+	sessions: IRSession[],
+): Map<string, number> {
 	const totals = new Map<string, number>();
 	for (const session of sessions || []) {
 		const blockId = String(session?.blockId || "");
@@ -410,7 +435,7 @@ function buildSessionSecondsByBlockId(sessions: IRSession[]): Map<string, number
 
 function getReadingHoursForUnit(
 	unit: Pick<IRAnalyticsUnit, "id" | "stats">,
-	sessionSecondsByBlockId: Map<string, number>
+	sessionSecondsByBlockId: Map<string, number>,
 ): number {
 	if (sessionSecondsByBlockId.has(unit.id)) {
 		return (sessionSecondsByBlockId.get(unit.id) || 0) / 3600;
@@ -418,11 +443,16 @@ function getReadingHoursForUnit(
 	return estimateReadingHours(unit.stats);
 }
 
-function estimateEffectivePriority(unit: Pick<IRAnalyticsUnit, "priorityEff" | "priorityUi">): number {
+function estimateEffectivePriority(
+	unit: Pick<IRAnalyticsUnit, "priorityEff" | "priorityUi">,
+): number {
 	return Number.isFinite(unit.priorityEff) ? unit.priorityEff : unit.priorityUi;
 }
 
-export function calculateUrgencyScore(nextRepDate: number, nowMs = Date.now()): number {
+export function calculateUrgencyScore(
+	nextRepDate: number,
+	nowMs = Date.now(),
+): number {
 	if (!Number.isFinite(nextRepDate) || nextRepDate <= 0) return 6.5;
 
 	const today = new Date(nowMs);
@@ -439,33 +469,51 @@ export function calculateUrgencyScore(nextRepDate: number, nowMs = Date.now()): 
 	return round(Math.max(1, 7 - Math.log2(1 + diffDays) * 1.6), 1);
 }
 
-function calculateActionScore(unit: IRAnalyticsUnit, readingHours: number, nowMs = Date.now()): number {
+function calculateActionScore(
+	unit: IRAnalyticsUnit,
+	readingHours: number,
+	nowMs = Date.now(),
+): number {
 	const activityWeight =
 		1 +
 		(unit.stats.cardsCreated || 0) * 0.15 +
 		(unit.stats.extracts || 0) * 0.08 +
 		(unit.stats.notesWritten || 0) * 0.06 +
 		readingHours * 0.1;
-	return estimateEffectivePriority(unit) * calculateUrgencyScore(unit.nextRepDate, nowMs) * activityWeight;
-}
-
-function normalizeSelectionKey(value: string): string {
-	return String(value || "").trim().toLowerCase();
-}
-
-function normalizeIdentifiers(values: Array<string | null | undefined>): string[] {
-	return Array.from(
-		new Set(values.map((value) => normalizeSelectionKey(String(value || ""))).filter(Boolean))
+	return (
+		estimateEffectivePriority(unit) *
+		calculateUrgencyScore(unit.nextRepDate, nowMs) *
+		activityWeight
 	);
 }
 
-function getStudySessionDeckIdentifiers(session: Partial<IRStudySession> | null | undefined): string[] {
+function normalizeSelectionKey(value: string): string {
+	return String(value || "")
+		.trim()
+		.toLowerCase();
+}
+
+function normalizeIdentifiers(
+	values: Array<string | null | undefined>,
+): string[] {
+	return Array.from(
+		new Set(
+			values
+				.map((value) => normalizeSelectionKey(String(value || "")))
+				.filter(Boolean),
+		),
+	);
+}
+
+function getStudySessionDeckIdentifiers(
+	session: Partial<IRStudySession> | null | undefined,
+): string[] {
 	return Array.from(
 		new Set(
 			[session?.topicId, session?.deckId]
 				.map((value) => normalizeSelectionKey(String(value || "")))
-				.filter(Boolean)
-		)
+				.filter(Boolean),
+		),
 	);
 }
 
@@ -475,7 +523,9 @@ function isSystemAnalyticsTag(tagKey: string): boolean {
 	return /^#?ir([/_-]|$)/.test(normalized);
 }
 
-export function normalizeAnalyticsTags(tags: string[]): Array<{ key: string; label: string }> {
+export function normalizeAnalyticsTags(
+	tags: string[],
+): Array<{ key: string; label: string }> {
 	const ordered = new Map<string, string>();
 	for (const rawTag of tags || []) {
 		const label = String(rawTag || "").trim();
@@ -486,7 +536,10 @@ export function normalizeAnalyticsTags(tags: string[]): Array<{ key: string; lab
 	return Array.from(ordered.entries()).map(([key, label]) => ({ key, label }));
 }
 
-function createSelectionUnit(unit: IRAnalyticsUnit, readingHours: number): IRAnalyticsSelectionUnit {
+function createSelectionUnit(
+	unit: IRAnalyticsUnit,
+	readingHours: number,
+): IRAnalyticsSelectionUnit {
 	return {
 		id: unit.id,
 		status: unit.status,
@@ -502,7 +555,7 @@ function createSelectionUnit(unit: IRAnalyticsUnit, readingHours: number): IRAna
 export function filterAnalyticsSelectionUnits(
 	units: IRAnalyticsSelectionUnit[],
 	mode: IRAnalyticsMode,
-	selectionKey?: string
+	selectionKey?: string,
 ): IRAnalyticsSelectionUnit[] {
 	if (mode === "overall") return units;
 	const normalizedKey = normalizeSelectionKey(selectionKey || "");
@@ -516,7 +569,7 @@ export function filterAnalyticsSelectionUnits(
 export function buildAnalyticsSelectionOptions(
 	units: IRAnalyticsSelectionUnit[],
 	mode: Exclude<IRAnalyticsMode, "overall">,
-	labelByKey: Map<string, string>
+	labelByKey: Map<string, string>,
 ): IRAnalyticsSourceOption[] {
 	const grouped = new Map<string, IRAnalyticsSelectionUnit[]>();
 	for (const unit of units) {
@@ -536,8 +589,12 @@ export function buildAnalyticsSelectionOptions(
 	return Array.from(grouped.entries())
 		.map(([key, items]) => {
 			const activeItems = items.filter((item) => !isClosedStatus(item.status));
-			const dueCount = activeItems.filter((item) => item.nextRepDate <= 0 || item.nextRepDate <= todayEnd).length;
-			const overdueCount = activeItems.filter((item) => item.nextRepDate > 0 && item.nextRepDate < todayStart).length;
+			const dueCount = activeItems.filter(
+				(item) => item.nextRepDate <= 0 || item.nextRepDate <= todayEnd,
+			).length;
+			const overdueCount = activeItems.filter(
+				(item) => item.nextRepDate > 0 && item.nextRepDate < todayStart,
+			).length;
 			return {
 				key,
 				label: labelByKey.get(key) || key,
@@ -547,14 +604,27 @@ export function buildAnalyticsSelectionOptions(
 				activeCount: activeItems.length,
 				dueCount,
 				overdueCount,
-				totalReadingHours: round(items.reduce((sum, item) => sum + item.readingHours, 0), 1),
-				avgPriority: round(average(items.map((item) => Number.isFinite(item.priorityEff) ? item.priorityEff : item.priorityUi)), 1),
+				totalReadingHours: round(
+					items.reduce((sum, item) => sum + item.readingHours, 0),
+					1,
+				),
+				avgPriority: round(
+					average(
+						items.map((item) =>
+							Number.isFinite(item.priorityEff)
+								? item.priorityEff
+								: item.priorityUi,
+						),
+					),
+					1,
+				),
 			} satisfies IRAnalyticsSourceOption;
 		})
 		.filter((option) => option.itemCount > 0)
 		.sort((a, b) => {
 			if (mode === "tag") {
-				if (b.activeCount !== a.activeCount) return b.activeCount - a.activeCount;
+				if (b.activeCount !== a.activeCount)
+					return b.activeCount - a.activeCount;
 				if (b.dueCount !== a.dueCount) return b.dueCount - a.dueCount;
 				return a.label.localeCompare(b.label, "zh-CN");
 			}
@@ -572,29 +642,38 @@ function toShortDateLabel(dateKey: string): string {
 
 export function buildAnalyticsForecastFromProjectedSummary(
 	summary: IRProjectedScheduleSummary,
-	filteredIdSet: Set<string>
+	filteredIdSet: Set<string>,
 ): IRAnalyticsForecastPoint[] {
 	const projectedDayLoadMap = buildProjectedDayLoadMap(summary);
 	const overloadLevelByDate = new Map(
-		summary.schedule.days.map((day) => [day.dateKey, day.overloadLevel] as const)
+		summary.schedule.days.map(
+			(day) => [day.dateKey, day.overloadLevel] as const,
+		),
 	);
 
 	return summary.schedule.days.map((day) => {
 		const dayLoad = projectedDayLoadMap.get(day.dateKey);
 		const allItems = dayLoad?.items || [];
 		const items =
-			filteredIdSet.size > 0 ? allItems.filter((item) => filteredIdSet.has(item.id)) : allItems;
+			filteredIdSet.size > 0
+				? allItems.filter((item) => filteredIdSet.has(item.id))
+				: allItems;
 
 		return {
 			dateKey: day.dateKey,
 			label: toShortDateLabel(day.dateKey),
 			itemCount: items.length,
 			totalEstimatedMinutes: round(
-				items.reduce((sum, item) => sum + Number(item.estimatedMinutes || 0), 0),
-				1
+				items.reduce(
+					(sum, item) => sum + Number(item.estimatedMinutes || 0),
+					0,
+				),
+				1,
 			),
 			overloadLevel:
-				items.length === 0 ? "normal" : overloadLevelByDate.get(day.dateKey) || "normal",
+				items.length === 0
+					? "normal"
+					: overloadLevelByDate.get(day.dateKey) || "normal",
 		};
 	});
 }
@@ -660,7 +739,10 @@ export class IRAnalyticsService {
 		return {
 			days,
 			dailyBudgetMinutes,
-			forecast: buildAnalyticsForecastFromProjectedSummary(projectedSummary, new Set()),
+			forecast: buildAnalyticsForecastFromProjectedSummary(
+				projectedSummary,
+				new Set(),
+			),
 		};
 	}
 
@@ -727,45 +809,84 @@ export class IRAnalyticsService {
 		});
 		const extractCardIds = this.collectExtractCardIds(readingMaterials);
 
-		const sessionSecondsByBlockId = buildSessionSecondsByBlockId(history.sessions || []);
-		const selectionUnits = units.map((unit) => createSelectionUnit(unit, getReadingHoursForUnit(unit, sessionSecondsByBlockId)));
+		const sessionSecondsByBlockId = buildSessionSecondsByBlockId(
+			history.sessions || [],
+		);
+		const selectionUnits = units.map((unit) =>
+			createSelectionUnit(
+				unit,
+				getReadingHoursForUnit(unit, sessionSecondsByBlockId),
+			),
+		);
 		const tagLabelByKey = this.buildTagLabelMap(units);
 		const sources =
 			mode === "overall"
 				? []
-				: buildAnalyticsSelectionOptions(selectionUnits, mode, mode === "topic" ? topicLabelByKey : tagLabelByKey);
+				: buildAnalyticsSelectionOptions(
+						selectionUnits,
+						mode,
+						mode === "topic" ? topicLabelByKey : tagLabelByKey,
+				  );
 
-		const normalizedSelectionKey = normalizeSelectionKey(options?.selectionKey || "");
+		const normalizedSelectionKey = normalizeSelectionKey(
+			options?.selectionKey || "",
+		);
 		const resolvedSelectionKey =
 			mode === "overall"
 				? ""
 				: sources.some((item) => item.key === normalizedSelectionKey)
-					? normalizedSelectionKey
-					: "";
+				? normalizedSelectionKey
+				: "";
 		const filteredUnits = this.filterUnits(units, mode, resolvedSelectionKey);
 		const filteredIdSet = new Set(filteredUnits.map((unit) => unit.id));
 
 		return {
 			scopeMode: mode,
 			scopeKey: resolvedSelectionKey || null,
-			scopeLabel: this.buildScopeLabel(mode, resolvedSelectionKey, topicLabelByKey, tagLabelByKey),
+			scopeLabel: this.buildScopeLabel(
+				mode,
+				resolvedSelectionKey,
+				topicLabelByKey,
+				tagLabelByKey,
+			),
 			sources,
-			sourceBreakdown: this.buildSourceBreakdown(filteredUnits, cards, extractCardIds),
-			overview: this.buildOverview(filteredUnits, sessionSecondsByBlockId, cards, extractCardIds),
+			sourceBreakdown: this.buildSourceBreakdown(
+				filteredUnits,
+				cards,
+				extractCardIds,
+			),
+			overview: this.buildOverview(
+				filteredUnits,
+				sessionSecondsByBlockId,
+				cards,
+				extractCardIds,
+			),
 			activityTrend: this.buildActivityTrend(filteredUnits, days),
 			quantityTrend: this.buildQuantityTrend(filteredUnits, days),
 			timingBuckets: this.buildTimingBuckets(filteredUnits),
-			difficultyScatter: this.buildDifficultyScatter(filteredUnits, sessionSecondsByBlockId),
-			forecast: buildAnalyticsForecastFromProjectedSummary(projectedSummary, filteredIdSet),
-			monitoringSummary: mode === "overall" ? this.buildMonitoringSummary() : null,
+			difficultyScatter: this.buildDifficultyScatter(
+				filteredUnits,
+				sessionSecondsByBlockId,
+			),
+			forecast: buildAnalyticsForecastFromProjectedSummary(
+				projectedSummary,
+				filteredIdSet,
+			),
+			monitoringSummary:
+				mode === "overall" ? this.buildMonitoringSummary() : null,
 		};
 	}
 
-	private buildTopicLabelMap(decks: Record<string, IRDeck>): Map<string, string> {
+	private buildTopicLabelMap(
+		decks: Record<string, IRDeck>,
+	): Map<string, string> {
 		const map = new Map<string, string>();
 		for (const deck of Object.values(decks || {})) {
 			const label = String(deck?.name || "").trim();
-			const identifiers = [deck?.id, deck?.path].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+			const identifiers = [deck?.id, deck?.path].filter(
+				(value): value is string =>
+					typeof value === "string" && value.trim().length > 0,
+			);
 			for (const identifier of identifiers) {
 				map.set(normalizeSelectionKey(identifier), label || identifier);
 			}
@@ -799,11 +920,16 @@ export class IRAnalyticsService {
 		for (const block of input.legacyBlocks) {
 			const sourcePath = String(block.filePath || "").trim();
 			const sourceKind = detectTraceSourceKind(sourcePath);
-			const sourceDocumentKey = normalizeTraceDocumentKey(sourcePath, sourceKind);
+			const sourceDocumentKey = normalizeTraceDocumentKey(
+				sourcePath,
+				sourceKind,
+			);
 			if (!sourceDocumentKey) {
 				continue;
 			}
-			const material = input.materialByPath.get(normalizePath(sourcePath || ""));
+			const material = input.materialByPath.get(
+				normalizePath(sourcePath || ""),
+			);
 			const sourceTitle = stripExtension(getPathBaseName(sourcePath));
 			const normalizedTags = normalizeAnalyticsTags(block.tags || []);
 			const migrated = migrateToIRBlockV4(block);
@@ -824,8 +950,16 @@ export class IRAnalyticsService {
 				id: block.id,
 				title: sourceTitle,
 				status: String(migrated.status || block.state || "new"),
-				priorityUi: getIRPriorityValue(block.priorityUi, block.priorityEff, block.priority),
-				priorityEff: getIRPriorityValue(block.priorityEff, block.priorityUi, block.priority),
+				priorityUi: getIRPriorityValue(
+					block.priorityUi,
+					block.priorityEff,
+					block.priority,
+				),
+				priorityEff: getIRPriorityValue(
+					block.priorityEff,
+					block.priorityUi,
+					block.priority,
+				),
 				intervalDays: Number(migrated.intervalDays || block.interval || 0),
 				nextRepDate: Number(migrated.nextRepDate || 0),
 				createdAt: Number(migrated.createdAt ?? 0),
@@ -844,21 +978,33 @@ export class IRAnalyticsService {
 		}
 
 		for (const chunk of input.chunks) {
-			const sourceMeta = chunk.sourceId ? input.sourcesMap[chunk.sourceId] : undefined;
+			const sourceMeta = chunk.sourceId
+				? input.sourcesMap[chunk.sourceId]
+				: undefined;
 			const sourcePath = sourceMeta?.originalPath || chunk.filePath;
 			const sourceKind = detectTraceSourceKind(sourcePath);
-			const sourceDocumentKey = normalizeTraceDocumentKey(sourcePath, sourceKind);
+			const sourceDocumentKey = normalizeTraceDocumentKey(
+				sourcePath,
+				sourceKind,
+			);
 			if (!sourceDocumentKey) {
 				continue;
 			}
-			const material = input.materialByPath.get(normalizePath(sourcePath || ""));
-			const sourceTitle = sourceMeta?.title || stripExtension(getPathBaseName(sourcePath));
+			const material = input.materialByPath.get(
+				normalizePath(sourcePath || ""),
+			);
+			const sourceTitle =
+				sourceMeta?.title || stripExtension(getPathBaseName(sourcePath));
 			const topicKeys = this.extractChunkTopicKeys(chunk);
-			const normalizedTags = normalizeAnalyticsTags((chunk as { tags?: string[] }).tags || []);
+			const normalizedTags = normalizeAnalyticsTags(
+				(chunk as { tags?: string[] }).tags || [],
+			);
 			const associatedNotePaths = resolveAssociatedNotePaths({
 				associatedNotePath:
-					resolveAssociatedNotePath(chunk.meta) || resolveAssociatedNotePath(material ?? null),
-				associatedNotePaths: chunk.meta?.associatedNotePaths || material?.associatedNotePaths,
+					resolveAssociatedNotePath(chunk.meta) ||
+					resolveAssociatedNotePath(material ?? null),
+				associatedNotePaths:
+					chunk.meta?.associatedNotePaths || material?.associatedNotePaths,
 			});
 			units.push({
 				id: chunk.chunkId,
@@ -886,7 +1032,10 @@ export class IRAnalyticsService {
 		for (const task of input.pdfTasks) {
 			const normalizedTags = normalizeAnalyticsTags(task.tags || []);
 			const sourceKind: IRTraceSourceKind = "pdf";
-			const sourceDocumentKey = normalizeTraceDocumentKey(task.pdfPath, sourceKind);
+			const sourceDocumentKey = normalizeTraceDocumentKey(
+				task.pdfPath,
+				sourceKind,
+			);
 			if (!sourceDocumentKey) {
 				continue;
 			}
@@ -921,7 +1070,10 @@ export class IRAnalyticsService {
 		for (const task of input.epubTasks) {
 			const normalizedTags = normalizeAnalyticsTags(task.tags || []);
 			const sourceKind: IRTraceSourceKind = "epub";
-			const sourceDocumentKey = normalizeTraceDocumentKey(task.epubFilePath, sourceKind);
+			const sourceDocumentKey = normalizeTraceDocumentKey(
+				task.epubFilePath,
+				sourceKind,
+			);
 			if (!sourceDocumentKey) {
 				continue;
 			}
@@ -947,7 +1099,8 @@ export class IRAnalyticsService {
 				tagLabels: normalizedTags.map((tag) => tag.label),
 				sourceKind,
 				sourceDocumentKey,
-				sourceSubunitKey: normalizeTraceSubunitKey(task.tocHref || task.id) || undefined,
+				sourceSubunitKey:
+					normalizeTraceSubunitKey(task.tocHref || task.id) || undefined,
 				associatedNotePath: associatedNotePaths[0],
 				associatedNotePaths,
 			});
@@ -958,10 +1111,7 @@ export class IRAnalyticsService {
 
 	private extractChunkTopicKeys(chunk: IRChunkFileData): string[] {
 		const keys = new Set<string>();
-		const rawKeys = [
-			...((chunk.topicIds || [])),
-			...((chunk.deckIds || [])),
-		];
+		const rawKeys = [...(chunk.topicIds || []), ...(chunk.deckIds || [])];
 		for (const rawKey of rawKeys) {
 			const key = normalizeSelectionKey(rawKey);
 			if (key) keys.add(key);
@@ -978,17 +1128,27 @@ export class IRAnalyticsService {
 		return Array.from(keys);
 	}
 
-	private extractLegacyBlockTopicKeys(block: IRBlock, decksRecord: Record<string, IRDeck>): string[] {
+	private extractLegacyBlockTopicKeys(
+		block: IRBlock,
+		decksRecord: Record<string, IRDeck>,
+	): string[] {
 		const keys = new Set<string>();
-		const normalizedDeckPath = normalizeSelectionKey(readString(block.deckPath));
+		const normalizedDeckPath = normalizeSelectionKey(
+			readString(block.deckPath),
+		);
 		if (normalizedDeckPath) {
 			keys.add(normalizedDeckPath);
 		}
 
 		for (const deck of Object.values(decksRecord || {})) {
-			const identifiers = [deck?.id, deck?.path].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-			const matchesBlockId = Array.isArray(deck?.blockIds) && deck.blockIds.includes(block.id);
-			const matchesDeckPath = normalizedDeckPath !== "" && identifiers.includes(normalizedDeckPath);
+			const identifiers = [deck?.id, deck?.path].filter(
+				(value): value is string =>
+					typeof value === "string" && value.trim().length > 0,
+			);
+			const matchesBlockId =
+				Array.isArray(deck?.blockIds) && deck.blockIds.includes(block.id);
+			const matchesDeckPath =
+				normalizedDeckPath !== "" && identifiers.includes(normalizedDeckPath);
 			if (!matchesBlockId && !matchesDeckPath) {
 				continue;
 			}
@@ -1000,7 +1160,11 @@ export class IRAnalyticsService {
 		return Array.from(keys);
 	}
 
-	private filterUnits(units: IRAnalyticsUnit[], mode: IRAnalyticsMode, selectionKey?: string): IRAnalyticsUnit[] {
+	private filterUnits(
+		units: IRAnalyticsUnit[],
+		mode: IRAnalyticsMode,
+		selectionKey?: string,
+	): IRAnalyticsUnit[] {
 		if (mode === "overall") return units;
 		const normalizedKey = normalizeSelectionKey(selectionKey || "");
 		if (!normalizedKey) return [];
@@ -1014,11 +1178,12 @@ export class IRAnalyticsService {
 		mode: IRAnalyticsMode,
 		selectionKey: string,
 		topicLabelByKey: Map<string, string>,
-		tagLabelByKey: Map<string, string>
+		tagLabelByKey: Map<string, string>,
 	): string {
 		if (mode === "overall") return "总体增量阅读";
 		if (!selectionKey) return mode === "topic" ? "专题" : "标签";
-		if (mode === "topic") return `专题：${topicLabelByKey.get(selectionKey) || selectionKey}`;
+		if (mode === "topic")
+			return `专题：${topicLabelByKey.get(selectionKey) || selectionKey}`;
 		return `标签：#${tagLabelByKey.get(selectionKey) || selectionKey}`;
 	}
 
@@ -1026,7 +1191,7 @@ export class IRAnalyticsService {
 		units: IRAnalyticsUnit[],
 		sessionSecondsByBlockId: Map<string, number>,
 		cards: Card[],
-		extractCardIds: Set<string>
+		extractCardIds: Set<string>,
 	): IRAnalyticsOverview {
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
@@ -1044,17 +1209,40 @@ export class IRAnalyticsService {
 			cards,
 			extractCardIds,
 		});
-		const actionCardsCreated = units.reduce((sum, unit) => sum + (unit.stats.cardsCreated || 0), 0);
-		const actionExtracts = units.reduce((sum, unit) => sum + (unit.stats.extracts || 0), 0);
-		const actionNotesWritten = units.reduce((sum, unit) => sum + (unit.stats.notesWritten || 0), 0);
+		const actionCardsCreated = units.reduce(
+			(sum, unit) => sum + (unit.stats.cardsCreated || 0),
+			0,
+		);
+		const actionExtracts = units.reduce(
+			(sum, unit) => sum + (unit.stats.extracts || 0),
+			0,
+		);
+		const actionNotesWritten = units.reduce(
+			(sum, unit) => sum + (unit.stats.notesWritten || 0),
+			0,
+		);
 
 		return {
 			totalItems: units.length,
 			activeItems: activeUnits.length,
-			dueToday: activeUnits.filter((unit) => unit.nextRepDate <= 0 || unit.nextRepDate <= todayEnd).length,
-			overdueItems: activeUnits.filter((unit) => unit.nextRepDate > 0 && unit.nextRepDate < todayStart).length,
-			totalReadingHours: round(units.reduce((sum, unit) => sum + getReadingHoursForUnit(unit, sessionSecondsByBlockId), 0), 1),
-			avgPriority: round(average(units.map((unit) => estimateEffectivePriority(unit))), 1),
+			dueToday: activeUnits.filter(
+				(unit) => unit.nextRepDate <= 0 || unit.nextRepDate <= todayEnd,
+			).length,
+			overdueItems: activeUnits.filter(
+				(unit) => unit.nextRepDate > 0 && unit.nextRepDate < todayStart,
+			).length,
+			totalReadingHours: round(
+				units.reduce(
+					(sum, unit) =>
+						sum + getReadingHoursForUnit(unit, sessionSecondsByBlockId),
+					0,
+				),
+				1,
+			),
+			avgPriority: round(
+				average(units.map((unit) => estimateEffectivePriority(unit))),
+				1,
+			),
 			cardsCreated: tracedStats.memoryCardCount,
 			extracts: tracedStats.extractCount,
 			notesWritten: tracedStats.noteCount,
@@ -1067,7 +1255,7 @@ export class IRAnalyticsService {
 	private buildSourceBreakdown(
 		units: IRAnalyticsUnit[],
 		cards: Card[],
-		extractCardIds: Set<string>
+		extractCardIds: Set<string>,
 	): IRAnalyticsSourceBreakdown[] {
 		if (!units.length) {
 			return [];
@@ -1098,17 +1286,25 @@ export class IRAnalyticsService {
 						resolveAssociatedNotePaths({
 							associatedNotePath: unit.associatedNotePath,
 							associatedNotePaths: unit.associatedNotePaths,
-						})
-					)
+						}),
+					),
 				).size;
 				const itemCount = documentUnits.length;
-				const activeCount = documentUnits.filter((unit) => !isClosedStatus(unit.status)).length;
-				const children = this.buildSourceBreakdownChildren(documentUnits, documentMatches);
+				const activeCount = documentUnits.filter(
+					(unit) => !isClosedStatus(unit.status),
+				).length;
+				const children = this.buildSourceBreakdownChildren(
+					documentUnits,
+					documentMatches,
+				);
 
 				return {
 					key: documentKey,
 					label: firstUnit.title,
-					subtitle: this.buildSourceBreakdownSubtitle(firstUnit.sourceKind, documentKey),
+					subtitle: this.buildSourceBreakdownSubtitle(
+						firstUnit.sourceKind,
+						documentKey,
+					),
 					sourceKind: firstUnit.sourceKind,
 					itemCount,
 					activeCount,
@@ -1119,9 +1315,11 @@ export class IRAnalyticsService {
 				} satisfies IRAnalyticsSourceBreakdown;
 			})
 			.sort((a, b) => {
-				if (b.cardsCreated !== a.cardsCreated) return b.cardsCreated - a.cardsCreated;
+				if (b.cardsCreated !== a.cardsCreated)
+					return b.cardsCreated - a.cardsCreated;
 				if (b.extracts !== a.extracts) return b.extracts - a.extracts;
-				if (b.activeCount !== a.activeCount) return b.activeCount - a.activeCount;
+				if (b.activeCount !== a.activeCount)
+					return b.activeCount - a.activeCount;
 				return a.label.localeCompare(b.label, "zh-CN");
 			})
 			.slice(0, 12);
@@ -1129,7 +1327,7 @@ export class IRAnalyticsService {
 
 	private buildSourceBreakdownChildren(
 		documentUnits: IRAnalyticsUnit[],
-		documentMatches: ReturnType<typeof collectTraceCardMatches>
+		documentMatches: ReturnType<typeof collectTraceCardMatches>,
 	): IRAnalyticsSourceBreakdownChild[] {
 		const sourceKind = documentUnits[0]?.sourceKind;
 		if (sourceKind !== "pdf" && sourceKind !== "epub") {
@@ -1149,9 +1347,13 @@ export class IRAnalyticsService {
 
 		let mappedExtracts = 0;
 		let mappedCards = 0;
-		const children: IRAnalyticsSourceBreakdownChild[] = Array.from(childGroups.entries())
+		const children: IRAnalyticsSourceBreakdownChild[] = Array.from(
+			childGroups.entries(),
+		)
 			.map(([childKey, childUnits]) => {
-				const childMatches = documentMatches.filter((match) => match.sourceSubunitKey === childKey);
+				const childMatches = documentMatches.filter(
+					(match) => match.sourceSubunitKey === childKey,
+				);
 				const childStats = this.summarizeCardMatches(childMatches);
 				mappedExtracts += childStats.extracts;
 				mappedCards += childStats.cardsCreated;
@@ -1160,23 +1362,26 @@ export class IRAnalyticsService {
 						resolveAssociatedNotePaths({
 							associatedNotePath: unit.associatedNotePath,
 							associatedNotePaths: unit.associatedNotePaths,
-						})
-					)
+						}),
+					),
 				).size;
 				return {
 					key: childKey,
 					label: childUnits[0]?.title || "未命名书签",
 					itemCount: childUnits.length,
-					activeCount: childUnits.filter((unit) => !isClosedStatus(unit.status)).length,
+					activeCount: childUnits.filter((unit) => !isClosedStatus(unit.status))
+						.length,
 					extracts: childStats.extracts,
 					cardsCreated: childStats.cardsCreated,
 					notesWritten,
 				} satisfies IRAnalyticsSourceBreakdownChild;
 			})
 			.sort((a, b) => {
-				if (b.cardsCreated !== a.cardsCreated) return b.cardsCreated - a.cardsCreated;
+				if (b.cardsCreated !== a.cardsCreated)
+					return b.cardsCreated - a.cardsCreated;
 				if (b.extracts !== a.extracts) return b.extracts - a.extracts;
-				if (b.activeCount !== a.activeCount) return b.activeCount - a.activeCount;
+				if (b.activeCount !== a.activeCount)
+					return b.activeCount - a.activeCount;
 				return a.label.localeCompare(b.label, "zh-CN");
 			});
 
@@ -1199,7 +1404,9 @@ export class IRAnalyticsService {
 		return children;
 	}
 
-	private summarizeCardMatches(matches: ReturnType<typeof collectTraceCardMatches>): {
+	private summarizeCardMatches(
+		matches: ReturnType<typeof collectTraceCardMatches>,
+	): {
 		extracts: number;
 		cardsCreated: number;
 	} {
@@ -1215,7 +1422,10 @@ export class IRAnalyticsService {
 		return { extracts, cardsCreated };
 	}
 
-	private buildSourceBreakdownSubtitle(sourceKind: IRTraceSourceKind, documentKey: string): string {
+	private buildSourceBreakdownSubtitle(
+		sourceKind: IRTraceSourceKind,
+		documentKey: string,
+	): string {
 		if (sourceKind === "pdf") {
 			return `PDF · ${documentKey}`;
 		}
@@ -1228,7 +1438,9 @@ export class IRAnalyticsService {
 		return documentKey;
 	}
 
-	private buildReadingMaterialByPath(materials: ReadingMaterial[]): Map<string, ReadingMaterial> {
+	private buildReadingMaterialByPath(
+		materials: ReadingMaterial[],
+	): Map<string, ReadingMaterial> {
 		const map = new Map<string, ReadingMaterial>();
 		for (const material of materials || []) {
 			const normalizedFilePath = normalizePath(material.filePath || "");
@@ -1281,11 +1493,15 @@ export class IRAnalyticsService {
 
 	private getDailyReadingBudgetMinutes(): number {
 		const plugin = this.getPluginInstance();
-		const configured = Number(plugin?.settings?.incrementalReading?.dailyTimeBudgetMinutes ?? 30);
+		const configured = Number(
+			plugin?.settings?.incrementalReading?.dailyTimeBudgetMinutes ?? 30,
+		);
 		return Number.isFinite(configured) && configured > 0 ? configured : 30;
 	}
 
-	private async getFilteredStudySessions(deckIds?: string[]): Promise<IRStudySession[]> {
+	private async getFilteredStudySessions(
+		deckIds?: string[],
+	): Promise<IRStudySession[]> {
 		const sessions = await this.storage.getStudySessions();
 		if (!Array.isArray(deckIds)) {
 			return sessions;
@@ -1300,7 +1516,9 @@ export class IRAnalyticsService {
 		const allowedIdentifiers = new Set(requestedDeckIds);
 		for (const deck of decks) {
 			const identifiers = normalizeIdentifiers([deck.id, deck.path]);
-			if (!identifiers.some((identifier) => allowedIdentifiers.has(identifier))) {
+			if (
+				!identifiers.some((identifier) => allowedIdentifiers.has(identifier))
+			) {
 				continue;
 			}
 			for (const identifier of identifiers) {
@@ -1310,19 +1528,25 @@ export class IRAnalyticsService {
 
 		return sessions.filter((session) =>
 			getStudySessionDeckIdentifiers(session).some((identifier) =>
-				allowedIdentifiers.has(identifier)
-			)
+				allowedIdentifiers.has(identifier),
+			),
 		);
 	}
 
 	private buildStudySessionScatterSnapshot(
-		sessions: IRStudySession[]
+		sessions: IRStudySession[],
 	): IRStudySessionScatterSnapshot {
 		const validSessions = sessions.filter(
-			(session) => Number(session.confirmedDuration || 0) >= STUDY_SESSION_MIN_DURATION_SECONDS
+			(session) =>
+				Number(session.confirmedDuration || 0) >=
+				STUDY_SESSION_MIN_DURATION_SECONDS,
 		);
 		const dateAxis = Array.from(
-			new Set(validSessions.map((session) => String(session.startTime || "").split("T")[0]))
+			new Set(
+				validSessions.map(
+					(session) => String(session.startTime || "").split("T")[0],
+				),
+			),
 		).sort();
 		const dateViewData = validSessions.map((session) => {
 			const startDate = new Date(session.startTime);
@@ -1351,7 +1575,7 @@ export class IRAnalyticsService {
 		});
 		const totalSeconds = validSessions.reduce(
 			(sum, session) => sum + Number(session.confirmedDuration || 0),
-			0
+			0,
 		);
 
 		return {
@@ -1360,7 +1584,10 @@ export class IRAnalyticsService {
 			weekdayAxis: [...WEEKDAY_LABELS],
 			dateViewData,
 			weekdayViewData,
-			maxDurationMinutes: Math.max(...dateViewData.map((point) => point.value[2]), 60),
+			maxDurationMinutes: Math.max(
+				...dateViewData.map((point) => point.value[2]),
+				60,
+			),
 			summary: {
 				totalSessions: validSessions.length,
 				totalHours: round(totalSeconds / 3600, 1),
@@ -1372,7 +1599,9 @@ export class IRAnalyticsService {
 		};
 	}
 
-	private buildActivityHeatmapSnapshot(sessions: IRStudySession[]): IRActivityHeatmapSnapshot {
+	private buildActivityHeatmapSnapshot(
+		sessions: IRStudySession[],
+	): IRActivityHeatmapSnapshot {
 		const dailyData = new Map<string, { blocks: number; duration: number }>();
 		for (const session of sessions) {
 			const dateKey = String(session.startTime || "").split("T")[0];
@@ -1384,7 +1613,7 @@ export class IRAnalyticsService {
 		}
 
 		const allMinutes = Array.from(dailyData.values()).map((item) =>
-			Math.round(item.duration / 60)
+			Math.round(item.duration / 60),
 		);
 		const maxMinutes = Math.max(...allMinutes, 30);
 		const endDate = new Date();
@@ -1411,7 +1640,9 @@ export class IRAnalyticsService {
 				const monthName = cursor.toLocaleString("zh-CN", { month: "short" });
 				if (
 					!monthLabels.some(
-						(label) => label.name === monthName && Math.abs(label.position - weekIndex) < 4
+						(label) =>
+							label.name === monthName &&
+							Math.abs(label.position - weekIndex) < 4,
 					)
 				) {
 					monthLabels.push({ name: monthName, position: weekIndex });
@@ -1446,10 +1677,13 @@ export class IRAnalyticsService {
 		const activeDates = Array.from(dailyData.keys()).sort();
 		const totalBlocks = sessions.reduce(
 			(sum, session) => sum + Number(session.blocksCompleted || 0),
-			0
+			0,
 		);
 		const totalMinutes = Math.round(
-			sessions.reduce((sum, session) => sum + Number(session.confirmedDuration || 0), 0) / 60
+			sessions.reduce(
+				(sum, session) => sum + Number(session.confirmedDuration || 0),
+				0,
+			) / 60,
 		);
 		const totalDays = activeDates.length;
 
@@ -1500,7 +1734,9 @@ export class IRAnalyticsService {
 		for (let index = 1; index < activeDates.length; index++) {
 			const previous = new Date(activeDates[index - 1]);
 			const current = new Date(activeDates[index]);
-			const diffDays = Math.round((current.getTime() - previous.getTime()) / DAY_MS);
+			const diffDays = Math.round(
+				(current.getTime() - previous.getTime()) / DAY_MS,
+			);
 			if (diffDays === 1) {
 				currentStreak += 1;
 			} else {
@@ -1512,21 +1748,39 @@ export class IRAnalyticsService {
 		return maxStreak;
 	}
 
-	private buildActivityTrend(units: IRAnalyticsUnit[], days: number): IRAnalyticsActivityPoint[] {
+	private buildActivityTrend(
+		units: IRAnalyticsUnit[],
+		days: number,
+	): IRAnalyticsActivityPoint[] {
 		const datePoints = buildRecentDatePoints(days);
 		return datePoints.map((point) => ({
 			dateKey: point.dateKey,
 			label: point.label,
-			createdCount: units.filter((unit) => unit.createdAt > 0 && unit.createdAt >= point.startMs && unit.createdAt <= point.endMs).length,
-			interactedCount: units.filter((unit) => unit.lastInteractionAt > 0 && unit.lastInteractionAt >= point.startMs && unit.lastInteractionAt <= point.endMs).length,
+			createdCount: units.filter(
+				(unit) =>
+					unit.createdAt > 0 &&
+					unit.createdAt >= point.startMs &&
+					unit.createdAt <= point.endMs,
+			).length,
+			interactedCount: units.filter(
+				(unit) =>
+					unit.lastInteractionAt > 0 &&
+					unit.lastInteractionAt >= point.startMs &&
+					unit.lastInteractionAt <= point.endMs,
+			).length,
 			completedCount: units.filter((unit) => {
 				const closedAt = toCloseTimestamp(unit);
-				return closedAt > 0 && closedAt >= point.startMs && closedAt <= point.endMs;
+				return (
+					closedAt > 0 && closedAt >= point.startMs && closedAt <= point.endMs
+				);
 			}).length,
 		}));
 	}
 
-	private buildQuantityTrend(units: IRAnalyticsUnit[], days: number): IRAnalyticsQuantityPoint[] {
+	private buildQuantityTrend(
+		units: IRAnalyticsUnit[],
+		days: number,
+	): IRAnalyticsQuantityPoint[] {
 		const datePoints = buildRecentDatePoints(days);
 		return datePoints.map((point) => {
 			const existing = units.filter((unit) => unit.createdAt <= point.endMs);
@@ -1544,7 +1798,9 @@ export class IRAnalyticsService {
 		});
 	}
 
-	private buildTimingBuckets(units: IRAnalyticsUnit[]): IRAnalyticsTimingBucket[] {
+	private buildTimingBuckets(
+		units: IRAnalyticsUnit[],
+	): IRAnalyticsTimingBucket[] {
 		const activeUnits = units.filter((unit) => !isClosedStatus(unit.status));
 		const now = new Date();
 		now.setHours(0, 0, 0, 0);
@@ -1578,10 +1834,12 @@ export class IRAnalyticsService {
 
 	private buildDifficultyScatter(
 		units: IRAnalyticsUnit[],
-		sessionSecondsByBlockId: Map<string, number>
+		sessionSecondsByBlockId: Map<string, number>,
 	): IRAnalyticsScatterPoint[] {
 		if (!units.length) return [];
-		const actionableUnits = units.filter((unit) => !isClosedStatus(unit.status));
+		const actionableUnits = units.filter(
+			(unit) => !isClosedStatus(unit.status),
+		);
 		if (!actionableUnits.length) return [];
 		const nowMs = Date.now();
 
@@ -1590,7 +1848,10 @@ export class IRAnalyticsService {
 			.sort((a, b) => {
 				const aHours = getReadingHoursForUnit(a, sessionSecondsByBlockId);
 				const bHours = getReadingHoursForUnit(b, sessionSecondsByBlockId);
-				return calculateActionScore(b, bHours, nowMs) - calculateActionScore(a, aHours, nowMs);
+				return (
+					calculateActionScore(b, bHours, nowMs) -
+					calculateActionScore(a, aHours, nowMs)
+				);
 			})
 			.slice(0, 80)
 			.map((unit) => ({
@@ -1601,13 +1862,22 @@ export class IRAnalyticsService {
 					8,
 					Math.min(
 						38,
-						8 + Math.sqrt((unit.stats.cardsCreated || 0) * 6 + (unit.stats.extracts || 0) * 4 + (unit.stats.notesWritten || 0) * 3 + 4)
-					)
+						8 +
+							Math.sqrt(
+								(unit.stats.cardsCreated || 0) * 6 +
+									(unit.stats.extracts || 0) * 4 +
+									(unit.stats.notesWritten || 0) * 3 +
+									4,
+							),
+					),
 				),
 				itemCount: 1,
 				dueCount: unit.nextRepDate <= 0 || unit.nextRepDate <= nowMs ? 1 : 0,
 				overdueCount: unit.nextRepDate > 0 && unit.nextRepDate < nowMs ? 1 : 0,
-				readingHours: round(getReadingHoursForUnit(unit, sessionSecondsByBlockId), 2),
+				readingHours: round(
+					getReadingHoursForUnit(unit, sessionSecondsByBlockId),
+					2,
+				),
 				cardsCreated: unit.stats.cardsCreated || 0,
 				extracts: unit.stats.extracts || 0,
 				notesWritten: unit.stats.notesWritten || 0,
@@ -1624,5 +1894,4 @@ export class IRAnalyticsService {
 			linkedOutcomeRate: round(calibration.linkedOutcomeRate * 100, 1),
 		};
 	}
-
 }

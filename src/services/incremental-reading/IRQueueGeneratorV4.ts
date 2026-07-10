@@ -7,7 +7,10 @@
 
 import type { IRBlockV4 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
-import { calculateSelectionScore, estimateBlockCost } from "./IRCoreAlgorithmsV4";
+import {
+	calculateSelectionScore,
+	estimateBlockCost,
+} from "./IRCoreAlgorithmsV4";
 
 export interface QueueItemV4 {
 	block: IRBlockV4;
@@ -63,9 +66,15 @@ export class IRQueueGeneratorV4 {
 		this.agingStrength = strength;
 	}
 
-	setInterleavePreferences(enabled: boolean, maxConsecutiveSameTopic: number): void {
+	setInterleavePreferences(
+		enabled: boolean,
+		maxConsecutiveSameTopic: number,
+	): void {
 		this.interleaveMode = enabled;
-		this.maxConsecutiveSameTopic = Math.max(1, Math.floor(maxConsecutiveSameTopic || 3));
+		this.maxConsecutiveSameTopic = Math.max(
+			1,
+			Math.floor(maxConsecutiveSameTopic || 3),
+		);
 	}
 
 	generateQueue(
@@ -73,15 +82,21 @@ export class IRQueueGeneratorV4 {
 		groupMapping: Record<string, string>,
 		groupWeights?: GroupWeights,
 		timeBudget: number = this.defaultTimeBudget,
-		currentSourcePath: string | null = null
+		currentSourcePath: string | null = null,
 	): QueueGenerationResultV4 {
-		const scheduled = candidatePool.filter((block) => block.status === "scheduled");
+		const scheduled = candidatePool.filter(
+			(block) => block.status === "scheduled",
+		);
 
 		if (scheduled.length === 0) {
 			return this.emptyResult();
 		}
 
-		const items = this.buildQueueItems(scheduled, groupMapping, currentSourcePath);
+		const items = this.buildQueueItems(
+			scheduled,
+			groupMapping,
+			currentSourcePath,
+		);
 		const groups = this.groupByTagGroup(items, groupWeights, timeBudget);
 		const { queue, totalMinutes } = this.deficitRoundRobin(groups, timeBudget);
 
@@ -94,7 +109,9 @@ export class IRQueueGeneratorV4 {
 		const overBudgetRatio = timeBudget > 0 ? totalMinutes / timeBudget : 0;
 
 		logger.info(
-			`[IRQueueGeneratorV4] 队列生成完成: 候选=${scheduled.length}, 入队=${queue.length}, 预估时间=${totalMinutes.toFixed(1)}min/${timeBudget}min`
+			`[IRQueueGeneratorV4] 队列生成完成: 候选=${scheduled.length}, 入队=${
+				queue.length
+			}, 预估时间=${totalMinutes.toFixed(1)}min/${timeBudget}min`,
 		);
 
 		return {
@@ -113,12 +130,17 @@ export class IRQueueGeneratorV4 {
 	private buildQueueItems(
 		blocks: IRBlockV4[],
 		groupMapping: Record<string, string>,
-		currentSourcePath: string | null
+		currentSourcePath: string | null,
 	): QueueItemV4[] {
 		return blocks.map((block) => {
 			const groupId = groupMapping[block.id] || "default";
 			const estimatedCost = estimateBlockCost(block);
-			const score = calculateSelectionScore(block, currentSourcePath, 0.5, this.agingStrength);
+			const score = calculateSelectionScore(
+				block,
+				currentSourcePath,
+				0.5,
+				this.agingStrength,
+			);
 
 			return {
 				block,
@@ -132,7 +154,7 @@ export class IRQueueGeneratorV4 {
 	private groupByTagGroup(
 		items: QueueItemV4[],
 		groupWeights: GroupWeights | undefined,
-		timeBudget: number
+		timeBudget: number,
 	): Map<string, GroupState> {
 		const groups = new Map<string, GroupState>();
 		const groupIds = new Set(items.map((item) => item.groupId));
@@ -164,20 +186,26 @@ export class IRQueueGeneratorV4 {
 
 	private deficitRoundRobin(
 		groups: Map<string, GroupState>,
-		timeBudget: number
+		timeBudget: number,
 	): { queue: IRBlockV4[]; totalMinutes: number } {
 		const queue: IRBlockV4[] = [];
 		let totalMinutes = 0;
 		let lastGroupId: string | null = null;
 		let consecutiveCount = 0;
-		const groupList = Array.from(groups.values()).filter((group) => group.items.length > 0);
+		const groupList = Array.from(groups.values()).filter(
+			(group) => group.items.length > 0,
+		);
 
 		if (groupList.length === 0) {
 			return { queue: [], totalMinutes: 0 };
 		}
 
 		while (totalMinutes < timeBudget && this.hasAvailableItems(groupList)) {
-			const selectedGroup = this.selectNextGroup(groupList, lastGroupId, consecutiveCount);
+			const selectedGroup = this.selectNextGroup(
+				groupList,
+				lastGroupId,
+				consecutiveCount,
+			);
 			if (!selectedGroup || selectedGroup.items.length === 0) {
 				break;
 			}
@@ -194,7 +222,7 @@ export class IRQueueGeneratorV4 {
 					({ lastGroupId, consecutiveCount } = this.updateRunState(
 						lastGroupId,
 						consecutiveCount,
-						selectedGroup.groupId
+						selectedGroup.groupId,
 					));
 					continue;
 				}
@@ -207,13 +235,18 @@ export class IRQueueGeneratorV4 {
 					({ lastGroupId, consecutiveCount } = this.updateRunState(
 						lastGroupId,
 						consecutiveCount,
-						selectedGroup.groupId
+						selectedGroup.groupId,
 					));
 					logger.debug(
-						`[IRQueueGeneratorV4] 尾部碎片：允许轻微超出, block=${item.block.id}, cost=${cost.toFixed(1)}min`
+						`[IRQueueGeneratorV4] 尾部碎片：允许轻微超出, block=${
+							item.block.id
+						}, cost=${cost.toFixed(1)}min`,
 					);
 				} else {
-					const smallerItem = this.findSmallerItem(selectedGroup, timeBudget - totalMinutes);
+					const smallerItem = this.findSmallerItem(
+						selectedGroup,
+						timeBudget - totalMinutes,
+					);
 					if (smallerItem) {
 						queue.push(smallerItem.block);
 						totalMinutes += smallerItem.estimatedCost;
@@ -225,7 +258,7 @@ export class IRQueueGeneratorV4 {
 						({ lastGroupId, consecutiveCount } = this.updateRunState(
 							lastGroupId,
 							consecutiveCount,
-							selectedGroup.groupId
+							selectedGroup.groupId,
 						));
 					} else {
 						selectedGroup.items.shift();
@@ -241,12 +274,14 @@ export class IRQueueGeneratorV4 {
 			({ lastGroupId, consecutiveCount } = this.updateRunState(
 				lastGroupId,
 				consecutiveCount,
-				selectedGroup.groupId
+				selectedGroup.groupId,
 			));
 		}
 
 		logger.debug(
-			`[IRQueueGeneratorV4] DRR 完成: ${queue.length} 块, 总时间=${totalMinutes.toFixed(1)}min`
+			`[IRQueueGeneratorV4] DRR 完成: ${
+				queue.length
+			} 块, 总时间=${totalMinutes.toFixed(1)}min`,
 		);
 
 		return { queue, totalMinutes };
@@ -259,7 +294,7 @@ export class IRQueueGeneratorV4 {
 	private selectNextGroup(
 		groups: GroupState[],
 		lastGroupId: string | null,
-		consecutiveCount: number
+		consecutiveCount: number,
 	): GroupState | null {
 		let maxGroup: GroupState | null = null;
 		let maxDeficit = -Infinity;
@@ -272,7 +307,12 @@ export class IRQueueGeneratorV4 {
 
 			const adjustedDeficit =
 				group.deficit +
-				this.getInterleaveBias(group.groupId, lastGroupId, consecutiveCount, alternativesRemain);
+				this.getInterleaveBias(
+					group.groupId,
+					lastGroupId,
+					consecutiveCount,
+					alternativesRemain,
+				);
 
 			if (adjustedDeficit > maxDeficit) {
 				maxDeficit = adjustedDeficit;
@@ -287,7 +327,7 @@ export class IRQueueGeneratorV4 {
 		groupId: string,
 		lastGroupId: string | null,
 		consecutiveCount: number,
-		alternativesRemain: boolean
+		alternativesRemain: boolean,
 	): number {
 		if (!this.interleaveMode || !lastGroupId || !alternativesRemain) {
 			return 0;
@@ -302,18 +342,23 @@ export class IRQueueGeneratorV4 {
 		return groupId === lastGroupId ? -bias : bias;
 	}
 
-	private hasAlternativeGroup(groups: GroupState[], lastGroupId: string | null): boolean {
+	private hasAlternativeGroup(
+		groups: GroupState[],
+		lastGroupId: string | null,
+	): boolean {
 		if (!lastGroupId) {
 			return false;
 		}
 
-		return groups.some((group) => group.groupId !== lastGroupId && group.items.length > 0);
+		return groups.some(
+			(group) => group.groupId !== lastGroupId && group.items.length > 0,
+		);
 	}
 
 	private updateRunState(
 		lastGroupId: string | null,
 		consecutiveCount: number,
-		selectedGroupId: string
+		selectedGroupId: string,
 	): { lastGroupId: string; consecutiveCount: number } {
 		if (selectedGroupId === lastGroupId) {
 			return {
@@ -328,7 +373,10 @@ export class IRQueueGeneratorV4 {
 		};
 	}
 
-	private findSmallerItem(group: GroupState, maxCost: number): QueueItemV4 | null {
+	private findSmallerItem(
+		group: GroupState,
+		maxCost: number,
+	): QueueItemV4 | null {
 		for (const item of group.items) {
 			if (item.estimatedCost <= maxCost) {
 				return item;
@@ -354,9 +402,14 @@ export class IRQueueGeneratorV4 {
 	previewQueue(
 		candidatePool: IRBlockV4[],
 		groupMapping: Record<string, string>,
-		timeBudget: number = this.defaultTimeBudget
+		timeBudget: number = this.defaultTimeBudget,
 	): { blocks: IRBlockV4[]; totalMinutes: number } {
-		const result = this.generateQueue(candidatePool, groupMapping, undefined, timeBudget);
+		const result = this.generateQueue(
+			candidatePool,
+			groupMapping,
+			undefined,
+			timeBudget,
+		);
 		return {
 			blocks: result.queue,
 			totalMinutes: result.totalEstimatedMinutes,
@@ -366,15 +419,20 @@ export class IRQueueGeneratorV4 {
 	getOverloadStats(
 		candidatePool: IRBlockV4[],
 		groupMapping: Record<string, string>,
-		timeBudget: number = this.defaultTimeBudget
+		timeBudget: number = this.defaultTimeBudget,
 	): {
 		isOverloaded: boolean;
 		totalCandidateCost: number;
 		budgetMinutes: number;
 		overloadRatio: number;
-		groupOverload: Record<string, { count: number; cost: number; ratio: number }>;
+		groupOverload: Record<
+			string,
+			{ count: number; cost: number; ratio: number }
+		>;
 	} {
-		const scheduled = candidatePool.filter((block) => block.status === "scheduled");
+		const scheduled = candidatePool.filter(
+			(block) => block.status === "scheduled",
+		);
 		let totalCost = 0;
 		const groupCosts: Record<string, { count: number; cost: number }> = {};
 
@@ -395,7 +453,10 @@ export class IRQueueGeneratorV4 {
 		const groupCount = Object.keys(groupCosts).length || 1;
 		const fairShare = groupCount > 0 ? timeBudget / groupCount : timeBudget;
 
-		const groupOverload: Record<string, { count: number; cost: number; ratio: number }> = {};
+		const groupOverload: Record<
+			string,
+			{ count: number; cost: number; ratio: number }
+		> = {};
 		for (const [groupId, data] of Object.entries(groupCosts)) {
 			groupOverload[groupId] = {
 				count: data.count,

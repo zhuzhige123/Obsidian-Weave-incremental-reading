@@ -8,7 +8,10 @@
  */
 
 import type { App, TFile } from "obsidian";
-import { ReadingCategory, type ReadingYAMLFields } from "../types/incremental-reading-types";
+import {
+	ReadingCategory,
+	type ReadingYAMLFields,
+} from "../types/incremental-reading-types";
 import {
 	READING_LEGACY_DECK_YAML_KEY,
 	READING_TOPIC_YAML_KEY,
@@ -66,12 +69,18 @@ export class YAMLFrontmatterManager {
 			modify?: (file: TFile, content: string) => Promise<void>;
 		};
 
-		if (typeof vaultAny.read !== "function" || typeof vaultAny.modify !== "function") {
+		if (
+			typeof vaultAny.read !== "function" ||
+			typeof vaultAny.modify !== "function"
+		) {
 			return;
 		}
 
 		const content = await vaultAny.read(file);
-		const cleanedContent = content.replace(/^---\r?\n(?:[ \t]*\r?\n)*(?:---|\.\.\.)(?:\r?\n)?/, "");
+		const cleanedContent = content.replace(
+			/^---\r?\n(?:[ \t]*\r?\n)*(?:---|\.\.\.)(?:\r?\n)?/,
+			"",
+		);
 		if (cleanedContent !== content) {
 			await vaultAny.modify(file, cleanedContent);
 		}
@@ -82,7 +91,9 @@ export class YAMLFrontmatterManager {
 	 * @param file 目标文件
 	 * @returns 增量阅读字段，如果不存在则返回null
 	 */
-	async getReadingFields(file: TFile): Promise<Partial<ReadingYAMLFields> | null> {
+	async getReadingFields(
+		file: TFile,
+	): Promise<Partial<ReadingYAMLFields> | null> {
 		try {
 			const cache = this.app.metadataCache.getFileCache(file);
 			const frontmatter = asRecord(cache?.frontmatter);
@@ -97,16 +108,20 @@ export class YAMLFrontmatterManager {
 			if (readingId) {
 				fields["weave-reading-id"] = readingId;
 			}
-			const category = readReadingCategory(frontmatter["weave-reading-category"]);
+			const category = readReadingCategory(
+				frontmatter["weave-reading-category"],
+			);
 			if (category) {
 				fields["weave-reading-category"] = category;
 			}
 			if (frontmatter["weave-reading-priority"] !== undefined) {
-				fields["weave-reading-priority"] = readNumber(frontmatter["weave-reading-priority"]);
+				fields["weave-reading-priority"] = readNumber(
+					frontmatter["weave-reading-priority"],
+				);
 			}
-			if (frontmatter["weave_tags"] !== undefined) {
-				fields["weave_tags"] = normalizeWeaveTags(
-					readStringArrayFromUnknown(frontmatter["weave_tags"])
+			if (frontmatter.weave_tags !== undefined) {
+				fields.weave_tags = normalizeWeaveTags(
+					readStringArrayFromUnknown(frontmatter.weave_tags),
 				);
 			}
 			const topicId = extractReadingTopicIdFromFrontmatter(frontmatter);
@@ -137,7 +152,10 @@ export class YAMLFrontmatterManager {
 	 * @param file 目标文件
 	 * @param updates 要更新的字段
 	 */
-	async updateReadingFields(file: TFile, updates: Partial<ReadingYAMLFields>): Promise<void> {
+	async updateReadingFields(
+		file: TFile,
+		updates: Partial<ReadingYAMLFields>,
+	): Promise<void> {
 		try {
 			await this.app.fileManager.processFrontMatter(file, (rawFrontmatter) => {
 				const frontmatter = asFrontmatterRecord(rawFrontmatter);
@@ -147,24 +165,26 @@ export class YAMLFrontmatterManager {
 					if (readingId) {
 						frontmatter["weave-reading-id"] = readingId;
 					} else {
-						delete frontmatter["weave-reading-id"];
+						frontmatter["weave-reading-id"] = undefined;
 					}
 				}
 				if (updates["weave-reading-category"] !== undefined) {
-					delete frontmatter["weave-reading-category"];
+					frontmatter["weave-reading-category"] = undefined;
 				}
 				if (updates["weave-reading-priority"] !== undefined) {
-					delete frontmatter["weave-reading-priority"];
+					frontmatter["weave-reading-priority"] = undefined;
 				}
-				if (updates["weave_tags"] !== undefined) {
-					const normalizedTags = normalizeWeaveTags(updates["weave_tags"] || []);
+				if (updates.weave_tags !== undefined) {
+					const normalizedTags = normalizeWeaveTags(updates.weave_tags || []);
 					if (normalizedTags.length > 0) {
-						frontmatter["weave_tags"] = normalizedTags;
+						frontmatter.weave_tags = normalizedTags;
 					} else {
-						delete frontmatter["weave_tags"];
+						frontmatter.weave_tags = undefined;
 					}
 				}
-				const topicId = updates[READING_TOPIC_YAML_KEY] ?? updates[READING_LEGACY_DECK_YAML_KEY];
+				const topicId =
+					updates[READING_TOPIC_YAML_KEY] ??
+					updates[READING_LEGACY_DECK_YAML_KEY];
 				if (topicId !== undefined) {
 					void topicId;
 					delete frontmatter[READING_TOPIC_YAML_KEY];
@@ -190,7 +210,7 @@ export class YAMLFrontmatterManager {
 		file: TFile,
 		uuid: string,
 		category: ReadingCategory,
-		priority: number
+		priority: number,
 	): Promise<void> {
 		await this.updateReadingFields(file, {
 			"weave-reading-id": uuid,

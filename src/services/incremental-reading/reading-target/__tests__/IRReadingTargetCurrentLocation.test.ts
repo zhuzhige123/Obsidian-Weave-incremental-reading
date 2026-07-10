@@ -6,8 +6,7 @@ describe("buildReadingTargetPreviewMarkdown", () => {
 	test("PDF 链接预览保留嵌入以显示选区片段", () => {
 		const target: ParsedReadingTarget = {
 			kind: "pdf",
-			rawInput:
-				"![[附件/book.pdf#page=203&rect=1,2,3,4|人格心理学, p.188]]",
+			rawInput: "![[附件/book.pdf#page=203&rect=1,2,3,4|人格心理学, p.188]]",
 			resumeLink: "附件/book.pdf#page=203&rect=1,2,3,4",
 			displayLink: "[[附件/book.pdf#page=203&rect=1,2,3,4|人格心理学, p.188]]",
 			sourceFilePath: "附件/book.pdf",

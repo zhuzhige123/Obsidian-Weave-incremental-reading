@@ -1,19 +1,27 @@
-import { App, Component, MarkdownView, Platform, Scope, TFile, WorkspaceLeaf } from "obsidian";
+import {
+	App,
+	Component,
+	MarkdownView,
+	Platform,
+	Scope,
+	TFile,
+	WorkspaceLeaf,
+} from "obsidian";
+import {
+	asMarkdownViewInternal,
+	readMarkdownViewScope,
+} from "../../types/markdown-view-internal";
 import { DirectoryUtils } from "../../utils/directory-utils";
-import { logger } from "../../utils/logger";
 import { i18n } from "../../utils/i18n";
+import { logger } from "../../utils/logger";
+import { applyStyleProps } from "../../utils/style-props";
+import { readVaultConfigValue } from "../../utils/vault-config";
 import EditorContextManager from "./EditorContextManager";
 import {
 	buildDetachedEditorTempFilePath,
 	isDetachedEditorTempFilePath,
 	resolveDetachedEditorTempFolder,
 } from "./editor-temp-file-policy";
-import { applyStyleProps } from "../../utils/style-props";
-import {
-	asMarkdownViewInternal,
-	readMarkdownViewScope,
-} from "../../types/markdown-view-internal";
-import { readVaultConfigValue } from "../../utils/vault-config";
 
 export interface DetachedEditorOptions {
 	value?: string;
@@ -53,7 +61,11 @@ export class DetachedLeafEditor extends Component {
 	private originalParent: HTMLElement | null = null;
 	private originalNextSibling: Node | null = null;
 
-	constructor(app: App, container: HTMLElement, options: DetachedEditorOptions = {}) {
+	constructor(
+		app: App,
+		container: HTMLElement,
+		options: DetachedEditorOptions = {},
+	) {
 		super();
 		this.app = app;
 		this.containerEl = container;
@@ -87,11 +99,17 @@ export class DetachedLeafEditor extends Component {
 		}
 	}
 
-	private setWorkspaceActiveLeaf(leaf: WorkspaceLeaf | null, focus: boolean): void {
+	private setWorkspaceActiveLeaf(
+		leaf: WorkspaceLeaf | null,
+		focus: boolean,
+	): void {
 		if (!leaf) return;
 		try {
 			const workspace = this.app.workspace as {
-				setActiveLeaf?: (target: WorkspaceLeaf, focus?: boolean | { focus?: boolean }) => void;
+				setActiveLeaf?: (
+					target: WorkspaceLeaf,
+					focus?: boolean | { focus?: boolean },
+				) => void;
 			};
 			if (typeof workspace.setActiveLeaf !== "function") {
 				return;
@@ -176,9 +194,11 @@ export class DetachedLeafEditor extends Component {
 
 				if (typeof v === "string") {
 					const s = v.toLowerCase();
-					if (s === "hidden" || s === "hide" || s === "off" || s === "never") return true;
+					if (s === "hidden" || s === "hide" || s === "off" || s === "never")
+						return true;
 					if (s === "source") return true;
-					if (s === "show" || s === "visible" || s === "on" || s === "always") return false;
+					if (s === "show" || s === "visible" || s === "on" || s === "always")
+						return false;
 				}
 			}
 
@@ -245,7 +265,10 @@ export class DetachedLeafEditor extends Component {
 		} catch (error) {
 			logger.error("[DetachedLeafEditor] 初始化失败:", error);
 			// 显示错误信息
-			this.containerEl.createDiv({ text: i18n.t("irServiceNotices.editor.initFailed"), cls: "error-message" });
+			this.containerEl.createDiv({
+				text: i18n.t("irServiceNotices.editor.initFailed"),
+				cls: "error-message",
+			});
 		} finally {
 			if (this.readyResolve) {
 				try {
@@ -258,20 +281,28 @@ export class DetachedLeafEditor extends Component {
 
 	private async prepareTempFile() {
 		const sessionId = this.options.sessionId || Date.now().toString();
-		const folderPath = resolveDetachedEditorTempFolder(this.app, this.options.sourcePath);
+		const folderPath = resolveDetachedEditorTempFolder(
+			this.app,
+			this.options.sourcePath,
+		);
 		const preferredPath = buildDetachedEditorTempFilePath(
 			folderPath,
-			`weave-editor-${sessionId}.md`
+			`weave-editor-${sessionId}.md`,
 		);
 		const fallbackPath = buildDetachedEditorTempFilePath(
 			folderPath,
-			`weave-editor-${Date.now()}.md`
+			`weave-editor-${Date.now()}.md`,
 		);
 		const candidatePaths =
-			preferredPath === fallbackPath ? [preferredPath] : [preferredPath, fallbackPath];
+			preferredPath === fallbackPath
+				? [preferredPath]
+				: [preferredPath, fallbackPath];
 
 		if (folderPath) {
-			await DirectoryUtils.ensureDirRecursive(this.app.vault.adapter, folderPath);
+			await DirectoryUtils.ensureDirRecursive(
+				this.app.vault.adapter,
+				folderPath,
+			);
 		}
 
 		let lastError: unknown = null;
@@ -286,11 +317,18 @@ export class DetachedLeafEditor extends Component {
 					return;
 				}
 
-				this.tempFile = await this.app.vault.create(filePath, this.options.value || "");
+				this.tempFile = await this.app.vault.create(
+					filePath,
+					this.options.value || "",
+				);
 				return;
 			} catch (error) {
 				lastError = error;
-				logger.warn("[DetachedLeafEditor] 创建临时文件失败，尝试备用路径:", filePath, error);
+				logger.warn(
+					"[DetachedLeafEditor] 创建临时文件失败，尝试备用路径:",
+					filePath,
+					error,
+				);
 			}
 		}
 
@@ -312,7 +350,8 @@ export class DetachedLeafEditor extends Component {
 			try {
 				return (
 					!!split &&
-					typeof (split as { setDimension?: (size: number) => void }).setDimension === "function"
+					typeof (split as { setDimension?: (size: number) => void })
+						.setDimension === "function"
 				);
 			} catch {
 				return false;
@@ -324,9 +363,15 @@ export class DetachedLeafEditor extends Component {
 		try {
 			this.leaf = this.app.workspace.createLeafInParent(parentSplit, 0);
 		} catch (e) {
-			logger.warn("[DetachedLeafEditor] createLeafInParent 失败，回退到 rootSplit:", e);
+			logger.warn(
+				"[DetachedLeafEditor] createLeafInParent 失败，回退到 rootSplit:",
+				e,
+			);
 			try {
-				this.leaf = this.app.workspace.createLeafInParent(workspace.rootSplit, 0);
+				this.leaf = this.app.workspace.createLeafInParent(
+					workspace.rootSplit,
+					0,
+				);
 			} catch {
 				this.leaf = null;
 			}
@@ -337,7 +382,8 @@ export class DetachedLeafEditor extends Component {
 		}
 
 		// 立即隐藏，防止闪烁
-		const leafEl = (this.leaf as WorkspaceLeaf & { containerEl?: HTMLElement }).containerEl;
+		const leafEl = (this.leaf as WorkspaceLeaf & { containerEl?: HTMLElement })
+			.containerEl;
 		if (leafEl) {
 			leafEl.dataset.weaveDetachedLeafEditor = "true";
 			this.originalParent = leafEl.parentElement;
@@ -373,7 +419,10 @@ export class DetachedLeafEditor extends Component {
 					active: false,
 				});
 			} catch (error) {
-				logger.warn("[DetachedLeafEditor] setViewState markdown 回退失败:", error);
+				logger.warn(
+					"[DetachedLeafEditor] setViewState markdown 回退失败:",
+					error,
+				);
 			}
 
 			if (!(await this.resolveMarkdownView())) {
@@ -403,14 +452,16 @@ export class DetachedLeafEditor extends Component {
 
 		const view = this.editorView;
 		const contentEl = view.contentEl; // 这是包含编辑器的主要元素
-		(contentEl).dataset.weaveDetachedLeafEditor = "true";
+		contentEl.dataset.weaveDetachedLeafEditor = "true";
 
 		try {
-			contentEl.querySelectorAll(".weave-ir-markdown-bottom-toolbar-container").forEach((el) => {
-				try {
-					(el as HTMLElement).remove();
-				} catch {}
-			});
+			contentEl
+				.querySelectorAll(".weave-ir-markdown-bottom-toolbar-container")
+				.forEach((el) => {
+					try {
+						(el as HTMLElement).remove();
+					} catch {}
+				});
 		} catch {}
 
 		// 清空容器
@@ -560,7 +611,10 @@ export class DetachedLeafEditor extends Component {
 		if (!globalLivePreview) return;
 
 		try {
-			if (typeof this.editorView.getMode !== "function" || this.editorView.getMode() !== "source") {
+			if (
+				typeof this.editorView.getMode !== "function" ||
+				this.editorView.getMode() !== "source"
+			) {
 				return;
 			}
 
@@ -568,19 +622,28 @@ export class DetachedLeafEditor extends Component {
 			// source 模式下的 Live Preview 与纯源码模式，这里仅在内部状态明确表示
 			// 当前是纯源码模式时，才谨慎地切回 Live Preview。
 			const currentMode = asMarkdownViewInternal(this.editorView)?.currentMode;
-			if (!currentMode || currentMode.type !== "source" || currentMode.sourceMode !== true) {
+			if (
+				!currentMode ||
+				currentMode.type !== "source" ||
+				currentMode.sourceMode !== true
+			) {
 				return;
 			}
 
 			if (typeof currentMode.toggleSource !== "function") {
-				logger.debug("[DetachedLeafEditor] 当前版本未暴露 toggleSource，跳过 Live Preview 同步");
+				logger.debug(
+					"[DetachedLeafEditor] 当前版本未暴露 toggleSource，跳过 Live Preview 同步",
+				);
 				return;
 			}
 
 			currentMode.toggleSource();
 			this.editorView.editor?.refresh?.();
 		} catch (error) {
-			logger.warn("[DetachedLeafEditor] Live Preview 同步失败，保留当前编辑模式:", error);
+			logger.warn(
+				"[DetachedLeafEditor] Live Preview 同步失败，保留当前编辑模式:",
+				error,
+			);
 		}
 	}
 
@@ -615,14 +678,17 @@ export class DetachedLeafEditor extends Component {
 			let el: HTMLElement | null = null;
 			if (target instanceof HTMLElement) {
 				el = target;
-			} else if (target instanceof Node && target.parentElement instanceof HTMLElement) {
+			} else if (
+				target instanceof Node &&
+				target.parentElement instanceof HTMLElement
+			) {
 				el = target.parentElement;
 			}
 
 			if (!el) return false;
 
 			const hit = el.closest(
-				".metadata-container, .metadata-properties, .metadata-container-inner, .metadata-properties-heading, .metadata-add-property"
+				".metadata-container, .metadata-properties, .metadata-container-inner, .metadata-properties-heading, .metadata-add-property",
 			);
 			return !!hit;
 		} catch {
@@ -640,7 +706,7 @@ export class DetachedLeafEditor extends Component {
 					if (info === this.editorView) {
 						this.options.onChange?.(this);
 					}
-				})
+				}),
 			);
 		}
 
@@ -680,22 +746,27 @@ export class DetachedLeafEditor extends Component {
 			this.editorView.contentEl.addEventListener(
 				"pointerdown",
 				this.pointerDownCaptureHandler,
-				true
+				true,
 			);
 			this.editorView.contentEl.addEventListener(
 				"touchstart",
 				this.pointerDownCaptureHandler,
-				true
+				true,
 			);
 
 			if (!this.keydownCaptureHandler) {
 				this.keydownCaptureHandler = (ev) => {
-					if (!(ev.ctrlKey || ev.metaKey || ev.altKey || ev.key === "Tab")) return;
+					if (!(ev.ctrlKey || ev.metaKey || ev.altKey || ev.key === "Tab"))
+						return;
 					this.activateLeafForHotkeys();
 				};
 			}
 
-			this.editorView.contentEl.addEventListener("keydown", this.keydownCaptureHandler, true);
+			this.editorView.contentEl.addEventListener(
+				"keydown",
+				this.keydownCaptureHandler,
+				true,
+			);
 
 			// 移动端也需要监听焦点事件，确保 Active Leaf 正确切换以显示工具栏
 			// 原先仅在桌面端启用，导致移动端焦点切换时工具栏不显示
@@ -740,7 +811,11 @@ export class DetachedLeafEditor extends Component {
 
 					this.popViewScope();
 
-					if (this.prevActiveLeaf && this.leaf && this.prevActiveLeaf !== this.leaf) {
+					if (
+						this.prevActiveLeaf &&
+						this.leaf &&
+						this.prevActiveLeaf !== this.leaf
+					) {
 						this.setWorkspaceActiveLeaf(this.prevActiveLeaf, false);
 					}
 					this.prevActiveLeaf = null;
@@ -749,8 +824,16 @@ export class DetachedLeafEditor extends Component {
 				};
 			}
 
-			this.editorView.contentEl.addEventListener("focusin", this.focusInHandler, true);
-			this.editorView.contentEl.addEventListener("focusout", this.focusOutHandler, true);
+			this.editorView.contentEl.addEventListener(
+				"focusin",
+				this.focusInHandler,
+				true,
+			);
+			this.editorView.contentEl.addEventListener(
+				"focusout",
+				this.focusOutHandler,
+				true,
+			);
 		}
 	}
 
@@ -834,23 +917,35 @@ export class DetachedLeafEditor extends Component {
 				this.editorView.contentEl.removeEventListener(
 					"pointerdown",
 					this.pointerDownCaptureHandler,
-					true
+					true,
 				);
 				this.editorView.contentEl.removeEventListener(
 					"touchstart",
 					this.pointerDownCaptureHandler,
-					true
+					true,
 				);
 			}
 			if (this.editorView?.contentEl && this.focusInHandler) {
-				this.editorView.contentEl.removeEventListener("focusin", this.focusInHandler, true);
+				this.editorView.contentEl.removeEventListener(
+					"focusin",
+					this.focusInHandler,
+					true,
+				);
 			}
 			if (this.editorView?.contentEl && this.focusOutHandler) {
-				this.editorView.contentEl.removeEventListener("focusout", this.focusOutHandler, true);
+				this.editorView.contentEl.removeEventListener(
+					"focusout",
+					this.focusOutHandler,
+					true,
+				);
 			}
 
 			if (this.editorView?.contentEl && this.keydownCaptureHandler) {
-				this.editorView.contentEl.removeEventListener("keydown", this.keydownCaptureHandler, true);
+				this.editorView.contentEl.removeEventListener(
+					"keydown",
+					this.keydownCaptureHandler,
+					true,
+				);
 			}
 		} catch {}
 

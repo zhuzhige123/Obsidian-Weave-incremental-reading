@@ -25,8 +25,16 @@ export class IRFolderSubscriptionSyncResultModal extends Modal {
 		contentEl.empty();
 		this.setTitle(i18n.t("irModals.folderSubscriptionSyncResult.title"));
 
-		const { scannedMarkdownCount, activeRuleCount, ruleSummaries, applyResult } = this.options;
-		const totalMatched = ruleSummaries.reduce((sum, item) => sum + item.matchedCount, 0);
+		const {
+			scannedMarkdownCount,
+			activeRuleCount,
+			ruleSummaries,
+			applyResult,
+		} = this.options;
+		const totalMatched = ruleSummaries.reduce(
+			(sum, item) => sum + item.matchedCount,
+			0,
+		);
 
 		contentEl.createEl("p", {
 			text: i18n.t("irModals.folderSubscriptionSyncResult.scanSummary", {
@@ -46,21 +54,25 @@ export class IRFolderSubscriptionSyncResultModal extends Modal {
 		this.renderPathSection(
 			contentEl,
 			i18n.t("irModals.folderSubscriptionSyncResult.sectionAdded"),
-			applyResult.addedFiles
+			applyResult.addedFiles,
 		);
 		this.renderPathSection(
 			contentEl,
 			i18n.t("irModals.folderSubscriptionSyncResult.sectionUpdated"),
-			applyResult.updatedFiles
+			applyResult.updatedFiles,
 		);
 		this.renderPathSection(
 			contentEl,
 			i18n.t("irModals.folderSubscriptionSyncResult.sectionUnchanged"),
-			applyResult.unchangedFiles
+			applyResult.unchangedFiles,
 		);
 
-		const ruleHost = contentEl.createDiv({ cls: "weave-folder-subscription-sync-result__rules" });
-		ruleHost.createEl("h3", { text: i18n.t("irModals.folderSubscriptionSyncResult.rulesHeading") });
+		const ruleHost = contentEl.createDiv({
+			cls: "weave-folder-subscription-sync-result__rules",
+		});
+		ruleHost.createEl("h3", {
+			text: i18n.t("irModals.folderSubscriptionSyncResult.rulesHeading"),
+		});
 		for (const summary of ruleSummaries) {
 			const setting = new Setting(ruleHost)
 				.setName(summary.folderPath || "/")
@@ -69,27 +81,38 @@ export class IRFolderSubscriptionSyncResultModal extends Modal {
 						deckName: summary.deckName,
 						matched: summary.matchedCount,
 						pending: summary.pendingCount,
-					})
+					}),
 				);
 			setting.setClass("weave-folder-subscription-sync-result__rule-item");
 		}
 
-		const footer = contentEl.createDiv({ cls: "weave-folder-subscription-sync-result__footer" });
-		footer
-			.createEl("button", { text: i18n.t("irModals.common.close"), cls: "mod-cta" })
-			.onclick = () => this.close();
+		const footer = contentEl.createDiv({
+			cls: "weave-folder-subscription-sync-result__footer",
+		});
+		footer.createEl("button", {
+			text: i18n.t("irModals.common.close"),
+			cls: "mod-cta",
+		}).onclick = () => this.close();
 	}
 
 	onClose(): void {
 		this.contentEl.empty();
 	}
 
-	private renderPathSection(container: HTMLElement, title: string, paths: string[]): void {
-		const section = container.createDiv({ cls: "weave-folder-subscription-sync-result__section" });
+	private renderPathSection(
+		container: HTMLElement,
+		title: string,
+		paths: string[],
+	): void {
+		const section = container.createDiv({
+			cls: "weave-folder-subscription-sync-result__section",
+		});
 		section.createEl("h3", { text: title });
 
 		if (paths.length === 0) {
-			section.createEl("p", { text: i18n.t("irModals.folderSubscriptionSyncResult.none") });
+			section.createEl("p", {
+				text: i18n.t("irModals.folderSubscriptionSyncResult.none"),
+			});
 			return;
 		}
 
@@ -99,7 +122,9 @@ export class IRFolderSubscriptionSyncResultModal extends Modal {
 		}
 		if (paths.length > 30) {
 			section.createEl("p", {
-				text: i18n.t("irModals.folderSubscriptionSyncResult.moreFiles", { count: paths.length - 30 }),
+				text: i18n.t("irModals.folderSubscriptionSyncResult.moreFiles", {
+					count: paths.length - 30,
+				}),
 			});
 		}
 	}

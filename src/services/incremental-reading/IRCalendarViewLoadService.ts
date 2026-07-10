@@ -3,13 +3,12 @@ import { logger } from "../../utils/logger";
 import { getSharedIRCalendarBackgroundLoadCoordinator } from "./IRCalendarBackgroundLoadCoordinator";
 import type { IRCalendarDaySummary } from "./IRCalendarDayIndexService";
 import {
-	getSharedIRCalendarQueryService,
 	type IRCalendarQueryResult,
+	getSharedIRCalendarQueryService,
 } from "./IRCalendarQueryService";
-import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import {
-	getSharedIRProjectionRuntime,
 	type IRProjectionPriorityHydrateResult,
+	getSharedIRProjectionRuntime,
 } from "./IRProjectionRuntime";
 
 const CALENDAR_TIER0_TIMEOUT_MS = 8_000;
@@ -49,7 +48,7 @@ export interface IRCalendarViewLoadResult {
 async function awaitWithTimeout<T>(
 	promise: Promise<T>,
 	timeoutMs: number,
-	label: string
+	label: string,
 ): Promise<T | null> {
 	let timeoutId: number | undefined;
 	try {
@@ -57,7 +56,9 @@ async function awaitWithTimeout<T>(
 			promise,
 			new Promise<null>((resolve) => {
 				timeoutId = window.setTimeout(() => {
-					logger.debug(`[IRCalendarViewLoad] ${label} timed out after ${timeoutMs}ms`);
+					logger.debug(
+						`[IRCalendarViewLoad] ${label} timed out after ${timeoutMs}ms`,
+					);
 					resolve(null);
 				}, timeoutMs);
 			}),
@@ -70,7 +71,10 @@ async function awaitWithTimeout<T>(
 }
 
 function runHeavyLoad<T>(app: App, task: () => Promise<T>): Promise<T> {
-	return getSharedIRCalendarBackgroundLoadCoordinator(app).runHeavyLoad("sidebar-load", task);
+	return getSharedIRCalendarBackgroundLoadCoordinator(app).runHeavyLoad(
+		"sidebar-load",
+		task,
+	);
 }
 
 /**
@@ -78,14 +82,20 @@ function runHeavyLoad<T>(app: App, task: () => Promise<T>): Promise<T> {
  */
 export async function loadIRCalendarView(
 	app: App,
-	options: IRCalendarViewLoadOptions
+	options: IRCalendarViewLoadOptions,
 ): Promise<IRCalendarViewLoadResult> {
 	const deckIds = options.deckIds;
 	const priorityDateKeys = Array.from(
-		new Set(options.priorityDateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+		new Set(
+			options.priorityDateKeys
+				.map((key) => String(key || "").trim())
+				.filter(Boolean),
+		),
 	);
 	const monthKeys = Array.from(
-		new Set(options.monthKeys.map((key) => String(key || "").trim()).filter(Boolean))
+		new Set(
+			options.monthKeys.map((key) => String(key || "").trim()).filter(Boolean),
+		),
 	);
 	const forceRecompute = Boolean(options.forceRecompute);
 	const isCancelled = options.isCancelled ?? (() => false);
@@ -100,15 +110,18 @@ export async function loadIRCalendarView(
 
 	const { monthHeatmap, projection: projectionHydrate } = forceRecompute
 		? {
-				monthHeatmap: await runtime.hydrateMonthHeatmapFromProjection(deckIds, monthKeys),
+				monthHeatmap: await runtime.hydrateMonthHeatmapFromProjection(
+					deckIds,
+					monthKeys,
+				),
 				projection: null as IRProjectionPriorityHydrateResult | null,
-			}
+		  }
 		: await runtime.ensureReady({
 				minLevel: "R1_day",
 				deckIds,
 				priorityDateKeys,
 				monthKeys,
-			});
+		  });
 	if (isCancelled()) {
 		return {
 			phase: "empty",
@@ -129,7 +142,7 @@ export async function loadIRCalendarView(
 				reason: "ui_refresh",
 				includeReadingMaterials: true,
 				preferDiskCache: false,
-			})
+			}),
 		);
 		runtime.markStale();
 		return {
@@ -164,10 +177,13 @@ export async function loadIRCalendarView(
 			forceRecompute: false,
 		});
 		if (!skipReconcile) {
-			logger.debug("[IRCalendarViewLoad] projection shell served; deferring reconcile", {
-				source: projectionHydrate.source,
-				priorityDateKeys,
-			});
+			logger.debug(
+				"[IRCalendarViewLoad] projection shell served; deferring reconcile",
+				{
+					source: projectionHydrate.source,
+					priorityDateKeys,
+				},
+			);
 		}
 		return {
 			phase: "shell_only",
@@ -200,7 +216,7 @@ export async function loadIRCalendarView(
 	const tier0 = await awaitWithTimeout(
 		queryService.tryGetTier0CalendarResult({ deckIds, priorityDateKeys }),
 		CALENDAR_TIER0_TIMEOUT_MS,
-		"tier-0 calendar hydration"
+		"tier-0 calendar hydration",
 	);
 	if (isCancelled()) {
 		return {
@@ -226,9 +242,12 @@ export async function loadIRCalendarView(
 		};
 	}
 
-	logger.debug("[IRCalendarViewLoad] no projection shell; deferring lean query to background reconcile", {
-		priorityDateKeys,
-	});
+	logger.debug(
+		"[IRCalendarViewLoad] no projection shell; deferring lean query to background reconcile",
+		{
+			priorityDateKeys,
+		},
+	);
 
 	return {
 		phase: "empty",
@@ -245,7 +264,10 @@ export async function loadIRCalendarView(
 export async function hydrateIRCalendarMonthHeatmap(
 	app: App,
 	deckIds: string[] | undefined,
-	monthKeys: string[]
+	monthKeys: string[],
 ): Promise<Map<string, Record<string, number>> | null> {
-	return getSharedIRProjectionRuntime(app).hydrateMonthHeatmapFromProjection(deckIds, monthKeys);
+	return getSharedIRProjectionRuntime(app).hydrateMonthHeatmapFromProjection(
+		deckIds,
+		monthKeys,
+	);
 }

@@ -1,0 +1,114 @@
+/* IRCalendar sidebar scheduling and priority floating menus */
+.ir-calendar-scheduling-menu {
+  min-width: 220px;
+  z-index: var(--weave-z-menu, 1200);
+}
+
+:global(.floating-menu.ir-calendar-scheduling-menu) {
+  pointer-events: auto;
+  min-width: min(240px, calc(100vw - 24px));
+  border-radius: var(--radius-m, 10px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  box-shadow: var(--shadow-s);
+  overflow: hidden;
+}
+
+:global(.floating-menu.ir-calendar-scheduling-menu .ir-calendar-scheduling-panel) {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+:global(.floating-menu.ir-calendar-priority-menu) {
+  width: min(360px, calc(100vw - 24px));
+  min-width: min(360px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 16%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-primary) 94%, var(--background-secondary));
+  box-shadow:
+    0 18px 40px color-mix(in srgb, var(--background-primary) 18%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+:global(.floating-menu.ir-calendar-priority-menu .ir-calendar-priority-panel) {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  background: transparent;
+}
+
+:global(.floating-menu.ir-calendar-priority-menu .ir-calendar-preview-summary) {
+  margin: 0 16px 16px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-modifier-border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary)),
+    color-mix(in srgb, var(--background-primary) 96%, var(--background-secondary))
+  );
+  box-shadow: none;
+}
+
+.ir-calendar-scheduling-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+}
+
+.ir-calendar-scheduling-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  border-radius: var(--clickable-icon-radius, 6px);
+  min-height: 36px;
+  width: 100%;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: none;
+  outline: none;
+  pointer-events: auto;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ir-calendar-scheduling-btn:hover,
+.ir-calendar-scheduling-btn.is-focused {
+  background: var(--background-modifier-hover);
+  transform: none;
+  box-shadow: none;
+}
+
+.ir-calendar-scheduling-label {
+  font-size: var(--font-ui-small, 13px);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.ir-calendar-scheduling-date {
+  font-size: var(--font-ui-smaller, 11px);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ir-calendar-scheduling-date.is-loading {
+  opacity: 0.45;
+}
+
+.ir-calendar-scheduling-date.is-unavailable {
+  opacity: 0.55;
+  font-style: italic;
+}

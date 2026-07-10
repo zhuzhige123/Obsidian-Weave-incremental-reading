@@ -1,0 +1,52 @@
+# Obsidian community review public repository
+
+# Dependencies and build cache
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Runtime build artifacts (distributed via GitHub Releases only)
+/main.js
+/styles.css
+
+# Logs and temp
+*.log
+tmp/
+temp/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*private-key*
+*private_key*
+*activation-code*
+*activation-codes*
+generated-*.json
+generated-*.txt
+codes-*.txt
+codes-*.json
+
+# Development-only (must never appear in this public tree)
+src/
+docs/
+scripts/
+AGENTS.md
+.cursor/
+.codex/
+.augment/
+backend/
+design/
+test/
+tests/
+*.bak

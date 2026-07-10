@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IRDueDateIndexService, formatDueDateKeyFromTimestamp } from "../IRDueDateIndexService";
+import {
+	IRDueDateIndexService,
+	formatDueDateKeyFromTimestamp,
+} from "../IRDueDateIndexService";
 
 vi.mock("../../utils/directory-utils", () => ({
 	DirectoryUtils: {

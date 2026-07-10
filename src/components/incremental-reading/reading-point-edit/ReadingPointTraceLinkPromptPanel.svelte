@@ -9,18 +9,9 @@
   import { parseReadingTargetInput } from '../../../services/incremental-reading/reading-target/IRReadingTargetParser';
   import { buildReadingTargetPreviewMarkdown } from '../../../services/incremental-reading/reading-target/IRReadingTargetCurrentLocation';
   import { getReadingTargetKindLabel } from '../../../services/incremental-reading/reading-target/IRReadingTargetTitleResolver';
+  import type { ReadingPointTraceLinkPanelState } from './ReadingPointTraceLinkPromptPanel.types';
   import type { ParsedReadingTarget } from '../../../services/incremental-reading/reading-target/IRReadingTargetTypes';
   import { tr } from '../../../utils/i18n';
-
-  export interface ReadingPointTraceLinkPanelState {
-    linkInput: string;
-    parsedTarget: ParsedReadingTarget | null;
-    preserveScheduleOnLinkChange: boolean;
-    dirty: boolean;
-    canSubmit: boolean;
-    previewMarkdown: string;
-    previewSourcePath: string;
-  }
 
   interface Props {
     plugin: WeavePlugin;

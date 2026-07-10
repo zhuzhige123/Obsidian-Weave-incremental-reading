@@ -49,7 +49,9 @@ describe("IRCalendarViewLoadService", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		hydrateMonthMock.mockResolvedValue(new Map([["2026-06", { "2026-06-19": 3 }]]));
+		hydrateMonthMock.mockResolvedValue(
+			new Map([["2026-06", { "2026-06-19": 3 }]]),
+		);
 		hydratePriorityMock.mockResolvedValue({
 			materialsByDate: new Map([["2026-06-19", [{ id: "p1" } as never]]]),
 			daySummaries: new Map([["2026-06-19", { totalCount: 1 }]]),
@@ -57,7 +59,9 @@ describe("IRCalendarViewLoadService", () => {
 		});
 		shouldSkipMock.mockResolvedValue(true);
 		tryGetTier0Mock.mockResolvedValue(null);
-		runHeavyLoadMock.mockImplementation(async (_owner: string, task: () => Promise<unknown>) => task());
+		runHeavyLoadMock.mockImplementation(
+			async (_owner: string, task: () => Promise<unknown>) => task(),
+		);
 	});
 
 	it("returns shell_only when projection exists even if reconcile is not skipped", async () => {
@@ -90,7 +94,9 @@ describe("IRCalendarViewLoadService", () => {
 	});
 
 	it("hydrates month heatmap via projection runtime", async () => {
-		const heatmap = await hydrateIRCalendarMonthHeatmap(app, undefined, ["2026-06"]);
+		const heatmap = await hydrateIRCalendarMonthHeatmap(app, undefined, [
+			"2026-06",
+		]);
 		expect(heatmap?.get("2026-06")).toEqual({ "2026-06-19": 3 });
 		expect(hydrateMonthMock).toHaveBeenCalledWith(undefined, ["2026-06"]);
 	});

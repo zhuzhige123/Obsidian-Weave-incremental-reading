@@ -2,11 +2,11 @@ import type { App } from "obsidian";
 import { getPluginPaths } from "../../config/paths";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
-import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import {
 	buildMonthSummariesFromDayCounts,
 	toCalendarMonthKey,
 } from "./IRCalendarProjectionUtils";
+import type { ScheduleItem } from "./IRCalendarScheduleItem";
 
 export const IR_CALENDAR_DAY_INDEX_VERSION = "2.1.0";
 
@@ -94,7 +94,11 @@ export class IRCalendarDayIndexService {
 		}
 
 		const priorityDateKeys = Array.from(
-			new Set(input.priorityDateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				input.priorityDateKeys
+					.map((key) => String(key || "").trim())
+					.filter(Boolean),
+			),
 		);
 		if (priorityDateKeys.length === 0) {
 			return null;
@@ -102,7 +106,9 @@ export class IRCalendarDayIndexService {
 
 		const materialsByDate = new Map<string, ScheduleItem[]>();
 		for (const dateKey of priorityDateKeys) {
-			const items = (scope.slices[dateKey] || []).map((item) => this.hydrateScheduleItem(item));
+			const items = (scope.slices[dateKey] || []).map((item) =>
+				this.hydrateScheduleItem(item),
+			);
 			materialsByDate.set(dateKey, items);
 		}
 
@@ -120,13 +126,16 @@ export class IRCalendarDayIndexService {
 			scheduleFingerprint: scope.scheduleFingerprint,
 			materialsByDate,
 			daySummaries,
-			scheduleGeneratedAt: Number.isFinite(scheduleGeneratedAt) ? scheduleGeneratedAt : 0,
+			scheduleGeneratedAt: Number.isFinite(scheduleGeneratedAt)
+				? scheduleGeneratedAt
+				: 0,
 		};
 	}
 
 	async tryHydrateDateKeys(input: {
 		cacheKey: string;
 		settingsFingerprint: string;
+		scheduleFingerprint: string;
 		dateKeys: string[];
 	}): Promise<{
 		materialsByDate: Map<string, ScheduleItem[]>;
@@ -134,21 +143,35 @@ export class IRCalendarDayIndexService {
 	} | null> {
 		const cacheKey = String(input.cacheKey || "").trim();
 		const settingsFingerprint = String(input.settingsFingerprint || "").trim();
+		const scheduleFingerprint = String(input.scheduleFingerprint || "").trim();
 		const dateKeys = Array.from(
-			new Set(input.dateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				input.dateKeys.map((key) => String(key || "").trim()).filter(Boolean),
+			),
 		);
-		if (!cacheKey || !settingsFingerprint || dateKeys.length === 0) {
+		if (
+			!cacheKey ||
+			!settingsFingerprint ||
+			!scheduleFingerprint ||
+			dateKeys.length === 0
+		) {
 			return null;
 		}
 
 		const scope = await this.readScope(cacheKey);
-		if (!scope || scope.settingsFingerprint !== settingsFingerprint) {
+		if (
+			!scope ||
+			scope.settingsFingerprint !== settingsFingerprint ||
+			scope.scheduleFingerprint !== scheduleFingerprint
+		) {
 			return null;
 		}
 
 		const materialsByDate = new Map<string, ScheduleItem[]>();
 		for (const dateKey of dateKeys) {
-			const items = (scope.slices[dateKey] || []).map((item) => this.hydrateScheduleItem(item));
+			const items = (scope.slices[dateKey] || []).map((item) =>
+				this.hydrateScheduleItem(item),
+			);
 			materialsByDate.set(dateKey, items);
 		}
 
@@ -173,7 +196,9 @@ export class IRCalendarDayIndexService {
 		const cacheKey = String(input.cacheKey || "").trim();
 		const settingsFingerprint = String(input.settingsFingerprint || "").trim();
 		const monthKeys = Array.from(
-			new Set(input.monthKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				input.monthKeys.map((key) => String(key || "").trim()).filter(Boolean),
+			),
 		);
 		if (!cacheKey || !settingsFingerprint || monthKeys.length === 0) {
 			return null;
@@ -194,13 +219,16 @@ export class IRCalendarDayIndexService {
 		return result.size > 0 ? result : null;
 	}
 
-	async invalidateDateKeys(cacheKey: string, dateKeys: string[]): Promise<void> {
+	async invalidateDateKeys(
+		cacheKey: string,
+		dateKeys: string[],
+	): Promise<void> {
 		const normalizedCacheKey = String(cacheKey || "").trim();
 		if (!normalizedCacheKey) {
 			return;
 		}
 		const normalizedDateKeys = Array.from(
-			new Set(dateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(dateKeys.map((key) => String(key || "").trim()).filter(Boolean)),
 		);
 		if (normalizedDateKeys.length === 0) {
 			return;
@@ -238,6 +266,26 @@ export class IRCalendarDayIndexService {
 		});
 	}
 
+	/** 清空全部 scope（调度/数据变更后避免继续读取过期日切片）。 */
+	async invalidateAllScopes(): Promise<void> {
+		if (this.writeDebounceTimer) {
+			window.clearTimeout(this.writeDebounceTimer);
+			this.writeDebounceTimer = null;
+		}
+		this.pendingScopeWrites.clear();
+		this.store = this.createEmptyStore();
+		this.storeLoaded = true;
+		this.inflightStoreLoad = null;
+
+		try {
+			const diskPath = this.getDiskPath();
+			await DirectoryUtils.ensureDirForFile(this.app.vault.adapter, diskPath);
+			await this.app.vault.adapter.write(diskPath, JSON.stringify(this.store));
+		} catch (error) {
+			logger.debug("[IRCalendarDayIndexService] invalidateAllScopes failed:", error);
+		}
+	}
+
 	/**
 	 * 合并写入：更新全日摘要计数，仅替换 priorityDateKeys 对应的列表切片。
 	 */
@@ -253,7 +301,8 @@ export class IRCalendarDayIndexService {
 			return;
 		}
 
-		const existing = (await this.readScope(cacheKey)) || this.createEmptyScope(input);
+		const existing =
+			(await this.readScope(cacheKey)) || this.createEmptyScope(input);
 		const mergedDaySummaries = { ...existing.daySummaries };
 		for (const [dateKey, items] of input.materialsByDate.entries()) {
 			const normalizedDateKey = String(dateKey || "").trim();
@@ -274,7 +323,9 @@ export class IRCalendarDayIndexService {
 				continue;
 			}
 			const items = input.materialsByDate.get(normalizedDateKey) || [];
-			mergedSlices[normalizedDateKey] = items.map((item) => this.serializeScheduleItem(item));
+			mergedSlices[normalizedDateKey] = items.map((item) =>
+				this.serializeScheduleItem(item),
+			);
 		}
 
 		await this.writeScope(cacheKey, {
@@ -301,7 +352,8 @@ export class IRCalendarDayIndexService {
 			return;
 		}
 
-		const existing = (await this.readScope(cacheKey)) || this.createEmptyScope(input);
+		const existing =
+			(await this.readScope(cacheKey)) || this.createEmptyScope(input);
 		const mergedDaySummaries = { ...existing.daySummaries };
 		const mergedSlices = { ...existing.slices };
 		for (const [dateKey, items] of input.dayPatches.entries()) {
@@ -310,7 +362,9 @@ export class IRCalendarDayIndexService {
 				continue;
 			}
 			mergedDaySummaries[normalizedDateKey] = { totalCount: items.length };
-			mergedSlices[normalizedDateKey] = items.map((item) => this.serializeScheduleItem(item));
+			mergedSlices[normalizedDateKey] = items.map((item) =>
+				this.serializeScheduleItem(item),
+			);
 		}
 
 		await this.writeScope(cacheKey, {
@@ -332,7 +386,9 @@ export class IRCalendarDayIndexService {
 	}
 
 	/** 读取 scope 元数据（指纹、保存时间），不加载切片正文。 */
-	async peekScopeManifest(cacheKey: string): Promise<IRCalendarDayIndexScopeManifest | null> {
+	async peekScopeManifest(
+		cacheKey: string,
+	): Promise<IRCalendarDayIndexScopeManifest | null> {
 		const normalizedCacheKey = String(cacheKey || "").trim();
 		if (!normalizedCacheKey) {
 			return null;
@@ -362,9 +418,16 @@ export class IRCalendarDayIndexService {
 		const settingsFingerprint = String(input.settingsFingerprint || "").trim();
 		const scheduleFingerprint = String(input.scheduleFingerprint || "").trim();
 		const dateKeys = Array.from(
-			new Set(input.dateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				input.dateKeys.map((key) => String(key || "").trim()).filter(Boolean),
+			),
 		);
-		if (!cacheKey || !settingsFingerprint || !scheduleFingerprint || dateKeys.length === 0) {
+		if (
+			!cacheKey ||
+			!settingsFingerprint ||
+			!scheduleFingerprint ||
+			dateKeys.length === 0
+		) {
 			return false;
 		}
 
@@ -382,6 +445,13 @@ export class IRCalendarDayIndexService {
 		for (const dateKey of dateKeys) {
 			const slice = scope.slices[dateKey];
 			if (!Array.isArray(slice)) {
+				return false;
+			}
+			const summaryCount = Math.max(
+				0,
+				Number(scope.daySummaries?.[dateKey]?.totalCount ?? slice.length),
+			);
+			if (summaryCount > slice.length) {
 				return false;
 			}
 		}
@@ -402,7 +472,9 @@ export class IRCalendarDayIndexService {
 		};
 	}
 
-	private buildDaySummariesMap(scope: IRCalendarDayIndexScope): Map<string, IRCalendarDaySummary> {
+	private buildDaySummariesMap(
+		scope: IRCalendarDayIndexScope,
+	): Map<string, IRCalendarDaySummary> {
 		const daySummaries = new Map<string, IRCalendarDaySummary>();
 		for (const [dateKey, summary] of Object.entries(scope.daySummaries || {})) {
 			if (!dateKey) {
@@ -418,14 +490,18 @@ export class IRCalendarDayIndexService {
 	private serializeScheduleItem(item: ScheduleItem): SerializedDayScheduleItem {
 		return {
 			...item,
-			nextReviewDate: item.nextReviewDate ? item.nextReviewDate.toISOString() : null,
+			nextReviewDate: item.nextReviewDate
+				? item.nextReviewDate.toISOString()
+				: null,
 		};
 	}
 
 	private hydrateScheduleItem(item: SerializedDayScheduleItem): ScheduleItem {
 		return {
 			...item,
-			nextReviewDate: item.nextReviewDate ? new Date(item.nextReviewDate) : null,
+			nextReviewDate: item.nextReviewDate
+				? new Date(item.nextReviewDate)
+				: null,
 		};
 	}
 
@@ -441,21 +517,21 @@ export class IRCalendarDayIndexService {
 		};
 	}
 
-	private normalizeScope(raw: Partial<IRCalendarDayIndexScope> | null | undefined): IRCalendarDayIndexScope | null {
+	private normalizeScope(
+		raw: Partial<IRCalendarDayIndexScope> | null | undefined,
+	): IRCalendarDayIndexScope | null {
 		if (!raw || typeof raw !== "object") {
 			return null;
 		}
 		const daySummaries =
 			raw.daySummaries && typeof raw.daySummaries === "object"
-				? (raw.daySummaries)
+				? raw.daySummaries
 				: {};
 		const slices =
-			raw.slices && typeof raw.slices === "object"
-				? (raw.slices)
-				: {};
+			raw.slices && typeof raw.slices === "object" ? raw.slices : {};
 		const monthSummaries =
 			raw.monthSummaries && typeof raw.monthSummaries === "object"
-				? (raw.monthSummaries)
+				? raw.monthSummaries
 				: buildMonthSummariesFromDayCounts(daySummaries);
 
 		return {
@@ -486,7 +562,9 @@ export class IRCalendarDayIndexService {
 		const scopes: Record<string, IRCalendarDayIndexScope> = {};
 		if (candidate.scopes && typeof candidate.scopes === "object") {
 			for (const [cacheKey, scopeRaw] of Object.entries(candidate.scopes)) {
-				const normalizedScope = this.normalizeScope(scopeRaw as Partial<IRCalendarDayIndexScope>);
+				const normalizedScope = this.normalizeScope(
+					scopeRaw as Partial<IRCalendarDayIndexScope>,
+				);
 				if (normalizedScope) {
 					scopes[cacheKey] = normalizedScope;
 				}
@@ -495,7 +573,8 @@ export class IRCalendarDayIndexService {
 		return {
 			version: IR_CALENDAR_DAY_INDEX_VERSION,
 			lastUpdated:
-				typeof candidate.lastUpdated === "string" && candidate.lastUpdated.trim()
+				typeof candidate.lastUpdated === "string" &&
+				candidate.lastUpdated.trim()
 					? candidate.lastUpdated
 					: new Date().toISOString(),
 			scopes,
@@ -526,7 +605,10 @@ export class IRCalendarDayIndexService {
 				this.storeLoaded = true;
 				return store;
 			} catch (error) {
-				logger.warn("[IRCalendarDayIndexService] Failed to read day index:", error);
+				logger.warn(
+					"[IRCalendarDayIndexService] Failed to read day index:",
+					error,
+				);
 				const emptyStore = this.createEmptyStore();
 				this.store = emptyStore;
 				this.storeLoaded = true;
@@ -544,7 +626,9 @@ export class IRCalendarDayIndexService {
 		}
 	}
 
-	private async readScope(cacheKey: string): Promise<IRCalendarDayIndexScope | null> {
+	private async readScope(
+		cacheKey: string,
+	): Promise<IRCalendarDayIndexScope | null> {
 		const store = await this.loadStore();
 		return store.scopes[cacheKey] || null;
 	}
@@ -559,9 +643,14 @@ export class IRCalendarDayIndexService {
 		}, PROJECTION_WRITE_DEBOUNCE_MS);
 	}
 
-	private async writeScope(cacheKey: string, scope: IRCalendarDayIndexScope): Promise<void> {
+	private async writeScope(
+		cacheKey: string,
+		scope: IRCalendarDayIndexScope,
+	): Promise<void> {
 		this.pendingScopeWrites.set(cacheKey, scope);
-		const store = this.storeLoaded ? this.store || this.createEmptyStore() : await this.loadStore();
+		const store = this.storeLoaded
+			? this.store || this.createEmptyStore()
+			: await this.loadStore();
 		this.store = {
 			...store,
 			scopes: {
@@ -578,7 +667,9 @@ export class IRCalendarDayIndexService {
 			return;
 		}
 
-		const store = this.storeLoaded ? this.store || this.createEmptyStore() : await this.loadStore();
+		const store = this.storeLoaded
+			? this.store || this.createEmptyStore()
+			: await this.loadStore();
 		const nextScopes = { ...store.scopes };
 		for (const [cacheKey, scope] of this.pendingScopeWrites.entries()) {
 			nextScopes[cacheKey] = scope;
@@ -606,7 +697,10 @@ export class IRCalendarDayIndexService {
 		try {
 			await writePromise;
 		} catch (error) {
-			logger.warn("[IRCalendarDayIndexService] Failed to write day index:", error);
+			logger.warn(
+				"[IRCalendarDayIndexService] Failed to write day index:",
+				error,
+			);
 		} finally {
 			if (this.inflightStoreWrite === writePromise) {
 				this.inflightStoreWrite = null;
@@ -617,7 +711,9 @@ export class IRCalendarDayIndexService {
 
 const dayIndexServiceByApp = new WeakMap<App, IRCalendarDayIndexService>();
 
-export function getSharedIRCalendarDayIndexService(app: App): IRCalendarDayIndexService {
+export function getSharedIRCalendarDayIndexService(
+	app: App,
+): IRCalendarDayIndexService {
 	let service = dayIndexServiceByApp.get(app);
 	if (!service) {
 		service = new IRCalendarDayIndexService(app);

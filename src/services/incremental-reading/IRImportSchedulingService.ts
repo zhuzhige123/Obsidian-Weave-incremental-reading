@@ -10,7 +10,11 @@ import type { IRBlock } from "../../types/ir-types";
 import type { IRProjectedScheduleItem } from "./IRProjectedScheduleSummary";
 import type { IRPlannedScheduleItem } from "./IRScheduleKernel";
 
-export type IRLoadBlock = IRBlock | ContentBlock | IRPlannedScheduleItem | IRProjectedScheduleItem;
+export type IRLoadBlock =
+	| IRBlock
+	| ContentBlock
+	| IRPlannedScheduleItem
+	| IRProjectedScheduleItem;
 
 export interface IRLoadInfo {
 	/** 每日时间预算（分钟） */
@@ -32,12 +36,12 @@ export class IRImportSchedulingService {
 	async calculateScheduling(
 		contentBlocks: ContentBlock[],
 		config: SchedulingConfig,
-		startDate: Date = new Date()
+		startDate: Date = new Date(),
 	): Promise<SchedulingImpact> {
 		const normalizedConfig = this.normalizeConfig(config);
 		const dailyLoads = await this.initializeDailyLoads(
 			normalizedConfig.distributionDays,
-			startDate
+			startDate,
 		);
 
 		switch (normalizedConfig.strategy) {
@@ -57,8 +61,14 @@ export class IRImportSchedulingService {
 
 	/** 归一化导入分散配置，避免空计划或异常负载率。 */
 	private normalizeConfig(config: SchedulingConfig): SchedulingConfig {
-		const distributionDays = Math.max(1, Math.floor(config.distributionDays || 0));
-		const targetLoadRate = Math.max(0, Number.isFinite(config.targetLoadRate) ? config.targetLoadRate : 0);
+		const distributionDays = Math.max(
+			1,
+			Math.floor(config.distributionDays || 0),
+		);
+		const targetLoadRate = Math.max(
+			0,
+			Number.isFinite(config.targetLoadRate) ? config.targetLoadRate : 0,
+		);
 
 		return {
 			...config,
@@ -73,7 +83,10 @@ export class IRImportSchedulingService {
 	}
 
 	/** 初始化每一天的已有负载。 */
-	private async initializeDailyLoads(days: number, startDate: Date): Promise<DailyLoad[]> {
+	private async initializeDailyLoads(
+		days: number,
+		startDate: Date,
+	): Promise<DailyLoad[]> {
 		const loads: DailyLoad[] = [];
 		const today = new Date(startDate);
 		today.setHours(0, 0, 0, 0);
@@ -84,7 +97,7 @@ export class IRImportSchedulingService {
 			const existingBlocks = await this.loadInfo.getBlocksForDate(date);
 			const existingMinutes = existingBlocks.reduce(
 				(sum, block) => sum + this.loadInfo.estimateBlockMinutes(block),
-				0
+				0,
 			);
 
 			loads.push({
@@ -105,7 +118,7 @@ export class IRImportSchedulingService {
 	private distributeEvenly(
 		blocks: ContentBlock[],
 		dailyLoads: DailyLoad[],
-		_config: SchedulingConfig
+		_config: SchedulingConfig,
 	): void {
 		const blocksPerDay = Math.ceil(blocks.length / dailyLoads.length);
 		let blockIndex = 0;
@@ -130,9 +143,10 @@ export class IRImportSchedulingService {
 	private distributeBalanced(
 		blocks: ContentBlock[],
 		dailyLoads: DailyLoad[],
-		config: SchedulingConfig
+		config: SchedulingConfig,
 	): void {
-		const targetMinutes = this.getSafeDailyBudgetMinutes() * config.targetLoadRate;
+		const targetMinutes =
+			this.getSafeDailyBudgetMinutes() * config.targetLoadRate;
 
 		for (const block of blocks) {
 			const blockMinutes = this.loadInfo.estimateBlockMinutes(block);
@@ -172,9 +186,10 @@ export class IRImportSchedulingService {
 	private distributeFrontLoaded(
 		blocks: ContentBlock[],
 		dailyLoads: DailyLoad[],
-		config: SchedulingConfig
+		config: SchedulingConfig,
 	): void {
-		const targetMinutes = this.getSafeDailyBudgetMinutes() * config.targetLoadRate;
+		const targetMinutes =
+			this.getSafeDailyBudgetMinutes() * config.targetLoadRate;
 		let blockIndex = 0;
 
 		for (const load of dailyLoads) {
@@ -237,7 +252,7 @@ export class IRImportSchedulingService {
 	/** 汇总分散计划的影响指标。 */
 	private calculateImpact(
 		dailyLoads: DailyLoad[],
-		_contentBlocks: ContentBlock[]
+		_contentBlocks: ContentBlock[],
 	): SchedulingImpact {
 		if (dailyLoads.length === 0) {
 			return {
@@ -252,8 +267,10 @@ export class IRImportSchedulingService {
 
 		const overloadedDays = dailyLoads.filter((l) => l.isOverloaded).length;
 		const peakLoadRate = Math.max(...dailyLoads.map((l) => l.loadRate));
-		const averageLoadRate = dailyLoads.reduce((sum, l) => sum + l.loadRate, 0) / dailyLoads.length;
-		const totalNewHours = dailyLoads.reduce((sum, l) => sum + l.newMinutes, 0) / 60;
+		const averageLoadRate =
+			dailyLoads.reduce((sum, l) => sum + l.loadRate, 0) / dailyLoads.length;
+		const totalNewHours =
+			dailyLoads.reduce((sum, l) => sum + l.newMinutes, 0) / 60;
 
 		const suggestions: string[] = [];
 
@@ -261,7 +278,9 @@ export class IRImportSchedulingService {
 			suggestions.push("建议延长分散天数或降低导入优先级");
 		}
 		if (peakLoadRate > 1.5) {
-			suggestions.push(`峰值负载过高(${Math.round(peakLoadRate * 100)}%)，建议调整策略`);
+			suggestions.push(
+				`峰值负载过高(${Math.round(peakLoadRate * 100)}%)，建议调整策略`,
+			);
 		}
 		if (averageLoadRate < 0.3) {
 			suggestions.push("平均负载较低，可以缩短分散天数");
@@ -280,13 +299,17 @@ export class IRImportSchedulingService {
 	/** 把分散计划映射回具体内容块。 */
 	applyScheduling(
 		contentBlocks: ContentBlock[],
-		impact: SchedulingImpact
+		impact: SchedulingImpact,
 	): Map<ContentBlock, Date> {
 		const assignments = new Map<ContentBlock, Date>();
 		let blockIndex = 0;
 
 		for (const load of impact.dailyLoads) {
-			for (let i = 0; i < load.newCount && blockIndex < contentBlocks.length; i++) {
+			for (
+				let i = 0;
+				i < load.newCount && blockIndex < contentBlocks.length;
+				i++
+			) {
 				assignments.set(contentBlocks[blockIndex], load.date);
 				blockIndex++;
 			}

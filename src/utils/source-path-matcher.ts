@@ -7,7 +7,12 @@
 
 import type { Card } from "../data/types";
 import { EpubLinkService } from "../services/epub-integration/EpubLinkService";
-import { parseBlockId, parseObsidianLink, parseSourceInfo, parseYAMLFromContent } from "./yaml-utils";
+import {
+	parseBlockId,
+	parseObsidianLink,
+	parseSourceInfo,
+	parseYAMLFromContent,
+} from "./yaml-utils";
 
 function sanitizeSourcePath(path: string | null | undefined): string | null {
 	if (typeof path !== "string") {
@@ -62,7 +67,10 @@ function getSourcePathKey(path: string): string {
 	return (sanitizeSourcePath(path) || "").toLowerCase();
 }
 
-function appendUniqueSourcePath(paths: string[], candidate: string | null | undefined): void {
+function appendUniqueSourcePath(
+	paths: string[],
+	candidate: string | null | undefined,
+): void {
 	const sanitized = sanitizeSourcePath(candidate);
 	if (!sanitized) {
 		return;
@@ -81,7 +89,10 @@ function hasExplicitExtension(path: string): boolean {
 	return sanitized ? /\.[^/.]+$/i.test(sanitized) : false;
 }
 
-function matchesSingleSourcePath(cardSource: string, targetPath: string): boolean {
+function matchesSingleSourcePath(
+	cardSource: string,
+	targetPath: string,
+): boolean {
 	const sanitizedCard = sanitizeSourcePath(cardSource);
 	const sanitizedTarget = sanitizeSourcePath(targetPath);
 
@@ -108,7 +119,10 @@ function matchesSingleSourcePath(cardSource: string, targetPath: string): boolea
 	}
 
 	// Only fall back to extension-less matching when one side has no extension.
-	if (hasExplicitExtension(sanitizedCard) && hasExplicitExtension(sanitizedTarget)) {
+	if (
+		hasExplicitExtension(sanitizedCard) &&
+		hasExplicitExtension(sanitizedTarget)
+	) {
 		return false;
 	}
 
@@ -146,19 +160,26 @@ export function extractAllSourcePaths(card: Card): string[] {
 			const yaml = parseYAMLFromContent(card.content);
 
 			if (yaml?.we_source) {
-				const sourceValues = Array.isArray(yaml.we_source) ? yaml.we_source : [yaml.we_source];
+				const sourceValues = Array.isArray(yaml.we_source)
+					? yaml.we_source
+					: [yaml.we_source];
 				for (const sourceValue of sourceValues) {
 					if (typeof sourceValue !== "string" || !sourceValue.trim()) {
 						continue;
 					}
 
 					appendUniqueSourcePath(paths, parseObsidianLink(sourceValue));
-					appendUniqueSourcePath(paths, EpubLinkService.parseLinkMarkup(sourceValue)?.filePath);
+					appendUniqueSourcePath(
+						paths,
+						EpubLinkService.parseLinkMarkup(sourceValue)?.filePath,
+					);
 				}
 			}
 
 			if (yaml?.we_block) {
-				const blockValues = Array.isArray(yaml.we_block) ? yaml.we_block : [yaml.we_block];
+				const blockValues = Array.isArray(yaml.we_block)
+					? yaml.we_block
+					: [yaml.we_block];
 				for (const blockValue of blockValues) {
 					if (typeof blockValue !== "string" || !blockValue.trim()) {
 						continue;
@@ -169,7 +190,9 @@ export function extractAllSourcePaths(card: Card): string[] {
 			}
 
 			if (yaml?.we_refs) {
-				const refValues = Array.isArray(yaml.we_refs) ? yaml.we_refs : [yaml.we_refs];
+				const refValues = Array.isArray(yaml.we_refs)
+					? yaml.we_refs
+					: [yaml.we_refs];
 				for (const refValue of refValues) {
 					if (typeof refValue !== "string" || !refValue.trim()) {
 						continue;
@@ -186,7 +209,10 @@ export function extractAllSourcePaths(card: Card): string[] {
 	appendUniqueSourcePath(paths, card.sourceFile);
 	appendUniqueSourcePath(paths, card.fields?.source_file);
 	appendUniqueSourcePath(paths, card.fields?.source_document);
-	appendUniqueSourcePath(paths, card.customFields?.obsidianFilePath as string | undefined);
+	appendUniqueSourcePath(
+		paths,
+		card.customFields?.obsidianFilePath as string | undefined,
+	);
 
 	return paths;
 }
@@ -260,14 +286,17 @@ export function matchesSourceDocument(card: Card, targetPath: string): boolean {
 	}
 
 	return extractAllSourcePaths(card).some((sourcePath) =>
-		matchesSingleSourcePath(sourcePath, targetPath)
+		matchesSingleSourcePath(sourcePath, targetPath),
 	);
 }
 
 /**
  * Filters cards to those that come from the target activeDocument.
  */
-export function filterCardsBySourceDocument(cards: Card[], targetPath: string | null): Card[] {
+export function filterCardsBySourceDocument(
+	cards: Card[],
+	targetPath: string | null,
+): Card[] {
 	if (!targetPath) {
 		return [];
 	}
@@ -311,7 +340,9 @@ export function extractEpubSourcePath(content: string): string | null {
 	if (!content) return null;
 
 	const markup = EpubLinkService.extractFirstEpubLinkMarkup(content);
-	return markup ? EpubLinkService.extractFilePathFromEpubLinkMarkup(markup) : null;
+	return markup
+		? EpubLinkService.extractFilePathFromEpubLinkMarkup(markup)
+		: null;
 }
 
 export function debugSourceInfo(card: Card): {
@@ -338,7 +369,9 @@ export function debugSourceInfo(card: Card): {
 		customFieldsPath: card.customFields?.obsidianFilePath as string | undefined,
 		extractedPath,
 		allExtractedPaths,
-		normalized: extractedPath ? normalizePathForComparison(extractedPath) : null,
+		normalized: extractedPath
+			? normalizePathForComparison(extractedPath)
+			: null,
 		basename: extractedPath ? extractBasename(extractedPath) : null,
 	};
 }

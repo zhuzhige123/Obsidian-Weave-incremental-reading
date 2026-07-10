@@ -1,5 +1,12 @@
-import type { IRAdvancedScheduleSettings, IRBlockStatus, IRBlockV4 } from "../../types/ir-types";
-import { DEFAULT_IR_BLOCK_META, DEFAULT_IR_BLOCK_STATS } from "../../types/ir-types";
+import type {
+	IRAdvancedScheduleSettings,
+	IRBlockStatus,
+	IRBlockV4,
+} from "../../types/ir-types";
+import {
+	DEFAULT_IR_BLOCK_META,
+	DEFAULT_IR_BLOCK_STATS,
+} from "../../types/ir-types";
 import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import {
 	M_BASE,
@@ -15,7 +22,8 @@ export type IRScheduleMenuAction = "intensive" | "normal" | "slow" | "postpone";
 export function scheduleItemToPreviewBlockV4(item: ScheduleItem): IRBlockV4 {
 	const priorityUi = item.explanation?.manualPriority ?? item.priority ?? 5;
 	const priorityEff = item.explanation?.effectivePriority ?? priorityUi;
-	const status = (String(item.scheduleStatus || "queued").trim() || "queued") as IRBlockStatus;
+	const status = (String(item.scheduleStatus || "queued").trim() ||
+		"queued") as IRBlockStatus;
 
 	return {
 		id: item.id,
@@ -37,13 +45,19 @@ export function scheduleItemToPreviewBlockV4(item: ScheduleItem): IRBlockV4 {
 	};
 }
 
-const SCHEDULING_DEFAULT_INTERVALS: Record<Exclude<IRScheduleMenuAction, "postpone">, number> = {
+const SCHEDULING_DEFAULT_INTERVALS: Record<
+	Exclude<IRScheduleMenuAction, "postpone">,
+	number
+> = {
 	intensive: 1,
 	normal: 3,
 	slow: 7,
 };
 
-const INTERVAL_MULTIPLIERS: Record<Exclude<IRScheduleMenuAction, "postpone">, number> = {
+const INTERVAL_MULTIPLIERS: Record<
+	Exclude<IRScheduleMenuAction, "postpone">,
+	number
+> = {
 	intensive: 0.5,
 	normal: 1,
 	slow: 1.8,
@@ -56,19 +70,26 @@ export interface IRScheduleModePreviewInput {
 	tagGroupIntervalFactor?: number;
 }
 
-function clampIntervalDays(intervalDays: number, maxIntervalDays: number): number {
+function clampIntervalDays(
+	intervalDays: number,
+	maxIntervalDays: number,
+): number {
 	return Math.max(1, Math.min(intervalDays, maxIntervalDays));
 }
 
-function withManualScheduleMeta(blockV4: IRBlockV4, nextRepDate: number, patch: Partial<IRBlockV4>): IRBlockV4 {
+function withManualScheduleMeta(
+	blockV4: IRBlockV4,
+	nextRepDate: number,
+	patch: Partial<IRBlockV4>,
+): IRBlockV4 {
 	const meta = { ...(blockV4.meta || {}) };
 	if (nextRepDate > 0) {
 		const date = new Date(nextRepDate);
-		meta.manualSchedulePinnedDateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-			date.getDate()
-		).padStart(2, "0")}`;
+		meta.manualSchedulePinnedDateKey = `${date.getFullYear()}-${String(
+			date.getMonth() + 1,
+		).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 	} else {
-		delete meta.manualSchedulePinnedDateKey;
+		meta.manualSchedulePinnedDateKey = undefined;
 	}
 	return {
 		...blockV4,
@@ -84,7 +105,7 @@ function withManualScheduleMeta(blockV4: IRBlockV4, nextRepDate: number, patch: 
 export function computeScheduleModeAdjustedBlock(
 	blockV4: IRBlockV4,
 	mode: Exclude<IRScheduleMenuAction, "postpone">,
-	input: IRScheduleModePreviewInput
+	input: IRScheduleModePreviewInput,
 ): IRBlockV4 {
 	const advancedSettings = input.advancedSettings;
 	const mGroup =
@@ -104,11 +125,14 @@ export function computeScheduleModeAdjustedBlock(
 				(advancedSettings.defaultIntervalFactor ?? M_BASE) *
 				mGroup *
 				psi *
-				INTERVAL_MULTIPLIERS[mode]
+				INTERVAL_MULTIPLIERS[mode],
 		);
 	}
 
-	intervalDays = clampIntervalDays(intervalDays, advancedSettings.maxIntervalDays ?? 365);
+	intervalDays = clampIntervalDays(
+		intervalDays,
+		advancedSettings.maxIntervalDays ?? 365,
+	);
 	const nextRepDate = calculateNextRepDate(intervalDays);
 
 	return withManualScheduleMeta(blockV4, nextRepDate, {
@@ -121,8 +145,12 @@ export function computeScheduleModeAdjustedBlock(
 /**
  * Tier-A：稍后（顺延 N 天）。
  */
-export function computePostponeAdjustedBlock(blockV4: IRBlockV4, days: number): IRBlockV4 {
-	const base = blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
+export function computePostponeAdjustedBlock(
+	blockV4: IRBlockV4,
+	days: number,
+): IRBlockV4 {
+	const base =
+		blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
 	base.setHours(0, 0, 0, 0);
 	base.setDate(base.getDate() + Math.max(1, Math.round(days)));
 	const nextRepDate = base.getTime();
@@ -134,7 +162,7 @@ export function computePostponeAdjustedBlock(blockV4: IRBlockV4, days: number): 
 
 export function computeAllScheduleMenuBlocks(
 	blockV4: IRBlockV4,
-	input: IRScheduleModePreviewInput
+	input: IRScheduleModePreviewInput,
 ): Record<IRScheduleMenuAction, IRBlockV4> {
 	return {
 		intensive: computeScheduleModeAdjustedBlock(blockV4, "intensive", input),

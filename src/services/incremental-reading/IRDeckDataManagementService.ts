@@ -14,10 +14,10 @@ import type {
 } from "../../types/ir-data-management-types";
 import { IR_POINT_STORAGE_VERSION } from "../../types/ir-point-storage-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
-import { logger } from "../../utils/logger";
-import { readString } from "../../utils/unknown-record";
 import { countInvalidSourcePathFieldsInRawPoint } from "../../utils/ir-point-source-path";
+import { logger } from "../../utils/logger";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
+import { readString } from "../../utils/unknown-record";
 import { IRPointStorageService } from "./IRPointStorageService";
 
 const IR_DECK_FILE_EXTENSION = ".irdeck";
@@ -57,14 +57,18 @@ export class IRDeckDataManagementService {
 				absolutePath,
 				topicId: String(entry.topicId || "").trim(),
 				topicName: String(entry.topicName || "").trim(),
-				pointCount: Array.isArray(entry.fileData.points) ? entry.fileData.points.length : 0,
+				pointCount: Array.isArray(entry.fileData.points)
+					? entry.fileData.points.length
+					: 0,
 				updatedAt: String(entry.fileData.updatedAt || "").trim(),
 				isInCanonicalDir: parentDir === canonicalPointsDir,
 			};
 		});
 
 		const duplicateGroups = this.buildDuplicateGroups(vaultFiles);
-		const activeTopicIds = new Set(vaultFiles.map((file) => file.topicId).filter(Boolean));
+		const activeTopicIds = new Set(
+			vaultFiles.map((file) => file.topicId).filter(Boolean),
+		);
 		const backupOrphans = await this.scanBackupOrphans(activeTopicIds);
 		const formatReports: IRPointFileFormatReport[] = [];
 		for (const file of vaultFiles) {
@@ -72,7 +76,7 @@ export class IRDeckDataManagementService {
 		}
 		const emptyPointFiles = vaultFiles.filter((file) => file.pointCount <= 0);
 		const needsMigrationFiles = formatReports.filter(
-			(report) => report.needsMigration && report.canMigrate
+			(report) => report.needsMigration && report.canMigrate,
 		);
 
 		return {
@@ -87,7 +91,9 @@ export class IRDeckDataManagementService {
 		};
 	}
 
-	async inspectPointFileFormat(absolutePath: string): Promise<IRPointFileFormatReport> {
+	async inspectPointFileFormat(
+		absolutePath: string,
+	): Promise<IRPointFileFormatReport> {
 		const normalizedPath = normalizePath(String(absolutePath || "").trim());
 		const issues: IRPointFileFormatIssue[] = [];
 
@@ -131,7 +137,10 @@ export class IRDeckDataManagementService {
 
 		let raw: Record<string, unknown>;
 		try {
-			raw = JSON.parse(await this.adapter.read(normalizedPath)) as Record<string, unknown>;
+			raw = JSON.parse(await this.adapter.read(normalizedPath)) as Record<
+				string,
+				unknown
+			>;
 		} catch {
 			return {
 				absolutePath: normalizedPath,
@@ -161,7 +170,8 @@ export class IRDeckDataManagementService {
 
 		const fileName = normalizedPath.split("/").pop() || "";
 		const topicId = readString(raw.topicId);
-		const topicName = readString(raw.topicName) || fileName.replace(/\.irdeck$/i, "");
+		const topicName =
+			readString(raw.topicName) || fileName.replace(/\.irdeck$/i, "");
 		const points = Array.isArray(raw.points) ? raw.points : null;
 
 		if (Number(raw.schemaVersion) !== IR_POINT_STORAGE_VERSION) {
@@ -170,9 +180,10 @@ export class IRDeckDataManagementService {
 				message: `schemaVersion 应为 ${IR_POINT_STORAGE_VERSION}，当前为 ${
 					raw.schemaVersion === undefined
 						? "缺失"
-						: typeof raw.schemaVersion === "string" || typeof raw.schemaVersion === "number"
-							? String(raw.schemaVersion)
-							: "无效"
+						: typeof raw.schemaVersion === "string" ||
+						  typeof raw.schemaVersion === "number"
+						? String(raw.schemaVersion)
+						: "无效"
 				}`,
 				severity: "warning",
 			});
@@ -282,7 +293,7 @@ export class IRDeckDataManagementService {
 
 		const isEmpty = pointCount === 0;
 		const hasBlockingIssue = issues.some(
-			(issue) => issue.severity === "error" && issue.code !== "empty_points"
+			(issue) => issue.severity === "error" && issue.code !== "empty_points",
 		);
 		const needsMigration =
 			!hasBlockingIssue &&
@@ -290,7 +301,7 @@ export class IRDeckDataManagementService {
 				(issue) =>
 					issue.code !== "empty_points" &&
 					issue.code !== "missing_source_path" &&
-					issue.severity !== "info"
+					issue.severity !== "info",
 			);
 
 		return {
@@ -310,7 +321,9 @@ export class IRDeckDataManagementService {
 		this.pointStorage.invalidatePointSnapshotListCache();
 	}
 
-	async migrateAllPointFiles(reports: IRPointFileFormatReport[]): Promise<number> {
+	async migrateAllPointFiles(
+		reports: IRPointFileFormatReport[],
+	): Promise<number> {
 		let migrated = 0;
 		for (const report of reports) {
 			if (!report.canMigrate) {
@@ -327,22 +340,25 @@ export class IRDeckDataManagementService {
 
 	async detectMergePointIdConflicts(
 		keeperPath: string,
-		sourcePaths: string[]
+		sourcePaths: string[],
 	): Promise<IRMergePointIdConflict[]> {
 		await this.pointStorage.initialize();
-		return this.pointStorage.detectMergePointIdConflictsBetweenFiles(keeperPath, sourcePaths);
+		return this.pointStorage.detectMergePointIdConflictsBetweenFiles(
+			keeperPath,
+			sourcePaths,
+		);
 	}
 
 	async mergeDuplicateGroupKeepingFile(
 		keeperPath: string,
 		sourcePaths: string[],
-		options?: { resolutions?: Record<string, string> }
+		options?: { resolutions?: Record<string, string> },
 	): Promise<IRPointFileMergeResult> {
 		const normalizedKeeper = normalizePath(String(keeperPath || "").trim());
 		const mergeResult = await this.pointStorage.mergePointFilesIntoKeeper(
 			normalizedKeeper,
 			sourcePaths,
-			{ resolutions: options?.resolutions }
+			{ resolutions: options?.resolutions },
 		);
 
 		if (mergeResult.conflicts?.length) {
@@ -375,7 +391,9 @@ export class IRDeckDataManagementService {
 		};
 	}
 
-	buildDuplicateGroups(vaultFiles: IRVaultPointFileEntry[]): IRDuplicateTopicGroup[] {
+	buildDuplicateGroups(
+		vaultFiles: IRVaultPointFileEntry[],
+	): IRDuplicateTopicGroup[] {
 		const grouped = new Map<string, IRVaultPointFileEntry[]>();
 		for (const file of vaultFiles) {
 			const topicId = String(file.topicId || "").trim();
@@ -393,20 +411,23 @@ export class IRDeckDataManagementService {
 				topicId,
 				topicName: String(files[0]?.topicName || topicId).trim(),
 				files: [...files].sort((left, right) =>
-					left.absolutePath.localeCompare(right.absolutePath, "zh-CN")
+					left.absolutePath.localeCompare(right.absolutePath, "zh-CN"),
 				),
 			}))
-			.sort((left, right) =>
-				left.topicName.localeCompare(right.topicName, "zh-CN") ||
-				left.topicId.localeCompare(right.topicId, "zh-CN")
+			.sort(
+				(left, right) =>
+					left.topicName.localeCompare(right.topicName, "zh-CN") ||
+					left.topicId.localeCompare(right.topicId, "zh-CN"),
 			);
 	}
 
 	buildNormalizeMovePlan(
 		vaultFiles: IRVaultPointFileEntry[],
-		targetDir: string
+		targetDir: string,
 	): IRPointFileMovePlanItem[] {
-		const normalizedTarget = normalizePath(String(targetDir || "").trim()) || this.getCanonicalPointsDir();
+		const normalizedTarget =
+			normalizePath(String(targetDir || "").trim()) ||
+			this.getCanonicalPointsDir();
 		const plan: IRPointFileMovePlanItem[] = [];
 		const reservedTargets = new Set<string>(
 			vaultFiles
@@ -414,7 +435,7 @@ export class IRDeckDataManagementService {
 					const parent = file.absolutePath.split("/").slice(0, -1).join("/");
 					return parent === normalizedTarget;
 				})
-				.map((file) => file.absolutePath)
+				.map((file) => file.absolutePath),
 		);
 
 		const filesNeedingMove = vaultFiles.filter((file) => {
@@ -443,7 +464,7 @@ export class IRDeckDataManagementService {
 					file.topicName,
 					topicId,
 					index + 1,
-					reservedTargets
+					reservedTargets,
 				);
 				reservedTargets.add(targetPath);
 				plan.push({
@@ -460,11 +481,14 @@ export class IRDeckDataManagementService {
 		}
 
 		return plan.sort((left, right) =>
-			left.targetPath.localeCompare(right.targetPath, "zh-CN")
+			left.targetPath.localeCompare(right.targetPath, "zh-CN"),
 		);
 	}
 
-	async comparePointFiles(pathA: string, pathB: string): Promise<IRPointFilePairDiff> {
+	async comparePointFiles(
+		pathA: string,
+		pathB: string,
+	): Promise<IRPointFilePairDiff> {
 		const normalizedA = normalizePath(pathA);
 		const normalizedB = normalizePath(pathB);
 		const [fileA, fileB] = await Promise.all([
@@ -508,7 +532,9 @@ export class IRDeckDataManagementService {
 		}
 
 		await this.pointStorage.initialize();
-		const targetDir = normalizePath(plan[0]?.targetPath.split("/").slice(0, -1).join("/") || "");
+		const targetDir = normalizePath(
+			plan[0]?.targetPath.split("/").slice(0, -1).join("/") || "",
+		);
 		if (targetDir) {
 			await DirectoryUtils.ensureDirRecursive(this.adapter, targetDir);
 		}
@@ -551,10 +577,11 @@ export class IRDeckDataManagementService {
 
 	async recoverBackupOrphan(
 		entry: IRBackupOrphanEntry,
-		targetDir?: string
+		targetDir?: string,
 	): Promise<string> {
 		const normalizedTarget =
-			normalizePath(String(targetDir || "").trim()) || this.getCanonicalPointsDir();
+			normalizePath(String(targetDir || "").trim()) ||
+			this.getCanonicalPointsDir();
 		await DirectoryUtils.ensureDirRecursive(this.adapter, normalizedTarget);
 
 		const raw = await this.adapter.read(entry.absolutePath);
@@ -570,7 +597,7 @@ export class IRDeckDataManagementService {
 			topicName,
 			topicId,
 			1,
-			reserved
+			reserved,
 		);
 
 		if (await this.adapter.exists(targetPath)) {
@@ -592,7 +619,7 @@ export class IRDeckDataManagementService {
 	}
 
 	private async readPointIds(
-		path: string
+		path: string,
 	): Promise<{ pointIds: string[]; topicId: string; topicName: string }> {
 		const raw = await this.adapter.read(path);
 		const parsed = JSON.parse(raw) as {
@@ -615,7 +642,7 @@ export class IRDeckDataManagementService {
 		topicName: string,
 		topicId: string,
 		ordinal: number,
-		reservedTargets: Set<string>
+		reservedTargets: Set<string>,
 	): string {
 		let attempt = Math.max(1, ordinal);
 		while (attempt < 200) {
@@ -629,7 +656,11 @@ export class IRDeckDataManagementService {
 		throw new Error(`无法为专题 ${topicName || topicId} 分配目标文件名`);
 	}
 
-	private buildTargetFileName(topicName: string, topicId: string, ordinal: number): string {
+	private buildTargetFileName(
+		topicName: string,
+		topicId: string,
+		ordinal: number,
+	): string {
 		const safeBase =
 			sanitizeForSync(topicName || topicId || "incremental-reading", 80) ||
 			"incremental-reading";
@@ -639,12 +670,16 @@ export class IRDeckDataManagementService {
 		return `${safeBase}.part${ordinal}${IR_DECK_FILE_EXTENSION}`;
 	}
 
-	private async scanBackupOrphans(activeTopicIds: Set<string>): Promise<IRBackupOrphanEntry[]> {
+	private async scanBackupOrphans(
+		activeTopicIds: Set<string>,
+	): Promise<IRBackupOrphanEntry[]> {
 		const orphans: IRBackupOrphanEntry[] = [];
 		const seenPaths = new Set<string>();
 
 		for (const pluginId of BACKUP_PLUGIN_IDS) {
-			const backupRoot = normalizePath(getPluginPathsById(this.app, pluginId).backups);
+			const backupRoot = normalizePath(
+				getPluginPathsById(this.app, pluginId).backups,
+			);
 			if (!(await this.adapter.exists(backupRoot))) {
 				continue;
 			}
@@ -676,10 +711,13 @@ export class IRDeckDataManagementService {
 							: filePath,
 					});
 				} catch (error) {
-					logger.debug("[IRDeckDataManagementService] 跳过无法解析的备份 .irdeck", {
-						filePath,
-						error,
-					});
+					logger.debug(
+						"[IRDeckDataManagementService] 跳过无法解析的备份 .irdeck",
+						{
+							filePath,
+							error,
+						},
+					);
 				}
 			}
 		}
@@ -687,7 +725,7 @@ export class IRDeckDataManagementService {
 		return orphans.sort(
 			(left, right) =>
 				left.topicName.localeCompare(right.topicName, "zh-CN") ||
-				left.absolutePath.localeCompare(right.absolutePath, "zh-CN")
+				left.absolutePath.localeCompare(right.absolutePath, "zh-CN"),
 		);
 	}
 

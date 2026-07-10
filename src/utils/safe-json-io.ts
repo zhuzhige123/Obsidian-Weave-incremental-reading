@@ -21,7 +21,10 @@ function getBackupDir(app?: { vault: { configDir: string } }): string {
  * 将 vault 路径转换为备份文件路径
  * 例: weave/memory/decks.json → .obsidian/plugins/weave/backups/json-recovery/weave__memory__decks.json
  */
-function toBackupPath(vaultPath: string, app?: { vault: { configDir: string } }): string {
+function toBackupPath(
+	vaultPath: string,
+	app?: { vault: { configDir: string } },
+): string {
 	const safeName = vaultPath.replace(/[/\\]/g, "__");
 	return `${getBackupDir(app)}/${safeName}`;
 }
@@ -32,7 +35,7 @@ export async function readJsonBackup<T = unknown>(
 		exists: (path: string) => Promise<boolean>;
 	},
 	filePath: string,
-	app?: { vault: { configDir: string } }
+	app?: { vault: { configDir: string } },
 ): Promise<{ data: T; raw: string } | null> {
 	const backupPath = toBackupPath(filePath, app);
 	if (!(await adapter.exists(backupPath))) {
@@ -52,7 +55,7 @@ export async function hasValidJsonBackup(
 		exists: (path: string) => Promise<boolean>;
 	},
 	filePath: string,
-	app?: { vault: { configDir: string } }
+	app?: { vault: { configDir: string } },
 ): Promise<boolean> {
 	try {
 		return !!(await readJsonBackup(adapter, filePath, app));
@@ -68,7 +71,7 @@ export async function restoreJsonBackup<T = unknown>(
 		exists: (path: string) => Promise<boolean>;
 	},
 	filePath: string,
-	app?: { vault: { configDir: string } }
+	app?: { vault: { configDir: string } },
 ): Promise<T | null> {
 	const backupEntry = await readJsonBackup<T>(adapter, filePath, app);
 	if (!backupEntry) {
@@ -93,7 +96,7 @@ export async function safeWriteJson(
 	},
 	filePath: string,
 	content: string,
-	app?: { vault: { configDir: string } }
+	app?: { vault: { configDir: string } },
 ): Promise<void> {
 	// 尝试备份当前版本
 	try {
@@ -102,7 +105,10 @@ export async function safeWriteJson(
 			// 只有当前内容是有效 JSON 时才备份（避免备份已损坏的文件）
 			JSON.parse(current);
 			const backupDir = getBackupDir(app);
-			await DirectoryUtils.ensureDirRecursive(adapter as DataAdapter, backupDir);
+			await DirectoryUtils.ensureDirRecursive(
+				adapter as DataAdapter,
+				backupDir,
+			);
 			await adapter.write(toBackupPath(filePath, app), current);
 		}
 	} catch {
@@ -126,7 +132,7 @@ export async function safeReadJson<T = unknown>(
 		write: (path: string, data: string) => Promise<void>;
 	},
 	filePath: string,
-	app?: { vault: { configDir: string } }
+	app?: { vault: { configDir: string } },
 ): Promise<T | null> {
 	// 尝试正常读取
 	try {
@@ -142,7 +148,12 @@ export async function safeReadJson<T = unknown>(
 			const backupEntry = await readJsonBackup<T>(adapter, filePath, app);
 			if (backupEntry) {
 				const data = backupEntry.data;
-				logger.warn(`[SafeJsonIO] 已从备份恢复: ${filePath} (backup: ${toBackupPath(filePath, app)})`);
+				logger.warn(
+					`[SafeJsonIO] 已从备份恢复: ${filePath} (backup: ${toBackupPath(
+						filePath,
+						app,
+					)})`,
+				);
 
 				// 用备份覆盖损坏的文件
 				await adapter.write(filePath, backupEntry.raw);

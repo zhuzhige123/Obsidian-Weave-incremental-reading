@@ -1,4 +1,4 @@
-import { normalizePath, type App } from "obsidian";
+import { type App, normalizePath } from "obsidian";
 import type { Card } from "../../data/types";
 import type { IRBlock, IRBlockMeta, IRPriority } from "../../types/ir-types";
 import {
@@ -8,13 +8,11 @@ import {
 } from "../../utils/ir-card-point-access";
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import {
-	resolveExternalBookmarkTaskKind,
-} from "./IRLinkedNotePolicy";
-import {
 	type IREpubBookmarkTask,
 	IREpubBookmarkTaskService,
 	isEpubBookmarkTaskId,
 } from "./IREpubBookmarkTaskService";
+import { resolveExternalBookmarkTaskKind } from "./IRLinkedNotePolicy";
 import {
 	type IRPdfBookmarkTask,
 	IRPdfBookmarkTaskService,
@@ -96,12 +94,15 @@ function normalizeDeckIds(deckIds: string[]): string[] {
 		new Set(
 			(Array.isArray(deckIds) ? deckIds : [])
 				.map((deckId) => String(deckId || "").trim())
-				.filter(Boolean)
-		)
+				.filter(Boolean),
+		),
 	);
 }
 
-function isIncrementalReadingPointId(id: string, kind?: IRPointWriteKind): boolean {
+function isIncrementalReadingPointId(
+	id: string,
+	kind?: IRPointWriteKind,
+): boolean {
 	const normalizedId = String(id || "").trim();
 	if (!normalizedId) {
 		return false;
@@ -114,7 +115,7 @@ function isIncrementalReadingPointId(id: string, kind?: IRPointWriteKind): boole
 
 function resolveExternalBookmarkKind(
 	card: Card,
-	target?: IRPointWriteTarget
+	target?: IRPointWriteTarget,
 ): "pdf" | "epub" | null {
 	if (target?.kind === "pdf" || target?.kind === "epub") {
 		return target.kind;
@@ -132,7 +133,10 @@ function resolveExternalBookmarkKind(
 function buildCardLikeTarget(target: IRPointWriteTarget): Card {
 	return buildPointWriteCardStub({
 		id: target.id,
-		kind: target.kind === "block" || target.kind === "chunk" ? target.kind : undefined,
+		kind:
+			target.kind === "block" || target.kind === "chunk"
+				? target.kind
+				: undefined,
 		sourceDocumentPath: target.sourceDocumentPath,
 	});
 }
@@ -161,18 +165,22 @@ export class IRPointWriteService {
 		this.pointTagService = new IRPointTagService(app);
 	}
 
-	async createPdfPoint(input: IRPdfPointCreateInput): Promise<IRPdfBookmarkTask> {
+	async createPdfPoint(
+		input: IRPdfPointCreateInput,
+	): Promise<IRPdfBookmarkTask> {
 		await this.pdfService.initialize();
 		return await this.pdfService.createTask(input);
 	}
 
-	async createEpubPoint(input: IREpubPointCreateInput): Promise<IREpubBookmarkTask> {
+	async createEpubPoint(
+		input: IREpubPointCreateInput,
+	): Promise<IREpubBookmarkTask> {
 		await this.epubService.initialize();
 		return await this.epubService.createTask(input);
 	}
 
 	async batchCreateEpubPoints(
-		inputs: IREpubBatchPointCreateInput[]
+		inputs: IREpubBatchPointCreateInput[],
 	): Promise<IREpubBookmarkTask[]> {
 		await this.epubService.initialize();
 		return await this.epubService.batchCreateTasks(inputs);
@@ -184,7 +192,10 @@ export class IRPointWriteService {
 			return 0;
 		}
 
-		await Promise.all([this.pdfService.initialize(), this.epubService.initialize()]);
+		await Promise.all([
+			this.pdfService.initialize(),
+			this.epubService.initialize(),
+		]);
 		const [deletedPdf, deletedEpub] = await Promise.all([
 			this.pdfService.deleteTasksByDeckIdentifiers(normalizedDeckIds),
 			this.epubService.deleteTasksByDeckIdentifiers(normalizedDeckIds),
@@ -197,8 +208,8 @@ export class IRPointWriteService {
 			new Set(
 				(Array.isArray(pdfPaths) ? pdfPaths : [])
 					.map((path) => normalizePath(String(path || "").trim()))
-					.filter(Boolean)
-			)
+					.filter(Boolean),
+			),
 		);
 		if (normalizedPaths.length === 0) {
 			return 0;
@@ -213,8 +224,8 @@ export class IRPointWriteService {
 			new Set(
 				(Array.isArray(epubPaths) ? epubPaths : [])
 					.map((path) => normalizePath(String(path || "").trim()))
-					.filter(Boolean)
-			)
+					.filter(Boolean),
+			),
 		);
 		if (normalizedPaths.length === 0) {
 			return 0;
@@ -278,17 +289,23 @@ export class IRPointWriteService {
 
 	async updatePointTags(
 		target: IRPointWriteTarget,
-		tags: string[]
+		tags: string[],
 	): Promise<IRPointWriteResult | null> {
 		return await this.updateTags(buildCardLikeTarget(target), tags);
 	}
 
-	async updateTags(card: Card, tags: string[]): Promise<IRPointWriteResult | null> {
+	async updateTags(
+		card: Card,
+		tags: string[],
+	): Promise<IRPointWriteResult | null> {
 		const normalizedTags = normalizeReadingPointTags(tags);
 		const pointKind = readCardPointKind(card);
 
 		if (isPdfBookmarkTaskId(card.uuid)) {
-			const updatedTask = await this.pointTagService.savePdfTaskTags(card.uuid, normalizedTags);
+			const updatedTask = await this.pointTagService.savePdfTaskTags(
+				card.uuid,
+				normalizedTags,
+			);
 			if (!updatedTask) {
 				return null;
 			}
@@ -301,7 +318,10 @@ export class IRPointWriteService {
 		}
 
 		if (isEpubBookmarkTaskId(card.uuid)) {
-			const updatedTask = await this.pointTagService.saveEpubTaskTags(card.uuid, normalizedTags);
+			const updatedTask = await this.pointTagService.saveEpubTaskTags(
+				card.uuid,
+				normalizedTags,
+			);
 			if (!updatedTask) {
 				return null;
 			}
@@ -316,7 +336,10 @@ export class IRPointWriteService {
 		await this.storage.initialize();
 
 		if (pointKind === "chunk") {
-			const updatedChunk = await this.pointTagService.saveChunkTags(card.uuid, normalizedTags);
+			const updatedChunk = await this.pointTagService.saveChunkTags(
+				card.uuid,
+				normalizedTags,
+			);
 			if (!updatedChunk) {
 				return null;
 			}
@@ -335,7 +358,8 @@ export class IRPointWriteService {
 				return null;
 			}
 
-			const nextGroupId = await this.pointTagService.matchGroupForTags(normalizedTags);
+			const nextGroupId =
+				await this.pointTagService.matchGroupForTags(normalizedTags);
 			block.tags = normalizedTags;
 			applyBlockTagGroup(block, nextGroupId);
 
@@ -349,7 +373,10 @@ export class IRPointWriteService {
 		return null;
 	}
 
-	async updatePriority(card: Card, priority: number): Promise<IRPointWriteResult | null> {
+	async updatePriority(
+		card: Card,
+		priority: number,
+	): Promise<IRPointWriteResult | null> {
 		const pointKind = readCardPointKind(card);
 
 		if (isPdfBookmarkTaskId(card.uuid)) {
@@ -425,15 +452,19 @@ export class IRPointWriteService {
 
 	async updatePointAssociatedNotes(
 		target: IRPointWriteTarget,
-		notePaths: string[]
+		notePaths: string[],
 	): Promise<IRPointWriteResult | null> {
-		return await this.updateAssociatedNotes(buildCardLikeTarget(target), notePaths, target);
+		return await this.updateAssociatedNotes(
+			buildCardLikeTarget(target),
+			notePaths,
+			target,
+		);
 	}
 
 	async updateAssociatedNotes(
 		card: Card,
 		notePaths: string[],
-		target?: IRPointWriteTarget
+		target?: IRPointWriteTarget,
 	): Promise<IRPointWriteResult | null> {
 		const normalizedNotePaths = resolveAssociatedNotePaths({
 			associatedNotePaths: notePaths,
@@ -496,7 +527,7 @@ export class IRPointWriteService {
 
 	async updateEpubResumePoint(
 		taskId: string,
-		cfi: string
+		cfi: string,
 	): Promise<IRPointWriteResult | null> {
 		if (!isEpubBookmarkTaskId(taskId)) {
 			return null;
@@ -516,7 +547,10 @@ export class IRPointWriteService {
 		};
 	}
 
-	async updateDecks(card: Card, deckIds: string[]): Promise<IRPointWriteResult | null> {
+	async updateDecks(
+		card: Card,
+		deckIds: string[],
+	): Promise<IRPointWriteResult | null> {
 		const normalizedDeckIds = normalizeDeckIds(deckIds).slice(0, 1);
 		const pointKind = readCardPointKind(card);
 
@@ -572,7 +606,10 @@ export class IRPointWriteService {
 		if (pointKind === "block") {
 			const allDecks = await this.storage.getAllDecks();
 			const currentDeckIds = Object.values(allDecks)
-				.filter((deck) => Array.isArray(deck.blockIds) && deck.blockIds.includes(card.uuid))
+				.filter(
+					(deck) =>
+						Array.isArray(deck.blockIds) && deck.blockIds.includes(card.uuid),
+				)
 				.map((deck) => String(deck.id || deck.path || "").trim())
 				.filter(Boolean);
 			const currentDeckSet = new Set(currentDeckIds);

@@ -1,6 +1,6 @@
-import { Notice, type App } from "obsidian";
-import { EpubError } from "./epub-error";
+import { type App, Notice } from "obsidian";
 import { getBookExtensionFromPath } from "./book-format";
+import { EpubError } from "./epub-error";
 import {
 	getEpubReaderInteropFailureMessage,
 	getEpubReaderInteropHost,
@@ -11,7 +11,10 @@ import type { TocItem } from "./types";
 /**
  * 为 IR 导入流程加载书籍目录：委托 Weave EPUB 阅读器插件。
  */
-export async function loadEpubTocForIrImport(app: App, filePath: string): Promise<TocItem[]> {
+export async function loadEpubTocForIrImport(
+	app: App,
+	filePath: string,
+): Promise<TocItem[]> {
 	const reader = getEpubReaderInteropHost(app);
 	if (typeof reader?.loadPublicationTocItems === "function") {
 		return reader.loadPublicationTocItems(filePath);

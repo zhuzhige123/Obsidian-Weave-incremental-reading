@@ -11,19 +11,26 @@ import type {
 } from "../../types/incremental-reading-types";
 import { ReadingCategory as Category } from "../../types/incremental-reading-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
-import { getReadingTopicId, setReadingMaterialDueAt } from "../../utils/ir-topic-compat";
 import { isIRInternalScheduleSourcePath } from "../../utils/ir-internal-data-path";
+import {
+	getReadingTopicId,
+	setReadingMaterialDueAt,
+} from "../../utils/ir-topic-compat";
 import { logger } from "../../utils/logger";
-import { countWords, estimateReadingTime, generateReadingUUID } from "../../utils/reading-utils";
+import {
+	countWords,
+	estimateReadingTime,
+	generateReadingUUID,
+} from "../../utils/reading-utils";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
 import type { YAMLFrontmatterManager } from "../../utils/yaml-frontmatter-utils";
 import type { AnchorManager } from "./AnchorManager";
+import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
+import { supportsPointLinkedNotesForSourcePath } from "./IRLinkedNotePolicy";
 import {
 	normalizeIRReadableMarkdownFolderPath,
 	resolveIRReadableMarkdownTargetFolder,
 } from "./IRReadableMarkdownPathResolver";
-import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
-import { supportsPointLinkedNotesForSourcePath } from "./IRLinkedNotePolicy";
 import type { ReadingMaterialStorage } from "./ReadingMaterialStorage";
 import { getIncrementalReadingPlugin } from "./ir-runtime";
 
@@ -56,14 +63,16 @@ export interface SplitMarkdownMaterialInput {
 	nextReviewAt?: Date | number;
 }
 
-export interface CreateSplitMarkdownMaterialsOptions extends CreateMaterialOptions {
+export interface CreateSplitMarkdownMaterialsOptions
+	extends CreateMaterialOptions {
 	/** 关联的增量阅读专题 ID */
 	deckId?: string;
 	/** 显式指定拆分后 Markdown 文件的导入目录 */
 	readableMarkdownFolder?: string;
 }
 
-export interface CreateCopiedMarkdownMaterialOptions extends CreateMaterialOptions {
+export interface CreateCopiedMarkdownMaterialOptions
+	extends CreateMaterialOptions {
 	/** 显式指定整文件副本的导入目录 */
 	readableMarkdownFolder?: string;
 }
@@ -89,7 +98,11 @@ export class ReadingMaterialManager {
 	private yamlManager: YAMLFrontmatterManager;
 	private anchorManager?: AnchorManager;
 
-	constructor(app: App, storage: ReadingMaterialStorage, yamlManager: YAMLFrontmatterManager) {
+	constructor(
+		app: App,
+		storage: ReadingMaterialStorage,
+		yamlManager: YAMLFrontmatterManager,
+	) {
 		this.app = app;
 		this.storage = storage;
 		this.yamlManager = yamlManager;
@@ -101,7 +114,8 @@ export class ReadingMaterialManager {
 		}
 
 		try {
-			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+			const frontmatter =
+				this.app.metadataCache.getFileCache(file)?.frontmatter;
 			const fmType =
 				frontmatter && typeof frontmatter.weave_type === "string"
 					? frontmatter.weave_type
@@ -129,7 +143,9 @@ export class ReadingMaterialManager {
 
 	private async assertNotIRFile(file: TFile, action: string): Promise<void> {
 		if (await this.isIRFile(file)) {
-			throw new Error(`${action} 不支持 IR 文件（chunk/index）。请使用增量阅读导入/文件化块流程。`);
+			throw new Error(
+				`${action} 不支持 IR 文件（chunk/index）。请使用增量阅读导入/文件化块流程。`,
+			);
 		}
 	}
 
@@ -141,7 +157,10 @@ export class ReadingMaterialManager {
 	// ===== 文件复制 =====
 
 	/** 复制文件到目标导入目录。 */
-	async copyFileToImportFolder(sourceFile: TFile, targetFolder: string): Promise<TFile> {
+	async copyFileToImportFolder(
+		sourceFile: TFile,
+		targetFolder: string,
+	): Promise<TFile> {
 		logger.info("[ReadingMaterialManager] copyFileToImportFolder 开始执行:");
 		logger.info(`  - 源文件: ${sourceFile.path}`);
 		logger.info(`  - 目标文件夹: ${targetFolder}`);
@@ -157,7 +176,7 @@ export class ReadingMaterialManager {
 		const targetPath = await this.generateUniqueFilePath(
 			targetFolder,
 			sourceFile.basename,
-			sourceFile.extension
+			sourceFile.extension,
 		);
 		logger.info(`[ReadingMaterialManager] 目标路径: ${targetPath}`);
 
@@ -165,19 +184,25 @@ export class ReadingMaterialManager {
 		if (sourceFile.extension === "md") {
 			logger.info("[ReadingMaterialManager] 读取源文件内容...");
 			const content = await this.app.vault.read(sourceFile);
-			logger.info(`[ReadingMaterialManager] 源文件内容长度: ${content.length} 字符`);
+			logger.info(
+				`[ReadingMaterialManager] 源文件内容长度: ${content.length} 字符`,
+			);
 
 			logger.info("[ReadingMaterialManager] 创建新文件...");
 			newFile = await this.app.vault.create(targetPath, content);
 		} else {
 			logger.info("[ReadingMaterialManager] 读取源文件内容（二进制）...");
 			const content = await this.app.vault.readBinary(sourceFile);
-			logger.info(`[ReadingMaterialManager] 源文件内容长度: ${content.byteLength} bytes`);
+			logger.info(
+				`[ReadingMaterialManager] 源文件内容长度: ${content.byteLength} bytes`,
+			);
 
 			logger.info("[ReadingMaterialManager] 创建新文件（二进制）...");
 			newFile = await this.app.vault.createBinary(targetPath, content);
 		}
-		logger.info(`[ReadingMaterialManager] ✅ 文件已复制: ${sourceFile.path} -> ${newFile.path}`);
+		logger.info(
+			`[ReadingMaterialManager] ✅ 文件已复制: ${sourceFile.path} -> ${newFile.path}`,
+		);
 
 		return newFile;
 	}
@@ -186,12 +211,14 @@ export class ReadingMaterialManager {
 	private async generateUniqueFilePath(
 		folderPath: string,
 		basename: string,
-		extension: string
+		extension: string,
 	): Promise<string> {
 		const adapter = this.app.vault.adapter;
 		const normalizedFolderPath = normalizePath(folderPath);
 		const baseFolder = normalizedFolderPath === "/" ? "" : normalizedFolderPath;
-		let targetPath = baseFolder ? `${baseFolder}/${basename}.${extension}` : `${basename}.${extension}`;
+		let targetPath = baseFolder
+			? `${baseFolder}/${basename}.${extension}`
+			: `${basename}.${extension}`;
 		let counter = 1;
 
 		while (await adapter.exists(targetPath)) {
@@ -218,7 +245,11 @@ export class ReadingMaterialManager {
 		return targetPath;
 	}
 
-	private sanitizeImportedMarkdownName(name: string, fallback: string, maxLength = 80): string {
+	private sanitizeImportedMarkdownName(
+		name: string,
+		fallback: string,
+		maxLength = 80,
+	): string {
 		const trimmed = String(name || "").trim();
 		const sanitized = sanitizeForSync(trimmed || fallback, maxLength).trim();
 		return sanitized || fallback;
@@ -227,11 +258,18 @@ export class ReadingMaterialManager {
 	private async createSplitMarkdownFile(
 		targetFolder: string,
 		order: number,
-		block: SplitMarkdownMaterialInput
+		block: SplitMarkdownMaterialInput,
 	): Promise<TFile> {
-		const safeTitle = this.sanitizeImportedMarkdownName(block.title, `内容块 ${order + 1}`);
+		const safeTitle = this.sanitizeImportedMarkdownName(
+			block.title,
+			`内容块 ${order + 1}`,
+		);
 		const baseName = `${String(order + 1).padStart(2, "0")}_${safeTitle}`;
-		const targetPath = await this.generateUniqueFilePath(targetFolder, baseName, "md");
+		const targetPath = await this.generateUniqueFilePath(
+			targetFolder,
+			baseName,
+			"md",
+		);
 		const trimmedContent = block.content.trim();
 		const normalizedBacklink = String(block.sourceBacklink || "").trim();
 
@@ -245,7 +283,7 @@ export class ReadingMaterialManager {
 
 		return await this.app.vault.create(
 			normalizePath(targetPath),
-			finalContent.endsWith("\n") ? finalContent : `${finalContent}\n`
+			finalContent.endsWith("\n") ? finalContent : `${finalContent}\n`,
 		);
 	}
 
@@ -273,13 +311,18 @@ export class ReadingMaterialManager {
 
 	/** 返回本次导入应使用的目标文件夹。 */
 	private getImportFolder(options: CreateMaterialOptions): string {
-		return options.importFolder || this.getDefaultImportFolderFromPluginSettings();
+		return (
+			options.importFolder || this.getDefaultImportFolderFromPluginSettings()
+		);
 	}
 
 	private getSelectionQuickCreateLastFolderFromPluginSettings(): string {
 		try {
 			const plugin = this.getHostPluginForIncrementalReadingSettings();
-			return String(plugin?.settings?.incrementalReading?.selectionQuickCreateLastFolder || "").trim();
+			return String(
+				plugin?.settings?.incrementalReading?.selectionQuickCreateLastFolder ||
+					"",
+			).trim();
 		} catch {
 			return "";
 		}
@@ -287,20 +330,26 @@ export class ReadingMaterialManager {
 
 	private resolveReadableMarkdownFolder(
 		preferredFolder: string | undefined,
-		contextPath: string
+		contextPath: string,
 	): string {
 		return normalizeIRReadableMarkdownFolderPath(
 			preferredFolder ||
 				resolveIRReadableMarkdownTargetFolder(this.app, {
-					lastSelectedFolder: this.getSelectionQuickCreateLastFolderFromPluginSettings(),
+					lastSelectedFolder:
+						this.getSelectionQuickCreateLastFolderFromPluginSettings(),
 					contextPath,
 					allowActiveFileFallback: false,
-				})
+				}),
 		);
 	}
 
-	private async syncMaterialDeckYaml(material: ReadingMaterial, deckId?: string): Promise<void> {
-		const abstractFile = this.app.vault.getAbstractFileByPath?.(material.filePath);
+	private async syncMaterialDeckYaml(
+		material: ReadingMaterial,
+		deckId?: string,
+	): Promise<void> {
+		const abstractFile = this.app.vault.getAbstractFileByPath?.(
+			material.filePath,
+		);
 		if (!(abstractFile instanceof TFile) || abstractFile.extension !== "md") {
 			return;
 		}
@@ -316,21 +365,27 @@ export class ReadingMaterialManager {
 	}
 
 	/** 为文件创建阅读材料，并同步 YAML 元数据。 */
-	async createMaterial(file: TFile, options: CreateMaterialOptions = {}): Promise<ReadingMaterial> {
+	async createMaterial(
+		file: TFile,
+		options: CreateMaterialOptions = {},
+	): Promise<ReadingMaterial> {
 		await this.assertNotIRFile(file, "createMaterial");
 		const now = new Date().toISOString();
 		const preferredUuid = String(options.preferredUuid || "").trim();
 		const uuid = preferredUuid || generateReadingUUID();
 
 		// Markdown 直接使用原文档，其他文件按需复制到导入目录。
-		const shouldCopy = file.extension === "md" ? false : options.copyToImportFolder !== false;
+		const shouldCopy =
+			file.extension === "md" ? false : options.copyToImportFolder !== false;
 		const importFolder = this.getImportFolder(options);
 
 		logger.info("[ReadingMaterialManager] createMaterial 被调用:");
 		logger.info(`  - 源文件: ${file.path}`);
 		logger.info(`  - shouldCopy: ${shouldCopy}`);
 		logger.info(`  - importFolder: ${importFolder}`);
-		logger.info(`  - options.copyToImportFolder: ${options.copyToImportFolder}`);
+		logger.info(
+			`  - options.copyToImportFolder: ${options.copyToImportFolder}`,
+		);
 
 		let targetFile = file;
 
@@ -342,15 +397,18 @@ export class ReadingMaterialManager {
 			try {
 				targetFile = await this.copyFileToImportFolder(file, importFolder);
 				logger.info(
-					`[ReadingMaterialManager] ✅ 已复制文件到兼容导入目录: ${file.path} -> ${targetFile.path}`
+					`[ReadingMaterialManager] ✅ 已复制文件到兼容导入目录: ${file.path} -> ${targetFile.path}`,
 				);
 			} catch (error) {
-				logger.error(`[ReadingMaterialManager] ❌ 复制文件失败，使用原文件: ${file.path}`, error);
+				logger.error(
+					`[ReadingMaterialManager] ❌ 复制文件失败，使用原文件: ${file.path}`,
+					error,
+				);
 				targetFile = file;
 			}
 		} else {
 			logger.info(
-				`[ReadingMaterialManager] 跳过复制: shouldCopy=${shouldCopy}, alreadyInFolder=${alreadyInFolder}`
+				`[ReadingMaterialManager] 跳过复制: shouldCopy=${shouldCopy}, alreadyInFolder=${alreadyInFolder}`,
 			);
 		}
 
@@ -395,11 +453,18 @@ export class ReadingMaterialManager {
 		if (targetFile.extension === "md") {
 			const existingReadingId = await this.yamlManager.getReadingId(targetFile);
 			if (existingReadingId !== uuid) {
-				await this.yamlManager.initializeReadingFields(targetFile, uuid, category, priority);
+				await this.yamlManager.initializeReadingFields(
+					targetFile,
+					uuid,
+					category,
+					priority,
+				);
 			}
 		}
 
-		logger.info(`[ReadingMaterialManager] 创建阅读材料: ${uuid} for ${targetFile.path}`);
+		logger.info(
+			`[ReadingMaterialManager] 创建阅读材料: ${uuid} for ${targetFile.path}`,
+		);
 
 		return material;
 	}
@@ -407,7 +472,7 @@ export class ReadingMaterialManager {
 	async createSplitMarkdownMaterials(
 		sourceFile: TFile,
 		blocks: SplitMarkdownMaterialInput[],
-		options: CreateSplitMarkdownMaterialsOptions = {}
+		options: CreateSplitMarkdownMaterialsOptions = {},
 	): Promise<ReadingMaterial[]> {
 		await this.assertNotIRFile(sourceFile, "createSplitMarkdownMaterials");
 
@@ -421,15 +486,22 @@ export class ReadingMaterialManager {
 
 		const readableMarkdownRoot = this.resolveReadableMarkdownFolder(
 			options.readableMarkdownFolder,
-			sourceFile.path
+			sourceFile.path,
 		);
 		const adapter = this.app.vault.adapter;
 		if (readableMarkdownRoot !== "/") {
 			await DirectoryUtils.ensureDirRecursive(adapter, readableMarkdownRoot);
 		}
-		const { deckId, readableMarkdownFolder: _readableMarkdownFolder, ...materialOptions } = options;
+		const {
+			deckId,
+			readableMarkdownFolder: _readableMarkdownFolder,
+			...materialOptions
+		} = options;
 
-		const sourceFolderName = this.sanitizeImportedMarkdownName(sourceFile.basename, "Imported");
+		const sourceFolderName = this.sanitizeImportedMarkdownName(
+			sourceFile.basename,
+			"Imported",
+		);
 		const targetFolderBase =
 			readableMarkdownRoot === "/"
 				? sourceFolderName
@@ -441,7 +513,11 @@ export class ReadingMaterialManager {
 
 		for (let index = 0; index < blocks.length; index++) {
 			const block = blocks[index];
-			const createdFile = await this.createSplitMarkdownFile(targetFolder, index, block);
+			const createdFile = await this.createSplitMarkdownFile(
+				targetFolder,
+				index,
+				block,
+			);
 
 			let material = await this.createMaterial(createdFile, {
 				...materialOptions,
@@ -454,7 +530,9 @@ export class ReadingMaterialManager {
 
 			if (block.nextReviewAt !== undefined) {
 				const nextReviewAt =
-					block.nextReviewAt instanceof Date ? block.nextReviewAt : new Date(block.nextReviewAt);
+					block.nextReviewAt instanceof Date
+						? block.nextReviewAt
+						: new Date(block.nextReviewAt);
 				if (!Number.isNaN(nextReviewAt.getTime())) {
 					await this.setNextReviewDate(material.uuid, nextReviewAt);
 				}
@@ -468,7 +546,7 @@ export class ReadingMaterialManager {
 		}
 
 		logger.info(
-			`[ReadingMaterialManager] 拆分导入完成: ${sourceFile.path} -> ${createdMaterials.length} 个 Markdown 阅读材料`
+			`[ReadingMaterialManager] 拆分导入完成: ${sourceFile.path} -> ${createdMaterials.length} 个 Markdown 阅读材料`,
 		);
 
 		return createdMaterials;
@@ -476,7 +554,7 @@ export class ReadingMaterialManager {
 
 	async createCopiedMarkdownMaterial(
 		sourceFile: TFile,
-		options: CreateCopiedMarkdownMaterialOptions = {}
+		options: CreateCopiedMarkdownMaterialOptions = {},
 	): Promise<ReadingMaterial> {
 		await this.assertNotIRFile(sourceFile, "createCopiedMarkdownMaterial");
 
@@ -486,10 +564,16 @@ export class ReadingMaterialManager {
 
 		const readableMarkdownRoot = this.resolveReadableMarkdownFolder(
 			options.readableMarkdownFolder,
-			sourceFile.path
+			sourceFile.path,
 		);
-		const copiedFile = await this.copyFileToImportFolder(sourceFile, readableMarkdownRoot);
-		const { readableMarkdownFolder: _readableMarkdownFolder, ...materialOptions } = options;
+		const copiedFile = await this.copyFileToImportFolder(
+			sourceFile,
+			readableMarkdownRoot,
+		);
+		const {
+			readableMarkdownFolder: _readableMarkdownFolder,
+			...materialOptions
+		} = options;
 
 		return await this.createMaterial(copiedFile, {
 			...materialOptions,
@@ -500,7 +584,7 @@ export class ReadingMaterialManager {
 	/** 先查已有材料，找不到再创建。 */
 	async getOrCreateMaterial(
 		file: TFile,
-		options: CreateMaterialOptions = {}
+		options: CreateMaterialOptions = {},
 	): Promise<ReadingMaterial> {
 		await this.assertNotIRFile(file, "getOrCreateMaterial");
 		const existingMaterial = await this.findMaterialByFile(file);
@@ -517,7 +601,7 @@ export class ReadingMaterialManager {
 	 */
 	async ensureMaterialForFolderSubscription(
 		file: TFile,
-		options: CreateMaterialOptions = {}
+		options: CreateMaterialOptions = {},
 	): Promise<ReadingMaterial> {
 		await this.assertNotIRFile(file, "ensureMaterialForFolderSubscription");
 		const existingMaterial = await this.findMaterialByFile(file);
@@ -539,7 +623,7 @@ export class ReadingMaterialManager {
 
 	private async reconcileSubscriptionMaterialFilePath(
 		material: ReadingMaterial,
-		file: TFile
+		file: TFile,
 	): Promise<void> {
 		if (material.filePath === file.path) {
 			return;
@@ -562,7 +646,9 @@ export class ReadingMaterialManager {
 	}
 
 	/** 按 YAML 中的阅读 ID 或文件路径查找材料。 */
-	private async findMaterialByFile(file: TFile): Promise<ReadingMaterial | null> {
+	private async findMaterialByFile(
+		file: TFile,
+	): Promise<ReadingMaterial | null> {
 		const readingId = await this.yamlManager.getReadingId(file);
 		if (readingId) {
 			const material = this.storage.getMaterialById(readingId);
@@ -579,7 +665,7 @@ export class ReadingMaterialManager {
 	/** 切换阅读材料分类，并同步材料级续读安排状态。 */
 	async changeCategory(
 		materialId: string,
-		newCategory: ReadingCategory
+		newCategory: ReadingCategory,
 	): Promise<CategoryChangeResult> {
 		const material = this.storage.getMaterialById(materialId);
 		if (!material) {
@@ -610,9 +696,13 @@ export class ReadingMaterialManager {
 		if (scheduleActive && !material.fsrs) {
 			material.fsrs = this.createLegacyScheduleState();
 			this.syncMaterialScheduleDueAt(material);
-			logger.debug(`[ReadingMaterialManager] 激活材料级续读安排: ${materialId}`);
+			logger.debug(
+				`[ReadingMaterialManager] 激活材料级续读安排: ${materialId}`,
+			);
 		} else if (!scheduleActive && material.fsrs) {
-			logger.debug(`[ReadingMaterialManager] 停用材料级续读安排: ${materialId}`);
+			logger.debug(
+				`[ReadingMaterialManager] 停用材料级续读安排: ${materialId}`,
+			);
 		}
 
 		await this.storage.saveMaterial(material);
@@ -622,12 +712,15 @@ export class ReadingMaterialManager {
 			try {
 				await this.yamlManager.updateCategory(file, newCategory);
 			} catch (error) {
-				logger.warn(`[ReadingMaterialManager] 更新YAML失败: ${material.filePath}`, error);
+				logger.warn(
+					`[ReadingMaterialManager] 更新YAML失败: ${material.filePath}`,
+					error,
+				);
 			}
 		}
 
 		logger.info(
-			`[ReadingMaterialManager] 分类变更: ${materialId} ${oldCategory} -> ${newCategory}`
+			`[ReadingMaterialManager] 分类变更: ${materialId} ${oldCategory} -> ${newCategory}`,
 		);
 
 		return {
@@ -662,7 +755,10 @@ export class ReadingMaterialManager {
 			try {
 				await this.yamlManager.updatePriority(file, material.priority);
 			} catch (error) {
-				logger.warn(`[ReadingMaterialManager] 更新优先级YAML失败: ${material.filePath}`, error);
+				logger.warn(
+					`[ReadingMaterialManager] 更新优先级YAML失败: ${material.filePath}`,
+					error,
+				);
 			}
 		}
 
@@ -682,7 +778,7 @@ export class ReadingMaterialManager {
 
 			const lastAccessed = new Date(material.lastAccessed);
 			const daysSinceAccess = Math.floor(
-				(now.getTime() - lastAccessed.getTime()) / (1000 * 60 * 60 * 24)
+				(now.getTime() - lastAccessed.getTime()) / (1000 * 60 * 60 * 24),
 			);
 
 			if (daysSinceAccess > 0) {
@@ -699,7 +795,9 @@ export class ReadingMaterialManager {
 		}
 
 		if (updatedCount > 0) {
-			logger.info(`[ReadingMaterialManager] 优先级衰减: 更新了 ${updatedCount} 个材料`);
+			logger.info(
+				`[ReadingMaterialManager] 优先级衰减: 更新了 ${updatedCount} 个材料`,
+			);
 		}
 
 		return updatedCount;
@@ -736,10 +834,13 @@ export class ReadingMaterialManager {
 	/** 将材料级到期时间同步到新字段和历史兼容字段。 */
 	private syncMaterialScheduleDueAt(
 		material: ReadingMaterial,
-		dueAt?: string | number | Date | null
+		dueAt?: string | number | Date | null,
 	): void {
 		this.ensureLegacyScheduleState(material);
-		const updated = setReadingMaterialDueAt(material, dueAt ?? material.fsrs?.due);
+		const updated = setReadingMaterialDueAt(
+			material,
+			dueAt ?? material.fsrs?.due,
+		);
 		material.fsrs = updated.fsrs;
 		material.nextDueAt = updated.nextDueAt;
 	}
@@ -748,7 +849,9 @@ export class ReadingMaterialManager {
 	async completeReading(
 		materialId: string,
 		rating: Rating,
-		scheduleCalculator: { schedule: (card: FSRSCard, rating: Rating) => FSRSCard }
+		scheduleCalculator: {
+			schedule: (card: FSRSCard, rating: Rating) => FSRSCard;
+		},
 	): Promise<FSRSCard | null> {
 		let material = await this.getMaterialOrWarn(materialId, "阅读材料");
 		if (!material) {
@@ -757,7 +860,7 @@ export class ReadingMaterialManager {
 
 		const updatedScheduleState = scheduleCalculator.schedule(
 			this.ensureLegacyScheduleState(material),
-			rating
+			rating,
 		);
 		const now = new Date().toISOString();
 		material = setReadingMaterialDueAt(
@@ -765,7 +868,7 @@ export class ReadingMaterialManager {
 				...material,
 				fsrs: updatedScheduleState,
 			},
-			updatedScheduleState.due
+			updatedScheduleState.due,
 		);
 		material.lastAccessed = now;
 		material.modified = now;
@@ -773,7 +876,7 @@ export class ReadingMaterialManager {
 		await this.storage.saveMaterial(material);
 
 		logger.info(
-			`[ReadingMaterialManager] 完成阅读: ${materialId}, 评分: ${rating}, 下次: ${updatedScheduleState.due}`
+			`[ReadingMaterialManager] 完成阅读: ${materialId}, 评分: ${rating}, 下次: ${updatedScheduleState.due}`,
 		);
 
 		return updatedScheduleState;
@@ -789,7 +892,9 @@ export class ReadingMaterialManager {
 		this.syncMaterialScheduleDueAt(material, date);
 		await this.touchAndSaveMaterial(material);
 
-		logger.info(`[ReadingMaterialManager] 手动调整日期: ${materialId} -> ${date.toISOString()}`);
+		logger.info(
+			`[ReadingMaterialManager] 手动调整日期: ${materialId} -> ${date.toISOString()}`,
+		);
 
 		return true;
 	}
@@ -797,7 +902,10 @@ export class ReadingMaterialManager {
 	// ===== 进度更新 =====
 
 	/** 合并并保存阅读进度。 */
-	async updateProgress(materialId: string, progress: Partial<ReadingProgress>): Promise<boolean> {
+	async updateProgress(
+		materialId: string,
+		progress: Partial<ReadingProgress>,
+	): Promise<boolean> {
 		const material = await this.getMaterialOrWarn(materialId, "阅读材料");
 		if (!material) {
 			return false;
@@ -830,7 +938,10 @@ export class ReadingMaterialManager {
 		}
 
 		if (this.anchorManager) {
-			const progress = await this.anchorManager.calculateProgress(file, material);
+			const progress = await this.anchorManager.calculateProgress(
+				file,
+				material,
+			);
 			material.progress = progress;
 			await this.touchAndSaveMaterial(material);
 			return progress;
@@ -871,11 +982,17 @@ export class ReadingMaterialManager {
 	}
 
 	/** 设置关联的 Markdown 笔记路径。 */
-	async setAssociatedNotePath(materialId: string, notePath: string | null): Promise<boolean> {
+	async setAssociatedNotePath(
+		materialId: string,
+		notePath: string | null,
+	): Promise<boolean> {
 		return this.setAssociatedNotePaths(materialId, notePath ? [notePath] : []);
 	}
 
-	async setAssociatedNotePaths(materialId: string, notePaths: string[]): Promise<boolean> {
+	async setAssociatedNotePaths(
+		materialId: string,
+		notePaths: string[],
+	): Promise<boolean> {
 		const material = await this.getMaterialOrWarn(materialId, "阅读材料");
 		if (!material) {
 			return false;
@@ -884,7 +1001,10 @@ export class ReadingMaterialManager {
 		const normalizedPaths = resolveAssociatedNotePaths({
 			associatedNotePaths: notePaths,
 		});
-		if (normalizedPaths.length > 0 && !supportsPointLinkedNotesForSourcePath(material.filePath)) {
+		if (
+			normalizedPaths.length > 0 &&
+			!supportsPointLinkedNotesForSourcePath(material.filePath)
+		) {
 			return false;
 		}
 
@@ -906,7 +1026,7 @@ export class ReadingMaterialManager {
 	/** 按 ID 获取材料；找不到时记录一致的警告日志。 */
 	private async getMaterialOrWarn(
 		materialId: string,
-		label = "材料"
+		label = "材料",
 	): Promise<ReadingMaterial | null> {
 		const material = this.storage.getMaterialById(materialId);
 		if (!material) {
@@ -953,7 +1073,7 @@ export class ReadingMaterialManager {
 	async batchImportMaterials(
 		filePaths: string[],
 		onProgress?: (current: number, total: number) => void,
-		options: BatchImportOptions = {}
+		options: BatchImportOptions = {},
 	): Promise<BatchImportResult> {
 		const result: BatchImportResult = {
 			success: 0,
@@ -962,13 +1082,18 @@ export class ReadingMaterialManager {
 		};
 
 		const total = filePaths.length;
-		logger.info("[ReadingMaterialManager] ========================================");
+		logger.info(
+			"[ReadingMaterialManager] ========================================",
+		);
 		logger.info(`[ReadingMaterialManager] 开始批量导入 ${total} 个文件`);
 		logger.info(`[ReadingMaterialManager] options: ${JSON.stringify(options)}`);
 
-		const targetFolder = options.importFolder || this.getDefaultImportFolderFromPluginSettings();
+		const targetFolder =
+			options.importFolder || this.getDefaultImportFolderFromPluginSettings();
 		logger.info(`[ReadingMaterialManager] 导入目标文件夹: ${targetFolder}`);
-		logger.info("[ReadingMaterialManager] ========================================");
+		logger.info(
+			"[ReadingMaterialManager] ========================================",
+		);
 
 		for (let i = 0; i < filePaths.length; i++) {
 			const filePath = filePaths[i];
@@ -999,23 +1124,29 @@ export class ReadingMaterialManager {
 						const existingMaterial = this.storage.getMaterialById(existingId);
 						if (existingMaterial) {
 							result.skipped++;
-							logger.debug(`[ReadingMaterialManager] 跳过已导入文件: ${filePath}`);
+							logger.debug(
+								`[ReadingMaterialManager] 跳过已导入文件: ${filePath}`,
+							);
 							continue;
 						}
 					}
 				}
 
 				const potentialTargetPath = `${targetFolder}/${file.basename}.${file.extension}`;
-				const existingByPath = this.storage.getMaterialByPath(potentialTargetPath);
+				const existingByPath =
+					this.storage.getMaterialByPath(potentialTargetPath);
 				if (existingByPath) {
-					const targetFileExists = this.app.vault.getAbstractFileByPath(potentialTargetPath);
+					const targetFileExists =
+						this.app.vault.getAbstractFileByPath(potentialTargetPath);
 					if (targetFileExists) {
 						result.skipped++;
-						logger.debug(`[ReadingMaterialManager] 跳过已存在副本: ${potentialTargetPath}`);
+						logger.debug(
+							`[ReadingMaterialManager] 跳过已存在副本: ${potentialTargetPath}`,
+						);
 						continue;
 					} else {
 						logger.info(
-							`[ReadingMaterialManager] 检测到残留记录（文件已删除），清理: ${existingByPath.uuid}`
+							`[ReadingMaterialManager] 检测到残留记录（文件已删除），清理: ${existingByPath.uuid}`,
 						);
 						await this.storage.deleteMaterial(existingByPath.uuid);
 					}
@@ -1040,7 +1171,7 @@ export class ReadingMaterialManager {
 		}
 
 		logger.info(
-			`[ReadingMaterialManager] 批量导入完成: 成功 ${result.success}, 跳过 ${result.skipped}, 失败 ${result.errors.length}`
+			`[ReadingMaterialManager] 批量导入完成: 成功 ${result.success}, 跳过 ${result.skipped}, 失败 ${result.errors.length}`,
 		);
 
 		return result;
@@ -1051,7 +1182,7 @@ export class ReadingMaterialManager {
 		parentMaterialId: string,
 		title: string,
 		resumeLink: string,
-		pdfFilePath: string
+		pdfFilePath: string,
 	): Promise<ReadingMaterial | null> {
 		const parent = await this.getMaterialOrWarn(parentMaterialId, "父材料");
 		if (!parent) {
@@ -1089,15 +1220,21 @@ export class ReadingMaterialManager {
 		};
 
 		await this.storage.saveMaterial(material);
-		logger.info(`[ReadingMaterialManager] 创建阅读点: ${title} (parent: ${parentMaterialId})`);
+		logger.info(
+			`[ReadingMaterialManager] 创建阅读点: ${title} (parent: ${parentMaterialId})`,
+		);
 		return material;
 	}
 
 	/** 批量创建阅读点。 */
 	async batchCreateReadingPoints(
 		parentMaterialId: string,
-		points: Array<{ title: string; resumeLink: string; parentMaterialId?: string }>,
-		pdfFilePath: string
+		points: Array<{
+			title: string;
+			resumeLink: string;
+			parentMaterialId?: string;
+		}>,
+		pdfFilePath: string,
 	): Promise<ReadingMaterial[]> {
 		const results: ReadingMaterial[] = [];
 
@@ -1108,35 +1245,43 @@ export class ReadingMaterialManager {
 				actualParent,
 				pt.title,
 				pt.resumeLink,
-				pdfFilePath
+				pdfFilePath,
 			);
 			if (material) {
 				results.push(material);
 			}
 		}
 
-		logger.info(`[ReadingMaterialManager] 批量创建阅读点: ${results.length}/${points.length}`);
+		logger.info(
+			`[ReadingMaterialManager] 批量创建阅读点: ${results.length}/${points.length}`,
+		);
 		return results;
 	}
 
 	/** 删除阅读材料，并清理 YAML 与调度残留。 */
 	async removeMaterial(materialId: string): Promise<boolean> {
-		let material = await this.getMaterialOrWarn(materialId);
+		const material = await this.getMaterialOrWarn(materialId);
 		if (!material) {
 			return false;
 		}
 
-		const irStorage = new (await import("./IRStorageService")).IRStorageService(this.app);
+		const irStorage = new (await import("./IRStorageService")).IRStorageService(
+			this.app,
+		);
 		await irStorage.initialize();
 
 		const allMaterials = this.storage.getAllMaterials();
-		const children = allMaterials.filter((m) => m.parentMaterialId === materialId);
+		const children = allMaterials.filter(
+			(m) => m.parentMaterialId === materialId,
+		);
 		for (const child of children) {
 			child.parentMaterialId = material.parentMaterialId;
 			await this.touchAndSaveMaterial(child);
 		}
 		if (children.length > 0) {
-			logger.info(`[ReadingMaterialManager] 子节点提升: ${children.length} 个子材料已提升`);
+			logger.info(
+				`[ReadingMaterialManager] 子节点提升: ${children.length} 个子材料已提升`,
+			);
 		}
 
 		const success = await this.storage.deleteMaterial(materialId);
@@ -1150,7 +1295,7 @@ export class ReadingMaterialManager {
 			} catch (error) {
 				logger.warn(
 					`[ReadingMaterialManager] 清理阅读材料调度残留失败: ${material.filePath}`,
-					error
+					error,
 				);
 			}
 
@@ -1161,8 +1306,11 @@ export class ReadingMaterialManager {
 	}
 
 	/** 手动覆盖材料的下次续读时间。 */
-	async rescheduleMaterial(materialId: string, newDate: Date): Promise<boolean> {
-		let material = await this.getMaterialOrWarn(materialId);
+	async rescheduleMaterial(
+		materialId: string,
+		newDate: Date,
+	): Promise<boolean> {
+		const material = await this.getMaterialOrWarn(materialId);
 		if (!material) {
 			return false;
 		}
@@ -1188,200 +1336,11 @@ export class ReadingMaterialManager {
 		await this.touchAndSaveMaterial(material);
 
 		logger.info(
-			`[ReadingMaterialManager] 已调整材料日期: ${material.title} -> ${newDate.toISOString()}`
+			`[ReadingMaterialManager] 已调整材料日期: ${
+				material.title
+			} -> ${newDate.toISOString()}`,
 		);
 		return true;
-	}
-
-	// ===== 摘录卡片管理 =====
-
-	/** 获取阅读材料视角下的摘录卡片列表。 */
-	async getExtractCards(
-		deckId?: string
-	): Promise<import("../../types/extract-types").ExtractCard[]> {
-		const materials = this.storage.getAllMaterials();
-		const extractCards: import("../../types/extract-types").ExtractCard[] = [];
-
-		for (const material of materials) {
-			if (deckId && getReadingTopicId(material) !== deckId) {
-				continue;
-			}
-
-			let fullContent = material.title;
-			try {
-				const file = this.app.vault.getAbstractFileByPath(material.filePath);
-				if (file instanceof TFile) {
-					const fileContent = await this.app.vault.cachedRead(file);
-					fullContent = this.stripYAMLFrontmatter(fileContent);
-				}
-			} catch (error) {
-				logger.warn(`[ReadingMaterialManager] 读取文件内容失败: ${material.filePath}`, error);
-				fullContent = material.title;
-			}
-
-			const extractCard: import("../../types/extract-types").ExtractCard = {
-				id: material.uuid,
-				type: this.mapCategoryToExtractType(material.category),
-				content: fullContent,
-				sourceFile: material.filePath,
-				createdAt: new Date(material.created),
-				updatedAt: new Date(material.modified),
-				completed: material.progress.percentage >= 100,
-				pinned: material.category === Category.Favorite,
-				tags: material.tags || [],
-				deckId: getReadingTopicId(material) || "default",
-			};
-
-			extractCards.push(extractCard);
-		}
-
-		logger.debug(`[ReadingMaterialManager] 获取摘录卡片: ${extractCards.length} 张`);
-		return extractCards;
-	}
-
-	/** 去掉 Markdown 顶部的 YAML frontmatter。 */
-	private stripYAMLFrontmatter(content: string): string {
-		const yamlRegex = /^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)(?:\r?\n|$)/;
-		return content.replace(yamlRegex, "").trim();
-	}
-
-	/** 根据摘录卡片状态回写阅读材料。 */
-	async updateExtractCard(card: import("../../types/extract-types").ExtractCard): Promise<boolean> {
-		const material = await this.getMaterialOrWarn(card.id, "摘录卡片对应的材料");
-		if (!material) {
-			return false;
-		}
-
-		if (card.pinned) {
-			material.category = Category.Favorite;
-		} else if (card.completed) {
-			material.category = Category.Archived;
-		}
-
-		await this.touchAndSaveMaterial(material);
-
-		logger.debug(`[ReadingMaterialManager] 更新摘录卡片: ${card.id}`);
-		return true;
-	}
-
-	/** 更新摘录卡片类型。 */
-	async updateExtractCardType(
-		cardId: string,
-		newType: import("../../types/extract-types").ExtractType
-	): Promise<boolean> {
-		const material = await this.getMaterialOrWarn(cardId, "摘录卡片对应的材料");
-		if (!material) {
-			return false;
-		}
-
-		material.category = this.mapExtractTypeToCategory(newType);
-		await this.touchAndSaveMaterial(material);
-
-		logger.debug(`[ReadingMaterialManager] 更新摘录卡片类型: ${cardId} -> ${newType}`);
-		return true;
-	}
-
-	/** 更新摘录卡片所属牌组。 */
-	async updateExtractCardDeck(cardId: string, deckId: string): Promise<boolean> {
-		const material = await this.getMaterialOrWarn(cardId, "摘录卡片对应的材料");
-		if (!material) {
-			return false;
-		}
-
-		this.assignMaterialDeck(material, deckId);
-		await this.touchAndSaveMaterial(material);
-
-		logger.debug(`[ReadingMaterialManager] 更新摘录卡片牌组: ${cardId} -> ${deckId}`);
-		return true;
-	}
-
-	/** 将摘录类型映射回阅读分类。 */
-	private mapExtractTypeToCategory(
-		type: import("../../types/extract-types").ExtractType
-	): ReadingCategory {
-		switch (type) {
-			case "note":
-				return Category.Later;
-			case "todo":
-				return Category.Reading;
-			case "important":
-				return Category.Favorite;
-			case "idea":
-				return Category.Later;
-			case "capsule":
-				return Category.Archived;
-			default:
-				return Category.Later;
-		}
-	}
-
-	/** 将阅读分类映射到摘录类型。 */
-	private mapCategoryToExtractType(
-		category: ReadingCategory
-	): import("../../types/extract-types").ExtractType {
-		switch (category) {
-			case Category.Later:
-				return "note";
-			case Category.Reading:
-				return "todo";
-			case Category.Favorite:
-				return "important";
-			case Category.Archived:
-				return "capsule";
-			default:
-				return "note";
-		}
-	}
-
-	/** 从摘录卡片数据直接创建阅读材料。 */
-	async addExtractCard(
-		extractCard: import("../../types/extract-types").ExtractCard
-	): Promise<boolean> {
-		try {
-			const now = new Date().toISOString();
-
-			const material: ReadingMaterial = {
-				uuid: extractCard.id,
-				filePath: extractCard.sourceFile,
-				title:
-					extractCard.content.substring(0, 50) + (extractCard.content.length > 50 ? "..." : ""),
-				category: this.mapExtractTypeToCategory(extractCard.type),
-				priority: 50,
-				priorityDecay: 0.5,
-				lastAccessed: now,
-				progress: {
-					anchorHistory: [],
-					percentage: 0,
-					totalWords: extractCard.content.length,
-					readWords: 0,
-					estimatedTimeRemaining: 0,
-				},
-				extractedCards: [],
-				tags: extractCard.tags || [],
-				created: now,
-				modified: now,
-				source: "manual",
-			};
-
-			this.assignMaterialDeck(material, extractCard.deckId);
-
-			if (extractCard.sourceBlock) {
-				material.progress.anchorHistory.push({
-					anchorId: extractCard.sourceBlock,
-					position: 0,
-					timestamp: now,
-					wordCount: extractCard.content.length,
-				});
-			}
-
-			await this.storage.saveMaterial(material);
-
-			logger.info(`[ReadingMaterialManager] 添加摘录卡片成功: ${extractCard.id}`);
-			return true;
-		} catch (error) {
-			logger.error("[ReadingMaterialManager] 添加摘录卡片失败:", error);
-			return false;
-		}
 	}
 }
 
@@ -1389,7 +1348,7 @@ export class ReadingMaterialManager {
 export function createReadingMaterialManager(
 	app: App,
 	storage: ReadingMaterialStorage,
-	yamlManager: YAMLFrontmatterManager
+	yamlManager: YAMLFrontmatterManager,
 ): ReadingMaterialManager {
 	return new ReadingMaterialManager(app, storage, yamlManager);
 }

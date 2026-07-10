@@ -14,7 +14,11 @@ const LOCATOR_PATH_KEYS = [
 	"rawFilePath",
 ] as const;
 
-const METADATA_PATH_KEYS = ["sourcePath", "rawFilePath", "chunkFilePath"] as const;
+const METADATA_PATH_KEYS = [
+	"sourcePath",
+	"rawFilePath",
+	"chunkFilePath",
+] as const;
 
 function sanitizePathValue(value: unknown): { next: string; changed: boolean } {
 	if (typeof value !== "string" || !value.trim()) {
@@ -31,8 +35,12 @@ function sanitizePathValue(value: unknown): { next: string; changed: boolean } {
 function sanitizeRecordPathFields(
 	record: Record<string, unknown> | undefined,
 	keys: readonly string[],
-	options?: { emptyStringKeys?: readonly string[] }
-): { next: Record<string, unknown> | undefined; changed: boolean; clearedFields: string[] } {
+	options?: { emptyStringKeys?: readonly string[] },
+): {
+	next: Record<string, unknown> | undefined;
+	changed: boolean;
+	clearedFields: string[];
+} {
 	if (!record) {
 		return { next: record, changed: false, clearedFields: [] };
 	}
@@ -91,18 +99,28 @@ export function countInvalidSourcePathFieldsInRawPoint(point: unknown): number {
 			: null;
 	for (const key of METADATA_PATH_KEYS) {
 		const value = metadata?.[key];
-		if (typeof value === "string" && value.trim() && !isValidUserReadingSourcePathShape(value)) {
+		if (
+			typeof value === "string" &&
+			value.trim() &&
+			!isValidUserReadingSourcePathShape(value)
+		) {
 			invalidCount += 1;
 		}
 	}
 
 	const locator =
 		record.trace && typeof record.trace === "object"
-			? ((record.trace as Record<string, unknown>).locator as Record<string, unknown> | undefined)
+			? ((record.trace as Record<string, unknown>).locator as
+					| Record<string, unknown>
+					| undefined)
 			: undefined;
 	for (const key of LOCATOR_PATH_KEYS) {
 		const value = locator?.[key];
-		if (typeof value === "string" && value.trim() && !isValidUserReadingSourcePathShape(value)) {
+		if (
+			typeof value === "string" &&
+			value.trim() &&
+			!isValidUserReadingSourcePathShape(value)
+		) {
 			invalidCount += 1;
 		}
 	}
@@ -130,7 +148,7 @@ export function sanitizePointSourcePathFields(point: IRPoint): {
 	if (sourceResult.changed) {
 		changed = true;
 		clearedFields.push(
-			...sourceResult.clearedFields.map((field) => `source.${field}`)
+			...sourceResult.clearedFields.map((field) => `source.${field}`),
 		);
 		nextPoint = {
 			...nextPoint,
@@ -142,16 +160,16 @@ export function sanitizePointSourcePathFields(point: IRPoint): {
 		nextPoint.metadata && typeof nextPoint.metadata === "object"
 			? ({ ...nextPoint.metadata } as Record<string, unknown>)
 			: undefined,
-		METADATA_PATH_KEYS
+		METADATA_PATH_KEYS,
 	);
 	if (metadataResult.changed) {
 		changed = true;
 		clearedFields.push(
-			...metadataResult.clearedFields.map((field) => `metadata.${field}`)
+			...metadataResult.clearedFields.map((field) => `metadata.${field}`),
 		);
 		nextPoint = {
 			...nextPoint,
-			metadata: metadataResult.next as IRPoint["metadata"],
+			metadata: metadataResult.next,
 		};
 	}
 
@@ -161,12 +179,12 @@ export function sanitizePointSourcePathFields(point: IRPoint): {
 			trace.locator && typeof trace.locator === "object"
 				? ({ ...trace.locator } as Record<string, unknown>)
 				: undefined,
-			LOCATOR_PATH_KEYS
+			LOCATOR_PATH_KEYS,
 		);
 		if (locatorResult.changed) {
 			changed = true;
 			clearedFields.push(
-				...locatorResult.clearedFields.map((field) => `trace.locator.${field}`)
+				...locatorResult.clearedFields.map((field) => `trace.locator.${field}`),
 			);
 			nextPoint = {
 				...nextPoint,

@@ -60,16 +60,21 @@ describe("openLinkWithExistingLeaf", () => {
 			},
 			vault: {
 				getAbstractFileByPath: vi.fn((path: string) =>
-					path === targetFile.path ? targetFile : null
+					path === targetFile.path ? targetFile : null,
 				),
 			},
 			workspace,
 		};
 
-		const openedLeaf = await openLinkWithExistingLeaf(app, "Notes/source.md", "Books/demo.epub", {
-			openInNewTab: true,
-			focus: true,
-		});
+		const openedLeaf = await openLinkWithExistingLeaf(
+			app,
+			"Notes/source.md",
+			"Books/demo.epub",
+			{
+				openInNewTab: true,
+				focus: true,
+			},
+		);
 
 		expect(openedLeaf).toBe(leaf);
 		expect(workspace.openLinkText).not.toHaveBeenCalled();
@@ -94,7 +99,7 @@ describe("openLinkWithExistingLeaf", () => {
 			},
 			vault: {
 				getAbstractFileByPath: vi.fn((path: string) =>
-					path === targetFile.path ? targetFile : null
+					path === targetFile.path ? targetFile : null,
 				),
 			},
 			workspace,
@@ -104,14 +109,14 @@ describe("openLinkWithExistingLeaf", () => {
 			app,
 			"[[Notes/source.md#^block]]",
 			"Books/demo.epub",
-			{ focus: true }
+			{ focus: true },
 		);
 
 		expect(workspace.openLinkText).toHaveBeenCalledWith(
 			"[[Notes/source.md#^block]]",
 			"Books/demo.epub",
 			false,
-			{ active: true }
+			{ active: true },
 		);
 	});
 });

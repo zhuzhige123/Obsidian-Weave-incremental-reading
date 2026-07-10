@@ -1059,10 +1059,6 @@
     color: var(--text-normal);
   }
 
-  .step-content strong {
-    color: var(--text-accent);
-  }
-
   /* 优先级变更日志 */
   .priority-log {
     background: var(--background-secondary);

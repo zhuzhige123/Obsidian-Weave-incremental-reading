@@ -8,7 +8,9 @@ type VaultConfigLike = {
 };
 
 function normalizeFolderPath(folderPath?: string | null): string {
-	const raw = String(folderPath || "").trim().replace(/\\/g, "/");
+	const raw = String(folderPath || "")
+		.trim()
+		.replace(/\\/g, "/");
 	if (!raw || raw === "." || raw === "/") {
 		return "/";
 	}
@@ -40,12 +42,17 @@ function getParentFolder(path: string): string {
 	return normalizePath(normalizedPath.slice(0, lastSlash));
 }
 
-function inferExistingVaultPathKind(app: App, normalizedPath: string): "file" | "folder" | null {
+function inferExistingVaultPathKind(
+	app: App,
+	normalizedPath: string,
+): "file" | "folder" | null {
 	try {
 		const abstractFile = app.vault.getAbstractFileByPath?.(normalizedPath);
 		if (!abstractFile) return null;
 
-		if (typeof (abstractFile as { extension?: unknown }).extension === "string") {
+		if (
+			typeof (abstractFile as { extension?: unknown }).extension === "string"
+		) {
 			return "file";
 		}
 
@@ -53,7 +60,8 @@ function inferExistingVaultPathKind(app: App, normalizedPath: string): "file" | 
 			return "folder";
 		}
 
-		const ctorName = (abstractFile as { constructor?: { name?: string } }).constructor?.name;
+		const ctorName = (abstractFile as { constructor?: { name?: string } })
+			.constructor?.name;
 		if (ctorName === "TFile") return "file";
 		if (ctorName === "TFolder") return "folder";
 	} catch {}
@@ -67,7 +75,10 @@ function looksLikeFilePath(normalizedPath: string): boolean {
 	return lastDot > 0 && lastDot < lastSegment.length - 1;
 }
 
-function resolveContextFolder(app: App, contextPath?: string | null): string | null {
+function resolveContextFolder(
+	app: App,
+	contextPath?: string | null,
+): string | null {
 	const rawPath = String(contextPath || "").trim();
 	if (!rawPath) {
 		return null;
@@ -96,8 +107,9 @@ function resolveContextFolder(app: App, contextPath?: string | null): string | n
 
 function getActiveFilePath(app: App): string | null {
 	try {
-		const activeFile = (app.workspace as { getActiveFile?: () => { path?: string } | null })
-			.getActiveFile?.();
+		const activeFile = (
+			app.workspace as { getActiveFile?: () => { path?: string } | null }
+		).getActiveFile?.();
 		const path = String(activeFile?.path || "").trim();
 		return path ? normalizePath(path) : null;
 	} catch {
@@ -105,7 +117,9 @@ function getActiveFilePath(app: App): string | null {
 	}
 }
 
-export function normalizeIRReadableMarkdownFolderPath(folderPath?: string | null): string {
+export function normalizeIRReadableMarkdownFolderPath(
+	folderPath?: string | null,
+): string {
 	return normalizeFolderPath(folderPath);
 }
 
@@ -114,17 +128,21 @@ export function resolveObsidianDefaultNewNoteFolder(
 	options: {
 		contextPath?: string | null;
 		allowActiveFileFallback?: boolean;
-	} = {}
+	} = {},
 ): string | null {
 	const locationValue = readString(
-		readVaultConfigValue(app, "newFileLocation") ?? readVaultConfigValue(app, "newFileDestination")
+		readVaultConfigValue(app, "newFileLocation") ??
+			readVaultConfigValue(app, "newFileDestination"),
 	).toLowerCase();
 	const configuredFolderPath = readString(
-		readVaultConfigValue(app, "newFileFolderPath") ?? readVaultConfigValue(app, "newFileFolder")
+		readVaultConfigValue(app, "newFileFolderPath") ??
+			readVaultConfigValue(app, "newFileFolder"),
 	);
 	const contextFolder =
 		resolveContextFolder(app, options.contextPath) ||
-		(options.allowActiveFileFallback ? resolveContextFolder(app, getActiveFilePath(app)) : null);
+		(options.allowActiveFileFallback
+			? resolveContextFolder(app, getActiveFilePath(app))
+			: null);
 
 	if (locationValue.includes("current")) {
 		return contextFolder;
@@ -135,7 +153,9 @@ export function resolveObsidianDefaultNewNoteFolder(
 	}
 
 	if (locationValue.includes("folder") || locationValue.includes("specified")) {
-		return configuredFolderPath ? normalizeFolderPath(configuredFolderPath) : "/";
+		return configuredFolderPath
+			? normalizeFolderPath(configuredFolderPath)
+			: "/";
 	}
 
 	if (configuredFolderPath) {
@@ -151,7 +171,7 @@ export function resolveIRReadableMarkdownTargetFolder(
 		lastSelectedFolder?: string | null;
 		contextPath?: string | null;
 		allowActiveFileFallback?: boolean;
-	} = {}
+	} = {},
 ): string {
 	const rememberedFolder = String(options.lastSelectedFolder || "").trim();
 	if (rememberedFolder) {
@@ -169,7 +189,7 @@ export function resolveIRReadableMarkdownTargetFolder(
 export async function generateUniqueVaultFilePath(
 	app: App,
 	folderPath: string,
-	fileName: string
+	fileName: string,
 ): Promise<string> {
 	const normalizedFolder = normalizeFolderPath(folderPath);
 	const normalizedFileName = String(fileName || "").trim();
@@ -179,7 +199,9 @@ export async function generateUniqueVaultFilePath(
 
 	const lastDot = normalizedFileName.lastIndexOf(".");
 	const baseName =
-		lastDot > 0 ? normalizedFileName.slice(0, lastDot).trim() : normalizedFileName;
+		lastDot > 0
+			? normalizedFileName.slice(0, lastDot).trim()
+			: normalizedFileName;
 	const extension = lastDot > 0 ? normalizedFileName.slice(lastDot) : "";
 	const baseCandidate =
 		normalizedFolder === "/"

@@ -1,6 +1,6 @@
-
 vi.mock("obsidian", () => ({
-	normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/{2,}/g, "/"),
+	normalizePath: (path: string) =>
+		path.replace(/\\/g, "/").replace(/\/{2,}/g, "/"),
 }));
 
 import {
@@ -18,7 +18,9 @@ describe("IRAssociatedNoteVisibility", () => {
 			associatedNoteScope: "point" as const,
 		};
 
-		expect(getVisibleAssociatedNotePath(material)).toBe("Folder/Linked Note.md");
+		expect(getVisibleAssociatedNotePath(material)).toBe(
+			"Folder/Linked Note.md",
+		);
 		expect(getPointAssociatedNotePath(material)).toBe("Folder/Linked Note.md");
 		expect(hasVisibleAssociatedNote(material)).toBe(true);
 		expect(hasPointAssociatedNote(material)).toBe(true);
@@ -62,10 +64,18 @@ describe("IRAssociatedNoteVisibility", () => {
 	});
 
 	it("没有路径时不显示关联笔记入口", () => {
-		expect(getVisibleAssociatedNotePath({ associatedNoteScope: "point" })).toBe("");
-		expect(getPointAssociatedNotePath({ associatedNoteScope: "point" })).toBe("");
-		expect(hasVisibleAssociatedNote({ associatedNoteScope: "point" })).toBe(false);
-		expect(hasPointAssociatedNote({ associatedNoteScope: "point" })).toBe(false);
+		expect(getVisibleAssociatedNotePath({ associatedNoteScope: "point" })).toBe(
+			"",
+		);
+		expect(getPointAssociatedNotePath({ associatedNoteScope: "point" })).toBe(
+			"",
+		);
+		expect(hasVisibleAssociatedNote({ associatedNoteScope: "point" })).toBe(
+			false,
+		);
+		expect(hasPointAssociatedNote({ associatedNoteScope: "point" })).toBe(
+			false,
+		);
 	});
 
 	it("缺少 sourceType 但 id 为 EPUB 书签时仍显示关联笔记", () => {

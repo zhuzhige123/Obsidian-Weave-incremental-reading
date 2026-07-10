@@ -132,7 +132,7 @@ describe("IRReadingPointTopicMigrationService", () => {
 		expect(pointStorageSpies.updatePointTopicIds).toHaveBeenCalledWith(
 			"pdfbm-1",
 			["deck-b"],
-			expect.any(Object)
+			expect.any(Object),
 		);
 		expect(pointWriteSpies.updateDecks).not.toHaveBeenCalled();
 	});
@@ -158,7 +158,9 @@ describe("IRReadingPointTopicMigrationService", () => {
 
 		expect(result.changed).toBe(true);
 		expect(result.kind).toBe("chunk");
-		expect(storageSpies.updateChunkDecks).toHaveBeenCalledWith("chunk-1", ["deck-b"]);
+		expect(storageSpies.updateChunkDecks).toHaveBeenCalledWith("chunk-1", [
+			"deck-b",
+		]);
 		expect(pointStorageSpies.updatePointTopicIds).not.toHaveBeenCalled();
 	});
 
@@ -181,7 +183,7 @@ describe("IRReadingPointTopicMigrationService", () => {
 		expect(pointStorageSpies.updatePointTopicIds).toHaveBeenCalledWith(
 			"point-only-1",
 			["deck-b"],
-			expect.any(Object)
+			expect.any(Object),
 		);
 	});
 });

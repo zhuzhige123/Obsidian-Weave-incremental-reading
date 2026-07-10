@@ -18,7 +18,12 @@ export function createMemoryApp(options?: {
 	const initialFiles = options?.initialFiles || {};
 	const initialDirs = options?.initialDirs || [];
 	const files = new Map<string, string>();
-	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave"]);
+	const folders = new Set<string>([
+		"",
+		".obsidian",
+		".obsidian/plugins",
+		".obsidian/plugins/weave",
+	]);
 
 	const ensureDir = (dir: string) => {
 		const normalized = normalizeTestPath(dir);
@@ -60,7 +65,8 @@ export function createMemoryApp(options?: {
 			const childFiles: string[] = [];
 
 			for (const folder of folders) {
-				if (!folder || folder === normalized || !folder.startsWith(prefix)) continue;
+				if (!folder || folder === normalized || !folder.startsWith(prefix))
+					continue;
 				const rest = folder.slice(prefix.length);
 				if (!rest || rest.includes("/")) continue;
 				childFolders.add(folder);
@@ -114,7 +120,9 @@ export function createMemoryApp(options?: {
 	const weavePlugin = {
 		settings: {
 			weaveParentFolder: "",
-			...(typeof options?.weavePlugin?.settings === "object" ? (options.weavePlugin.settings as object) : {}),
+			...(typeof options?.weavePlugin?.settings === "object"
+				? (options.weavePlugin.settings as object)
+				: {}),
 		},
 		...(options?.weavePlugin || {}),
 	};

@@ -54,7 +54,9 @@ export interface GetPdfOutlineForFileOptions {
 export const DEFAULT_PDF_OUTLINE_DIRECT_LOAD_TIMEOUT_MS = 20_000;
 export const DEFAULT_PDF_OUTLINE_BINARY_SIZE_LIMIT_BYTES = 128 * 1024 * 1024;
 
-function extractPdfDocumentFromView(view: PdfViewerViewLike | null | undefined): PdfOutlineDocumentLike | null {
+function extractPdfDocumentFromView(
+	view: PdfViewerViewLike | null | undefined,
+): PdfOutlineDocumentLike | null {
 	const pdfDocument =
 		view?.viewer?.pdfViewer?.pdfDocument ||
 		view?.pdfViewer?.pdfDocument ||
@@ -64,7 +66,10 @@ function extractPdfDocumentFromView(view: PdfViewerViewLike | null | undefined):
 	return typeof pdfDocument?.getOutline === "function" ? pdfDocument : null;
 }
 
-export function getOpenWorkspacePdfDocument(app: App, filePath: string): PdfOutlineDocumentLike | null {
+export function getOpenWorkspacePdfDocument(
+	app: App,
+	filePath: string,
+): PdfOutlineDocumentLike | null {
 	const workspace = app.workspace as PdfWorkspaceLike;
 
 	try {
@@ -81,7 +86,9 @@ export function getOpenWorkspacePdfDocument(app: App, filePath: string): PdfOutl
 			}
 		}
 
-		const recentView = workspace.getMostRecentLeaf?.()?.view as PdfViewerViewLike | undefined;
+		const recentView = workspace.getMostRecentLeaf?.()?.view as
+			| PdfViewerViewLike
+			| undefined;
 		if (recentView?.file?.path === filePath) {
 			return extractPdfDocumentFromView(recentView);
 		}
@@ -94,7 +101,7 @@ export function getOpenWorkspacePdfDocument(app: App, filePath: string): PdfOutl
 
 async function resolvePdfOutlinePageNumber(
 	pdfDocument: PdfOutlineDocumentLike,
-	item: PdfOutlineEntry
+	item: PdfOutlineEntry,
 ): Promise<number> {
 	const dest = item.dest;
 	if (!dest) {
@@ -102,13 +109,18 @@ async function resolvePdfOutlinePageNumber(
 	}
 
 	try {
-		const destArray = typeof dest === "string" ? await pdfDocument.getDestination?.(dest) : dest;
+		const destArray =
+			typeof dest === "string"
+				? await pdfDocument.getDestination?.(dest)
+				: dest;
 		if (!Array.isArray(destArray) || destArray.length === 0) {
 			return 0;
 		}
 
 		const pageIndex = await pdfDocument.getPageIndex(destArray[0]);
-		return typeof pageIndex === "number" && !Number.isNaN(pageIndex) ? pageIndex + 1 : 0;
+		return typeof pageIndex === "number" && !Number.isNaN(pageIndex)
+			? pageIndex + 1
+			: 0;
 	} catch {
 		return 0;
 	}
@@ -116,7 +128,7 @@ async function resolvePdfOutlinePageNumber(
 
 export async function extractPdfOutlineFromDocument(
 	pdfDocument: PdfOutlineDocumentLike,
-	options: Pick<GetPdfOutlineForFileOptions, "includeEntriesWithoutPage"> = {}
+	options: Pick<GetPdfOutlineForFileOptions, "includeEntriesWithoutPage"> = {},
 ): Promise<PdfOutlineItem[]> {
 	const includeEntriesWithoutPage = options.includeEntriesWithoutPage ?? true;
 
@@ -157,8 +169,11 @@ export async function extractPdfOutlineFromDocument(
 async function loadPdfDocumentFromBinary(
 	app: App,
 	pdfFile: TFile,
-	timeoutMs: number
-): Promise<{ pdfDocument: PdfOutlineDocumentLike; cleanup: () => Promise<void> } | null> {
+	timeoutMs: number,
+): Promise<{
+	pdfDocument: PdfOutlineDocumentLike;
+	cleanup: () => Promise<void>;
+} | null> {
 	const pdfjsLib = (window as Window & { pdfjsLib?: PdfJsLibLike }).pdfjsLib;
 	if (!pdfjsLib?.getDocument) {
 		return null;
@@ -171,7 +186,10 @@ async function loadPdfDocumentFromBinary(
 		const pdfDocument = await Promise.race([
 			loadingTask.promise,
 			new Promise<never>((_, reject) =>
-				window.setTimeout(() => reject(new Error("PDF load timeout")), timeoutMs)
+				window.setTimeout(
+					() => reject(new Error("PDF load timeout")),
+					timeoutMs,
+				),
 			),
 		]);
 
@@ -197,13 +215,15 @@ async function loadPdfDocumentFromBinary(
 export async function getPdfOutlineForFile(
 	app: App,
 	pdfFile: TFile,
-	options: GetPdfOutlineForFileOptions = {}
+	options: GetPdfOutlineForFileOptions = {},
 ): Promise<PdfOutlineItem[]> {
 	const includeEntriesWithoutPage = options.includeEntriesWithoutPage ?? true;
 	const preferOpenView = options.preferOpenView ?? true;
-	const directLoadTimeoutMs = options.directLoadTimeoutMs ?? DEFAULT_PDF_OUTLINE_DIRECT_LOAD_TIMEOUT_MS;
+	const directLoadTimeoutMs =
+		options.directLoadTimeoutMs ?? DEFAULT_PDF_OUTLINE_DIRECT_LOAD_TIMEOUT_MS;
 	const maxDirectLoadFileSizeBytes =
-		options.maxDirectLoadFileSizeBytes ?? DEFAULT_PDF_OUTLINE_BINARY_SIZE_LIMIT_BYTES;
+		options.maxDirectLoadFileSizeBytes ??
+		DEFAULT_PDF_OUTLINE_BINARY_SIZE_LIMIT_BYTES;
 
 	if (preferOpenView) {
 		const openPdfDocument = getOpenWorkspacePdfDocument(app, pdfFile.path);
@@ -226,7 +246,11 @@ export async function getPdfOutlineForFile(
 		return [];
 	}
 
-	const loadedPdf = await loadPdfDocumentFromBinary(app, pdfFile, directLoadTimeoutMs);
+	const loadedPdf = await loadPdfDocumentFromBinary(
+		app,
+		pdfFile,
+		directLoadTimeoutMs,
+	);
 	if (!loadedPdf) {
 		return [];
 	}

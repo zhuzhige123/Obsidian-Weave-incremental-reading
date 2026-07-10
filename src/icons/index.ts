@@ -9,12 +9,6 @@ import {
 
 // FontAwesome 图标名称映射 - 必须在getIcon函数之前定义！
 const ICON_MAPPING: Record<string, string> = {
-	// === 主要功能 ===（优化后的图标映射）
-	deckStudy: "graduation-cap", // 学习 - 使用毕业帽更直观
-	weaveCardManagement: "id-card", // 卡片管理 - 使用身份卡图标
-	cardManagement: "id-card", // 卡片管理 - 使用身份卡图标
-	aiAssistant: "robot", // AI助手 - 使用机器人图标表示AI功能
-
 	// === 基础操作 ===
 	plus: "plus",
 	trash: "trash",
@@ -251,11 +245,6 @@ export type IconName = string;
 
 // 导出常用图标名称常量，提供更好的开发体验
 export const ICON_NAMES = {
-	// === 主要功能 ===（优化后的图标常量）
-	DECK_STUDY: "deckStudy" as const, // 牌组学习 - 现在映射到graduation-cap
-	CARD_MANAGEMENT: "weaveCardManagement" as const, // 卡片管理 - 现在映射到id-card
-	AI_ASSISTANT: "aiAssistant" as const, // AI助手 - 现在映射到robot
-
 	// === 基础操作 ===
 	ADD: "plus" as const,
 	DELETE: "trash" as const,

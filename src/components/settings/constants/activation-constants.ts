@@ -270,7 +270,10 @@ export const ACTIVATION_WARNING_MESSAGES = {
 		suggestedAction: "如果这是预期的变化，请忽略此警告",
 	},
 
-	VERSION_MISMATCH_WARNING: (licenseVersion: string, currentVersion: string) => ({
+	VERSION_MISMATCH_WARNING: (
+		licenseVersion: string,
+		currentVersion: string,
+	) => ({
 		title: "版本不匹配",
 		message: `许可证版本(${licenseVersion})与当前版本(${currentVersion})不匹配`,
 		suggestedAction: "建议更新到匹配的版本以获得最佳体验",
@@ -283,7 +286,8 @@ export const ACTIVATION_WARNING_MESSAGES = {
  * 激活码帮助文本
  */
 export const ACTIVATION_HELP_TEXT = {
-	FORMAT_HELP: "激活码是一个长字符串，通常包含500-800个字符，由两部分组成并用点号分隔",
+	FORMAT_HELP:
+		"激活码是一个长字符串，通常包含500-800个字符，由两部分组成并用点号分隔",
 
 	INPUT_TIPS: [
 		"请完整复制激活码，包括所有字符",
@@ -313,10 +317,11 @@ export const ACTIVATION_HELP_TEXT = {
  * 获取错误消息
  */
 export function getActivationErrorMessage(
-	code: ActivationErrorCode
+	code: ActivationErrorCode,
 ): typeof ACTIVATION_ERROR_MESSAGES[ActivationErrorCode] {
 	return (
-		ACTIVATION_ERROR_MESSAGES[code] || ACTIVATION_ERROR_MESSAGES[ActivationErrorCode.UNKNOWN_ERROR]
+		ACTIVATION_ERROR_MESSAGES[code] ||
+		ACTIVATION_ERROR_MESSAGES[ActivationErrorCode.UNKNOWN_ERROR]
 	);
 }
 
@@ -325,7 +330,10 @@ export function getActivationErrorMessage(
  */
 export function isActivationCodeLengthValid(code: string): boolean {
 	const length = code.trim().length;
-	return length >= ACTIVATION_CODE_FORMAT.MIN_LENGTH && length <= ACTIVATION_CODE_FORMAT.MAX_LENGTH;
+	return (
+		length >= ACTIVATION_CODE_FORMAT.MIN_LENGTH &&
+		length <= ACTIVATION_CODE_FORMAT.MAX_LENGTH
+	);
 }
 
 /**

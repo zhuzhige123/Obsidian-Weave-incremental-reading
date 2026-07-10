@@ -26,7 +26,9 @@ export function isError(value: unknown): value is Error {
 /**
  * 类型守卫：检查是否包含 message 属性的错误
  */
-export function isErrorWithMessage(error: unknown): error is { message: string } {
+export function isErrorWithMessage(
+	error: unknown,
+): error is { message: string } {
 	return (
 		typeof error === "object" &&
 		error !== null &&
@@ -38,7 +40,9 @@ export function isErrorWithMessage(error: unknown): error is { message: string }
 /**
  * 类型守卫：检查是否包含 stack 属性的错误
  */
-export function isErrorWithStack(error: unknown): error is { stack: string; message: string } {
+export function isErrorWithStack(
+	error: unknown,
+): error is { stack: string; message: string } {
 	return (
 		isErrorWithMessage(error) &&
 		"stack" in error &&
@@ -65,7 +69,7 @@ export function isWeaveError(error: unknown): error is WeaveError {
 export function isFileSystemError(error: unknown): error is FileSystemError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
+	const code = error.code;
 	return (
 		code === ErrorCode.FILE_NOT_FOUND ||
 		code === ErrorCode.FILE_ALREADY_EXISTS ||
@@ -83,7 +87,7 @@ export function isFileSystemError(error: unknown): error is FileSystemError {
 export function isStorageError(error: unknown): error is StorageError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
+	const code = error.code;
 	return (
 		code === ErrorCode.STORAGE_INIT_ERROR ||
 		code === ErrorCode.STORAGE_READ_ERROR ||
@@ -99,7 +103,7 @@ export function isStorageError(error: unknown): error is StorageError {
 export function isCardError(error: unknown): error is CardError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
+	const code = error.code;
 	return (
 		code === ErrorCode.CARD_NOT_FOUND ||
 		code === ErrorCode.CARD_CREATE_ERROR ||
@@ -115,7 +119,7 @@ export function isCardError(error: unknown): error is CardError {
 export function isDeckError(error: unknown): error is DeckError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
+	const code = error.code;
 	return (
 		code === ErrorCode.DECK_NOT_FOUND ||
 		code === ErrorCode.DECK_CREATE_ERROR ||
@@ -130,7 +134,7 @@ export function isDeckError(error: unknown): error is DeckError {
 export function isAnkiConnectError(error: unknown): error is AnkiConnectError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
+	const code = error.code;
 	return (
 		code === ErrorCode.ANKICONNECT_CONNECTION_ERROR ||
 		code === ErrorCode.ANKICONNECT_API_ERROR ||
@@ -144,7 +148,7 @@ export function isAnkiConnectError(error: unknown): error is AnkiConnectError {
 export function isEditorError(error: unknown): error is EditorError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
+	const code = error.code;
 	return (
 		code === ErrorCode.EDITOR_INIT_ERROR ||
 		code === ErrorCode.EDITOR_OPEN_ERROR ||
@@ -159,7 +163,7 @@ export function isEditorError(error: unknown): error is EditorError {
 export function isTemplateError(error: unknown): error is TemplateError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
+	const code = error.code;
 	return (
 		code === ErrorCode.TEMPLATE_NOT_FOUND ||
 		code === ErrorCode.TEMPLATE_PARSE_ERROR ||
@@ -173,8 +177,11 @@ export function isTemplateError(error: unknown): error is TemplateError {
 export function isFSRSError(error: unknown): error is FSRSError {
 	if (!isWeaveError(error)) return false;
 
-	const code = (error).code;
-	return code === ErrorCode.FSRS_CALCULATION_ERROR || code === ErrorCode.FSRS_PARAMETER_ERROR;
+	const code = error.code;
+	return (
+		code === ErrorCode.FSRS_CALCULATION_ERROR ||
+		code === ErrorCode.FSRS_PARAMETER_ERROR
+	);
 }
 
 /**
@@ -222,14 +229,18 @@ export type Nullable<T> = {
  * 工具类型：深度只读
  */
 export type DeepReadonly<T> = {
-	readonly [P in keyof T]: T[P] extends Record<string, unknown> ? DeepReadonly<T[P]> : T[P];
+	readonly [P in keyof T]: T[P] extends Record<string, unknown>
+		? DeepReadonly<T[P]>
+		: T[P];
 };
 
 /**
  * 工具类型：深度部分
  */
 export type DeepPartial<T> = {
-	[P in keyof T]?: T[P] extends Record<string, unknown> ? DeepPartial<T[P]> : T[P];
+	[P in keyof T]?: T[P] extends Record<string, unknown>
+		? DeepPartial<T[P]>
+		: T[P];
 };
 
 /**
@@ -245,30 +256,26 @@ export type ArrayElement<T> = T extends (infer U)[] ? U : never;
 /**
  * 工具类型：必需属性
  */
-export type RequiredKeys<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
+export type RequiredKeys<T, K extends keyof T> = Omit<T, K> &
+	Required<Pick<T, K>>;
 
 /**
  * 工具类型：可选属性
  */
-export type OptionalKeys<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+export type OptionalKeys<T, K extends keyof T> = Omit<T, K> &
+	Partial<Pick<T, K>>;
 
 /**
  * 工具类型：提取函数参数类型
  */
-export type FunctionParameters<T extends (...args: unknown[]) => unknown> = T extends (
-	...args: infer P
-) => unknown
-	? P
-	: never;
+export type FunctionParameters<T extends (...args: unknown[]) => unknown> =
+	T extends (...args: infer P) => unknown ? P : never;
 
 /**
  * 工具类型：提取函数返回类型
  */
-export type FunctionReturn<T extends (...args: unknown[]) => unknown> = T extends (
-	...args: unknown[]
-) => infer R
-	? R
-	: never;
+export type FunctionReturn<T extends (...args: unknown[]) => unknown> =
+	T extends (...args: unknown[]) => infer R ? R : never;
 
 /**
  * 类型守卫：检查值是否为 null 或 undefined
@@ -322,7 +329,9 @@ export function isArray(value: unknown): value is unknown[] {
 /**
  * 类型守卫：检查是否为函数
  */
-export function isFunction(value: unknown): value is (...args: unknown[]) => unknown {
+export function isFunction(
+	value: unknown,
+): value is (...args: unknown[]) => unknown {
 	return typeof value === "function";
 }
 
@@ -353,7 +362,7 @@ export function safeJsonStringify(value: unknown, indent?: number): string {
  */
 export function assertDefined<T>(
 	value: T | null | undefined,
-	message?: string
+	message?: string,
 ): asserts value is T {
 	if (isNullOrUndefined(value)) {
 		throw new Error(message || "值不能为 null 或 undefined");
@@ -363,7 +372,10 @@ export function assertDefined<T>(
 /**
  * 类型断言：检查是否为字符串
  */
-export function assertString(value: unknown, message?: string): asserts value is string {
+export function assertString(
+	value: unknown,
+	message?: string,
+): asserts value is string {
 	if (!isString(value)) {
 		throw new Error(message || "值必须为字符串类型");
 	}
@@ -372,7 +384,10 @@ export function assertString(value: unknown, message?: string): asserts value is
 /**
  * 类型断言：检查是否为数字
  */
-export function assertNumber(value: unknown, message?: string): asserts value is number {
+export function assertNumber(
+	value: unknown,
+	message?: string,
+): asserts value is number {
 	if (!isNumber(value)) {
 		throw new Error(message || "值必须为数字类型");
 	}
@@ -383,7 +398,7 @@ export function assertNumber(value: unknown, message?: string): asserts value is
  */
 export function assertObject(
 	value: unknown,
-	message?: string
+	message?: string,
 ): asserts value is Record<string, unknown> {
 	if (!isObject(value)) {
 		throw new Error(message || "值必须为对象类型");

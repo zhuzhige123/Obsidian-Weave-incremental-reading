@@ -88,21 +88,33 @@ describe("IRLoadDeferService", () => {
 	});
 
 	test("load_defer 触发原因会跳过持久化，避免循环写入", async () => {
-		const { applyLoadDeferralsFromPlan } = await import("../IRLoadDeferService");
+		const { applyLoadDeferralsFromPlan } = await import(
+			"../IRLoadDeferService"
+		);
 		const app = { vault: {} } as any;
-		const applied = await applyLoadDeferralsFromPlan(app, [createDeferral("chunk-1")], {
-			reason: "load_defer",
-		});
+		const applied = await applyLoadDeferralsFromPlan(
+			app,
+			[createDeferral("chunk-1")],
+			{
+				reason: "load_defer",
+			},
+		);
 		expect(applied).toBe(0);
 		expect(mockUpdateChunkSchedule).not.toHaveBeenCalled();
 	});
 
 	test("ui_refresh 会持久化 chunk 顺延并清除手动 pin", async () => {
-		const { applyLoadDeferralsFromPlan } = await import("../IRLoadDeferService");
+		const { applyLoadDeferralsFromPlan } = await import(
+			"../IRLoadDeferService"
+		);
 		const app = { vault: {} } as any;
-		const applied = await applyLoadDeferralsFromPlan(app, [createDeferral("chunk-1")], {
-			reason: "ui_refresh",
-		});
+		const applied = await applyLoadDeferralsFromPlan(
+			app,
+			[createDeferral("chunk-1")],
+			{
+				reason: "ui_refresh",
+			},
+		);
 		expect(applied).toBe(1);
 		expect(mockUpdateChunkSchedule).toHaveBeenCalledWith("chunk-1", {
 			nextRepDate: Date.parse("2026-06-20T08:00:00"),

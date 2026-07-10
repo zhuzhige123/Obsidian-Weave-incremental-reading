@@ -1,13 +1,13 @@
-import { Notice, type App } from "obsidian";
+import { type App, Notice } from "obsidian";
+import type { IRBlockV4 } from "../../../types/ir-types";
 import { i18n } from "../../../utils/i18n";
 import { logger } from "../../../utils/logger";
 import { showObsidianConfirm } from "../../../utils/obsidian-confirm";
-import type { IRBlockV4 } from "../../../types/ir-types";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
-import { IRReadingPointTopicMigrationService } from "../reading-point-edit/IRReadingPointTopicMigrationService";
 import { IRPointWriteService } from "../IRPointWriteService";
 import { IRStorageService } from "../IRStorageService";
 import { IRV4SchedulerService } from "../IRV4SchedulerService";
+import { IRReadingPointTopicMigrationService } from "../reading-point-edit/IRReadingPointTopicMigrationService";
 import { resolveScheduleItemWriteTarget } from "./resolveScheduleItemWriteTarget";
 
 export interface IRReadingPointBatchCallbacks {
@@ -30,7 +30,7 @@ export class IRReadingPointBatchService {
 
 	constructor(
 		private readonly app: App,
-		private readonly callbacks: IRReadingPointBatchCallbacks
+		private readonly callbacks: IRReadingPointBatchCallbacks,
 	) {
 		this.pointWrite = new IRPointWriteService(app);
 		this.scheduler = new IRV4SchedulerService(app);
@@ -38,7 +38,9 @@ export class IRReadingPointBatchService {
 		this.storage = new IRStorageService(app);
 	}
 
-	async batchRemove(materials: ScheduleItem[]): Promise<IRReadingPointBatchResult> {
+	async batchRemove(
+		materials: ScheduleItem[],
+	): Promise<IRReadingPointBatchResult> {
 		const targets = dedupeMaterials(materials);
 		if (targets.length === 0) {
 			return emptyBatchResult();
@@ -51,26 +53,32 @@ export class IRReadingPointBatchService {
 				title: i18n.t("irSidebar.batch.removeTitle"),
 				confirmText: i18n.t("irSidebar.calendar.removeConfirm"),
 				confirmClass: "mod-warning",
-			}
+			},
 		);
 		if (!confirmed) {
 			return cancelledBatchResult(targets.length);
 		}
 
-		return await this.runDestructiveBatch(targets, async (material) => {
-			const writeTarget = resolveScheduleItemWriteTarget(material);
-			const removed = await this.pointWrite.deletePoint({
-				id: writeTarget.id,
-				kind: writeTarget.kind,
-			});
-			if (!removed) {
-				throw new Error(`remove-failed:${material.id}`);
-			}
-			return material.id;
-		}, "remove");
+		return await this.runDestructiveBatch(
+			targets,
+			async (material) => {
+				const writeTarget = resolveScheduleItemWriteTarget(material);
+				const removed = await this.pointWrite.deletePoint({
+					id: writeTarget.id,
+					kind: writeTarget.kind,
+				});
+				if (!removed) {
+					throw new Error(`remove-failed:${material.id}`);
+				}
+				return material.id;
+			},
+			"remove",
+		);
 	}
 
-	async batchDelete(materials: ScheduleItem[]): Promise<IRReadingPointBatchResult> {
+	async batchDelete(
+		materials: ScheduleItem[],
+	): Promise<IRReadingPointBatchResult> {
 		const targets = dedupeMaterials(materials);
 		if (targets.length === 0) {
 			return emptyBatchResult();
@@ -83,7 +91,7 @@ export class IRReadingPointBatchService {
 				title: i18n.t("irSidebar.batch.deleteTitle"),
 				confirmText: i18n.t("irMain.dialog.delete"),
 				confirmClass: "mod-warning",
-			}
+			},
 		);
 		if (!confirmed) {
 			return cancelledBatchResult(targets.length);
@@ -91,16 +99,20 @@ export class IRReadingPointBatchService {
 
 		await this.scheduler.initialize();
 
-		return await this.runDestructiveBatch(targets, async (material) => {
-			const block = await this.callbacks.resolveBlockV4(material);
-			await this.scheduler.deleteBlockV4(block, true);
-			return material.id;
-		}, "delete");
+		return await this.runDestructiveBatch(
+			targets,
+			async (material) => {
+				const block = await this.callbacks.resolveBlockV4(material);
+				await this.scheduler.deleteBlockV4(block, true);
+				return material.id;
+			},
+			"delete",
+		);
 	}
 
 	async batchMoveTopic(
 		materials: ScheduleItem[],
-		targetDeckId: string
+		targetDeckId: string,
 	): Promise<IRReadingPointBatchResult> {
 		const targets = dedupeMaterials(materials);
 		const normalizedDeckId = String(targetDeckId || "").trim();
@@ -132,7 +144,10 @@ export class IRReadingPointBatchService {
 				}
 			} catch (error) {
 				result.failed++;
-				logger.error(`[IRReadingPointBatchService] move-topic failed: ${material.id}`, error);
+				logger.error(
+					`[IRReadingPointBatchService] move-topic failed: ${material.id}`,
+					error,
+				);
 			}
 
 			if ((result.success + result.failed + result.skipped) % 10 === 0) {
@@ -151,7 +166,7 @@ export class IRReadingPointBatchService {
 	private async runDestructiveBatch(
 		targets: ScheduleItem[],
 		action: (material: ScheduleItem) => Promise<string>,
-		operation: "remove" | "delete"
+		operation: "remove" | "delete",
 	): Promise<IRReadingPointBatchResult> {
 		const result: IRReadingPointBatchResult = {
 			total: targets.length,
@@ -168,7 +183,10 @@ export class IRReadingPointBatchService {
 				result.success++;
 			} catch (error) {
 				result.failed++;
-				logger.error(`[IRReadingPointBatchService] ${operation} failed: ${material.id}`, error);
+				logger.error(
+					`[IRReadingPointBatchService] ${operation} failed: ${material.id}`,
+					error,
+				);
 			}
 
 			if ((result.success + result.failed) % 10 === 0) {
@@ -186,7 +204,7 @@ export class IRReadingPointBatchService {
 
 	private showResultNotice(
 		operation: "remove" | "delete" | "move-topic",
-		result: IRReadingPointBatchResult
+		result: IRReadingPointBatchResult,
 	): void {
 		if (result.success === 0 && result.failed === 0) {
 			return;
@@ -197,8 +215,8 @@ export class IRReadingPointBatchService {
 				operation === "remove"
 					? "irSidebar.batch.removeSuccess"
 					: operation === "delete"
-						? "irSidebar.batch.deleteSuccess"
-						: "irSidebar.batch.moveTopicSuccess";
+					? "irSidebar.batch.deleteSuccess"
+					: "irSidebar.batch.moveTopicSuccess";
 			new Notice(i18n.t(key, { count: result.success }), 2500);
 			return;
 		}
@@ -208,7 +226,7 @@ export class IRReadingPointBatchService {
 				success: result.success,
 				failed: result.failed,
 			}),
-			3500
+			3500,
 		);
 	}
 }

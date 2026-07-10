@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { readSystemClipboardText, writeSystemClipboardText } from "../system-clipboard";
+import {
+	readSystemClipboardText,
+	writeSystemClipboardText,
+} from "../system-clipboard";
 
 describe("system-clipboard", () => {
 	it("writes text through navigator.clipboard when available", async () => {

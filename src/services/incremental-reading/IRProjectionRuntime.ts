@@ -1,17 +1,25 @@
 import type { App } from "obsidian";
 import { logger } from "../../utils/logger";
 import {
-	getSharedIRCalendarDayIndexService,
 	type IRCalendarDaySummary,
+	getSharedIRCalendarDayIndexService,
 } from "./IRCalendarDayIndexService";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
 import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import { getSharedIRPointStorageService } from "./IRPointStorageService";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 
-export type IRProjectionHydrateSource = "day_index" | "tier0" | "stale_disk" | "none";
+export type IRProjectionHydrateSource =
+	| "day_index"
+	| "tier0"
+	| "stale_disk"
+	| "none";
 
-export type IRProjectionReadinessLevel = "R0_shell" | "R1_day" | "R2_month" | "R3_materials";
+export type IRProjectionReadinessLevel =
+	| "R0_shell"
+	| "R1_day"
+	| "R2_month"
+	| "R3_materials";
 
 export interface IRProjectionPriorityHydrateResult {
 	materialsByDate: Map<string, ScheduleItem[]>;
@@ -24,6 +32,8 @@ export type IRProjectionPatch = {
 	monthKeys?: string[];
 	reason?: string;
 	deckIds?: string[];
+	/** 后台 reconcile 刚算出的优先日期列表；有值时 UI 应直接合并，避免再次读取尚未落盘的投影。 */
+	reconciledMaterialsByDate?: Map<string, ScheduleItem[]>;
 	/** 后台 calendar-reconcile 失败时为 true，UI 可进入 degraded 冷却。 */
 	reconcileFailed?: boolean;
 };
@@ -106,33 +116,54 @@ export class IRProjectionRuntime {
 	 * 确保投影达到指定就绪级别（默认 R1：今日/选中日列表可交互）。
 	 * 返回已恢复的月热力与优先日期投影，供 load 编排复用，避免重复 hydrate。
 	 */
-	async ensureReady(options: IRProjectionEnsureReadyOptions = {}): Promise<IRProjectionEnsureReadyResult> {
+	async ensureReady(
+		options: IRProjectionEnsureReadyOptions = {},
+	): Promise<IRProjectionEnsureReadyResult> {
 		await this.preloadColdStartCaches();
 
 		const minLevel = options.minLevel ?? "R1_day";
 		const priorityDateKeys = Array.from(
-			new Set((options.priorityDateKeys || []).map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				(options.priorityDateKeys || [])
+					.map((key) => String(key || "").trim())
+					.filter(Boolean),
+			),
 		);
 		const monthKeys = Array.from(
-			new Set((options.monthKeys || []).map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				(options.monthKeys || [])
+					.map((key) => String(key || "").trim())
+					.filter(Boolean),
+			),
 		);
 
 		let monthHeatmap: Map<string, Record<string, number>> | null = null;
 		let projection: IRProjectionPriorityHydrateResult | null = null;
 
 		if (monthKeys.length > 0) {
-			monthHeatmap = await this.hydrateMonthHeatmapFromProjection(options.deckIds, monthKeys);
+			monthHeatmap = await this.hydrateMonthHeatmapFromProjection(
+				options.deckIds,
+				monthKeys,
+			);
 		}
 
 		if (priorityDateKeys.length > 0) {
-			projection = await this.hydratePriorityDatesFromProjection(options.deckIds, priorityDateKeys);
+			projection = await this.hydratePriorityDatesFromProjection(
+				options.deckIds,
+				priorityDateKeys,
+			);
 		}
 
-		const hasPriorityDates = priorityDateKeys.length === 0 || Boolean(projection);
-		const hasMonthHeatmap = monthKeys.length === 0 || Boolean(monthHeatmap && monthHeatmap.size > 0);
+		const hasPriorityDates =
+			priorityDateKeys.length === 0 || Boolean(projection);
+		const hasMonthHeatmap =
+			monthKeys.length === 0 || Boolean(monthHeatmap && monthHeatmap.size > 0);
 		const level = this.getReadinessLevel(hasPriorityDates, hasMonthHeatmap);
 
-		if (IRProjectionRuntime.readinessRank(level) < IRProjectionRuntime.readinessRank(minLevel)) {
+		if (
+			IRProjectionRuntime.readinessRank(level) <
+			IRProjectionRuntime.readinessRank(minLevel)
+		) {
 			logger.debug("[IRProjectionRuntime] ensureReady below target", {
 				level,
 				minLevel,
@@ -144,7 +175,10 @@ export class IRProjectionRuntime {
 		return { level, monthHeatmap, projection };
 	}
 
-	getReadinessLevel(hasPriorityDates: boolean, hasMonthHeatmap: boolean): IRProjectionReadinessLevel {
+	getReadinessLevel(
+		hasPriorityDates: boolean,
+		hasMonthHeatmap: boolean,
+	): IRProjectionReadinessLevel {
 		if (!hasPriorityDates) {
 			return "R0_shell";
 		}
@@ -177,24 +211,39 @@ export class IRProjectionRuntime {
 
 	buildReconcileSessionKey(options: IRBackgroundReconcileOptions): string {
 		const queryService = getSharedIRCalendarQueryService(this.app);
-		const cacheKey = queryService.buildQueryCacheKeyForDeckIds(options.deckIds || []);
+		const cacheKey = queryService.buildQueryCacheKeyForDeckIds(
+			options.deckIds || [],
+		);
 		const settingsFingerprint = queryService.getSettingsFingerprint();
 		const dateKeys = Array.from(
-			new Set(options.priorityDateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				options.priorityDateKeys
+					.map((key) => String(key || "").trim())
+					.filter(Boolean),
+			),
 		).sort();
-		return `${cacheKey}::${settingsFingerprint}::${dateKeys.join(",")}::${options.forceRecompute ? "force" : "normal"}`;
+		return `${cacheKey}::${settingsFingerprint}::${dateKeys.join(",")}::${
+			options.forceRecompute ? "force" : "normal"
+		}`;
 	}
 
-	markBackgroundReconcileComplete(options: IRBackgroundReconcileOptions, scheduleFingerprint?: string): void {
+	markBackgroundReconcileComplete(
+		options: IRBackgroundReconcileOptions,
+		scheduleFingerprint?: string,
+	): void {
 		const baseKey = this.buildReconcileSessionKey(options);
 		const schedulePart = String(scheduleFingerprint || "").trim();
-		this.lastReconcileSessionKey = schedulePart ? `${baseKey}::${schedulePart}` : baseKey;
+		this.lastReconcileSessionKey = schedulePart
+			? `${baseKey}::${schedulePart}`
+			: baseKey;
 	}
 
 	/**
 	 * 指纹与切片齐全时跳过后台 reconcile（原 enrich 全量查询）。
 	 */
-	async shouldSkipBackgroundReconcile(options: IRBackgroundReconcileOptions): Promise<boolean> {
+	async shouldSkipBackgroundReconcile(
+		options: IRBackgroundReconcileOptions,
+	): Promise<boolean> {
 		if (options.forceRecompute) {
 			return false;
 		}
@@ -205,30 +254,45 @@ export class IRProjectionRuntime {
 		}
 
 		const queryService = getSharedIRCalendarQueryService(this.app);
-		const cacheKey = queryService.buildQueryCacheKeyForDeckIds(options.deckIds || []);
+		const cacheKey = queryService.buildQueryCacheKeyForDeckIds(
+			options.deckIds || [],
+		);
 		const settingsFingerprint = queryService.getSettingsFingerprint();
 		let scheduleFingerprint = "";
 		try {
 			scheduleFingerprint = String(
-				(await getSharedIRScheduleIndexService(this.app).peekScheduleFingerprint()) || ""
+				(await getSharedIRScheduleIndexService(
+					this.app,
+				).peekScheduleFingerprint()) || "",
 			).trim();
 		} catch (error) {
-			logger.debug("[IRProjectionRuntime] schedule fingerprint peek failed", error);
+			logger.debug(
+				"[IRProjectionRuntime] schedule fingerprint peek failed",
+				error,
+			);
 			return false;
 		}
 		if (!scheduleFingerprint) {
-			const manifest = await getSharedIRCalendarDayIndexService(this.app).peekScopeManifest(cacheKey);
+			const manifest = await getSharedIRCalendarDayIndexService(
+				this.app,
+			).peekScopeManifest(cacheKey);
 			scheduleFingerprint = String(manifest?.scheduleFingerprint || "").trim();
 		}
 
 		const dateKeys = Array.from(
-			new Set(options.priorityDateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				options.priorityDateKeys
+					.map((key) => String(key || "").trim())
+					.filter(Boolean),
+			),
 		);
 		if (!scheduleFingerprint || dateKeys.length === 0) {
 			return false;
 		}
 
-		const fresh = await getSharedIRCalendarDayIndexService(this.app).hasFreshProjectionForPriorityDates({
+		const fresh = await getSharedIRCalendarDayIndexService(
+			this.app,
+		).hasFreshProjectionForPriorityDates({
 			cacheKey,
 			settingsFingerprint,
 			scheduleFingerprint,
@@ -243,10 +307,12 @@ export class IRProjectionRuntime {
 
 	async hydratePriorityDatesFromProjection(
 		deckIds: string[] | undefined,
-		priorityDateKeys: string[]
+		priorityDateKeys: string[],
 	): Promise<IRProjectionPriorityHydrateResult | null> {
 		const dateKeys = Array.from(
-			new Set(priorityDateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(
+				priorityDateKeys.map((key) => String(key || "").trim()).filter(Boolean),
+			),
 		);
 		if (dateKeys.length === 0) {
 			return null;
@@ -303,10 +369,10 @@ export class IRProjectionRuntime {
 
 	async hydrateMonthHeatmapFromProjection(
 		deckIds: string[] | undefined,
-		monthKeys: string[]
+		monthKeys: string[],
 	): Promise<Map<string, Record<string, number>> | null> {
 		const normalizedMonthKeys = Array.from(
-			new Set(monthKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			new Set(monthKeys.map((key) => String(key || "").trim()).filter(Boolean)),
 		);
 		if (normalizedMonthKeys.length === 0) {
 			return null;

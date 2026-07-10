@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { IRBlockV4 } from "../../types/ir-types";
+import type { IRBlockV4 } from "../../../types/ir-types";
+import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import {
 	computeAllScheduleMenuBlocks,
 	computePostponeAdjustedBlock,
 	computeScheduleModeAdjustedBlock,
 	scheduleItemToPreviewBlockV4,
 } from "../IRScheduleModePreviewService";
-import type { ScheduleItem } from "../IRCalendarScheduleItem";
 
 function createBlock(overrides: Partial<IRBlockV4> = {}): IRBlockV4 {
 	return {

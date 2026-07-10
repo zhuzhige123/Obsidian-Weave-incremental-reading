@@ -16,9 +16,9 @@ import { resolveIRImportFolder } from "../../config/paths";
 import type { IRDeck, IRDeckSettings, IRDeckStats } from "../../types/ir-types";
 import { createDefaultIRDeck } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
-import { getIncrementalReadingPlugin } from "./ir-runtime";
 import { IRStorageService } from "./IRStorageService";
 import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
+import { getIncrementalReadingPlugin } from "./ir-runtime";
 
 export class IRDeckManager {
 	private app: App;
@@ -30,7 +30,9 @@ export class IRDeckManager {
 		this.storage = storage;
 		const plugin = getIncrementalReadingPlugin(app);
 		const parentFolder = plugin?.settings?.weaveParentFolder;
-		this.chunkRoot = normalizePath(resolveIRImportFolder(chunkRoot, parentFolder));
+		this.chunkRoot = normalizePath(
+			resolveIRImportFolder(chunkRoot, parentFolder),
+		);
 	}
 
 	private async cleanAllEmptyFoldersUnderChunks(): Promise<void> {
@@ -109,7 +111,10 @@ export class IRDeckManager {
 	 */
 	private async cleanEmptyParentFolders(filePath: string): Promise<void> {
 		const normalizedFilePath = normalizePath(filePath);
-		let parentPath = normalizedFilePath.substring(0, normalizedFilePath.lastIndexOf("/"));
+		let parentPath = normalizedFilePath.substring(
+			0,
+			normalizedFilePath.lastIndexOf("/"),
+		);
 		const chunksRoot = this.chunkRoot;
 
 		while (parentPath?.startsWith(chunksRoot) && parentPath !== chunksRoot) {
@@ -137,7 +142,9 @@ export class IRDeckManager {
 		dailyReviewLimit?: number;
 		learnAheadDays?: number;
 	}): Promise<Array<{ deck: IRDeck; stats: IRDeckStats }>> {
-		const snapshot = await getSharedIRWorkspaceSnapshotService(this.app).getDeckOverview({
+		const snapshot = await getSharedIRWorkspaceSnapshotService(
+			this.app,
+		).getDeckOverview({
 			dailyNewLimit: options?.dailyNewLimit ?? 20,
 			dailyReviewLimit: options?.dailyReviewLimit ?? 50,
 			learnAheadDays: options?.learnAheadDays ?? 3,
@@ -169,7 +176,10 @@ export class IRDeckManager {
 	/**
 	 * 导入材料文件夹作为牌组
 	 */
-	async importFolder(folderPath: string, settings?: Partial<IRDeckSettings>): Promise<IRDeck> {
+	async importFolder(
+		folderPath: string,
+		settings?: Partial<IRDeckSettings>,
+	): Promise<IRDeck> {
 		// 验证文件夹存在
 		const folder = this.app.vault.getAbstractFileByPath(folderPath);
 		if (!(folder instanceof TFolder)) {
@@ -179,7 +189,7 @@ export class IRDeckManager {
 		// 检查是否已存在，同时检查 id 和 path
 		const existingDecks = await this.storage.getAllDecks();
 		const existing = Object.values(existingDecks).find(
-			(d) => d.id === folderPath || d.path === folderPath
+			(d) => d.id === folderPath || d.path === folderPath,
 		);
 		if (existing) {
 			logger.warn(`[IRDeckManager] 牌组已存在: ${folderPath}`);
@@ -227,21 +237,31 @@ export class IRDeckManager {
 	 */
 	async addBlocksToDeck(deckId: string, blockIds: string[]): Promise<void> {
 		await this.storage.addBlocksToDeck(deckId, blockIds);
-		logger.debug(`[IRDeckManager] 向牌组 ${deckId} 添加 ${blockIds.length} 个内容块`);
+		logger.debug(
+			`[IRDeckManager] 向牌组 ${deckId} 添加 ${blockIds.length} 个内容块`,
+		);
 	}
 
 	/**
 	 * 从牌组移除内容块
 	 */
-	async removeBlocksFromDeck(deckId: string, blockIds: string[]): Promise<void> {
+	async removeBlocksFromDeck(
+		deckId: string,
+		blockIds: string[],
+	): Promise<void> {
 		await this.storage.removeBlocksFromDeck(deckId, blockIds);
-		logger.debug(`[IRDeckManager] 从牌组 ${deckId} 移除 ${blockIds.length} 个内容块`);
+		logger.debug(
+			`[IRDeckManager] 从牌组 ${deckId} 移除 ${blockIds.length} 个内容块`,
+		);
 	}
 
 	/**
 	 * 更新牌组设置
 	 */
-	async updateDeckSettings(deckPath: string, settings: Partial<IRDeckSettings>): Promise<IRDeck> {
+	async updateDeckSettings(
+		deckPath: string,
+		settings: Partial<IRDeckSettings>,
+	): Promise<IRDeck> {
 		const deck = await this.storage.getDeckById(deckPath);
 		if (!deck) {
 			throw new Error(`专题不存在: ${deckPath}`);
@@ -329,7 +349,9 @@ export class IRDeckManager {
 	/**
 	 * 获取可导入的文件夹列表
 	 */
-	async getImportableFolders(): Promise<Array<{ path: string; name: string; fileCount: number }>> {
+	async getImportableFolders(): Promise<
+		Array<{ path: string; name: string; fileCount: number }>
+	> {
 		const result: Array<{ path: string; name: string; fileCount: number }> = [];
 		const existingDecks = await this.storage.getAllDecks();
 		const existingPaths = new Set(Object.keys(existingDecks));
@@ -398,7 +420,7 @@ export class IRDeckManager {
 		}
 
 		logger.info(
-			`[IRDeckManager] 刷新牌组 ${deckPath}: 新增 ${added}, 删除 ${removed}, 不变 ${unchanged}`
+			`[IRDeckManager] 刷新牌组 ${deckPath}: 新增 ${added}, 删除 ${removed}, 不变 ${unchanged}`,
 		);
 
 		return { added, removed, unchanged };

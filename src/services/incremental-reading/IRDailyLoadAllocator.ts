@@ -1,9 +1,9 @@
-import type { IRPlannedScheduleItem } from "./IRScheduleKernel";
 import {
+	type IRScheduleSortableItem,
 	isScheduleItemInitialSequenceLockedForDay,
 	sortScheduleItemsForDailyQueue,
-	type IRScheduleSortableItem,
 } from "./IRScheduleItemSort";
+import type { IRPlannedScheduleItem } from "./IRScheduleKernel";
 
 export type IRDailyLoadOverloadLevel = "normal" | "warning" | "overloaded";
 export type IRLoadDeferAction = "load_defer" | "horizon_spread";
@@ -58,10 +58,15 @@ export function clampFlowStretchPercent(value: number | undefined): number {
 	if (!Number.isFinite(raw)) {
 		return DEFAULT_FLOW_STRETCH_PERCENT;
 	}
-	return Math.max(MIN_FLOW_STRETCH_PERCENT, Math.min(MAX_FLOW_STRETCH_PERCENT, Math.round(raw)));
+	return Math.max(
+		MIN_FLOW_STRETCH_PERCENT,
+		Math.min(MAX_FLOW_STRETCH_PERCENT, Math.round(raw)),
+	);
 }
 
-export function clampMaxEstimatedMinutesPerItem(value: number | undefined): number {
+export function clampMaxEstimatedMinutesPerItem(
+	value: number | undefined,
+): number {
 	const raw = Number(value);
 	if (!Number.isFinite(raw)) {
 		return DEFAULT_MAX_ESTIMATED_MINUTES_PER_ITEM;
@@ -80,7 +85,7 @@ export function clampDailyReadingPointCap(value: number | undefined): number {
 export function computeReadingPointStretchCap(
 	baselineCount: number,
 	flowStretchPercent: number,
-	explicitStretch?: number
+	explicitStretch?: number,
 ): number {
 	if (typeof explicitStretch === "number" && Number.isFinite(explicitStretch)) {
 		return Math.max(baselineCount, Math.round(explicitStretch));
@@ -100,24 +105,28 @@ export function buildDailyLoadPolicy(input: {
 }): IRDailyLoadPolicy {
 	const baselineMinutes = Math.max(1, Number(input.baselineMinutes) || 40);
 	const flowStretchPercent = clampFlowStretchPercent(input.flowStretchPercent);
-	const dailyReadingPointCap = clampDailyReadingPointCap(input.dailyReadingPointCap);
+	const dailyReadingPointCap = clampDailyReadingPointCap(
+		input.dailyReadingPointCap,
+	);
 	return {
 		baselineMinutes,
 		flowStretchPercent,
-		maxEstimatedMinutesPerItem: clampMaxEstimatedMinutesPerItem(input.maxEstimatedMinutesPerItem),
+		maxEstimatedMinutesPerItem: clampMaxEstimatedMinutesPerItem(
+			input.maxEstimatedMinutesPerItem,
+		),
 		enableLoadBasedDefer: input.enableLoadBasedDefer !== false,
 		dailyReadingPointCap,
 		dailyReadingPointStretchCap: computeReadingPointStretchCap(
 			dailyReadingPointCap,
 			flowStretchPercent,
-			input.dailyReadingPointStretchCap
+			input.dailyReadingPointStretchCap,
 		),
 	};
 }
 
 export function computeStretchCeilingMinutes(
 	baselineMinutes: number,
-	flowStretchPercent: number
+	flowStretchPercent: number,
 ): number {
 	const baseline = Math.max(1, baselineMinutes);
 	const percent = clampFlowStretchPercent(flowStretchPercent);
@@ -126,7 +135,7 @@ export function computeStretchCeilingMinutes(
 
 export function resolveScheduleItemLoadMinutes(
 	item: IRScheduleSortableItem & { estimatedMinutes?: number },
-	maxEstimatedMinutesPerItem: number
+	maxEstimatedMinutesPerItem: number,
 ): number {
 	const raw =
 		Number(item.estimatedMinutes) ||
@@ -135,13 +144,19 @@ export function resolveScheduleItemLoadMinutes(
 	return capItemLoadMinutes(raw, maxEstimatedMinutesPerItem);
 }
 
-export function capItemLoadMinutes(estimatedMinutes: number, maxPerItem: number): number {
+export function capItemLoadMinutes(
+	estimatedMinutes: number,
+	maxPerItem: number,
+): number {
 	const raw = Math.max(0, Number(estimatedMinutes) || 0);
 	const cap = clampMaxEstimatedMinutesPerItem(maxPerItem);
 	return Math.min(Math.max(raw, 1), cap);
 }
 
-export function isItemLoadDeferPinned(item: IRScheduleSortableItem, dayKey: string): boolean {
+export function isItemLoadDeferPinned(
+	item: IRScheduleSortableItem,
+	dayKey: string,
+): boolean {
 	if (isScheduleItemInitialSequenceLockedForDay(item, dayKey)) {
 		return true;
 	}
@@ -158,7 +173,8 @@ export function computeDayOverloadLevel(input: {
 	stretchCountCeiling: number;
 	deferredCount: number;
 }): IRDailyLoadOverloadLevel {
-	const minutesOverStretch = input.assignedMinutes > input.stretchCeilingMinutes;
+	const minutesOverStretch =
+		input.assignedMinutes > input.stretchCeilingMinutes;
 	const countOverStretch = input.assignedCount > input.stretchCountCeiling;
 	if (input.deferredCount > 0 || minutesOverStretch || countOverStretch) {
 		return "overloaded";
@@ -177,17 +193,18 @@ export function allocateDailyLoadByPriority<T extends IRScheduleSortableItem>(
 	policy: IRDailyLoadPolicy,
 	options?: {
 		isPinned?: (item: T) => boolean;
-	}
+	},
 ): IRDailyLoadAllocationResult<T> {
 	const baselineMinutes = Math.max(1, policy.baselineMinutes);
 	const stretchCeilingMinutes = computeStretchCeilingMinutes(
 		baselineMinutes,
-		policy.flowStretchPercent
+		policy.flowStretchPercent,
 	);
 	const baselineCount = policy.dailyReadingPointCap;
 	const stretchCountCeiling = policy.dailyReadingPointStretchCap;
 	const sorted = sortScheduleItemsForDailyQueue(candidates, dayKey);
-	const isPinned = options?.isPinned ?? ((item) => isItemLoadDeferPinned(item, dayKey));
+	const isPinned =
+		options?.isPinned ?? ((item) => isItemLoadDeferPinned(item, dayKey));
 
 	const assigned: T[] = [];
 	const deferred: T[] = [];
@@ -195,7 +212,10 @@ export function allocateDailyLoadByPriority<T extends IRScheduleSortableItem>(
 	let deferredMinutes = 0;
 
 	for (const item of sorted) {
-		const load = resolveScheduleItemLoadMinutes(item, policy.maxEstimatedMinutesPerItem);
+		const load = resolveScheduleItemLoadMinutes(
+			item,
+			policy.maxEstimatedMinutesPerItem,
+		);
 		if (!policy.enableLoadBasedDefer || isPinned(item)) {
 			assigned.push(item);
 			assignedMinutes += load;
@@ -204,7 +224,8 @@ export function allocateDailyLoadByPriority<T extends IRScheduleSortableItem>(
 
 		const withinMinutes =
 			assigned.length === 0 || assignedMinutes + load <= stretchCeilingMinutes;
-		const withinCount = assigned.length === 0 || assigned.length + 1 <= stretchCountCeiling;
+		const withinCount =
+			assigned.length === 0 || assigned.length + 1 <= stretchCountCeiling;
 		if (withinMinutes && withinCount) {
 			assigned.push(item);
 			assignedMinutes += load;

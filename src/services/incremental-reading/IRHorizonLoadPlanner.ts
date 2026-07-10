@@ -1,10 +1,10 @@
 import {
-	buildDailyLoadPolicy,
-	computeStretchCeilingMinutes,
 	DEFAULT_HORIZON_SPREAD_DAYS,
 	type IRDailyLoadPolicy,
 	type IRLoadDeferAction,
 	type IRLoadDeferralRecord,
+	buildDailyLoadPolicy,
+	computeStretchCeilingMinutes,
 	isItemLoadDeferPinned,
 	resolveScheduleItemLoadMinutes,
 } from "./IRDailyLoadAllocator";
@@ -28,15 +28,22 @@ export function buildHorizonLoadPolicy(input: {
 }): IRHorizonLoadPolicy {
 	return {
 		...buildDailyLoadPolicy(input),
-		horizonDays: Math.max(1, Math.min(14, Math.round(Number(input.horizonDays) || DEFAULT_HORIZON_SPREAD_DAYS))),
+		horizonDays: Math.max(
+			1,
+			Math.min(
+				14,
+				Math.round(Number(input.horizonDays) || DEFAULT_HORIZON_SPREAD_DAYS),
+			),
+		),
 		enableHorizonSmoothing: input.enableHorizonSmoothing !== false,
 	};
 }
 
 function formatDateKey(date: Date): string {
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-		date.getDate()
-	).padStart(2, "0")}`;
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function startOfDay(date: Date): Date {
@@ -53,7 +60,10 @@ function addDays(base: Date, offset: number): Date {
 }
 
 function dayOffsetBetween(target: Date, base: Date): number {
-	return Math.round((startOfDay(target).getTime() - startOfDay(base).getTime()) / (24 * 60 * 60 * 1000));
+	return Math.round(
+		(startOfDay(target).getTime() - startOfDay(base).getTime()) /
+			(24 * 60 * 60 * 1000),
+	);
 }
 
 type HorizonBucket<T> = {
@@ -78,7 +88,7 @@ function buildBuckets<T extends IRPlannedScheduleItem>(
 	items: T[],
 	today: Date,
 	horizonDays: number,
-	policy: IRDailyLoadPolicy
+	policy: IRDailyLoadPolicy,
 ): HorizonBucket<T>[] {
 	const buckets: HorizonBucket<T>[] = [];
 	for (let offset = 0; offset < horizonDays; offset++) {
@@ -94,17 +104,23 @@ function buildBuckets<T extends IRPlannedScheduleItem>(
 
 	const lastKey = buckets[buckets.length - 1]?.dayKey;
 	for (const item of items) {
-		const reviewDate = item.nextReviewDate ? startOfDay(item.nextReviewDate) : today;
+		const reviewDate = item.nextReviewDate
+			? startOfDay(item.nextReviewDate)
+			: today;
 		let dayKey = formatDateKey(reviewDate);
 		const inHorizon = buckets.some((bucket) => bucket.dayKey === dayKey);
 		if (!inHorizon) {
 			dayKey = lastKey || formatDateKey(today);
 		}
-		const bucket = buckets.find((entry) => entry.dayKey === dayKey) || buckets[0];
+		const bucket =
+			buckets.find((entry) => entry.dayKey === dayKey) || buckets[0];
 		if (!bucket) {
 			continue;
 		}
-		const load = resolveScheduleItemLoadMinutes(item, policy.maxEstimatedMinutesPerItem);
+		const load = resolveScheduleItemLoadMinutes(
+			item,
+			policy.maxEstimatedMinutesPerItem,
+		);
 		bucket.items.push(item);
 		bucket.minutes += load;
 		bucket.count += 1;
@@ -115,12 +131,15 @@ function buildBuckets<T extends IRPlannedScheduleItem>(
 
 function recomputeBucketMetrics<T extends IRPlannedScheduleItem>(
 	bucket: HorizonBucket<T>,
-	policy: IRDailyLoadPolicy
+	policy: IRDailyLoadPolicy,
 ): void {
 	bucket.minutes = 0;
 	bucket.count = bucket.items.length;
 	for (const item of bucket.items) {
-		bucket.minutes += resolveScheduleItemLoadMinutes(item, policy.maxEstimatedMinutesPerItem);
+		bucket.minutes += resolveScheduleItemLoadMinutes(
+			item,
+			policy.maxEstimatedMinutesPerItem,
+		);
 	}
 }
 
@@ -129,7 +148,7 @@ function findValleyBucketIndex<T>(
 	excludeIndex: number,
 	stretchMinutes: number,
 	stretchCount: number,
-	itemLoad: number
+	itemLoad: number,
 ): number {
 	let bestIndex = -1;
 	let bestScore = Number.POSITIVE_INFINITY;
@@ -141,7 +160,8 @@ function findValleyBucketIndex<T>(
 		const projectedMinutes = bucket.minutes + itemLoad;
 		const projectedCount = bucket.count + 1;
 		const overload =
-			Math.max(0, projectedMinutes - stretchMinutes) + Math.max(0, projectedCount - stretchCount) * 3;
+			Math.max(0, projectedMinutes - stretchMinutes) +
+			Math.max(0, projectedCount - stretchCount) * 3;
 		const score = projectedMinutes + projectedCount * 2 + overload * 10;
 		if (score < bestScore) {
 			bestScore = score;
@@ -155,12 +175,14 @@ function isMovableToBucket<T extends IRPlannedScheduleItem>(
 	item: T,
 	fromBucket: HorizonBucket<T>,
 	toBucket: HorizonBucket<T>,
-	today: Date
+	_today: Date,
 ): boolean {
 	if (isItemLoadDeferPinned(item, fromBucket.dayKey)) {
 		return false;
 	}
-	const original = item.nextReviewDate ? startOfDay(item.nextReviewDate) : fromBucket.day;
+	const original = item.nextReviewDate
+		? startOfDay(item.nextReviewDate)
+		: fromBucket.day;
 	const maxDelay = getMaxDelayDays(getScheduleItemManualPriority(item));
 	const delayDays = dayOffsetBetween(toBucket.day, original);
 	if (delayDays < 0) {
@@ -175,7 +197,7 @@ function isMovableToBucket<T extends IRPlannedScheduleItem>(
 export function smoothHorizonLoad<T extends IRPlannedScheduleItem>(
 	items: T[],
 	today: Date,
-	policy: IRHorizonLoadPolicy
+	policy: IRHorizonLoadPolicy,
 ): { items: T[]; spreadRecords: IRLoadDeferralRecord[] } {
 	if (!policy.enableHorizonSmoothing || items.length === 0) {
 		return { items, spreadRecords: [] };
@@ -183,7 +205,7 @@ export function smoothHorizonLoad<T extends IRPlannedScheduleItem>(
 
 	const stretchMinutes = computeStretchCeilingMinutes(
 		policy.baselineMinutes,
-		policy.flowStretchPercent
+		policy.flowStretchPercent,
 	);
 	const stretchCount = policy.dailyReadingPointStretchCap;
 	const buckets = buildBuckets(items, today, policy.horizonDays, policy);
@@ -216,17 +238,20 @@ export function smoothHorizonLoad<T extends IRPlannedScheduleItem>(
 			.sort(
 				(a, b) =>
 					getScheduleItemManualPriority(a) - getScheduleItemManualPriority(b) ||
-					String(a.id).localeCompare(String(b.id), "zh-CN")
+					String(a.id).localeCompare(String(b.id), "zh-CN"),
 			);
 
 		for (const item of candidates) {
-			const itemLoad = resolveScheduleItemLoadMinutes(item, policy.maxEstimatedMinutesPerItem);
+			const itemLoad = resolveScheduleItemLoadMinutes(
+				item,
+				policy.maxEstimatedMinutesPerItem,
+			);
 			const valleyIndex = findValleyBucketIndex(
 				buckets,
 				peakIndex,
 				stretchMinutes,
 				stretchCount,
-				itemLoad
+				itemLoad,
 			);
 			if (valleyIndex < 0) {
 				continue;
@@ -272,7 +297,7 @@ export function findLowestLoadDayKey(
 	startIndex: number,
 	stretchMinutes: number,
 	stretchCount: number,
-	itemLoad: number
+	itemLoad: number,
 ): string | null {
 	let bestKey: string | null = null;
 	let bestScore = Number.POSITIVE_INFINITY;
@@ -284,7 +309,8 @@ export function findLowestLoadDayKey(
 		const minutes = (projectedMinutes.get(dayKey) || 0) + itemLoad;
 		const count = (projectedCount.get(dayKey) || 0) + 1;
 		const overload =
-			Math.max(0, minutes - stretchMinutes) + Math.max(0, count - stretchCount) * 3;
+			Math.max(0, minutes - stretchMinutes) +
+			Math.max(0, count - stretchCount) * 3;
 		const score = minutes + count * 2 + overload * 10;
 		if (score < bestScore) {
 			bestScore = score;
@@ -319,7 +345,7 @@ export function recordLoadDeferral(input: {
 export function spreadBunchedDueDates<T extends { nextRepDate: number }>(
 	items: T[],
 	horizonDays: number,
-	anchorMs: number
+	anchorMs: number,
 ): T[] {
 	if (items.length <= 1 || horizonDays <= 1) {
 		return items;

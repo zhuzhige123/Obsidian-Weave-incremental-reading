@@ -6,7 +6,8 @@
  */
 
 // ===== Emoji 正则（覆盖常见 Emoji 范围） =====
-const EMOJI_REGEX = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
+const EMOJI_REGEX =
+	/\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
 
 // ===== 全角标点映射 =====
 const FULLWIDTH_MAP: Record<string, string> = {
@@ -28,7 +29,10 @@ const FULLWIDTH_MAP: Record<string, string> = {
 	"\u201D": "'", // "
 };
 
-const FULLWIDTH_CHARS_REGEX = new RegExp(`[${Object.keys(FULLWIDTH_MAP).join("")}]`, "g");
+const FULLWIDTH_CHARS_REGEX = new RegExp(
+	`[${Object.keys(FULLWIDTH_MAP).join("")}]`,
+	"g",
+);
 
 /** 诊断结果 */
 export interface SyncDiagnostic {
@@ -74,7 +78,11 @@ export function hasUnsyncableChars(name: string): boolean {
  * @param isFile 是否是文件（用于检测无扩展名问题）
  * @param fullPathLength 完整路径长度（用于检测超长路径）
  */
-export function diagnoseFilename(name: string, isFile = false, fullPathLength = 0): SyncDiagnostic {
+export function diagnoseFilename(
+	name: string,
+	isFile = false,
+	fullPathLength = 0,
+): SyncDiagnostic {
 	const issues: SyncIssueType[] = [];
 
 	EMOJI_REGEX.lastIndex = 0;
@@ -141,7 +149,10 @@ export function sanitizeForSync(name: string, maxLength = 100): string {
 	result = result.replace(EMOJI_REGEX, "");
 
 	// 2. 全角标点 → 半角
-	result = result.replace(FULLWIDTH_CHARS_REGEX, (ch) => FULLWIDTH_MAP[ch] || "_");
+	result = result.replace(
+		FULLWIDTH_CHARS_REGEX,
+		(ch) => FULLWIDTH_MAP[ch] || "_",
+	);
 
 	// 3. 方括号 → 圆括号
 	result = result.replace(/\[/g, "(").replace(/\]/g, ")");
@@ -182,11 +193,19 @@ export function sanitizeForSync(name: string, maxLength = 100): string {
  */
 export function diagnosePath(relativePath: string): {
 	hasIssue: boolean;
-	segments: Array<{ index: number; segment: string; diagnostic: SyncDiagnostic }>;
+	segments: Array<{
+		index: number;
+		segment: string;
+		diagnostic: SyncDiagnostic;
+	}>;
 	fullPathTooLong: boolean;
 } {
 	const segments = relativePath.split("/");
-	const results: Array<{ index: number; segment: string; diagnostic: SyncDiagnostic }> = [];
+	const results: Array<{
+		index: number;
+		segment: string;
+		diagnostic: SyncDiagnostic;
+	}> = [];
 	let hasIssue = false;
 	const fullPathTooLong = relativePath.length > 150;
 

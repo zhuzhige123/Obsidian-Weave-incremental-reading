@@ -1,22 +1,25 @@
 import type { App } from "obsidian";
 import { logger } from "../../utils/logger";
 import { getSharedIRCalendarDayIndexService } from "./IRCalendarDayIndexService";
-import { getSharedIRDueDateIndexService } from "./IRDueDateIndexService";
-import { derivePriorityDateKeysFromSchedule, mergePriorityDateKeys } from "./IRCalendarProjectionUtils";
+import {
+	derivePriorityDateKeysFromSchedule,
+	mergePriorityDateKeys,
+} from "./IRCalendarProjectionUtils";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
 import { buildScheduleItemFromProjectedItem } from "./IRCalendarScheduleItem";
 import type { ScheduleItem } from "./IRCalendarScheduleItem";
+import { getSharedIRDueDateIndexService } from "./IRDueDateIndexService";
+import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
 import { buildScheduleFingerprintFromWorkspace } from "./IRScheduleFingerprint";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
-import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
-import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
 import {
-	getSharedIRScheduleKernel,
-	IRScheduleKernel,
 	type IRPlannedSchedule,
+	IRScheduleKernel,
 	type RecomputeOptions,
 	type ScheduleRecomputeReason,
+	getSharedIRScheduleKernel,
 } from "./IRScheduleKernel";
+import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
 
 export const IR_DATA_UPDATED_EVENT = "Weave:ir-data-updated";
 
@@ -28,7 +31,11 @@ export type UpdatedEventDetail = {
 	priorityDateKeys?: string[];
 };
 
-export type IRDataInvalidationScope = "none" | "projection" | "calendar" | "full";
+export type IRDataInvalidationScope =
+	| "none"
+	| "projection"
+	| "calendar"
+	| "full";
 
 export type BroadcastIRDataUpdatedOptions = {
 	reason?: ScheduleRecomputeReason;
@@ -57,7 +64,7 @@ function getKernel(app: App): IRScheduleKernel {
 }
 
 function resolveInvalidationScope(
-	options?: BroadcastIRDataUpdatedOptions
+	options?: BroadcastIRDataUpdatedOptions,
 ): IRDataInvalidationScope {
 	if (options?.invalidationScope) {
 		return options.invalidationScope;
@@ -68,18 +75,20 @@ function resolveInvalidationScope(
 	return "projection";
 }
 
-function dispatchIRDataUpdatedEvent(detail: UpdatedEventDetail): UpdatedEventDetail {
+function dispatchIRDataUpdatedEvent(
+	detail: UpdatedEventDetail,
+): UpdatedEventDetail {
 	window.dispatchEvent(
 		new CustomEvent<UpdatedEventDetail>(IR_DATA_UPDATED_EVENT, {
 			detail,
-		})
+		}),
 	);
 	return detail;
 }
 
 export function broadcastIRDataUpdated(
 	app: App,
-	options?: BroadcastIRDataUpdatedOptions
+	options?: BroadcastIRDataUpdatedOptions,
 ): UpdatedEventDetail {
 	const scope = resolveInvalidationScope(options);
 	const priorityDateKeys = mergePriorityDateKeys(options?.priorityDateKeys, []);
@@ -104,7 +113,10 @@ export function broadcastIRDataUpdated(
 		reason: options?.reason ?? "ui_refresh",
 		generatedAt: options?.generatedAt ?? Date.now(),
 		deckIds: options?.deckIds,
-		priorityDateKeys: priorityDateKeys.length > 0 ? priorityDateKeys : options?.priorityDateKeys,
+		priorityDateKeys:
+			priorityDateKeys.length > 0
+				? priorityDateKeys
+				: options?.priorityDateKeys,
 	});
 	if (scope === "calendar" && priorityDateKeys.length > 0) {
 		notifyProjectionPatch(app, {
@@ -137,7 +149,7 @@ export async function syncCalendarProjectionFromMaterialsByDate(
 		scheduleFingerprint: string;
 		materialsByDate: Map<string, ScheduleItem[]>;
 		priorityDateKeys?: string[];
-	}
+	},
 ): Promise<void> {
 	await getSharedIRCalendarDayIndexService(app).syncFromMaterialsByDate(input);
 }
@@ -149,7 +161,7 @@ export async function patchCalendarProjectionDaySlices(
 		settingsFingerprint: string;
 		scheduleFingerprint: string;
 		dayPatches: Map<string, ScheduleItem[]>;
-	}
+	},
 ): Promise<void> {
 	await getSharedIRCalendarDayIndexService(app).patchDaySlices(input);
 }
@@ -167,13 +179,15 @@ export function broadcastPriorityChangeUpdate(
 	options?: {
 		deckIds?: string[];
 		priorityDateKeys?: string[];
-	}
+	},
 ): UpdatedEventDetail {
 	getSharedIRWorkspaceSnapshotService(app).invalidate();
 	return broadcastIRDataUpdated(app, {
 		reason: "change_priority",
 		deckIds: options?.deckIds,
-		priorityDateKeys: mergePriorityDateKeys(options?.priorityDateKeys, [getLocalTodayDateKey()]),
+		priorityDateKeys: mergePriorityDateKeys(options?.priorityDateKeys, [
+			getLocalTodayDateKey(),
+		]),
 		invalidateScheduleCache: false,
 		invalidationScope: "none",
 	});
@@ -191,7 +205,7 @@ const FULL_INVALIDATION_RECOMPUTE_REASONS = new Set<ScheduleRecomputeReason>([
 
 export function shouldUseDeckScopedScheduleRefresh(
 	reason: ScheduleRecomputeReason,
-	options?: Pick<RecomputeOptions, "deckIds" | "priorityDateKeys">
+	options?: Pick<RecomputeOptions, "deckIds" | "priorityDateKeys">,
 ): boolean {
 	if (!options?.deckIds?.length || !options?.priorityDateKeys?.length) {
 		return false;
@@ -200,7 +214,9 @@ export function shouldUseDeckScopedScheduleRefresh(
 }
 
 /** ir-data-updated 可由 runtime.notify 单独驱动的局部刷新（避免 Sidebar 双重重载）。 */
-export function isProjectionPrimaryDataUpdate(detail?: UpdatedEventDetail): boolean {
+export function isProjectionPrimaryDataUpdate(
+	detail?: UpdatedEventDetail,
+): boolean {
 	if (!detail?.priorityDateKeys?.length || !detail.deckIds?.length) {
 		return false;
 	}
@@ -216,7 +232,7 @@ function notifyProjectionPatch(
 		priorityDateKeys?: string[];
 		deckIds?: string[];
 		reason?: string;
-	}
+	},
 ): void {
 	getSharedIRProjectionRuntime(app).notify(patch);
 }
@@ -224,13 +240,15 @@ function notifyProjectionPatch(
 export async function recomputeAndBroadcastIRData(
 	app: App,
 	reason: ScheduleRecomputeReason,
-	options?: RecomputeOptions
+	options?: RecomputeOptions,
 ): Promise<UpdatedEventDetail> {
 	try {
 		const scopedRefresh = shouldUseDeckScopedScheduleRefresh(reason, options);
 		const priorityDateKeys =
 			options?.priorityDateKeys && options.priorityDateKeys.length > 0
-				? mergePriorityDateKeys(options.priorityDateKeys, [getLocalTodayDateKey()])
+				? mergePriorityDateKeys(options.priorityDateKeys, [
+						getLocalTodayDateKey(),
+				  ])
 				: undefined;
 
 		if (scopedRefresh) {
@@ -257,9 +275,11 @@ export async function recomputeAndBroadcastIRData(
 		const l1PatchedSet = new Set(
 			(options?.l1PatchedDateKeys || [])
 				.map((key) => String(key || "").trim())
-				.filter(Boolean)
+				.filter(Boolean),
 		);
-		const projectionDateKeys = resolvedPriorityDateKeys.filter((key) => !l1PatchedSet.has(key));
+		const projectionDateKeys = resolvedPriorityDateKeys.filter(
+			(key) => !l1PatchedSet.has(key),
+		);
 
 		if (projectionDateKeys.length > 0) {
 			await syncCalendarProjectionFromPlannedSchedule(app, schedule, {
@@ -289,12 +309,18 @@ export async function recomputeAndBroadcastIRData(
 		return detail;
 	} catch (error) {
 		getSharedIRWorkspaceSnapshotService(app).invalidate();
-		logger.error("[IRScheduleRefreshService] 重排并广播失败:", { reason, options, error });
+		logger.error("[IRScheduleRefreshService] 重排并广播失败:", {
+			reason,
+			options,
+			error,
+		});
 		const detail: UpdatedEventDetail = {
 			reason,
 			generatedAt: Date.now(),
 			deckIds: options?.deckIds,
-			priorityDateKeys: mergePriorityDateKeys(options?.priorityDateKeys, [getLocalTodayDateKey()]),
+			priorityDateKeys: mergePriorityDateKeys(options?.priorityDateKeys, [
+				getLocalTodayDateKey(),
+			]),
 		};
 		return dispatchIRDataUpdatedEvent(detail);
 	}
@@ -303,16 +329,18 @@ export async function recomputeAndBroadcastIRData(
 async function syncCalendarProjectionFromPlannedSchedule(
 	app: App,
 	schedule: IRPlannedSchedule,
-	options: { deckIds: string[]; priorityDateKeys: string[] }
+	options: { deckIds: string[]; priorityDateKeys: string[] },
 ): Promise<void> {
 	try {
 		const queryService = getSharedIRCalendarQueryService(app);
 		const settingsFingerprint = queryService.getSettingsFingerprint();
-		const workspaceData = await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
-		const scheduleFingerprint = buildScheduleFingerprintFromWorkspace(workspaceData);
+		const workspaceData =
+			await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
+		const scheduleFingerprint =
+			buildScheduleFingerprintFromWorkspace(workspaceData);
 		const cacheKey = queryService.buildQueryCacheKeyForDeckIds(
 			options.deckIds,
-			undefined
+			undefined,
 		);
 		const materialsByDate = new Map<string, ScheduleItem[]>();
 		for (const dateKey of options.priorityDateKeys) {
@@ -323,7 +351,7 @@ async function syncCalendarProjectionFromPlannedSchedule(
 			const plannedItems = schedule.itemsByDate.get(normalizedDateKey) || [];
 			materialsByDate.set(
 				normalizedDateKey,
-				plannedItems.map((item) => buildScheduleItemFromProjectedItem(item))
+				plannedItems.map((item) => buildScheduleItemFromProjectedItem(item)),
 			);
 		}
 		if (materialsByDate.size === 0) {
@@ -337,6 +365,9 @@ async function syncCalendarProjectionFromPlannedSchedule(
 			priorityDateKeys: options.priorityDateKeys,
 		});
 	} catch (error) {
-		logger.debug("[IRScheduleRefreshService] Failed to sync calendar projection:", error);
+		logger.debug(
+			"[IRScheduleRefreshService] Failed to sync calendar projection:",
+			error,
+		);
 	}
 }

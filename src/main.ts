@@ -1,56 +1,97 @@
 import {
-	Menu,
 	MarkdownView,
+	Menu,
 	Notice,
 	Plugin,
 	TFile,
 	WorkspaceLeaf,
 	normalizePath,
 } from "obsidian";
-import "./styles/global.css";
+import { IRDataManagementModalObsidian } from "./components/incremental-reading/IRDataManagementModalObsidian";
+import { StandaloneIRSettingsTab } from "./components/settings/StandaloneIRSettingsTab";
 import { resolveIRImportFolder } from "./config/paths";
 import type { SelectionToIRSubmitPayload } from "./modals/SelectionToIRModal";
 import type { WebPageToIRSubmitPayload } from "./modals/WebPageToIRModal";
-import { registerExtensionsSafely } from "./utils/register-extensions-safely";
-import { isIRDeckFilePath } from "./utils/ir-internal-data-path";
 import {
-	registerEpubHost,
-	unregisterEpubHost,
 	type EpubHostIRCapabilities,
 	type EpubHostIncrementalReadingTopicOption,
 	type EpubHostReaderCapabilities,
+	registerEpubHost,
+	unregisterEpubHost,
 } from "./services/epub-integration/epub-host";
+import { createAnchorManager } from "./services/incremental-reading/AnchorManager";
 import {
-	IRHostSharedService,
+	type ExistingChunkLike,
+	applyIncrementalReadingFolderSubscriptionCandidates,
+	scanIncrementalReadingFolderSubscriptions,
+} from "./services/incremental-reading/IRFolderSubscriptionSyncService";
+import { getSharedIRHostCriticalWorkGuard } from "./services/incremental-reading/IRHostCriticalWorkGuard";
+import {
 	type IREnsureExternalDocumentChunkScheduledOptions,
+	IRHostSharedService,
 } from "./services/incremental-reading/IRHostSharedService";
-import type { ParagraphWorkbenchOpenInput } from "./services/incremental-reading/paragraph-workbench/types";
-import { IR_RUNTIME } from "./services/incremental-reading/ir-runtime";
-import { revealLeaf } from "./utils/workspace-navigation";
+import {
+	type IRLegacyStorageMigrationExecutionReport,
+	IRLegacyStorageMigrationFacade,
+	type IRLegacyStorageMigrationSummary,
+} from "./services/incremental-reading/IRLegacyStorageMigrationFacade";
+import { getSharedIRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
+import { IRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
+import { getSharedIRProjectionRuntime } from "./services/incremental-reading/IRProjectionRuntime";
 import {
 	generateUniqueVaultFilePath,
 	resolveIRReadableMarkdownTargetFolder,
 } from "./services/incremental-reading/IRReadableMarkdownPathResolver";
 import { recomputeAndBroadcastIRData } from "./services/incremental-reading/IRScheduleRefreshService";
-import { scheduleIRWorkspaceWarmup } from "./services/incremental-reading/IRWorkspaceWarmup";
-import { getSharedIRProjectionRuntime } from "./services/incremental-reading/IRProjectionRuntime";
-import { getSharedIRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
-import { IRPointStorageService } from "./services/incremental-reading/IRPointStorageService";
 import { IRStorageService } from "./services/incremental-reading/IRStorageService";
-import { createAnchorManager } from "./services/incremental-reading/AnchorManager";
+import { getSharedIRRefreshScheduler } from "./services/incremental-reading/IRRefreshScheduler";
 import {
-	createReadingMaterialManager,
 	type ReadingMaterialManager,
+	createReadingMaterialManager,
 } from "./services/incremental-reading/ReadingMaterialManager";
 import {
-	createReadingMaterialStorage,
 	type ReadingMaterialStorage,
+	createReadingMaterialStorage,
 } from "./services/incremental-reading/ReadingMaterialStorage";
-import { ReadingCategory } from "./types/incremental-reading-types";
 import { replaceSelectionInMarkdownContent } from "./services/incremental-reading/SelectionQuickCreateSourceTransform";
-import { PremiumFeatureGuard, PREMIUM_FEATURES } from "./services/premium/PremiumFeatureGuard";
+import { shouldTriggerFolderSubscriptionResyncForVaultEvent } from "./services/incremental-reading/folder-subscription-event-trigger";
+import { IR_RUNTIME } from "./services/incremental-reading/ir-runtime";
+import {
+	buildDefaultIncrementalReadingSettings,
+	normalizeIRCalendarSidebarSettings,
+	normalizeIncrementalReadingSettings,
+} from "./services/incremental-reading/ir-settings";
+import {
+	buildWebReadingPointMarkdown,
+	deriveWebPageTitleFromUrl,
+} from "./services/incremental-reading/ir-web-reading-point";
+import type { ParagraphWorkbenchOpenInput } from "./services/incremental-reading/paragraph-workbench/types";
+import { getActiveWebViewerPageContext } from "./services/obsidian/web-viewer-context";
 import { registerIRPremiumFeaturePreviewHost } from "./services/premium/IRPremiumFeaturePreviewHost";
+import {
+	PREMIUM_FEATURES,
+	PremiumFeatureGuard,
+} from "./services/premium/PremiumFeatureGuard";
 import { ensureIRPremiumFeature } from "./services/premium/ir-premium";
+import {
+	getCanvasTextCandidatesFromText,
+	resolveCanvasMenuNodeId,
+} from "./services/ui/canvas-source-locate";
+import "./styles/global.css";
+import type { CanvasMenuNode } from "./types/canvas-menu-node";
+import {
+	readCanvasNodeData,
+	readCanvasNodeText,
+} from "./types/canvas-menu-node";
+import { ReadingCategory } from "./types/incremental-reading-types";
+import {
+	DEFAULT_IR_BLOCK_META,
+	type IRBlockMeta,
+	createDefaultChunkFileData,
+	createDefaultIRDeck,
+	generateChunkId,
+	generateSourceId,
+} from "./types/ir-types";
 import type {
 	EffectiveLicenseState,
 	LicenseInfo,
@@ -58,45 +99,36 @@ import type {
 	LicensedProduct,
 } from "./types/license";
 import { DEFAULT_LICENSE_INFO, DEFAULT_LICENSE_STORE } from "./types/license";
-import { getInheritedLicensesFromLegacyWeave } from "./utils/plugin-access";
-import { findCollaboratorEpubHost } from "./utils/obsidian-plugin-registry";
-import type { CanvasMenuNode } from "./types/canvas-menu-node";
-import { readCanvasNodeData, readCanvasNodeText } from "./types/canvas-menu-node";
+import type {
+	IRCalendarSidebarSettings,
+	IncrementalReadingSettings,
+} from "./types/plugin-settings.d";
 import {
-	getLegacyPrimaryLicense,
+	type PluginUiLanguagePreference,
+	applyPluginUiLanguagePreference,
+	i18n,
+	initI18n,
+	normalizePluginUiLanguagePreference,
+	syncI18nWithObsidianLanguage,
+} from "./utils/i18n";
+import { isIRDeckFilePath } from "./utils/ir-internal-data-path";
+import {
 	LICENSED_PRODUCTS,
+	getLegacyPrimaryLicense,
 	normalizeLicenseStore,
 	resolveEffectiveLicenseState,
 } from "./utils/license-state";
 import { registerLicenseSyncBridge } from "./utils/license-sync-bridge";
-import { IRDataManagementModalObsidian } from "./components/incremental-reading/IRDataManagementModalObsidian";
-import {
-	IRLegacyStorageMigrationFacade,
-	type IRLegacyStorageMigrationExecutionReport,
-	type IRLegacyStorageMigrationSummary,
-} from "./services/incremental-reading/IRLegacyStorageMigrationFacade";
 import { licenseManager } from "./utils/licenseManager";
-import { safeOpenSettings } from "./utils/obsidian-api-safe";
-import {
-	getCanvasTextCandidatesFromText,
-	resolveCanvasMenuNodeId,
-} from "./services/ui/canvas-source-locate";
-import {
-	createDefaultChunkFileData,
-	createDefaultIRDeck,
-	DEFAULT_IR_BLOCK_META,
-	generateChunkId,
-	generateSourceId,
-	type IRBlockMeta,
-} from "./types/ir-types";
-import type {
-	IncrementalReadingSettings,
-	IRCalendarSidebarSettings,
-} from "./types/plugin-settings.d";
-import { markServiceReady } from "./utils/service-ready-event";
-import { createYAMLFrontmatterManager } from "./utils/yaml-frontmatter-utils";
-import { initI18n, syncI18nWithObsidianLanguage, applyPluginUiLanguagePreference, i18n, normalizePluginUiLanguagePreference, type PluginUiLanguagePreference } from "./utils/i18n";
 import { logger } from "./utils/logger";
+import { safeOpenSettings } from "./utils/obsidian-api-safe";
+import { showObsidianConfirm } from "./utils/obsidian-confirm";
+import { findCollaboratorEpubHost } from "./utils/obsidian-plugin-registry";
+import { getInheritedLicensesFromLegacyWeave } from "./utils/plugin-access";
+import { registerExtensionsSafely } from "./utils/register-extensions-safely";
+import { markServiceReady } from "./utils/service-ready-event";
+import { revealLeaf } from "./utils/workspace-navigation";
+import { createYAMLFrontmatterManager } from "./utils/yaml-frontmatter-utils";
 import { createContentWithMetadata } from "./utils/yaml-utils";
 import { IRCalendarView, VIEW_TYPE_IR_CALENDAR } from "./views/IRCalendarView";
 import { IRDeckView, VIEW_TYPE_IRDECK } from "./views/IRDeckView";
@@ -105,24 +137,6 @@ import {
 	IRParagraphWorkbenchView,
 	VIEW_TYPE_IR_PARAGRAPH_WORKBENCH,
 } from "./views/IRParagraphWorkbenchView";
-import { StandaloneIRSettingsTab } from "./components/settings/StandaloneIRSettingsTab";
-import {
-	buildDefaultIncrementalReadingSettings,
-	normalizeIRCalendarSidebarSettings,
-	normalizeIncrementalReadingSettings,
-} from "./services/incremental-reading/ir-settings";
-import {
-	applyIncrementalReadingFolderSubscriptionCandidates,
-	scanIncrementalReadingFolderSubscriptions,
-	type ExistingChunkLike,
-} from "./services/incremental-reading/IRFolderSubscriptionSyncService";
-import { shouldTriggerFolderSubscriptionResyncForVaultEvent } from "./services/incremental-reading/folder-subscription-event-trigger";
-import { showObsidianConfirm } from "./utils/obsidian-confirm";
-import { getActiveWebViewerPageContext } from "./services/obsidian/web-viewer-context";
-import {
-	buildWebReadingPointMarkdown,
-	deriveWebPageTitleFromUrl,
-} from "./services/incremental-reading/ir-web-reading-point";
 
 type StandaloneIRSettings = {
 	weaveParentFolder: string;
@@ -132,15 +146,11 @@ type StandaloneIRSettings = {
 	allowInheritedLicenses: boolean;
 	showPremiumFeaturesPreview?: boolean;
 	uiLanguage?: PluginUiLanguagePreference;
-	deckCardStyle?: string;
 	editorModalSize?: {
 		rememberLastSize?: boolean;
 		enableResize?: boolean;
 		width?: number;
 		height?: number;
-	};
-	ankiConnect?: Record<string, unknown> & {
-		incrementalSyncState?: unknown;
 	};
 };
 
@@ -187,23 +197,29 @@ export default class StandaloneIncrementalReadingPlugin
 	readingMaterialManager!: ReadingMaterialManager;
 
 	private workspaceViewsRegistered = false;
-	private irCalendarSidebarSettingsCache: IRCalendarSidebarSettings | null = null;
+	private irCalendarSidebarSettingsCache: IRCalendarSidebarSettings | null =
+		null;
 	private irHostSharedService: IRHostSharedService | null = null;
 	private irDeckIndexRefreshTimer: number | null = null;
+	private pendingIRDeckChangedPaths = new Set<string>();
+	private pendingIRDeckRemovedPaths = new Set<string>();
 	private incrementalReadingFolderSubscriptionResyncTimer: number | null = null;
-	private incrementalReadingFolderSubscriptionSyncPromise: Promise<number> | null = null;
+	private incrementalReadingFolderSubscriptionSyncPromise: Promise<number> | null =
+		null;
 	private deferredStartupPromise: Promise<void> | null = null;
 	private unregisterPremiumFeaturePreviewHost: (() => void) | null = null;
 
 	async onload(): Promise<void> {
 		initI18n();
-		this.registerEvent(this.app.workspace.on("layout-change", () => {
-			try {
-				syncI18nWithObsidianLanguage();
-			} catch {
-				void 0;
-			}
-		}));
+		this.registerEvent(
+			this.app.workspace.on("layout-change", () => {
+				try {
+					syncI18nWithObsidianLanguage();
+				} catch {
+					void 0;
+				}
+			}),
+		);
 		this.registerDomEvent(window, "focus", () => {
 			try {
 				syncI18nWithObsidianLanguage();
@@ -217,6 +233,7 @@ export default class StandaloneIncrementalReadingPlugin
 		licenseManager.initializeCloud(this.app);
 		this.dataStorage = {};
 		markServiceReady("dataStorage");
+		getSharedIRHostCriticalWorkGuard(this.app).register(this);
 
 		registerEpubHost(this.app, this);
 		PremiumFeatureGuard.getInstance().primeLicenseState({
@@ -230,27 +247,28 @@ export default class StandaloneIncrementalReadingPlugin
 			inheritedLicenses: this.getInheritedLicenses(),
 		});
 		PremiumFeatureGuard.getInstance().setPremiumFeaturesPreview(
-			this.settings.showPremiumFeaturesPreview ?? false
+			this.settings.showPremiumFeaturesPreview ?? false,
 		);
-		this.unregisterPremiumFeaturePreviewHost = registerIRPremiumFeaturePreviewHost(this.app, () => {
-			this.openIRPremiumSettings();
-		});
+		this.unregisterPremiumFeaturePreviewHost =
+			registerIRPremiumFeaturePreviewHost(this.app, () => {
+				this.openIRPremiumSettings();
+			});
 		registerLicenseSyncBridge(this, this);
 		this.addSettingTab(new StandaloneIRSettingsTab(this.app, this));
 		this.registerWorkspaceViews();
 		this.registerIRDeckVaultSync();
 		this.registerIncrementalReadingFolderSubscriptionWatchers();
 		this.registerCanvasNodeContextMenu();
-		void import("./services/incremental-reading/register-web-viewer-pane-menu").then(
-			({ registerWebViewerPaneMenuPatch }) => {
-				registerWebViewerPaneMenuPatch(this, this);
-			}
-		);
-		void import("./services/incremental-reading/register-web-viewer-context-menu").then(
-			({ registerWebViewerContextMenuPatch }) => {
-				registerWebViewerContextMenuPatch(this, this);
-			}
-		);
+		void import(
+			"./services/incremental-reading/register-web-viewer-pane-menu"
+		).then(({ registerWebViewerPaneMenuPatch }) => {
+			registerWebViewerPaneMenuPatch(this, this);
+		});
+		void import(
+			"./services/incremental-reading/register-web-viewer-context-menu"
+		).then(({ registerWebViewerContextMenuPatch }) => {
+			registerWebViewerContextMenuPatch(this, this);
+		});
 
 		this.addRibbonIcon("calendar", i18n.t("irCommands.openCalendar"), () => {
 			void this.activateIRCalendarView();
@@ -269,7 +287,8 @@ export default class StandaloneIncrementalReadingPlugin
 			name: i18n.t("irCommands.openActiveIrdeck"),
 			checkCallback: (checking) => {
 				const activeFile = this.app.workspace.getActiveFile();
-				const canOpen = activeFile instanceof TFile && activeFile.extension === "irdeck";
+				const canOpen =
+					activeFile instanceof TFile && activeFile.extension === "irdeck";
 				if (!checking && canOpen) {
 					void this.openIRDeckCalendar(activeFile.path);
 				}
@@ -281,7 +300,9 @@ export default class StandaloneIncrementalReadingPlugin
 			id: "create-ir-reading-point-from-selection",
 			name: i18n.t("irCommands.createFromSelection"),
 			callback: () => {
-				void this.runSelectionToIRQuickCreate(this.getSelectionContextForIRQuickCreate());
+				void this.runSelectionToIRQuickCreate(
+					this.getSelectionContextForIRQuickCreate(),
+				);
 			},
 		});
 
@@ -309,9 +330,10 @@ export default class StandaloneIncrementalReadingPlugin
 					new Notice(i18n.t("irNotices.openSupportedFileFirst"));
 					return;
 				}
-				const sourceType = activeFile.extension === "canvas"
-					? "canvas"
-					: activeFile.extension === "epub"
+				const sourceType =
+					activeFile.extension === "canvas"
+						? "canvas"
+						: activeFile.extension === "epub"
 						? "epub"
 						: "markdown";
 				void this.openParagraphReadingWorkbench({
@@ -325,7 +347,9 @@ export default class StandaloneIncrementalReadingPlugin
 			id: "sync-subscribed-folders",
 			name: i18n.t("irCommands.updateFolderSubscription"),
 			callback: () => {
-				void this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "manual" });
+				void this.syncIncrementalReadingFolderSubscriptionFromSettings({
+					trigger: "manual",
+				});
 			},
 		});
 
@@ -340,7 +364,7 @@ export default class StandaloneIncrementalReadingPlugin
 		// 注册完视图与命令后即可恢复 UI；重 I/O 与索引任务放到后台，避免拖慢 Obsidian 启动计时。
 		markServiceReady("allCoreServices");
 		void getSharedIRProjectionRuntime(this.app).preloadColdStartCaches();
-		scheduleIRWorkspaceWarmup(this.app);
+		void getSharedIRRefreshScheduler(this.app).scheduleBootstrap();
 		this.deferredStartupPromise = this.runDeferredStartupTasks();
 	}
 
@@ -353,8 +377,21 @@ export default class StandaloneIncrementalReadingPlugin
 			await this.initializeReadingMaterialServices();
 			await this.ensureDefaultIRDeckExists();
 			void getSharedIRPointStorageService(this.app).ensureRuntimeBaseline();
-			void this.refreshIRDeckIndexFromVault({ trigger: "startup", recompute: false });
-			void this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "startup" });
+			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
+				async () => {
+					await this.refreshIRDeckIndexFromVault({
+						trigger: "startup",
+						recompute: false,
+					});
+				},
+			);
+			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
+				async () => {
+					await this.syncIncrementalReadingFolderSubscriptionFromSettings({
+						trigger: "startup",
+					});
+				},
+			);
 		} catch (error) {
 			logger.warn("[Standalone IR] 后台启动任务失败", error);
 		}
@@ -379,12 +416,18 @@ export default class StandaloneIncrementalReadingPlugin
 			return;
 		}
 
-		this.registerView(VIEW_TYPE_IR_CALENDAR, (leaf) => new IRCalendarView(leaf, this));
+		this.registerView(
+			VIEW_TYPE_IR_CALENDAR,
+			(leaf) => new IRCalendarView(leaf, this),
+		);
 		this.registerView(VIEW_TYPE_IRDECK, (leaf) => new IRDeckView(leaf, this));
-		this.registerView(VIEW_TYPE_IR_FOCUS, (leaf) => new IRFocusView(leaf, this));
+		this.registerView(
+			VIEW_TYPE_IR_FOCUS,
+			(leaf) => new IRFocusView(leaf, this),
+		);
 		this.registerView(
 			VIEW_TYPE_IR_PARAGRAPH_WORKBENCH,
-			(leaf) => new IRParagraphWorkbenchView(leaf, this)
+			(leaf) => new IRParagraphWorkbenchView(leaf, this),
 		);
 		registerExtensionsSafely(
 			this,
@@ -392,7 +435,7 @@ export default class StandaloneIncrementalReadingPlugin
 			["irdeck"],
 			VIEW_TYPE_IRDECK,
 			"[Standalone IR]",
-			"Weave Incremental Reading "
+			"Weave Incremental Reading ",
 		);
 		this.workspaceViewsRegistered = true;
 	}
@@ -411,7 +454,7 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 
 		return getInheritedLicensesFromLegacyWeave(
-			this.app as Parameters<typeof getInheritedLicensesFromLegacyWeave>[0]
+			this.app as Parameters<typeof getInheritedLicensesFromLegacyWeave>[0],
 		);
 	}
 
@@ -433,7 +476,7 @@ export default class StandaloneIncrementalReadingPlugin
 			window.dispatchEvent(
 				new CustomEvent("WeaveIncrementalReading:navigate-settings", {
 					detail: { tab: "license" },
-				})
+				}),
 			);
 		}, 100);
 	}
@@ -468,10 +511,12 @@ export default class StandaloneIncrementalReadingPlugin
 		});
 		const normalizedStore = normalizeLicenseStore(
 			this.settings.license,
-			this.settings.licenseState
+			this.settings.licenseState,
 		);
 		this.settings.licenseState = normalizedStore;
-		this.settings.license = getLegacyPrimaryLicense(normalizedStore.localLicenses);
+		this.settings.license = getLegacyPrimaryLicense(
+			normalizedStore.localLicenses,
+		);
 		return (
 			JSON.stringify({
 				license: this.settings.license,
@@ -481,20 +526,22 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	async loadSettings(): Promise<void> {
-		const loaded = (await this.loadData()) as Partial<StandaloneIRSettings> | null;
+		const loaded =
+			(await this.loadData()) as Partial<StandaloneIRSettings> | null;
 		this.settings = this.normalizeSettings({
 			...DEFAULT_STANDALONE_IR_SETTINGS,
 			...(loaded ?? {}),
 		});
 		const licenseSettingsChanged = this.syncLicenseSettings();
-		this.irCalendarSidebarSettingsCache = this.normalizeIRCalendarSidebarSettings(
-			this.settings.incrementalReading.calendarSidebar
-		);
+		this.irCalendarSidebarSettingsCache =
+			this.normalizeIRCalendarSidebarSettings(
+				this.settings.incrementalReading.calendarSidebar,
+			);
 		if (licenseSettingsChanged) {
 			await this.saveData(this.settings);
 		}
 		PremiumFeatureGuard.getInstance().setPremiumFeaturesPreview(
-			this.settings.showPremiumFeaturesPreview ?? false
+			this.settings.showPremiumFeaturesPreview ?? false,
 		);
 	}
 
@@ -502,11 +549,12 @@ export default class StandaloneIncrementalReadingPlugin
 		this.settings = this.normalizeSettings(this.settings);
 		applyPluginUiLanguagePreference(this.settings.uiLanguage);
 		this.syncLicenseSettings();
-		this.irCalendarSidebarSettingsCache = this.normalizeIRCalendarSidebarSettings(
-			this.settings.incrementalReading.calendarSidebar
-		);
+		this.irCalendarSidebarSettingsCache =
+			this.normalizeIRCalendarSidebarSettings(
+				this.settings.incrementalReading.calendarSidebar,
+			);
 		PremiumFeatureGuard.getInstance().setPremiumFeaturesPreview(
-			this.settings.showPremiumFeaturesPreview ?? false
+			this.settings.showPremiumFeaturesPreview ?? false,
 		);
 		await this.saveData(this.settings);
 		await this.refreshPremiumState();
@@ -544,10 +592,16 @@ export default class StandaloneIncrementalReadingPlugin
 		this.settings = this.normalizeSettings(this.settings);
 		const settings = this.settings.incrementalReading;
 		const guard = PremiumFeatureGuard.getInstance();
-		const hasStrategy = guard.canUseFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS);
-		const hasInterleave = guard.canUseFeature(PREMIUM_FEATURES.INTERLEAVE_LEARNING_SETTINGS);
+		const hasStrategy = guard.canUseFeature(
+			PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS,
+		);
+		const hasInterleave = guard.canUseFeature(
+			PREMIUM_FEATURES.INTERLEAVE_LEARNING_SETTINGS,
+		);
 		const hasTagGroups = guard.canUseFeature(PREMIUM_FEATURES.TAG_GROUPS);
-		const hasFolderSubscription = guard.canUseFeature(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION);
+		const hasFolderSubscription = guard.canUseFeature(
+			PREMIUM_FEATURES.FOLDER_SUBSCRIPTION,
+		);
 		const hasTimer = guard.canUseFeature(PREMIUM_FEATURES.READING_TIMER);
 
 		return {
@@ -563,22 +617,26 @@ export default class StandaloneIncrementalReadingPlugin
 				  },
 			calendarSidebar: {
 				...(settings.calendarSidebar ?? {}),
-				showMaterialTimers: hasTimer ? settings.calendarSidebar?.showMaterialTimers : false,
+				showMaterialTimers: hasTimer
+					? settings.calendarSidebar?.showMaterialTimers
+					: false,
 			},
 		};
 	}
 
 	async saveIncrementalReadingSettings(
 		settings: IncrementalReadingSettings,
-		options?: { syncFolderSubscription?: boolean }
+		options?: { syncFolderSubscription?: boolean },
 	): Promise<IncrementalReadingSettings> {
 		this.settings.incrementalReading = normalizeIncrementalReadingSettings(
 			settings,
-			this.settings.weaveParentFolder
+			this.settings.weaveParentFolder,
 		);
 		await this.saveSettings();
 		if (options?.syncFolderSubscription) {
-			await this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "settings" });
+			await this.syncIncrementalReadingFolderSubscriptionFromSettings({
+				trigger: "settings",
+			});
 		}
 		return this.settings.incrementalReading;
 	}
@@ -586,10 +644,15 @@ export default class StandaloneIncrementalReadingPlugin
 	async syncIncrementalReadingFolderSubscriptionFromSettings(options?: {
 		trigger?: "startup" | "settings" | "file-change" | "manual";
 	}): Promise<number> {
-		const previous = this.incrementalReadingFolderSubscriptionSyncPromise ?? Promise.resolve(0);
+		const previous =
+			this.incrementalReadingFolderSubscriptionSyncPromise ??
+			Promise.resolve(0);
 		const current = previous
 			.catch(() => 0)
-			.then(async () => await this.performIncrementalReadingFolderSubscriptionSync(options));
+			.then(
+				async () =>
+					await this.performIncrementalReadingFolderSubscriptionSync(options),
+			);
 		this.incrementalReadingFolderSubscriptionSyncPromise = current;
 		try {
 			return await current;
@@ -605,39 +668,50 @@ export default class StandaloneIncrementalReadingPlugin
 	}): Promise<number> {
 		await this.ensureDeferredStartupComplete();
 		const trigger = options?.trigger ?? "manual";
-		if (!PremiumFeatureGuard.getInstance().canUseFeature(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)) {
+		if (
+			!PremiumFeatureGuard.getInstance().canUseFeature(
+				PREMIUM_FEATURES.FOLDER_SUBSCRIPTION,
+			)
+		) {
 			if (trigger === "manual") {
 				ensureIRPremiumFeature(this.app, PREMIUM_FEATURES.FOLDER_SUBSCRIPTION);
 			}
 			return 0;
 		}
-		const folderSubscription = this.getIncrementalReadingSettings().folderSubscription;
+		const folderSubscription =
+			this.getIncrementalReadingSettings().folderSubscription;
 		const storage = new IRStorageService(this.app);
 		await storage.initialize();
 
-		const decks = Object.values(await storage.getAllDecks()).filter((deck) => !deck.archivedAt);
+		const decks = Object.values(await storage.getAllDecks()).filter(
+			(deck) => !deck.archivedAt,
+		);
 		const deckById = new Map(
-			decks.map((deck) => [String(deck.id || "").trim(), deck] as const).filter(([deckId]) => Boolean(deckId))
+			decks
+				.map((deck) => [String(deck.id || "").trim(), deck] as const)
+				.filter(([deckId]) => Boolean(deckId)),
 		);
 		const deckNameById = Object.fromEntries(
 			decks.map((deck) => [
 				String(deck.id || "").trim(),
 				String(deck.name || "").trim() || String(deck.id || "").trim(),
-			])
+			]),
 		);
 		const subscriptionSettingsForScan = {
 			...folderSubscription,
 			rules: (folderSubscription?.rules || []).filter((rule) =>
-				deckById.has(String(rule.deckId || "").trim())
+				deckById.has(String(rule.deckId || "").trim()),
 			),
 		};
 		const chunks = Object.values(await storage.getAllChunkData());
-		const materials = this.readingMaterialStorage.getAllMaterials().map((material) => ({
-			uuid: material.uuid,
-			filePath: material.filePath,
-			readingDeckId: material.readingDeckId,
-			topicId: material.topicId,
-		}));
+		const materials = this.readingMaterialStorage
+			.getAllMaterials()
+			.map((material) => ({
+				uuid: material.uuid,
+				filePath: material.filePath,
+				readingDeckId: material.readingDeckId,
+				topicId: material.topicId,
+			}));
 		const scanResult = await scanIncrementalReadingFolderSubscriptions({
 			app: this.app,
 			settings: subscriptionSettingsForScan,
@@ -654,9 +728,13 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 
 		if (scanResult.pendingCount > 0 && trigger !== "file-change") {
-			const threshold = Number(folderSubscription?.importConfirmThreshold ?? 20);
+			const threshold = Number(
+				folderSubscription?.importConfirmThreshold ?? 20,
+			);
 			if (threshold > 0 && scanResult.pendingCount > threshold) {
-				const pendingRules = scanResult.ruleSummaries.filter((rule) => rule.pendingCount > 0);
+				const pendingRules = scanResult.ruleSummaries.filter(
+					(rule) => rule.pendingCount > 0,
+				);
 				const confirmed = await showObsidianConfirm(
 					this.app,
 					pendingRules.length <= 1
@@ -664,19 +742,22 @@ export default class StandaloneIncrementalReadingPlugin
 								pendingCount: scanResult.pendingCount,
 								threshold,
 								folderPath: pendingRules[0]?.folderPath || "",
-								deckName: pendingRules[0]?.deckName || pendingRules[0]?.deckId || "",
-							})
+								deckName:
+									pendingRules[0]?.deckName || pendingRules[0]?.deckId || "",
+						  })
 						: i18n.t("irMain.confirm.folderSubscriptionBatchMultipleRules", {
 								ruleCount: pendingRules.length,
 								pendingCount: scanResult.pendingCount,
 								threshold,
-							}),
+						  }),
 					{
 						title: i18n.t("irMain.confirm.folderSubscriptionBatchTitle"),
-						confirmText: i18n.t("irMain.confirm.folderSubscriptionBatchConfirm"),
+						confirmText: i18n.t(
+							"irMain.confirm.folderSubscriptionBatchConfirm",
+						),
 						cancelText: i18n.t("irMain.dialog.cancel"),
 						confirmClass: "mod-warning",
-					}
+					},
 				);
 				if (!confirmed) {
 					return 0;
@@ -687,33 +768,46 @@ export default class StandaloneIncrementalReadingPlugin
 		const pinToToday = folderSubscription?.initialScheduleMode !== "scheduled";
 		const irSettings = this.getIncrementalReadingSettings();
 		const todayStart = this.getIncrementalReadingTodayStart();
-		const applyResult = await applyIncrementalReadingFolderSubscriptionCandidates({
-			candidates: scanResult.candidates.map((candidate) => ({
-				...candidate,
-				deckName: candidate.deckName || deckNameById[String(candidate.rule.deckId || "").trim()] || "",
-			})),
-			pinToToday,
-			initialScheduleSpread: {
-				enabled: irSettings.enableHorizonSmoothing !== false,
-				horizonDays: Number(irSettings.horizonSpreadDays) || 7,
-				anchorMs: todayStart.getTime(),
-			},
-			getOrCreateMaterial: async (file, options) => {
-				const material = await this.readingMaterialManager.ensureMaterialForFolderSubscription(file, {
-					...options,
-					category: ReadingCategory.Later,
-				});
-				return { uuid: material.uuid };
-			},
-			setReadingDeck: async (materialId, deckId) =>
-				await this.readingMaterialManager.setReadingDeck(materialId, deckId),
-			ensureChunkScheduled: async (file, deckId, deckName, scheduleOptions) =>
-				await this.ensureExternalDocumentChunkScheduled(file, deckId, deckName, {
-					...scheduleOptions,
-					existingChunk: scheduleOptions.existingChunk,
-					readingMaterialId: scheduleOptions.readingMaterialId,
-				}),
-		});
+		const applyResult =
+			await applyIncrementalReadingFolderSubscriptionCandidates({
+				candidates: scanResult.candidates.map((candidate) => ({
+					...candidate,
+					deckName:
+						candidate.deckName ||
+						deckNameById[String(candidate.rule.deckId || "").trim()] ||
+						"",
+				})),
+				pinToToday,
+				initialScheduleSpread: {
+					enabled: irSettings.enableHorizonSmoothing !== false,
+					horizonDays: Number(irSettings.horizonSpreadDays) || 7,
+					anchorMs: todayStart.getTime(),
+				},
+				getOrCreateMaterial: async (file, options) => {
+					const material =
+						await this.readingMaterialManager.ensureMaterialForFolderSubscription(
+							file,
+							{
+								...options,
+								category: ReadingCategory.Later,
+							},
+						);
+					return { uuid: material.uuid };
+				},
+				setReadingDeck: async (materialId, deckId) =>
+					await this.readingMaterialManager.setReadingDeck(materialId, deckId),
+				ensureChunkScheduled: async (file, deckId, deckName, scheduleOptions) =>
+					await this.ensureExternalDocumentChunkScheduled(
+						file,
+						deckId,
+						deckName,
+						{
+							...scheduleOptions,
+							existingChunk: scheduleOptions.existingChunk,
+							readingMaterialId: scheduleOptions.readingMaterialId,
+						},
+					),
+			});
 		const { added, updated, unchanged } = applyResult;
 
 		const changedCount = added + updated;
@@ -721,7 +815,7 @@ export default class StandaloneIncrementalReadingPlugin
 			...new Set(
 				scanResult.candidates
 					.map((candidate) => String(candidate.rule.deckId || "").trim())
-					.filter(Boolean)
+					.filter(Boolean),
 			),
 		];
 		if (scanResult.candidates.length > 0) {
@@ -738,7 +832,7 @@ export default class StandaloneIncrementalReadingPlugin
 					updated,
 					unchanged,
 				}),
-				4500
+				4500,
 			);
 			const { IRFolderSubscriptionSyncResultModal } = await import(
 				"./modals/IRFolderSubscriptionSyncResultModal"
@@ -758,13 +852,14 @@ export default class StandaloneIncrementalReadingPlugin
 
 	getIRCalendarSidebarSettings(): IRCalendarSidebarSettings {
 		if (!this.irCalendarSidebarSettingsCache) {
-			this.irCalendarSidebarSettingsCache = this.normalizeIRCalendarSidebarSettings(
-				this.settings.incrementalReading.calendarSidebar
-			);
+			this.irCalendarSidebarSettingsCache =
+				this.normalizeIRCalendarSidebarSettings(
+					this.settings.incrementalReading.calendarSidebar,
+				);
 		}
 
 		const canUseTimer = PremiumFeatureGuard.getInstance().canUseFeature(
-			PREMIUM_FEATURES.READING_TIMER
+			PREMIUM_FEATURES.READING_TIMER,
 		);
 		return {
 			...this.irCalendarSidebarSettingsCache,
@@ -777,7 +872,9 @@ export default class StandaloneIncrementalReadingPlugin
 		};
 	}
 
-	async saveIRCalendarSidebarSettings(settings: Partial<IRCalendarSidebarSettings>): Promise<void> {
+	async saveIRCalendarSidebarSettings(
+		settings: Partial<IRCalendarSidebarSettings>,
+	): Promise<void> {
 		const current = this.getIRCalendarSidebarSettings();
 		const next = this.normalizeIRCalendarSidebarSettings({
 			...current,
@@ -792,12 +889,15 @@ export default class StandaloneIncrementalReadingPlugin
 		await this.saveSettings();
 	}
 
-	async activateIRCalendarView(options: {
-		preferredLeaf?: WorkspaceLeaf;
-		state?: Record<string, unknown>;
-	} = {}): Promise<void> {
+	async activateIRCalendarView(
+		options: {
+			preferredLeaf?: WorkspaceLeaf;
+			state?: Record<string, unknown>;
+		} = {},
+	): Promise<void> {
 		const { workspace } = this.app;
-		let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(VIEW_TYPE_IR_CALENDAR)[0] || null;
+		let leaf: WorkspaceLeaf | null =
+			workspace.getLeavesOfType(VIEW_TYPE_IR_CALENDAR)[0] || null;
 		if (!leaf) {
 			leaf = workspace.getLeftLeaf(false) ?? workspace.getLeftLeaf(true);
 		}
@@ -819,7 +919,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 	async openParagraphReadingWorkbench(
 		input: ParagraphWorkbenchOpenInput,
-		options: { preferredLeaf?: WorkspaceLeaf } = {}
+		options: { preferredLeaf?: WorkspaceLeaf } = {},
 	): Promise<void> {
 		const sourcePath = normalizePath(String(input.sourcePath || "").trim());
 		if (!sourcePath) {
@@ -827,7 +927,7 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 
 		const { workspace } = this.app;
-		let leaf =
+		const leaf =
 			workspace.getLeavesOfType(VIEW_TYPE_IR_PARAGRAPH_WORKBENCH)[0] ||
 			options.preferredLeaf ||
 			workspace.getLeaf("tab");
@@ -847,19 +947,28 @@ export default class StandaloneIncrementalReadingPlugin
 		revealLeaf(this.app, leaf);
 	}
 
-	async openIRDeckCalendar(filePath: string, preferredLeaf?: WorkspaceLeaf): Promise<void> {
+	async openIRDeckCalendar(
+		filePath: string,
+		preferredLeaf?: WorkspaceLeaf,
+	): Promise<void> {
 		const normalizedPath = normalizePath(String(filePath || "").trim());
 		if (!normalizedPath) {
 			throw new Error("irdeck-path-empty");
 		}
 
 		let focusDeckId = "";
-		let focusDeckName = normalizedPath.split("/").pop()?.replace(/\.irdeck$/i, "") || "";
+		let focusDeckName =
+			normalizedPath
+				.split("/")
+				.pop()
+				?.replace(/\.irdeck$/i, "") || "";
 		try {
-			const pointReadService = await import("./services/incremental-reading/IRPointDataReadService");
-			const entry = await new pointReadService.IRPointDataReadService(this.app).getPointFileEntryByPath(
-				normalizedPath
+			const pointReadService = await import(
+				"./services/incremental-reading/IRPointDataReadService"
 			);
+			const entry = await new pointReadService.IRPointDataReadService(
+				this.app,
+			).getPointFileEntryByPath(normalizedPath);
 			focusDeckId = String(entry?.topicId || "").trim();
 			focusDeckName = String(entry?.topicName || "").trim() || focusDeckName;
 		} catch (error) {
@@ -894,11 +1003,15 @@ export default class StandaloneIncrementalReadingPlugin
 			return;
 		}
 
-		const { notifyEpubReaderUnavailable } = await import("./utils/epub-reader-access");
+		const { notifyEpubReaderUnavailable } = await import(
+			"./utils/epub-reader-access"
+		);
 		notifyEpubReaderUnavailable(this.app);
 	}
 
-	async getAvailableEpubIncrementalReadingTopics(): Promise<EpubHostIncrementalReadingTopicOption[]> {
+	async getAvailableEpubIncrementalReadingTopics(): Promise<
+		EpubHostIncrementalReadingTopicOption[]
+	> {
 		return await this.getIRHostSharedService().getAvailableEpubIncrementalReadingTopics();
 	}
 
@@ -912,7 +1025,7 @@ export default class StandaloneIncrementalReadingPlugin
 		await this.getIRHostSharedService().scheduleEpubChapterForIncrementalReading(
 			options,
 			this.resolveIRDeckById.bind(this),
-			this.pickIRDeck.bind(this)
+			this.pickIRDeck.bind(this),
 		);
 	}
 
@@ -925,7 +1038,7 @@ export default class StandaloneIncrementalReadingPlugin
 	}): Promise<void> {
 		await this.getIRHostSharedService().markEpubResumePointFromReader(
 			options,
-			this.resolveIRDeckById.bind(this)
+			this.resolveIRDeckById.bind(this),
 		);
 	}
 
@@ -936,7 +1049,9 @@ export default class StandaloneIncrementalReadingPlugin
 		successNotice?: string;
 		initialTitle?: string;
 	}): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(String(options.filePath || "").trim());
+		const file = this.app.vault.getAbstractFileByPath(
+			String(options.filePath || "").trim(),
+		);
 		if (!(file instanceof TFile)) {
 			new Notice(i18n.t("irNotices.sourceFileNotFound"), 3000);
 			return;
@@ -969,7 +1084,10 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	normalizeImportFolder(folderPath?: string | null): string {
-		return resolveIRImportFolder(String(folderPath || "").trim(), this.settings.weaveParentFolder);
+		return resolveIRImportFolder(
+			String(folderPath || "").trim(),
+			this.settings.weaveParentFolder,
+		);
 	}
 
 	private getIRHostSharedService(): IRHostSharedService {
@@ -980,30 +1098,33 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	private normalizeSettings(
-		input: Partial<StandaloneIRSettings> | StandaloneIRSettings
+		input: Partial<StandaloneIRSettings> | StandaloneIRSettings,
 	): StandaloneIRSettings {
 		const weaveParentFolder = String(input.weaveParentFolder || "").trim();
-		const showPremiumFeaturesPreview = input.showPremiumFeaturesPreview === true;
+		const showPremiumFeaturesPreview =
+			input.showPremiumFeaturesPreview === true;
 		const uiLanguage = normalizePluginUiLanguagePreference(input.uiLanguage);
-		const licenseState = normalizeLicenseStore(input.license, input.licenseState);
+		const licenseState = normalizeLicenseStore(
+			input.license,
+			input.licenseState,
+		);
 		return {
 			weaveParentFolder,
 			incrementalReading: normalizeIncrementalReadingSettings(
 				input.incrementalReading ?? DEFAULT_INCREMENTAL_READING_SETTINGS,
-				weaveParentFolder
+				weaveParentFolder,
 			),
 			license: getLegacyPrimaryLicense(licenseState.localLicenses),
 			licenseState,
 			allowInheritedLicenses: input.allowInheritedLicenses !== false,
 			showPremiumFeaturesPreview,
 			uiLanguage,
-			deckCardStyle: input.deckCardStyle,
 			editorModalSize: input.editorModalSize,
 		};
 	}
 
 	private normalizeIRCalendarSidebarSettings(
-		settings?: Partial<IRCalendarSidebarSettings> | null
+		settings?: Partial<IRCalendarSidebarSettings> | null,
 	): IRCalendarSidebarSettings {
 		return normalizeIRCalendarSidebarSettings(settings);
 	}
@@ -1016,8 +1137,14 @@ export default class StandaloneIncrementalReadingPlugin
 		await storage.initialize();
 		const yamlManager = createYAMLFrontmatterManager(this.app);
 		this.readingMaterialStorage = storage;
-		this.readingMaterialManager = createReadingMaterialManager(this.app, storage, yamlManager);
-		this.readingMaterialManager.setAnchorManager(createAnchorManager(this.app, storage, yamlManager));
+		this.readingMaterialManager = createReadingMaterialManager(
+			this.app,
+			storage,
+			yamlManager,
+		);
+		this.readingMaterialManager.setAnchorManager(
+			createAnchorManager(this.app, storage, yamlManager),
+		);
 		markServiceReady("readingMaterialManager");
 	}
 
@@ -1032,32 +1159,40 @@ export default class StandaloneIncrementalReadingPlugin
 		const deck = createDefaultIRDeck(DEFAULT_DECK_NAME());
 		deck.path = deck.id;
 		await storage.saveDeck(deck);
-		logger.info("[Standalone IR] 已创建默认专题", { deckId: deck.id, name: deck.name });
+		logger.info("[Standalone IR] 已创建默认专题", {
+			deckId: deck.id,
+			name: deck.name,
+		});
 	}
 
 	private registerCanvasNodeContextMenu(): void {
 		this.registerEvent(
-			this.app.workspace.on("canvas:node-menu", (menu: Menu, node: CanvasMenuNode) => {
-				try {
-					if (!this.shouldShowPremiumEntry(PREMIUM_FEATURES.INCREMENTAL_READING)) {
-						return;
-					}
+			this.app.workspace.on(
+				"canvas:node-menu",
+				(menu: Menu, node: CanvasMenuNode) => {
+					try {
+						if (
+							!this.shouldShowPremiumEntry(PREMIUM_FEATURES.INCREMENTAL_READING)
+						) {
+							return;
+						}
 
-					const nodeContent = readCanvasNodeText(node);
-					if (!nodeContent) {
-						return;
-					}
+						const nodeContent = readCanvasNodeText(node);
+						if (!nodeContent) {
+							return;
+						}
 
-					menu.addItem((item) => {
-						item.setTitle(i18n.t("irCommands.addToIrDeck"));
-						item.setIcon("book-plus");
-						const submenu = item.setSubmenu();
-						void this.buildCanvasIRDeckSubmenu(submenu, node);
-					});
-				} catch (error) {
-					logger.error("[Standalone IR] 注册 Canvas 节点菜单失败:", error);
-				}
-			})
+						menu.addItem((item) => {
+							item.setTitle(i18n.t("irCommands.addToIrDeck"));
+							item.setIcon("book-plus");
+							const submenu = item.setSubmenu();
+							void this.buildCanvasIRDeckSubmenu(submenu, node);
+						});
+					} catch (error) {
+						logger.error("[Standalone IR] 注册 Canvas 节点菜单失败:", error);
+					}
+				},
+			),
 		);
 	}
 
@@ -1065,9 +1200,13 @@ export default class StandaloneIncrementalReadingPlugin
 		const handleFileChange = (
 			file: TFile,
 			eventType: "create" | "rename",
-			legacyPath?: string
+			legacyPath?: string,
 		) => {
-			void this.handleIncrementalReadingFolderSubscriptionFileChange(file, eventType, legacyPath);
+			void this.handleIncrementalReadingFolderSubscriptionFileChange(
+				file,
+				eventType,
+				legacyPath,
+			);
 		};
 
 		this.registerEvent(
@@ -1075,24 +1214,25 @@ export default class StandaloneIncrementalReadingPlugin
 				if (file instanceof TFile) {
 					handleFileChange(file, "create");
 				}
-			})
+			}),
 		);
 		this.registerEvent(
 			this.app.vault.on("rename", (file, oldPath) => {
 				if (file instanceof TFile) {
 					handleFileChange(file, "rename", oldPath);
 				}
-			})
+			}),
 		);
 	}
 
 	private async handleIncrementalReadingFolderSubscriptionFileChange(
 		file: TFile,
 		eventType: "create" | "rename",
-		legacyPath?: string
+		legacyPath?: string,
 	): Promise<void> {
 		try {
-			const folderSubscription = this.getIncrementalReadingSettings().folderSubscription;
+			const folderSubscription =
+				this.getIncrementalReadingSettings().folderSubscription;
 			if (file.extension !== "md") {
 				return;
 			}
@@ -1115,27 +1255,79 @@ export default class StandaloneIncrementalReadingPlugin
 		if (this.incrementalReadingFolderSubscriptionResyncTimer !== null) {
 			window.clearTimeout(this.incrementalReadingFolderSubscriptionResyncTimer);
 		}
-		this.incrementalReadingFolderSubscriptionResyncTimer = window.setTimeout(() => {
-			this.incrementalReadingFolderSubscriptionResyncTimer = null;
-			void this.syncIncrementalReadingFolderSubscriptionFromSettings({ trigger: "file-change" });
-		}, 300);
+		this.incrementalReadingFolderSubscriptionResyncTimer = window.setTimeout(
+			() => {
+				this.incrementalReadingFolderSubscriptionResyncTimer = null;
+				getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
+					async () => {
+						await this.syncIncrementalReadingFolderSubscriptionFromSettings({
+							trigger: "file-change",
+						});
+					},
+				);
+			},
+			300,
+		);
 	}
 
 	private registerIRDeckVaultSync(): void {
-		const scheduleRefreshForPathChange = (nextPath?: string | null, previousPath?: string | null) => {
-			if (!isIRDeckFilePath(nextPath) && !isIRDeckFilePath(previousPath)) {
+		const queuePathChange = (options: {
+			path?: string | null;
+			previousPath?: string | null;
+			deleted?: boolean;
+		}) => {
+			if (options.previousPath && isIRDeckFilePath(options.previousPath)) {
+				const normalizedPrevious = normalizePath(options.previousPath);
+				this.pendingIRDeckRemovedPaths.add(normalizedPrevious);
+				this.pendingIRDeckChangedPaths.delete(normalizedPrevious);
+			}
+
+			if (options.deleted && options.path && isIRDeckFilePath(options.path)) {
+				const normalized = normalizePath(options.path);
+				this.pendingIRDeckRemovedPaths.add(normalized);
+				this.pendingIRDeckChangedPaths.delete(normalized);
+			} else if (options.path && isIRDeckFilePath(options.path)) {
+				const normalized = normalizePath(options.path);
+				this.pendingIRDeckChangedPaths.add(normalized);
+				this.pendingIRDeckRemovedPaths.delete(normalized);
+			}
+
+			if (
+				this.pendingIRDeckChangedPaths.size === 0 &&
+				this.pendingIRDeckRemovedPaths.size === 0
+			) {
 				return;
 			}
 			this.scheduleIRDeckIndexRefresh();
 		};
 
-		this.registerEvent(this.app.vault.on("create", (file) => scheduleRefreshForPathChange(file?.path)));
-		this.registerEvent(this.app.vault.on("modify", (file) => scheduleRefreshForPathChange(file?.path)));
-		this.registerEvent(this.app.vault.on("delete", (file) => scheduleRefreshForPathChange(file?.path)));
 		this.registerEvent(
-			this.app.vault.on("rename", (file, oldPath) =>
-				scheduleRefreshForPathChange(file?.path, oldPath)
-			)
+			this.app.vault.on("create", (file) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path });
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path });
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path, deleted: true });
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile) {
+					queuePathChange({ path: file.path, previousPath: oldPath });
+				}
+			}),
 		);
 	}
 
@@ -1146,18 +1338,44 @@ export default class StandaloneIncrementalReadingPlugin
 
 		this.irDeckIndexRefreshTimer = window.setTimeout(() => {
 			this.irDeckIndexRefreshTimer = null;
-			void this.refreshIRDeckIndexFromVault({ trigger: "vault_change", recompute: true });
+			const changedPaths = Array.from(this.pendingIRDeckChangedPaths);
+			const removedPaths = Array.from(this.pendingIRDeckRemovedPaths);
+			this.pendingIRDeckChangedPaths.clear();
+			this.pendingIRDeckRemovedPaths.clear();
+			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
+				async () => {
+					await this.refreshIRDeckIndexFromVault({
+						trigger: "vault_change",
+						recompute: true,
+						changedPaths,
+						removedPaths,
+					});
+				},
+			);
 		}, 250);
 	}
 
 	private async refreshIRDeckIndexFromVault(options: {
 		trigger: "startup" | "vault_change";
 		recompute: boolean;
+		changedPaths?: string[];
+		removedPaths?: string[];
 	}): Promise<void> {
 		try {
 			const pointStorage = new IRPointStorageService(this.app);
-			const result = await pointStorage.refreshPointFilesIndexFromVault();
-			const hasIndexChanges = result.added > 0 || result.updated > 0 || result.removed > 0;
+			const result =
+				options.trigger === "vault_change" &&
+				((options.changedPaths?.length ?? 0) > 0 ||
+					(options.removedPaths?.length ?? 0) > 0)
+					? await pointStorage.refreshPointFilesIndexForVaultPaths(
+							options.changedPaths || [],
+							{
+								removedPaths: options.removedPaths,
+							},
+					  )
+					: await pointStorage.refreshPointFilesIndexFromVault();
+			const hasIndexChanges =
+				result.added > 0 || result.updated > 0 || result.removed > 0;
 
 			if (hasIndexChanges) {
 				logger.info("[Standalone IR] 已同步库内 .irdeck 专题索引", {
@@ -1182,10 +1400,16 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	private getExternalEpubHost(): EpubHostReaderCapabilities | null {
-		return findCollaboratorEpubHost(this.app, IR_RUNTIME.epubReaderHostPluginIds, this);
+		return findCollaboratorEpubHost(
+			this.app,
+			IR_RUNTIME.epubReaderHostPluginIds,
+			this,
+		);
 	}
 
-	private async resolveIRDeckById(deckId: string): Promise<{ id: string; name: string } | null> {
+	private async resolveIRDeckById(
+		deckId: string,
+	): Promise<{ id: string; name: string } | null> {
 		return await this.getIRHostSharedService().resolveIRDeckById(deckId);
 	}
 
@@ -1193,11 +1417,17 @@ export default class StandaloneIncrementalReadingPlugin
 		return PremiumFeatureGuard.getInstance().shouldShowFeatureEntry(featureId);
 	}
 
-	ensurePremiumFeatureAccess(featureId: string, _blockedMessage: string): boolean {
+	ensurePremiumFeatureAccess(
+		featureId: string,
+		_blockedMessage: string,
+	): boolean {
 		return ensureIRPremiumFeature(this.app, featureId);
 	}
 
-	private async getIRDeckIdentifiers(deck: { id: string; path?: string }): Promise<string[]> {
+	private async getIRDeckIdentifiers(deck: {
+		id: string;
+		path?: string;
+	}): Promise<string[]> {
 		return await this.getIRHostSharedService().getIRDeckIdentifiers(deck);
 	}
 
@@ -1277,8 +1507,11 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 
 		const canvasLeaf = this.app.workspace.getLeavesOfType("canvas")[0];
-		const canvasPath = (canvasLeaf?.view as { file?: { path?: string } } | undefined)?.file?.path;
-		return typeof canvasPath === "string" && canvasPath.toLowerCase().endsWith(".canvas")
+		const canvasPath = (
+			canvasLeaf?.view as { file?: { path?: string } } | undefined
+		)?.file?.path;
+		return typeof canvasPath === "string" &&
+			canvasPath.toLowerCase().endsWith(".canvas")
 			? canvasPath
 			: undefined;
 	}
@@ -1347,11 +1580,15 @@ export default class StandaloneIncrementalReadingPlugin
 		let initialTitle = "";
 		if (nodeData?.type === "file" && typeof nodeData.file === "string") {
 			const basename =
-				nodeData.file.split("/").pop()?.replace(/\.[^.]+$/u, "") || String(nodeData.file || "");
+				nodeData.file
+					.split("/")
+					.pop()
+					?.replace(/\.[^.]+$/u, "") || String(nodeData.file || "");
 			initialTitle = this.cleanIRReadingPointTitle(basename);
 		}
 		if (!initialTitle) {
-			initialTitle = this.deriveIRReadingPointDraftFromSelection(selectedText).title;
+			initialTitle =
+				this.deriveIRReadingPointDraftFromSelection(selectedText).title;
 		}
 
 		return {
@@ -1365,7 +1602,9 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	private buildCanvasIRSourceId(canvasPath: string): string {
-		const normalizedPath = normalizePath(String(canvasPath || "").trim()).toLowerCase();
+		const normalizedPath = normalizePath(
+			String(canvasPath || "").trim(),
+		).toLowerCase();
 		const readableName =
 			normalizedPath
 				.split("/")
@@ -1388,7 +1627,7 @@ export default class StandaloneIncrementalReadingPlugin
 			canvasNodeId: string;
 			canvasTextCandidates: string[];
 		},
-		existingMeta?: IRBlockMeta
+		existingMeta?: IRBlockMeta,
 	): IRBlockMeta {
 		const todayStart = this.getIncrementalReadingTodayStart();
 		const todayDateKey = this.getIncrementalReadingDateKey(todayStart);
@@ -1419,7 +1658,7 @@ export default class StandaloneIncrementalReadingPlugin
 			textCandidates: string[];
 		},
 		deckId: string,
-		deckName: string
+		deckName: string,
 	): Promise<"created" | "updated" | "unchanged"> {
 		const storage = new IRStorageService(this.app);
 		await storage.initialize();
@@ -1431,13 +1670,19 @@ export default class StandaloneIncrementalReadingPlugin
 		const existing = Object.values(chunks).find((chunk) => {
 			const chunkPath = normalizePath(chunk.filePath.trim());
 			const chunkNodeId = String(chunk.meta?.canvasNodeId || "").trim();
-			return chunkPath === normalizedCanvasPath && chunkNodeId === context.nodeId;
+			return (
+				chunkPath === normalizedCanvasPath && chunkNodeId === context.nodeId
+			);
 		});
 
 		if (existing) {
 			const existingMeta = { ...(existing.meta || {}) };
-			const existingDeckIds = Array.isArray(existing.deckIds) ? existing.deckIds : [];
-			const existingTopicIds = Array.isArray(existing.topicIds) ? existing.topicIds : [];
+			const existingDeckIds = Array.isArray(existing.deckIds)
+				? existing.deckIds
+				: [];
+			const existingTopicIds = Array.isArray(existing.topicIds)
+				? existing.topicIds
+				: [];
 			const existingStatus = String(existing.scheduleStatus || "").trim();
 			const shouldResetDueAt =
 				existingStatus === "removed" ||
@@ -1482,7 +1727,7 @@ export default class StandaloneIncrementalReadingPlugin
 					canvasNodeId: context.nodeId,
 					canvasTextCandidates: context.textCandidates,
 				},
-				existingMeta
+				existingMeta,
 			);
 			if (JSON.stringify(existingMeta) !== JSON.stringify(nextMeta)) {
 				changed = true;
@@ -1498,8 +1743,13 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 
 		const chunkId = generateChunkId();
-		const sourceId = this.buildCanvasIRSourceId(context.canvasFile.path) || generateSourceId();
-		const chunk = createDefaultChunkFileData(chunkId, sourceId, context.canvasFile.path);
+		const sourceId =
+			this.buildCanvasIRSourceId(context.canvasFile.path) || generateSourceId();
+		const chunk = createDefaultChunkFileData(
+			chunkId,
+			sourceId,
+			context.canvasFile.path,
+		);
 		chunk.topicIds = [deckId];
 		chunk.deckIds = [deckId];
 		chunk.topicTag = `#IR_deck_${deckName}`;
@@ -1516,12 +1766,17 @@ export default class StandaloneIncrementalReadingPlugin
 		return "created";
 	}
 
-	private async buildCanvasIRDeckSubmenu(submenu: Menu, node: CanvasMenuNode): Promise<void> {
+	private async buildCanvasIRDeckSubmenu(
+		submenu: Menu,
+		node: CanvasMenuNode,
+	): Promise<void> {
 		try {
 			const context = this.buildCanvasNodeIRPointContext(node);
 			if (!context) {
 				submenu.addItem((subItem) => {
-					subItem.setTitle(i18n.t("irCommands.canvasNodeNoContent")).setDisabled(true);
+					subItem
+						.setTitle(i18n.t("irCommands.canvasNodeNoContent"))
+						.setDisabled(true);
 				});
 				return;
 			}
@@ -1534,7 +1789,9 @@ export default class StandaloneIncrementalReadingPlugin
 
 			if (decks.length === 0) {
 				submenu.addItem((subItem) => {
-					subItem.setTitle(i18n.t("irCommands.noDecksAvailable")).setDisabled(true);
+					subItem
+						.setTitle(i18n.t("irCommands.noDecksAvailable"))
+						.setDisabled(true);
 				});
 				return;
 			}
@@ -1542,14 +1799,20 @@ export default class StandaloneIncrementalReadingPlugin
 			for (const deck of decks) {
 				submenu.addItem((subItem) => {
 					subItem.setTitle(deck.name).onClick(async () => {
-						await this.addCanvasNodeAsIRReadingPoint(context, deck.id, deck.name);
+						await this.addCanvasNodeAsIRReadingPoint(
+							context,
+							deck.id,
+							deck.name,
+						);
 					});
 				});
 			}
 		} catch (error) {
 			logger.error("[Standalone IR] 加载 Canvas 增量阅读专题列表失败:", error);
 			submenu.addItem((subItem) => {
-				subItem.setTitle(i18n.t("irCommands.loadDecksFailed")).setDisabled(true);
+				subItem
+					.setTitle(i18n.t("irCommands.loadDecksFailed"))
+					.setDisabled(true);
 			});
 		}
 	}
@@ -1564,24 +1827,30 @@ export default class StandaloneIncrementalReadingPlugin
 			textCandidates: string[];
 		},
 		deckId: string,
-		deckName: string
+		deckName: string,
 	): Promise<void> {
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				i18n.t("irCommands.premiumBlockedMessage")
+				i18n.t("irCommands.premiumBlockedMessage"),
 			)
 		) {
 			return;
 		}
 
 		try {
-			const result = await this.ensureCanvasNodeReadingPointScheduled(context, deckId, deckName);
-			const [{ getSharedIRWorkspaceSnapshotService }, { getSharedIRCalendarQueryService }] =
-				await Promise.all([
-					import("./services/incremental-reading/IRWorkspaceSnapshotService"),
-					import("./services/incremental-reading/IRCalendarQueryService"),
-				]);
+			const result = await this.ensureCanvasNodeReadingPointScheduled(
+				context,
+				deckId,
+				deckName,
+			);
+			const [
+				{ getSharedIRWorkspaceSnapshotService },
+				{ getSharedIRCalendarQueryService },
+			] = await Promise.all([
+				import("./services/incremental-reading/IRWorkspaceSnapshotService"),
+				import("./services/incremental-reading/IRCalendarQueryService"),
+			]);
 			getSharedIRWorkspaceSnapshotService(this.app).invalidate();
 			getSharedIRCalendarQueryService(this.app).invalidate();
 			await recomputeAndBroadcastIRData(this.app, "ui_refresh", {
@@ -1591,8 +1860,8 @@ export default class StandaloneIncrementalReadingPlugin
 				result === "created"
 					? i18n.t("irNotices.canvasAddedToDeck", { deckName })
 					: result === "updated"
-						? i18n.t("irNotices.canvasUpdatedInDeck", { deckName })
-						: i18n.t("irNotices.canvasAlreadyInDeck", { deckName })
+					? i18n.t("irNotices.canvasUpdatedInDeck", { deckName })
+					: i18n.t("irNotices.canvasAlreadyInDeck", { deckName }),
 			);
 		} catch (error) {
 			logger.error("[Standalone IR] 添加 Canvas 节点到增量阅读失败:", error);
@@ -1606,7 +1875,9 @@ export default class StandaloneIncrementalReadingPlugin
 		selectedText: string;
 	}): Promise<void> {
 		const url = String(context?.url || "").trim();
-		const selectedText = String(context?.selectedText || "").replace(/\r\n?/g, "\n").trim();
+		const selectedText = String(context?.selectedText || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
 		if (!url) {
 			new Notice(i18n.t("irNotices.noWebUrl"), 3000);
 			return;
@@ -1619,7 +1890,7 @@ export default class StandaloneIncrementalReadingPlugin
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				i18n.t("irCommands.defaultIrName")
+				i18n.t("irCommands.defaultIrName"),
 			)
 		) {
 			return;
@@ -1646,7 +1917,9 @@ export default class StandaloneIncrementalReadingPlugin
 				titleDetected: draft.titleDetected,
 				selectedText,
 				onSubmit: async (payload) => {
-					await this.createIRReadingPointFromWebPage(url, payload, { selectedText });
+					await this.createIRReadingPointFromWebPage(url, payload, {
+						selectedText,
+					});
 				},
 			}).open();
 		} catch (error) {
@@ -1655,7 +1928,10 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 	}
 
-	async runWebPageToIRQuickCreate(context: { url: string; title: string }): Promise<void> {
+	async runWebPageToIRQuickCreate(context: {
+		url: string;
+		title: string;
+	}): Promise<void> {
 		const url = String(context?.url || "").trim();
 		if (!url) {
 			new Notice(i18n.t("irNotices.noWebUrl"), 3000);
@@ -1665,16 +1941,20 @@ export default class StandaloneIncrementalReadingPlugin
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				i18n.t("irCommands.defaultIrName")
+				i18n.t("irCommands.defaultIrName"),
 			)
 		) {
 			return;
 		}
 
 		try {
-			const preferredTitle = this.cleanIRReadingPointTitle(String(context.title || ""));
+			const preferredTitle = this.cleanIRReadingPointTitle(
+				String(context.title || ""),
+			);
 			const draftTitle =
-				preferredTitle || deriveWebPageTitleFromUrl(url) || i18n.t("irMain.defaults.webReadingPointTitle");
+				preferredTitle ||
+				deriveWebPageTitleFromUrl(url) ||
+				i18n.t("irMain.defaults.webReadingPointTitle");
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
 			const deckOptions = Object.values(await storage.getAllDecks())
@@ -1711,7 +1991,7 @@ export default class StandaloneIncrementalReadingPlugin
 		if (
 			!this.ensurePremiumFeatureAccess(
 				PREMIUM_FEATURES.INCREMENTAL_READING,
-				i18n.t("irCommands.defaultIrName")
+				i18n.t("irCommands.defaultIrName"),
 			)
 		) {
 			return;
@@ -1734,18 +2014,24 @@ export default class StandaloneIncrementalReadingPlugin
 		}
 	}
 
-	private async runSelectionToIRQuickCreate(context: IRQuickCreateContext | null): Promise<void> {
+	private async runSelectionToIRQuickCreate(
+		context: IRQuickCreateContext | null,
+	): Promise<void> {
 		if (!context) {
 			new Notice(i18n.t("irNotices.selectMarkdownTextOrLine"), 3000);
 			return;
 		}
 
 		try {
-			const preferredTitle = this.cleanIRReadingPointTitle(String(context.initialTitle || ""));
+			const preferredTitle = this.cleanIRReadingPointTitle(
+				String(context.initialTitle || ""),
+			);
 			const draft = preferredTitle
 				? { title: preferredTitle, titleDetected: true }
 				: this.deriveIRReadingPointDraftFromSelection(context.selectedText);
-			const folderConfig = this.getSelectionQuickCreateFolderConfig(context.file.path);
+			const folderConfig = this.getSelectionQuickCreateFolderConfig(
+				context.file.path,
+			);
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
 			const deckOptions = Object.values(await storage.getAllDecks())
@@ -1756,9 +2042,13 @@ export default class StandaloneIncrementalReadingPlugin
 				new Notice(i18n.t("irCommands.noDecksAvailable"), 3000);
 				return;
 			}
-			const preferredDeck = await this.resolvePreferredIRDeckForSelectionSource(context.file);
+			const preferredDeck = await this.resolvePreferredIRDeckForSelectionSource(
+				context.file,
+			);
 
-			const { SelectionToIRModal } = await import("./modals/SelectionToIRModal");
+			const { SelectionToIRModal } = await import(
+				"./modals/SelectionToIRModal"
+			);
 			new SelectionToIRModal(this.app, {
 				deckOptions,
 				initialDeckId: preferredDeck?.id,
@@ -1786,13 +2076,17 @@ export default class StandaloneIncrementalReadingPlugin
 		title: string;
 		titleDetected: boolean;
 	} {
-		return this.getIRHostSharedService().deriveIRReadingPointDraftFromSelection(selectedText);
+		return this.getIRHostSharedService().deriveIRReadingPointDraftFromSelection(
+			selectedText,
+		);
 	}
 
-	private getSelectionQuickCreateFolderConfig(contextPath?: string): { initialFolder: string } {
+	private getSelectionQuickCreateFolderConfig(contextPath?: string): {
+		initialFolder: string;
+	} {
 		return this.getIRHostSharedService().getSelectionQuickCreateFolderConfig(
 			this.getIncrementalReadingSettings(),
-			contextPath
+			contextPath,
 		);
 	}
 
@@ -1803,22 +2097,37 @@ export default class StandaloneIncrementalReadingPlugin
 			...this.settings.incrementalReading,
 			...this.getIRHostSharedService().getUpdatedSelectionQuickCreatePreferences(
 				this.settings.incrementalReading,
-				update
+				update,
 			),
 		};
 		await this.saveSettings();
 	}
 
-	private buildIRReadingPointContent(title: string, body: string, options?: { sourceLink?: string }): string {
-		const safeTitle = this.cleanIRReadingPointTitle(title) || i18n.t("irMain.defaults.unnamedReadingPoint");
-		const normalizedBody = String(body || "").replace(/\r\n?/g, "\n").trim();
-		const markdownBody = normalizedBody ? `# ${safeTitle}\n\n${normalizedBody}\n` : `# ${safeTitle}\n`;
+	private buildIRReadingPointContent(
+		title: string,
+		body: string,
+		options?: { sourceLink?: string },
+	): string {
+		const safeTitle =
+			this.cleanIRReadingPointTitle(title) ||
+			i18n.t("irMain.defaults.unnamedReadingPoint");
+		const normalizedBody = String(body || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
+		const markdownBody = normalizedBody
+			? `# ${safeTitle}\n\n${normalizedBody}\n`
+			: `# ${safeTitle}\n`;
 		const sourceLink = String(options?.sourceLink || "").trim();
-		return sourceLink ? createContentWithMetadata({ we_source: sourceLink }, markdownBody) : markdownBody;
+		return sourceLink
+			? createContentWithMetadata({ we_source: sourceLink }, markdownBody)
+			: markdownBody;
 	}
 
-	private async ensureSelectionQuickCreateFolderExists(folderPath: string): Promise<void> {
-		const normalizedFolder = this.normalizeSelectionQuickCreateFolderPath(folderPath) || "/";
+	private async ensureSelectionQuickCreateFolderExists(
+		folderPath: string,
+	): Promise<void> {
+		const normalizedFolder =
+			this.normalizeSelectionQuickCreateFolderPath(folderPath) || "/";
 		if (normalizedFolder === "/") {
 			return;
 		}
@@ -1837,21 +2146,35 @@ export default class StandaloneIncrementalReadingPlugin
 			.replace(/[\\/:*?"<>|]/g, "_")
 			.replace(/\.+$/g, "")
 			.trim();
-		const truncated = cleaned.length > 120 ? cleaned.slice(0, 120).trim() : cleaned;
-		return truncated || `${i18n.t("irMain.defaults.readingPointFilePrefix")}-${Date.now()}`;
+		const truncated =
+			cleaned.length > 120 ? cleaned.slice(0, 120).trim() : cleaned;
+		return (
+			truncated ||
+			`${i18n.t("irMain.defaults.readingPointFilePrefix")}-${Date.now()}`
+		);
 	}
 
-	private async generateUniqueIRReadingPointPath(folderPath: string, title: string): Promise<string> {
-		const normalizedFolder = this.normalizeSelectionQuickCreateFolderPath(folderPath) || "/";
+	private async generateUniqueIRReadingPointPath(
+		folderPath: string,
+		title: string,
+	): Promise<string> {
+		const normalizedFolder =
+			this.normalizeSelectionQuickCreateFolderPath(folderPath) || "/";
 		const baseName = this.sanitizeIRReadingPointFileName(title);
-		return await generateUniqueVaultFilePath(this.app, normalizedFolder, `${baseName}.md`);
+		return await generateUniqueVaultFilePath(
+			this.app,
+			normalizedFolder,
+			`${baseName}.md`,
+		);
 	}
 
 	private async resolvePreferredIRDeckForSelectionSource(
-		file: TFile
+		file: TFile,
 	): Promise<{ id: string; name: string } | null> {
 		const frontmatter =
-			(this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined) ?? {};
+			(this.app.metadataCache.getFileCache(file)?.frontmatter as
+				| Record<string, unknown>
+				| undefined) ?? {};
 		const yamlTopicId =
 			typeof frontmatter["weave-reading-topic-id"] === "string"
 				? String(frontmatter["weave-reading-topic-id"]).trim()
@@ -1875,20 +2198,28 @@ export default class StandaloneIncrementalReadingPlugin
 		file: TFile,
 		link: string,
 		selectionRange: IRQuickCreateSelectionRange | null,
-		editor: MarkdownView["editor"] | null
+		editor: MarkdownView["editor"] | null,
 	): Promise<boolean> {
 		if (!selectionRange) {
 			return false;
 		}
 
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (editor && activeView?.editor === editor && activeView.file?.path === file.path) {
+		if (
+			editor &&
+			activeView?.editor === editor &&
+			activeView.file?.path === file.path
+		) {
 			editor.replaceRange(link, selectionRange.from, selectionRange.to);
 			return true;
 		}
 
 		const currentContent = await this.app.vault.cachedRead(file);
-		const updatedContent = replaceSelectionInMarkdownContent(currentContent, selectionRange, link);
+		const updatedContent = replaceSelectionInMarkdownContent(
+			currentContent,
+			selectionRange,
+			link,
+		);
 		if (updatedContent !== currentContent) {
 			await this.app.vault.modify(file, updatedContent);
 		}
@@ -1898,10 +2229,12 @@ export default class StandaloneIncrementalReadingPlugin
 	private async createIRReadingPointFromWebPage(
 		url: string,
 		payload: WebPageToIRSubmitPayload,
-		options?: { selectedText?: string }
+		options?: { selectedText?: string },
 	): Promise<void> {
 		const normalizedUrl = String(url || "").trim();
-		const selectedText = String(options?.selectedText || "").replace(/\r\n?/g, "\n").trim();
+		const selectedText = String(options?.selectedText || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
 		const title = this.cleanIRReadingPointTitle(payload.title);
 		if (!title) {
 			new Notice(i18n.t("irNotices.enterReadingPointName"), 3000);
@@ -1924,35 +2257,50 @@ export default class StandaloneIncrementalReadingPlugin
 
 		const deck = {
 			id: deckId,
-			name: String(rawDeck.name || "").trim() || i18n.t("irCommands.defaultIrName"),
+			name:
+				String(rawDeck.name || "").trim() || i18n.t("irCommands.defaultIrName"),
 		};
 		const folderPath =
 			this.normalizeSelectionQuickCreateFolderPath(
 				resolveIRReadableMarkdownTargetFolder(this.app, {
-					lastSelectedFolder: this.getIncrementalReadingSettings().selectionQuickCreateLastFolder,
+					lastSelectedFolder:
+						this.getIncrementalReadingSettings().selectionQuickCreateLastFolder,
 					allowActiveFileFallback: false,
-				})
+				}),
 			) || "/";
-		const fileContent = buildWebReadingPointMarkdown(title, normalizedUrl, { selectedText });
+		const fileContent = buildWebReadingPointMarkdown(title, normalizedUrl, {
+			selectedText,
+		});
 		let createdFile: TFile | null = null;
 
 		try {
 			await this.ensureSelectionQuickCreateFolderExists(folderPath);
-			const targetPath = await this.generateUniqueIRReadingPointPath(folderPath, title);
+			const targetPath = await this.generateUniqueIRReadingPointPath(
+				folderPath,
+				title,
+			);
 			createdFile = await this.app.vault.create(targetPath, fileContent);
 
-			await this.ensureExternalDocumentChunkScheduled(createdFile, deck.id, deck.name, {
-				pinToToday: true,
-				resumeLink: normalizedUrl,
-				webUrl: normalizedUrl,
-				webSelectionExcerpt: selectedText || undefined,
-			});
+			await this.ensureExternalDocumentChunkScheduled(
+				createdFile,
+				deck.id,
+				deck.name,
+				{
+					pinToToday: true,
+					resumeLink: normalizedUrl,
+					webUrl: normalizedUrl,
+					webSelectionExcerpt: selectedText || undefined,
+				},
+			);
 
 			await recomputeAndBroadcastIRData(this.app, "import_materials", {
 				deckIds: [deck.id],
 			});
 
-			new Notice(i18n.t("irNotices.addedToDeck", { deckName: deck.name }), 3500);
+			new Notice(
+				i18n.t("irNotices.addedToDeck", { deckName: deck.name }),
+				3500,
+			);
 		} catch (error) {
 			logger.error("[Standalone IR] 从网页创建阅读点失败:", error);
 			if (createdFile) {
@@ -1966,7 +2314,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 	private async createIRReadingPointFromSelection(
 		context: IRQuickCreateContext,
-		payload: SelectionToIRSubmitPayload
+		payload: SelectionToIRSubmitPayload,
 	): Promise<void> {
 		const title = this.cleanIRReadingPointTitle(payload.title);
 		if (!title) {
@@ -1990,18 +2338,23 @@ export default class StandaloneIncrementalReadingPlugin
 
 		const deck = {
 			id: deckId,
-			name: String(rawDeck.name || "").trim() || i18n.t("irCommands.defaultIrName"),
+			name:
+				String(rawDeck.name || "").trim() || i18n.t("irCommands.defaultIrName"),
 		};
 		const folderPath =
 			this.normalizeSelectionQuickCreateFolderPath(
 				payload.folderPath ||
 					resolveIRReadableMarkdownTargetFolder(this.app, {
-						lastSelectedFolder: this.getIncrementalReadingSettings().selectionQuickCreateLastFolder,
+						lastSelectedFolder:
+							this.getIncrementalReadingSettings()
+								.selectionQuickCreateLastFolder,
 						contextPath: context.file.path,
 						allowActiveFileFallback: true,
-					})
+					}),
 			) || "/";
-		const body = String(context.selectedText || "").replace(/\r\n?/g, "\n").trim();
+		const body = String(context.selectedText || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
 		const fileContent = this.buildIRReadingPointContent(title, body, {
 			sourceLink: context.sourceLink,
 		});
@@ -2009,19 +2362,29 @@ export default class StandaloneIncrementalReadingPlugin
 
 		try {
 			await this.ensureSelectionQuickCreateFolderExists(folderPath);
-			const targetPath = await this.generateUniqueIRReadingPointPath(folderPath, title);
+			const targetPath = await this.generateUniqueIRReadingPointPath(
+				folderPath,
+				title,
+			);
 			createdFile = await this.app.vault.create(targetPath, fileContent);
 
-			await this.ensureExternalDocumentChunkScheduled(createdFile, deck.id, deck.name);
+			await this.ensureExternalDocumentChunkScheduled(
+				createdFile,
+				deck.id,
+				deck.name,
+			);
 
-			const shouldReplaceSourceSelection = context.replaceSourceSelection !== false;
-			const createdLink = `[[${this.getIRReadingPointWikiLinkTarget(createdFile)}]]`;
+			const shouldReplaceSourceSelection =
+				context.replaceSourceSelection !== false;
+			const createdLink = `[[${this.getIRReadingPointWikiLinkTarget(
+				createdFile,
+			)}]]`;
 			const sourceUpdated = shouldReplaceSourceSelection
 				? await this.updateSourceDocumentAfterIRQuickCreate(
 						context.file,
 						createdLink,
 						context.selectionRange,
-						context.editor
+						context.editor,
 				  )
 				: false;
 
@@ -2037,7 +2400,7 @@ export default class StandaloneIncrementalReadingPlugin
 					sourceUpdated
 						? i18n.t("irNotices.pointCreatedWithReplace")
 						: i18n.t("irNotices.pointCreatedWithoutReplace"),
-					3500
+					3500,
 				);
 			} else {
 				new Notice(i18n.t("irNotices.pointCreated"), 2500);
@@ -2065,13 +2428,13 @@ export default class StandaloneIncrementalReadingPlugin
 		file: TFile,
 		deckId: string,
 		deckName: string,
-		options?: IREnsureExternalDocumentChunkScheduledOptions
+		options?: IREnsureExternalDocumentChunkScheduledOptions,
 	): Promise<boolean> {
 		return await this.getIRHostSharedService().ensureExternalDocumentChunkScheduled(
 			file,
 			deckId,
 			deckName,
-			options
+			options,
 		);
 	}
 }

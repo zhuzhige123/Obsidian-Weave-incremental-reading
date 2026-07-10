@@ -10,7 +10,7 @@ export const PLUGIN_UI_LANGUAGE_OPTIONS: PluginUiLanguagePreference[] = [
 ];
 
 export function normalizePluginUiLanguagePreference(
-	value: unknown
+	value: unknown,
 ): PluginUiLanguagePreference {
 	if (value === "zh-CN" || value === "en-US") {
 		return value;

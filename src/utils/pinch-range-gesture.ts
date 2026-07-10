@@ -42,7 +42,11 @@ export function bindPinchRangeGesture(
 		event.preventDefault();
 
 		const nextDistance = getTouchDistance(event.touches[0], event.touches[1]);
-		if (!Number.isFinite(nextDistance) || nextDistance <= 0 || baselineDistance <= 0) {
+		if (
+			!Number.isFinite(nextDistance) ||
+			nextDistance <= 0 ||
+			baselineDistance <= 0
+		) {
 			return;
 		}
 
@@ -81,15 +85,17 @@ export function bindPinchRangeGesture(
 		reset();
 	};
 
-	element.addEventListener('touchstart', handleTouchStart, { passive: false });
-	element.addEventListener('touchmove', handleTouchMove, { passive: false });
-	element.addEventListener('touchend', handleTouchEnd, { passive: false });
-	element.addEventListener('touchcancel', handleTouchCancel, { passive: false });
+	element.addEventListener("touchstart", handleTouchStart, { passive: false });
+	element.addEventListener("touchmove", handleTouchMove, { passive: false });
+	element.addEventListener("touchend", handleTouchEnd, { passive: false });
+	element.addEventListener("touchcancel", handleTouchCancel, {
+		passive: false,
+	});
 
 	return () => {
-		element.removeEventListener('touchstart', handleTouchStart);
-		element.removeEventListener('touchmove', handleTouchMove);
-		element.removeEventListener('touchend', handleTouchEnd);
-		element.removeEventListener('touchcancel', handleTouchCancel);
+		element.removeEventListener("touchstart", handleTouchStart);
+		element.removeEventListener("touchmove", handleTouchMove);
+		element.removeEventListener("touchend", handleTouchEnd);
+		element.removeEventListener("touchcancel", handleTouchCancel);
 	};
 }

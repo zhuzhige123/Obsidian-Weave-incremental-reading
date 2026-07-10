@@ -1,11 +1,18 @@
-import { normalizePath, TFile, type App } from "obsidian";
+import { type App, TFile, normalizePath } from "obsidian";
 import { i18n } from "../../../utils/i18n";
 import { deriveWebPageTitleFromUrl } from "../ir-web-reading-point";
 import type { ParsedReadingTarget } from "./IRReadingTargetTypes";
 
 function findNearestHeading(
-	headings: Array<{ heading: string; level: number; position: { start: { line: number } } }> | null | undefined,
-	targetLine: number
+	headings:
+		| Array<{
+				heading: string;
+				level: number;
+				position: { start: { line: number } };
+		  }>
+		| null
+		| undefined,
+	targetLine: number,
 ): string | null {
 	if (!Array.isArray(headings) || headings.length === 0) {
 		return null;
@@ -22,7 +29,11 @@ function findNearestHeading(
 	return candidate;
 }
 
-async function readBlockTextPreview(app: App, filePath: string, blockId: string): Promise<string | null> {
+async function readBlockTextPreview(
+	app: App,
+	filePath: string,
+	blockId: string,
+): Promise<string | null> {
 	const cache = app.metadataCache.getCache(filePath);
 	const blockRef = cache?.blocks?.[blockId];
 	if (!blockRef) {
@@ -61,7 +72,7 @@ export interface ReadingTargetTitleDraft {
 
 export async function resolveReadingTargetTitleDraft(
 	app: App,
-	target: ParsedReadingTarget
+	target: ParsedReadingTarget,
 ): Promise<ReadingTargetTitleDraft> {
 	const alias = String(target.alias || target.titleHint || "").trim();
 	if (alias) {
@@ -87,7 +98,10 @@ export async function resolveReadingTargetTitleDraft(
 		const cache = app.metadataCache.getCache(filePath);
 
 		if (target.blockId && cache?.blocks?.[target.blockId]) {
-			const heading = findNearestHeading(cache.headings, cache.blocks[target.blockId].position.start.line);
+			const heading = findNearestHeading(
+				cache.headings,
+				cache.blocks[target.blockId].position.start.line,
+			);
 			if (heading) {
 				return { title: heading, titleDetected: true };
 			}
@@ -104,7 +118,11 @@ export async function resolveReadingTargetTitleDraft(
 			}
 		}
 
-		const basename = filePath.split("/").pop()?.replace(/\.[^.]+$/u, "").trim();
+		const basename = filePath
+			.split("/")
+			.pop()
+			?.replace(/\.[^.]+$/u, "")
+			.trim();
 		if (basename) {
 			return { title: basename, titleDetected: false };
 		}
@@ -114,10 +132,15 @@ export async function resolveReadingTargetTitleDraft(
 		return { title: target.pdfPoints[0].title, titleDetected: true };
 	}
 
-	return { title: i18n.t("irSidebar.calendar.untitledPoint"), titleDetected: false };
+	return {
+		title: i18n.t("irSidebar.calendar.untitledPoint"),
+		titleDetected: false,
+	};
 }
 
-export function getReadingTargetKindLabel(kind: ParsedReadingTarget["kind"]): string {
+export function getReadingTargetKindLabel(
+	kind: ParsedReadingTarget["kind"],
+): string {
 	switch (kind) {
 		case "web":
 			return i18n.t("irAddTarget.kindLabels.web");

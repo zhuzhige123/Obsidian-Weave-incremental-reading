@@ -19,7 +19,10 @@ export function isIRInternalScheduleSourcePath(path?: string | null): boolean {
 }
 
 /** 从路径提取用于展示的文件名（去掉扩展名）。 */
-export function basenameWithoutExtension(path?: string | null, fallback = ""): string {
+export function basenameWithoutExtension(
+	path?: string | null,
+	fallback = "",
+): string {
 	const normalizedPath = normalizePath(String(path || "").trim());
 	const fileName = normalizedPath.split("/").pop() || "";
 	const withoutExtension = fileName.replace(/\.[^.]+$/u, "").trim();
@@ -29,7 +32,9 @@ export function basenameWithoutExtension(path?: string | null, fallback = ""): s
 const INVALID_ROOT_PATHS = new Set(["/", "."]);
 
 /** 静态形状校验：不访问 vault，用于写入门禁与磁盘扫描。 */
-export function isValidUserReadingSourcePathShape(path?: string | null): boolean {
+export function isValidUserReadingSourcePathShape(
+	path?: string | null,
+): boolean {
 	const normalized = normalizePath(String(path || "").trim());
 	if (!normalized || INVALID_ROOT_PATHS.has(normalized)) {
 		return false;

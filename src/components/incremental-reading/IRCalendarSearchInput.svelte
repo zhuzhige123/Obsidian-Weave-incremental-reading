@@ -10,7 +10,8 @@
   import { tr } from '../../utils/i18n';
   import { SCHEDULE_ITEM_TYPE_BADGES } from '../../services/incremental-reading/IRCalendarScheduleItemTypeBadge';
 
-  type DataSource = 'memory' | 'questionBank' | 'incremental-reading';
+  const SEARCH_HISTORY_DATA_SOURCE = 'incremental-reading';
+
   type TagSuggestionOption = string | { name: string; count?: number };
   /** 月历搜索仅需展示名称；不必绑定完整 Deck 模型。 */
   interface SearchDeckOption {
@@ -25,19 +26,12 @@
     onClear?: () => void;
     onSort?: (field: string) => void;
     app: App;
-    dataSource?: DataSource;
-    // 卡片数据统计
     availableDecks?: SearchDeckOption[];
     availableTags?: TagSuggestionOption[];
     availablePriorities?: number[];
-    availableQuestionTypes?: string[];
     availableReadingPointTypes?: string[];
     availableSources?: string[];
-    availableStatuses?: string[];
     availableStates?: string[];
-    availableAccuracies?: string[];
-    availableAttemptThresholds?: number[];
-    availableErrorLevels?: string[];
     availableYamlKeys?: string[];
     // 匹配计数
     matchCount?: number;
@@ -55,18 +49,12 @@
     onClear,
     onSort,
     app,
-    dataSource = 'incremental-reading',
     availableDecks = [],
     availableTags = [],
     availablePriorities = [],
-    availableQuestionTypes = [],
     availableReadingPointTypes = [...SCHEDULE_ITEM_TYPE_BADGES],
     availableSources = [],
-    availableStatuses = [],
     availableStates = [],
-    availableAccuracies = [],
-    availableAttemptThresholds = [],
-    availableErrorLevels = [],
     availableYamlKeys = [],
     matchCount = -1,
     totalCount = -1,
@@ -106,26 +94,15 @@
     { prefix: 'yaml:', label: t('management.cardSearch.options.yaml'), afterInsert: () => showYamlSuggestions() },
   ]);
 
-  const dataSourceOptions = $derived.by(() => {
-    const opts = [...baseSearchOptions];
-    if (dataSource === 'memory') {
-      opts.push({ prefix: 'type:', label: t('management.cardSearch.options.type'), afterInsert: () => showTypeSuggestions() });
-      opts.push({ prefix: 'status:', label: t('management.cardSearch.options.status'), afterInsert: () => showStatusSuggestions() });
-    } else if (dataSource === 'questionBank') {
-      opts.push({ prefix: 'type:', label: t('management.cardSearch.options.type'), afterInsert: () => showTypeSuggestions() });
-      opts.push({ prefix: 'accuracy:', label: t('management.cardSearch.options.accuracy'), afterInsert: () => showAccuracySuggestions() });
-      opts.push({ prefix: 'attempts:', label: t('management.cardSearch.options.attempts'), afterInsert: () => showAttemptsSuggestions() });
-      opts.push({ prefix: 'error:', label: t('management.cardSearch.options.error'), afterInsert: () => showErrorSuggestions() });
-    } else if (dataSource === 'incremental-reading') {
-      opts.push({
-        prefix: 'type:',
-        label: t('management.cardSearch.options.readingPointType'),
-        afterInsert: () => showReadingPointTypeSuggestions()
-      });
-      opts.push({ prefix: 'state:', label: t('management.cardSearch.options.state'), afterInsert: () => showStateSuggestions() });
-    }
-    return opts;
-  });
+  const dataSourceOptions = $derived.by(() => [
+    ...baseSearchOptions,
+    {
+      prefix: 'type:',
+      label: t('management.cardSearch.options.readingPointType'),
+      afterInsert: () => showReadingPointTypeSuggestions()
+    },
+    { prefix: 'state:', label: t('management.cardSearch.options.state'), afterInsert: () => showStateSuggestions() },
+  ]);
 
   function handleInputFocus() {
     updateAnchorWidth();
@@ -174,7 +151,7 @@
 
   onMount(() => {
     try {
-      const saved = vaultStorage.getItem(`weave-search-history-${dataSource}`);
+      const saved = vaultStorage.getItem(`weave-search-history-${SEARCH_HISTORY_DATA_SOURCE}`);
       if (saved) {
         searchHistory = JSON.parse(saved);
       }
@@ -204,7 +181,7 @@
   // 保存搜索历史
   function saveSearchHistory() {
     try {
-      vaultStorage.setItem(`weave-search-history-${dataSource}`, JSON.stringify(searchHistory));
+      vaultStorage.setItem(`weave-search-history-${SEARCH_HISTORY_DATA_SOURCE}`, JSON.stringify(searchHistory));
     } catch (error) {
       logger.error(t('management.cardSearch.saveHistoryFailed'), error);
     }
@@ -269,23 +246,11 @@
     } else if (lastWord.endsWith('priority:')) {
       showPrioritySuggestions();
     } else if (lastWord.endsWith('type:')) {
-      if (dataSource === 'incremental-reading') {
-        showReadingPointTypeSuggestions();
-      } else {
-        showTypeSuggestions();
-      }
+      showReadingPointTypeSuggestions();
     } else if (lastWord.endsWith('source:')) {
       showSourceSuggestions();
-    } else if (lastWord.endsWith('status:')) {
-      showStatusSuggestions();
     } else if (lastWord.endsWith('state:')) {
       showStateSuggestions();
-    } else if (lastWord.endsWith('accuracy:')) {
-      showAccuracySuggestions();
-    } else if (lastWord.endsWith('attempts:')) {
-      showAttemptsSuggestions();
-    } else if (lastWord.endsWith('error:')) {
-      showErrorSuggestions();
     } else if (lastWord.endsWith('created:')) {
       showDateSuggestions('created');
     } else if (lastWord.endsWith('modified:')) {
@@ -402,26 +367,6 @@
     menu.showAtPosition({ x: rect.left, y: rect.bottom + 2 });
   }
 
-  function showStatusSuggestions() {
-    if (!containerRef || menuShown) return;
-    const menu = new Menu();
-    (menu as any).app = app;
-    menu.addItem((item) => {
-      item.setTitle(t('management.cardSearch.menuSections.status'));
-      item.setDisabled(true);
-    });
-    const values = availableStatuses.length > 0 ? availableStatuses : ['new', 'learning', 'review', 'relearning'];
-    values.forEach((v) => {
-      menu.addItem((item) => {
-        item.setTitle(v);
-        item.onClick(() => {
-          replaceLastWord(v);
-        });
-      });
-    });
-    showMenuSafe(menu);
-  }
-
   function showStateSuggestions() {
     if (!containerRef || menuShown) return;
     const menu = new Menu();
@@ -432,66 +377,6 @@
     });
     const values = availableStates.length > 0 ? availableStates : ['new', 'learning', 'review', 'queued', 'active', 'scheduled', 'done', 'suspended', 'removed'];
     values.slice(0, 20).forEach((v) => {
-      menu.addItem((item) => {
-        item.setTitle(v);
-        item.onClick(() => {
-          replaceLastWord(v);
-        });
-      });
-    });
-    showMenuSafe(menu);
-  }
-
-  function showAccuracySuggestions() {
-    if (!containerRef || menuShown) return;
-    const menu = new Menu();
-    (menu as any).app = app;
-    menu.addItem((item) => {
-      item.setTitle(t('management.cardSearch.menuSections.accuracy'));
-      item.setDisabled(true);
-    });
-    const values = availableAccuracies.length > 0 ? availableAccuracies : ['high', 'medium', 'low', '80', '60'];
-    values.forEach((v) => {
-      menu.addItem((item) => {
-        item.setTitle(v);
-        item.onClick(() => {
-          replaceLastWord(v);
-        });
-      });
-    });
-    showMenuSafe(menu);
-  }
-
-  function showAttemptsSuggestions() {
-    if (!containerRef || menuShown) return;
-    const menu = new Menu();
-    (menu as any).app = app;
-    menu.addItem((item) => {
-      item.setTitle(t('management.cardSearch.menuSections.attempts'));
-      item.setDisabled(true);
-    });
-    const values = availableAttemptThresholds.length > 0 ? availableAttemptThresholds : [1, 3, 5, 10];
-    values.forEach((v) => {
-      menu.addItem((item) => {
-        item.setTitle(`${v}`);
-        item.onClick(() => {
-          replaceLastWord(`${v}`);
-        });
-      });
-    });
-    showMenuSafe(menu);
-  }
-
-  function showErrorSuggestions() {
-    if (!containerRef || menuShown) return;
-    const menu = new Menu();
-    (menu as any).app = app;
-    menu.addItem((item) => {
-      item.setTitle(t('management.cardSearch.menuSections.errorLevel'));
-      item.setDisabled(true);
-    });
-    const values = availableErrorLevels.length > 0 ? availableErrorLevels : ['high', 'common', 'light', 'none'];
-    values.forEach((v) => {
       menu.addItem((item) => {
         item.setTitle(v);
         item.onClick(() => {
@@ -614,26 +499,6 @@
         item.setTitle(`${priority}`);
         item.onClick(() => {
           replaceLastWord(`${priority}`);
-        });
-      });
-    });
-    showMenuSafe(menu);
-  }
-
-  // 显示题型建议
-  function showTypeSuggestions() {
-    if (!containerRef || menuShown) return;
-    const menu = new Menu();
-    (menu as any).app = app;
-    menu.addItem((item) => {
-      item.setTitle(t('management.cardSearch.menuSections.type'));
-      item.setDisabled(true);
-    });
-    availableQuestionTypes.forEach((type) => {
-      menu.addItem((item) => {
-        item.setTitle(type);
-        item.onClick(() => {
-          replaceLastWord(type);
         });
       });
     });

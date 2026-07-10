@@ -1,4 +1,4 @@
-import { Menu, TFile, normalizePath, type App } from "obsidian";
+import { type App, Menu, TFile, normalizePath } from "obsidian";
 import { i18n } from "../../utils/i18n";
 import { revealLeaf } from "../../utils/workspace-navigation";
 import {
@@ -24,7 +24,9 @@ function untitledNoteLabel(): string {
 	return i18n.t("irSidebar.associatedNote.untitled");
 }
 
-export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): void {
+export function populateAssociatedNoteMenu(
+	options: AssociatedNoteMenuOptions,
+): void {
 	const {
 		menu,
 		notePaths,
@@ -44,19 +46,19 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 				.setTitle(
 					i18n.t("irSidebar.associatedNote.openPrimaryNote", {
 						name: getLabel(notePaths[0]),
-					})
+					}),
 				)
 				.setIcon("file-text")
 				.onClick(() => {
 					void onOpen(notePaths[0]);
-				})
+				}),
 		);
 
 		menu.addItem((item) => {
 			item.setTitle(openAllTitle).setIcon("files");
-			const subMenu = (item as any).setSubmenu();
+			const subMenu = item.setSubmenu();
 			for (const notePath of notePaths) {
-				subMenu.addItem((subItem: any) => {
+				subMenu.addItem((subItem) => {
 					subItem
 						.setTitle(getLabel(notePath))
 						.setIcon(getLinkableVaultNoteIcon(notePath))
@@ -75,12 +77,12 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 			.setTitle(
 				notePaths.length > 0
 					? i18n.t("irSidebar.associatedNote.addLinkedNote")
-					: i18n.t("irSidebar.associatedNote.menuLink")
+					: i18n.t("irSidebar.associatedNote.menuLink"),
 			)
 			.setIcon("plus")
 			.onClick(() => {
 				void onPick(notePaths.length > 0 ? "append" : "replace");
-			})
+			}),
 	);
 
 	menu.addItem((item) =>
@@ -88,12 +90,12 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 			.setTitle(
 				notePaths.length > 0
 					? i18n.t("irSidebar.associatedNote.createAndAddNote")
-					: i18n.t("irSidebar.associatedNote.createAndLinkNote")
+					: i18n.t("irSidebar.associatedNote.createAndLinkNote"),
 			)
 			.setIcon("file-plus")
 			.onClick(() => {
 				void onCreate(notePaths.length > 0 ? "append" : "replace");
-			})
+			}),
 	);
 
 	if (notePaths.length === 0) {
@@ -103,14 +105,20 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 	menu.addSeparator();
 
 	menu.addItem((item) => {
-		item.setTitle(i18n.t("irSidebar.associatedNote.setPrimaryNote")).setIcon("star");
-		const subMenu = (item as any).setSubmenu();
+		item
+			.setTitle(i18n.t("irSidebar.associatedNote.setPrimaryNote"))
+			.setIcon("star");
+		const subMenu = item.setSubmenu();
 		for (const notePath of notePaths) {
 			const isPrimary = notePath === notePaths[0];
-			subMenu.addItem((subItem: any) => {
+			subMenu.addItem((subItem) => {
 				subItem
 					.setTitle(
-						`${isPrimary ? i18n.t("irSidebar.associatedNote.primary") : i18n.t("irSidebar.associatedNote.setPrimaryNote")}: ${getLabel(notePath)}`
+						`${
+							isPrimary
+								? i18n.t("irSidebar.associatedNote.primary")
+								: i18n.t("irSidebar.associatedNote.setPrimaryNote")
+						}: ${getLabel(notePath)}`,
 					)
 					.setIcon(isPrimary ? "check" : "chevrons-up")
 					.setDisabled(isPrimary)
@@ -124,10 +132,12 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 	});
 
 	menu.addItem((item) => {
-		item.setTitle(i18n.t("irSidebar.associatedNote.removeLinkedNote")).setIcon("trash");
-		const subMenu = (item as any).setSubmenu();
+		item
+			.setTitle(i18n.t("irSidebar.associatedNote.removeLinkedNote"))
+			.setIcon("trash");
+		const subMenu = item.setSubmenu();
 		for (const notePath of notePaths) {
-			subMenu.addItem((subItem: any) => {
+			subMenu.addItem((subItem) => {
 				subItem
 					.setTitle(getLabel(notePath))
 					.setIcon("trash")
@@ -145,12 +155,14 @@ export function populateAssociatedNoteMenu(options: AssociatedNoteMenuOptions): 
 			.setIcon("x-circle")
 			.onClick(() => {
 				void onClear();
-			})
+			}),
 	);
 }
 
 function sanitizeAssociatedNoteBaseName(rawName: string): string {
-	const normalized = String(rawName || "").trim().replace(/[\\/:*?"<>|#^\[\]]+/g, " ");
+	const normalized = String(rawName || "")
+		.trim()
+		.replace(/[\\/:*?"<>|#^[\]]+/g, " ");
 	const compact = normalized.replace(/\s+/g, " ").trim();
 	return compact || untitledNoteLabel();
 }
@@ -175,7 +187,7 @@ export function resolvePreferredAssociatedNoteFolder(
 	options: {
 		notePaths?: string[];
 		fallbackFilePath?: string;
-	}
+	},
 ): string {
 	for (const notePath of options.notePaths || []) {
 		const normalizedNotePath = normalizePath(String(notePath || "").trim());
@@ -186,7 +198,9 @@ export function resolvePreferredAssociatedNoteFolder(
 		}
 	}
 
-	const fallbackFilePath = normalizePath(String(options.fallbackFilePath || "").trim());
+	const fallbackFilePath = normalizePath(
+		String(options.fallbackFilePath || "").trim(),
+	);
 	if (fallbackFilePath) {
 		const slashIndex = fallbackFilePath.lastIndexOf("/");
 		if (slashIndex > 0) {
@@ -208,9 +222,11 @@ export async function createAssociatedMarkdownNote(
 		baseName: string;
 		preferredFolderPath?: string;
 		initialContent?: string;
-	}
+	},
 ): Promise<TFile> {
-	const folderPath = normalizePath(String(options.preferredFolderPath || "").trim());
+	const folderPath = normalizePath(
+		String(options.preferredFolderPath || "").trim(),
+	);
 	if (folderPath) {
 		await ensureFolderExists(app, folderPath);
 	}
@@ -229,7 +245,10 @@ export async function createAssociatedMarkdownNote(
 	return await app.vault.create(targetPath, content);
 }
 
-function resolveLinkableVaultNoteFile(app: App, notePath: string): TFile | null {
+function resolveLinkableVaultNoteFile(
+	app: App,
+	notePath: string,
+): TFile | null {
 	const normalized = normalizePath(String(notePath || "").trim());
 	if (!normalized) {
 		return null;
@@ -247,13 +266,17 @@ function resolveLinkableVaultNoteFile(app: App, notePath: string): TFile | null 
 	return null;
 }
 
-export async function openLinkedVaultNote(app: App, notePath: string): Promise<TFile | null> {
+export async function openLinkedVaultNote(
+	app: App,
+	notePath: string,
+): Promise<TFile | null> {
 	const file = resolveLinkableVaultNoteFile(app, notePath);
 	if (!file) {
 		return null;
 	}
 
-	const leaf = app.workspace.getRightLeaf(false) || app.workspace.getLeaf("tab");
+	const leaf =
+		app.workspace.getRightLeaf(false) || app.workspace.getLeaf("tab");
 	await leaf.openFile(file, { active: true });
 	revealLeaf(app, leaf);
 	return file;
@@ -272,8 +295,9 @@ export function getLinkedVaultNoteLabel(app: App, notePath: string): string {
 
 	const filename = normalized.split("/").pop() || normalized;
 	return (
-		filename.replace(/\.excalidraw\.md$/i, "").replace(/\.(?:md|markdown|canvas)$/i, "") ||
-		untitledNoteLabel()
+		filename
+			.replace(/\.excalidraw\.md$/i, "")
+			.replace(/\.(?:md|markdown|canvas)$/i, "") || untitledNoteLabel()
 	);
 }
 
@@ -282,13 +306,16 @@ export async function pickLinkableVaultNoteFile(
 	options?: {
 		placeholder?: string;
 		excludePath?: string;
-	}
+	},
 ): Promise<TFile | null> {
-	const { VaultFileSuggestModal } = await import("../../modals/VaultFileSuggestModal");
+	const { VaultFileSuggestModal } = await import(
+		"../../modals/VaultFileSuggestModal"
+	);
 	const picker = new VaultFileSuggestModal(app, {
 		placeholder: options?.placeholder,
 		files: listLinkableVaultNoteFiles(app),
-		filter: (file) => isLinkableVaultNoteFile(file) && file.path !== options?.excludePath,
+		filter: (file) =>
+			isLinkableVaultNoteFile(file) && file.path !== options?.excludePath,
 		icon: "files",
 		showFileIcon: false,
 		showFilePath: false,

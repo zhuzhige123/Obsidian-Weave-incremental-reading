@@ -1,24 +1,28 @@
-import { normalizePath, type App } from "obsidian";
-import type { ScheduleItem } from "../IRCalendarScheduleItem";
-import { i18n } from "../../../utils/i18n";
-import { isEpubBookmarkTaskId } from "../IREpubBookmarkTaskService";
-import { isPdfBookmarkTaskId } from "../IRPdfBookmarkTaskService";
-import { getSharedIRPointStorageService } from "../IRPointStorageService";
-import { resolveLegacyBlockResumeLink } from "../paragraph-workbench/paragraph-block-reference";
+import { type App, normalizePath } from "obsidian";
+import type { IRPointSnapshot } from "../../../types/ir-point-storage-types";
 import type { IRBlock } from "../../../types/ir-types";
 import type { IRChunkFileData } from "../../../types/ir-types";
-import type { IREpubBookmarkTask } from "../IREpubBookmarkTaskService";
-import type { IRPdfBookmarkTask } from "../IRPdfBookmarkTaskService";
-import type { IRPointSnapshot } from "../../../types/ir-point-storage-types";
-import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
+import { i18n } from "../../../utils/i18n";
 import { buildEpubChapterResumeLink } from "../../epub-integration/epub-chapter-locate";
+import type { ScheduleItem } from "../IRCalendarScheduleItem";
+import { isEpubBookmarkTaskId } from "../IREpubBookmarkTaskService";
+import type { IREpubBookmarkTask } from "../IREpubBookmarkTaskService";
+import { isPdfBookmarkTaskId } from "../IRPdfBookmarkTaskService";
+import type { IRPdfBookmarkTask } from "../IRPdfBookmarkTaskService";
+import { getSharedIRPointStorageService } from "../IRPointStorageService";
+import { resolveLegacyBlockResumeLink } from "../paragraph-workbench/paragraph-block-reference";
+import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
 
-function readChunkResumeLink(chunk: IRChunkFileData | null | undefined): string {
+function readChunkResumeLink(
+	chunk: IRChunkFileData | null | undefined,
+): string {
 	const meta = (chunk?.meta || {}) as Record<string, unknown>;
 	return typeof meta.resumeLink === "string" ? meta.resumeLink.trim() : "";
 }
 
-function readEpubResumeLink(task: IREpubBookmarkTask | null | undefined): string {
+function readEpubResumeLink(
+	task: IREpubBookmarkTask | null | undefined,
+): string {
 	const meta = (task?.meta || {}) as Record<string, unknown>;
 	if (typeof meta.resumeLink === "string" && meta.resumeLink.trim()) {
 		return meta.resumeLink.trim();
@@ -26,10 +30,13 @@ function readEpubResumeLink(task: IREpubBookmarkTask | null | undefined): string
 	return "";
 }
 
-function readSnapshotResumeLink(app: App, snapshot?: IRPointSnapshot | null): string {
+function readSnapshotResumeLink(
+	app: App,
+	snapshot?: IRPointSnapshot | null,
+): string {
 	const metadata = snapshot?.point.metadata;
 	if (metadata && typeof metadata === "object") {
-		const resumeLink = (metadata as Record<string, unknown>).resumeLink;
+		const resumeLink = metadata.resumeLink;
 		if (typeof resumeLink === "string" && resumeLink.trim()) {
 			return resumeLink.trim();
 		}
@@ -40,7 +47,8 @@ function readSnapshotResumeLink(app: App, snapshot?: IRPointSnapshot | null): st
 		return locator.resumeLink.trim();
 	}
 	if (snapshot?.point.trace?.locatorType === "epub-chapter") {
-		const tocHref = typeof locator.tocHref === "string" ? locator.tocHref.trim() : "";
+		const tocHref =
+			typeof locator.tocHref === "string" ? locator.tocHref.trim() : "";
 		const sourcePath = String(snapshot.point.source?.path || "").trim();
 		if (tocHref && sourcePath) {
 			return buildEpubChapterResumeLink(
@@ -48,7 +56,7 @@ function readSnapshotResumeLink(app: App, snapshot?: IRPointSnapshot | null): st
 				sourcePath,
 				tocHref,
 				snapshot.point.userData?.title,
-				snapshot.point.materialId
+				snapshot.point.materialId,
 			);
 		}
 	}
@@ -60,7 +68,7 @@ function readSnapshotResumeLink(app: App, snapshot?: IRPointSnapshot | null): st
 
 export function resolveSavedResumeLink(
 	linkInput: string,
-	parsedTarget: ParsedReadingTarget | null | undefined
+	parsedTarget: ParsedReadingTarget | null | undefined,
 ): string {
 	return String(parsedTarget?.resumeLink || linkInput || "").trim();
 }
@@ -68,13 +76,13 @@ export function resolveSavedResumeLink(
 export function resolveReadingPointLinkInputFromParts(
 	app: App,
 	input: {
-	material: ScheduleItem;
-	snapshot?: IRPointSnapshot | null;
-	pdfTask?: IRPdfBookmarkTask | null;
-	epubTask?: IREpubBookmarkTask | null;
-	chunk?: IRChunkFileData | null;
-	legacyBlock?: IRBlock | null;
-	}
+		material: ScheduleItem;
+		snapshot?: IRPointSnapshot | null;
+		pdfTask?: IRPdfBookmarkTask | null;
+		epubTask?: IREpubBookmarkTask | null;
+		chunk?: IRChunkFileData | null;
+		legacyBlock?: IRBlock | null;
+	},
 ): string {
 	const { material, snapshot, pdfTask, epubTask, chunk, legacyBlock } = input;
 
@@ -84,7 +92,8 @@ export function resolveReadingPointLinkInputFromParts(
 	}
 
 	if (isPdfBookmarkTaskId(material.id)) {
-		const pdfLink = String(pdfTask?.link || snapshot?.point.trace?.locator?.link || "").trim();
+		const rawPdfLink = pdfTask?.link ?? snapshot?.point.trace?.locator?.link;
+		const pdfLink = typeof rawPdfLink === "string" ? rawPdfLink.trim() : "";
 		if (pdfLink) {
 			return pdfLink;
 		}
@@ -97,7 +106,10 @@ export function resolveReadingPointLinkInputFromParts(
 		}
 		const tocHref = String(epubTask?.tocHref || "").trim();
 		const sourcePath = String(
-			epubTask?.epubFilePath || snapshot?.point.source?.path || material.sourceFile || ""
+			epubTask?.epubFilePath ||
+				snapshot?.point.source?.path ||
+				material.sourceFile ||
+				"",
 		).trim();
 		if (tocHref && sourcePath) {
 			return buildEpubChapterResumeLink(
@@ -105,7 +117,7 @@ export function resolveReadingPointLinkInputFromParts(
 				sourcePath,
 				tocHref,
 				epubTask?.title || snapshot?.point.userData?.title || material.title,
-				epubTask?.sourceId || snapshot?.point.materialId
+				epubTask?.sourceId || snapshot?.point.materialId,
 			);
 		}
 		const fallbackSnapshotLink = readSnapshotResumeLink(app, snapshot);
@@ -138,7 +150,7 @@ export function resolveReadingPointLinkInputFromParts(
 /** 从 points 存储读取最新溯源链接，供月历跳转等场景使用（避免 workspace 投影缓存滞后）。 */
 export async function resolveReadingPointOpenLink(
 	app: App,
-	material: ScheduleItem
+	material: ScheduleItem,
 ): Promise<string> {
 	const projectedResumeLink = String(material.resumeLink || "").trim();
 	if (projectedResumeLink) {

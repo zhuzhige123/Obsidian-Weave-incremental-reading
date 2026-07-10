@@ -4,14 +4,28 @@
  * 上方为月历热力图，下方为选中日期的阅读材料列表
  */
 
-import { type EventRef, ItemView, type ViewStateResult, WorkspaceLeaf } from "obsidian";
+import {
+	type EventRef,
+	ItemView,
+	type ViewStateResult,
+	WorkspaceLeaf,
+} from "obsidian";
 import type { unmount } from "svelte";
 import type { WeavePlugin } from "../main";
-import { PREMIUM_FEATURES, PremiumFeatureGuard } from "../services/premium/PremiumFeatureGuard";
-import { getDefaultIRPremiumFeaturePreviewId, requestIRPremiumFeaturePreview } from "../services/premium/ir-premium";
-import { getIncrementalReadingPlugin, IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
-import { logger } from "../utils/logger";
+import {
+	IR_RUNTIME,
+	getIncrementalReadingPlugin,
+} from "../services/incremental-reading/ir-runtime";
+import {
+	PREMIUM_FEATURES,
+	PremiumFeatureGuard,
+} from "../services/premium/PremiumFeatureGuard";
+import {
+	getDefaultIRPremiumFeaturePreviewId,
+	requestIRPremiumFeaturePreview,
+} from "../services/premium/ir-premium";
 import { i18n } from "../utils/i18n";
+import { logger } from "../utils/logger";
 import { getViewSurfaceTokens } from "../utils/view-location-utils";
 
 export const VIEW_TYPE_IR_CALENDAR = IR_RUNTIME.viewTypes.calendar;
@@ -70,7 +84,10 @@ export class IRCalendarView extends ItemView {
 		};
 	}
 
-	async setState(state: IRCalendarViewState, result: ViewStateResult): Promise<void> {
+	async setState(
+		state: IRCalendarViewState,
+		result: ViewStateResult,
+	): Promise<void> {
 		await super.setState(state, result);
 
 		this.sourceFilePath = String(state?.filePath || state?.file || "").trim();
@@ -117,12 +134,20 @@ export class IRCalendarView extends ItemView {
 
 	private applySurfaceContext(): void {
 		const surfaceTokens = getViewSurfaceTokens(this.leaf);
-		const targets = [this.contentEl, this.contentEl.parentElement].filter(Boolean) as HTMLElement[];
+		const targets = [this.contentEl, this.contentEl.parentElement].filter(
+			Boolean,
+		) as HTMLElement[];
 
 		for (const target of targets) {
 			target.dataset.weaveSurfaceContext = surfaceTokens.context;
-			target.style.setProperty("--weave-surface-background", surfaceTokens.surfaceBackground);
-			target.style.setProperty("--weave-elevated-background", surfaceTokens.elevatedBackground);
+			target.style.setProperty(
+				"--weave-surface-background",
+				surfaceTokens.surfaceBackground,
+			);
+			target.style.setProperty(
+				"--weave-elevated-background",
+				surfaceTokens.elevatedBackground,
+			);
 		}
 	}
 
@@ -130,18 +155,21 @@ export class IRCalendarView extends ItemView {
 	 * 渲染高级功能锁定提示
 	 */
 	private canUseIncrementalReading(): boolean {
-		return PremiumFeatureGuard.getInstance().canUseFeature(PREMIUM_FEATURES.INCREMENTAL_READING);
+		return PremiumFeatureGuard.getInstance().canUseFeature(
+			PREMIUM_FEATURES.INCREMENTAL_READING,
+		);
 	}
 
 	private subscribePremiumState(): void {
 		this.premiumUnsubscribe?.();
-		this.premiumUnsubscribe = PremiumFeatureGuard.getInstance().isPremiumActive.subscribe(() => {
-			if (!this.isOpen) {
-				return;
-			}
+		this.premiumUnsubscribe =
+			PremiumFeatureGuard.getInstance().isPremiumActive.subscribe(() => {
+				if (!this.isOpen) {
+					return;
+				}
 
-			void this.refreshPremiumPresentation();
-		});
+				void this.refreshPremiumPresentation();
+			});
 	}
 
 	private async refreshPremiumPresentation(): Promise<void> {
@@ -169,7 +197,7 @@ export class IRCalendarView extends ItemView {
 		});
 		requestIRPremiumFeaturePreview(
 			this.app,
-			getDefaultIRPremiumFeaturePreviewId()
+			getDefaultIRPremiumFeaturePreviewId(),
 		);
 	}
 
@@ -229,9 +257,13 @@ export class IRCalendarView extends ItemView {
 		logger.debug("[IRCalendarView] 等待独立 IR 插件完成初始化...");
 
 		try {
-			const { waitForServiceReady } = await import("../utils/service-ready-event");
+			const { waitForServiceReady } = await import(
+				"../utils/service-ready-event"
+			);
 			await waitForServiceReady("allCoreServices", 15000);
-			logger.debug("[IRCalendarView] allCoreServices 已就绪，继续确认插件注册状态");
+			logger.debug(
+				"[IRCalendarView] allCoreServices 已就绪，继续确认插件注册状态",
+			);
 		} catch (_error) {
 			logger.warn("[IRCalendarView] 事件等待超时，回退到轮询检查");
 		}
@@ -241,7 +273,9 @@ export class IRCalendarView extends ItemView {
 
 		for (let i = 0; i < maxAttempts; i++) {
 			if (this.isPluginReady()) {
-				logger.debug(`[IRCalendarView] 插件初始化已就绪（轮询 ${i * interval}ms）`);
+				logger.debug(
+					`[IRCalendarView] 插件初始化已就绪（轮询 ${i * interval}ms）`,
+				);
 				return;
 			}
 			await new Promise((resolve) => window.setTimeout(resolve, interval));

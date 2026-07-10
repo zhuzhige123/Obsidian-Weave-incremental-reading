@@ -1,4 +1,3 @@
-
 const invalidateScheduleCacheMock = vi.fn();
 const recomputeScheduleForDeckMock = vi.fn();
 const workspaceInvalidateMock = vi.fn();
@@ -71,8 +70,8 @@ vi.mock("../../../utils/logger", () => ({
 }));
 
 import {
-	broadcastIRDataUpdated,
 	IR_DATA_UPDATED_EVENT,
+	broadcastIRDataUpdated,
 	recomputeAndBroadcastIRData,
 } from "../IRScheduleRefreshService";
 
@@ -113,7 +112,26 @@ describe("IRScheduleRefreshService", () => {
 		recomputeScheduleForDeckMock.mockResolvedValue({
 			generatedAt: 123456,
 			deckIds: ["deck-1"],
-			days: [{ dateKey: "2026-05-29", items: [{ id: "a", title: "A", sourceFile: "a.md", priority: 1, intervalDays: 1, scheduleStatus: "scheduled", nextRepDate: 0, nextReviewDate: null, topicKey: "t", estimatedMinutes: 1, explanation: {} as any }] }],
+			days: [
+				{
+					dateKey: "2026-05-29",
+					items: [
+						{
+							id: "a",
+							title: "A",
+							sourceFile: "a.md",
+							priority: 1,
+							intervalDays: 1,
+							scheduleStatus: "scheduled",
+							nextRepDate: 0,
+							nextReviewDate: null,
+							topicKey: "t",
+							estimatedMinutes: 1,
+							explanation: {} as any,
+						},
+					],
+				},
+			],
 			itemsByDate: new Map([
 				[
 					"2026-05-29",
@@ -135,22 +153,29 @@ describe("IRScheduleRefreshService", () => {
 				],
 			]),
 		});
-		const detail = await recomputeAndBroadcastIRData({} as any, "import_materials", {
-			deckIds: ["deck-1"],
-			priorityDateKeys: ["2026-05-29"],
-		});
+		const detail = await recomputeAndBroadcastIRData(
+			{} as any,
+			"import_materials",
+			{
+				deckIds: ["deck-1"],
+				priorityDateKeys: ["2026-05-29"],
+			},
+		);
 
 		expect(workspaceInvalidateMock).toHaveBeenCalledTimes(1);
 		expect(scheduleIndexInvalidateMock).toHaveBeenCalledTimes(1);
 		expect(calendarInvalidateMock).toHaveBeenCalledTimes(1);
 		expect(invalidateScheduleCacheMock).toHaveBeenCalledTimes(1);
-		expect(recomputeScheduleForDeckMock).toHaveBeenCalledWith("import_materials", {
-			deckIds: ["deck-1"],
-			priorityDateKeys: ["2026-05-29"],
-		});
-		expect(invalidateScheduleCacheMock.mock.invocationCallOrder[0]).toBeLessThan(
-			recomputeScheduleForDeckMock.mock.invocationCallOrder[0]
+		expect(recomputeScheduleForDeckMock).toHaveBeenCalledWith(
+			"import_materials",
+			{
+				deckIds: ["deck-1"],
+				priorityDateKeys: ["2026-05-29"],
+			},
 		);
+		expect(
+			invalidateScheduleCacheMock.mock.invocationCallOrder[0],
+		).toBeLessThan(recomputeScheduleForDeckMock.mock.invocationCallOrder[0]);
 		expect(detail.reason).toBe("import_materials");
 		expect(detail.generatedAt).toBe(123456);
 		expect(detail.deckIds).toEqual(["deck-1"]);
@@ -193,7 +218,7 @@ describe("IRScheduleRefreshService", () => {
 			expect.objectContaining({
 				priorityDateKeys: ["2026-05-29"],
 				reason: "metadata_changed",
-			})
+			}),
 		);
 	});
 
@@ -222,7 +247,7 @@ describe("IRScheduleRefreshService", () => {
 			expect.objectContaining({
 				reason: "archive_block",
 				deckIds: ["deck-1"],
-			})
+			}),
 		);
 	});
 });

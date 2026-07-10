@@ -1,4 +1,3 @@
-
 vi.mock("../epub-runtime", () => ({
 	getEpubRuntime: () => ({
 		pluginId: "weave-epub-reader",
@@ -6,7 +5,11 @@ vi.mock("../epub-runtime", () => ({
 	}),
 }));
 
-import { registerEpubHost, resolveEpubHost, unregisterEpubHost } from "../epub-host";
+import {
+	registerEpubHost,
+	resolveEpubHost,
+	unregisterEpubHost,
+} from "../epub-host";
 
 describe("epub-host resolution", () => {
 	beforeEach(() => {
@@ -74,7 +77,9 @@ describe("epub-host resolution", () => {
 		await resolved?.openCreateCardModal?.({ initialContent: "demo" });
 		unregisterEpubHost(app);
 
-		expect(collaboratorCreateCard).toHaveBeenCalledWith({ initialContent: "demo" });
+		expect(collaboratorCreateCard).toHaveBeenCalledWith({
+			initialContent: "demo",
+		});
 	});
 
 	it("does not expose local IR capabilities when the registered host does not implement them", () => {
@@ -99,7 +104,9 @@ describe("epub-host resolution", () => {
 
 	it("falls back to collaborator Weave IR capabilities when the registered host does not implement them", async () => {
 		const collaboratorCreateReadingPoint = vi.fn(async () => undefined);
-		const collaboratorGetTopics = vi.fn(async () => [{ id: "deck-1", name: "专题 1" }]);
+		const collaboratorGetTopics = vi.fn(async () => [
+			{ id: "deck-1", name: "专题 1" },
+		]);
 		const localHost = {
 			openEpubReader: vi.fn(async () => undefined),
 		};
@@ -111,7 +118,8 @@ describe("epub-host resolution", () => {
 					}
 					if (pluginId === "weave") {
 						return {
-							openIRReadingPointFromExternalSelection: collaboratorCreateReadingPoint,
+							openIRReadingPointFromExternalSelection:
+								collaboratorCreateReadingPoint,
 							getAvailableEpubIncrementalReadingTopics: collaboratorGetTopics,
 						};
 					}
@@ -142,7 +150,7 @@ describe("epub-host resolution", () => {
 			openEpubReader: vi.fn(),
 		};
 		const getPlugin = vi.fn((pluginId: string) =>
-			pluginId === "weave-epub-reader" ? runtimeHost : null
+			pluginId === "weave-epub-reader" ? runtimeHost : null,
 		);
 		const app = {
 			plugins: {

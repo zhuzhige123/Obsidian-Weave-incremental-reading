@@ -14,7 +14,9 @@ export function isActivationAttempt(value: unknown): value is {
 	);
 }
 
-export function readActivationCodeData(value: unknown): ActivationCodeData | null {
+export function readActivationCodeData(
+	value: unknown,
+): ActivationCodeData | null {
 	if (!isRecord(value)) {
 		return null;
 	}
@@ -32,7 +34,8 @@ export function readActivationCodeData(value: unknown): ActivationCodeData | nul
 		return null;
 	}
 
-	const maxDevices = typeof value.maxDevices === "number" ? value.maxDevices : 0;
+	const maxDevices =
+		typeof value.maxDevices === "number" ? value.maxDevices : 0;
 	const features = Array.isArray(value.features)
 		? value.features.map((entry) => String(entry))
 		: [];
@@ -50,14 +53,16 @@ export function readActivationCodeData(value: unknown): ActivationCodeData | nul
 					(entry): entry is LicenseEntitlement =>
 						entry === "weave-premium" ||
 						entry === "epub-premium" ||
-						entry === "ir-premium"
-				)
+						entry === "ir-premium",
+			  )
 			: undefined,
 		metadata: isRecord(value.metadata) ? value.metadata : undefined,
 	};
 }
 
-export function parseActivationCodeDataJson(raw: string): ActivationCodeData | null {
+export function parseActivationCodeDataJson(
+	raw: string,
+): ActivationCodeData | null {
 	try {
 		return readActivationCodeData(JSON.parse(raw));
 	} catch {

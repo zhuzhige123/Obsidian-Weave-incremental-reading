@@ -12,13 +12,18 @@ interface WebViewerPluginInstance {
 }
 
 interface InternalPluginsAccessor {
-	getEnabledPluginById?: (id: string) => { instance?: WebViewerPluginInstance } | null;
+	getEnabledPluginById?: (
+		id: string,
+	) => { instance?: WebViewerPluginInstance } | null;
 	getPluginById?: (id: string) => { instance?: WebViewerPluginInstance } | null;
 }
 
-export function getWebViewerPluginInstance(app: App): WebViewerPluginInstance | null {
-	const internalPlugins = (app as App & { internalPlugins?: InternalPluginsAccessor })
-		.internalPlugins;
+export function getWebViewerPluginInstance(
+	app: App,
+): WebViewerPluginInstance | null {
+	const internalPlugins = (
+		app as App & { internalPlugins?: InternalPluginsAccessor }
+	).internalPlugins;
 	if (!internalPlugins) {
 		return null;
 	}
@@ -51,7 +56,10 @@ async function openUrlInWebViewerTab(app: App, url: string): Promise<boolean> {
 	}
 }
 
-function openUrlViaWebViewerInstance(instance: WebViewerPluginInstance, url: string): boolean {
+function openUrlViaWebViewerInstance(
+	instance: WebViewerPluginInstance,
+	url: string,
+): boolean {
 	if (typeof instance.openUrl !== "function") {
 		return false;
 	}
@@ -64,7 +72,10 @@ function openUrlViaWebViewerInstance(instance: WebViewerPluginInstance, url: str
 	}
 }
 
-function openUrlExternally(instance: WebViewerPluginInstance | null, url: string): boolean {
+function openUrlExternally(
+	instance: WebViewerPluginInstance | null,
+	url: string,
+): boolean {
 	if (instance && typeof instance.openUrlExternally === "function") {
 		try {
 			instance.openUrlExternally(url);
@@ -83,7 +94,10 @@ function openUrlExternally(instance: WebViewerPluginInstance | null, url: string
 }
 
 /** Opens a URL in Obsidian Web Viewer when possible, with browser fallbacks. */
-export async function openObsidianWebUrl(app: App, url: string): Promise<boolean> {
+export async function openObsidianWebUrl(
+	app: App,
+	url: string,
+): Promise<boolean> {
 	const normalizedUrl = String(url || "").trim();
 	if (!normalizedUrl || !isHttpUrl(normalizedUrl)) {
 		return false;
@@ -91,7 +105,10 @@ export async function openObsidianWebUrl(app: App, url: string): Promise<boolean
 
 	const webViewerInstance = getWebViewerPluginInstance(app);
 
-	if (webViewerInstance && openUrlViaWebViewerInstance(webViewerInstance, normalizedUrl)) {
+	if (
+		webViewerInstance &&
+		openUrlViaWebViewerInstance(webViewerInstance, normalizedUrl)
+	) {
 		return true;
 	}
 

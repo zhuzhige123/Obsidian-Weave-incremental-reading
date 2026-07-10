@@ -69,7 +69,7 @@ export function calculatePriorityEWMA(
 	priorityUi: number,
 	priorityEffOld: number,
 	lastUpdatedAt: string | null,
-	halfLifeDays = 7
+	halfLifeDays = 7,
 ): number {
 	const now = Date.now();
 	const lastUpdated = lastUpdatedAt ? new Date(lastUpdatedAt).getTime() : now;
@@ -119,11 +119,14 @@ export function calculateLoadSignal(
 	readingTimeSeconds: number,
 	createdCardCount = 0,
 	createdExtractCount = 0,
-	createdNoteCount = 0
+	createdNoteCount = 0,
 ): number {
 	// L_time = clamp(log(1+t) / log(1+t_ref), 0, 1), t_ref = 120s
 	const tRef = 120;
-	const lTime = Math.max(0, Math.min(1, Math.log(1 + readingTimeSeconds) / Math.log(1 + tRef)));
+	const lTime = Math.max(
+		0,
+		Math.min(1, Math.log(1 + readingTimeSeconds) / Math.log(1 + tRef)),
+	);
 
 	// L_actions = clamp(w_card*cards + w_extract*extracts + w_note*notes, 0, 1)
 	const wCard = 0.35;
@@ -133,8 +136,10 @@ export function calculateLoadSignal(
 		0,
 		Math.min(
 			1,
-			wCard * createdCardCount + wExtract * createdExtractCount + wNote * createdNoteCount
-		)
+			wCard * createdCardCount +
+				wExtract * createdExtractCount +
+				wNote * createdNoteCount,
+		),
 	);
 
 	// L = 0.5 * L_time + 0.5 * L_actions
@@ -156,7 +161,7 @@ export function calculateNextInterval(
 	intervalFactor: number,
 	priorityEff: number,
 	strategy: IRScheduleStrategy,
-	config: typeof DEFAULT_SCHEDULE_CONFIG_V3 = DEFAULT_SCHEDULE_CONFIG_V3
+	config: typeof DEFAULT_SCHEDULE_CONFIG_V3 = DEFAULT_SCHEDULE_CONFIG_V3,
 ): number {
 	// 基础间隔
 	const base = Math.max(currentIntervalDays, config.initialIntervalDays);
@@ -182,7 +187,10 @@ export function calculateNextInterval(
 	}
 
 	// clamp 到 [minInterval, maxInterval]
-	intervalNext = Math.max(minIntervalDays, Math.min(config.maxIntervalDays, intervalNext));
+	intervalNext = Math.max(
+		minIntervalDays,
+		Math.min(config.maxIntervalDays, intervalNext),
+	);
 
 	return intervalNext;
 }
@@ -195,7 +203,9 @@ export function calculateNextInterval(
  */
 export function calculateNextReviewDate(intervalDays: number): string {
 	const now = new Date();
-	const nextReview = new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+	const nextReview = new Date(
+		now.getTime() + intervalDays * 24 * 60 * 60 * 1000,
+	);
 	return nextReview.toISOString();
 }
 
@@ -206,7 +216,10 @@ export function calculateNextReviewDate(intervalDays: number): string {
  * @param maxAppearances 每日上限
  * @returns 是否达到上限
  */
-export function hasReachedDailyLimit(block: IRBlock, maxAppearances: number): boolean {
+export function hasReachedDailyLimit(
+	block: IRBlock,
+	maxAppearances: number,
+): boolean {
 	const today = new Date().toISOString().split("T")[0];
 	const appearances = block.dailyAppearances?.[today] ?? 0;
 	return appearances >= maxAppearances;
@@ -218,7 +231,9 @@ export function hasReachedDailyLimit(block: IRBlock, maxAppearances: number): bo
  * @param block 内容块
  * @returns 更新后的 dailyAppearances
  */
-export function incrementDailyAppearance(block: IRBlock): Record<string, number> {
+export function incrementDailyAppearance(
+	block: IRBlock,
+): Record<string, number> {
 	const today = new Date().toISOString().split("T")[0];
 	const dailyAppearances = { ...block.dailyAppearances };
 	dailyAppearances[today] = (dailyAppearances[today] ?? 0) + 1;
@@ -287,10 +302,15 @@ export class IRSchedulerV3 {
 	private scheduleConfig: typeof DEFAULT_SCHEDULE_CONFIG_V3;
 	private app: App | null;
 
-	constructor(storage: IRStorageService, config?: IRSchedulerV3Config, app?: App) {
+	constructor(
+		storage: IRStorageService,
+		config?: IRSchedulerV3Config,
+		app?: App,
+	) {
 		this.storage = storage;
 		this.strategy = config?.strategy ?? PROCESSING_STRATEGY;
-		this.advancedSettings = config?.advancedSettings ?? DEFAULT_ADVANCED_SCHEDULE_SETTINGS;
+		this.advancedSettings =
+			config?.advancedSettings ?? DEFAULT_ADVANCED_SCHEDULE_SETTINGS;
 		this.scheduleConfig = config?.scheduleConfig ?? DEFAULT_SCHEDULE_CONFIG_V3;
 		this.app = app ?? null;
 	}
@@ -299,7 +319,10 @@ export class IRSchedulerV3 {
 	 * 切换调度策略
 	 */
 	setStrategy(strategyType: "processing" | "reading-list"): void {
-		this.strategy = strategyType === "processing" ? PROCESSING_STRATEGY : READING_LIST_STRATEGY;
+		this.strategy =
+			strategyType === "processing"
+				? PROCESSING_STRATEGY
+				: READING_LIST_STRATEGY;
 		logger.info(`[IRSchedulerV3] 切换策略: ${strategyType}`);
 	}
 
@@ -330,7 +353,7 @@ export class IRSchedulerV3 {
 			priorityUi,
 			priorityEffOld,
 			block.priorityUpdatedAt ?? null,
-			this.advancedSettings.priorityHalfLifeDays
+			this.advancedSettings.priorityHalfLifeDays,
 		);
 
 		const updatedBlock: IRBlock = {
@@ -345,7 +368,9 @@ export class IRSchedulerV3 {
 
 		logger.debug(
 			`[IRSchedulerV3] 更新优先级 ${block.id}: ` +
-				`UI=${priorityUi}, Eff=${priorityEffOld.toFixed(2)}->${priorityEffNew.toFixed(2)}`
+				`UI=${priorityUi}, Eff=${priorityEffOld.toFixed(
+					2,
+				)}->${priorityEffNew.toFixed(2)}`,
 		);
 
 		return updatedBlock;
@@ -364,7 +389,7 @@ export class IRSchedulerV3 {
 		block: IRBlock,
 		data: ReadingCompletionData,
 		deckId = "",
-		groupProfile?: IRTagGroupProfile
+		groupProfile?: IRTagGroupProfile,
 	): Promise<IRBlock> {
 		const now = new Date();
 		let newState: IRBlockState = block.state;
@@ -379,7 +404,7 @@ export class IRSchedulerV3 {
 				data.priorityUi,
 				currentPriorityEff,
 				priorityUpdatedAt ?? null,
-				this.advancedSettings.priorityHalfLifeDays
+				this.advancedSettings.priorityHalfLifeDays,
 			);
 			priorityUpdatedAt = now.toISOString();
 		}
@@ -401,7 +426,7 @@ export class IRSchedulerV3 {
 					newIntervalFactor,
 					currentPriorityEff,
 					this.strategy,
-					this.scheduleConfig
+					this.scheduleConfig,
 				);
 				if (nextIntervalPreview >= this.scheduleConfig.reviewThresholdDays) {
 					newState = "review";
@@ -418,13 +443,14 @@ export class IRSchedulerV3 {
 		}
 
 		// 4. 计算新间隔
-		const currentInterval = block.interval || this.scheduleConfig.initialIntervalDays;
+		const currentInterval =
+			block.interval || this.scheduleConfig.initialIntervalDays;
 		const newInterval = calculateNextInterval(
 			currentInterval,
 			newIntervalFactor,
 			currentPriorityEff,
 			this.strategy,
-			this.scheduleConfig
+			this.scheduleConfig,
 		);
 
 		// 5. 增加每日出现计数
@@ -459,7 +485,10 @@ export class IRSchedulerV3 {
 			const chunkData = await this.storage.getChunkData(block.id);
 			if (chunkData) {
 				// 状态映射：IRBlockState -> IRBlockStatus
-				const statusMap: Record<string, import("../../types/ir-types").IRBlockStatus> = {
+				const statusMap: Record<
+					string,
+					import("../../types/ir-types").IRBlockStatus
+				> = {
 					new: "new",
 					learning: "queued",
 					review: "scheduled",
@@ -487,13 +516,18 @@ export class IRSchedulerV3 {
 				};
 				chunkData.stats.impressions++;
 				chunkData.stats.totalReadingTimeSec += data.readingTimeSeconds;
-				chunkData.stats.effectiveReadingTimeSec += Math.min(data.readingTimeSeconds, 600);
+				chunkData.stats.effectiveReadingTimeSec += Math.min(
+					data.readingTimeSeconds,
+					600,
+				);
 				chunkData.stats.cardsCreated += data.createdCardCount || 0;
 				chunkData.stats.lastInteraction = Date.now();
 				chunkData.stats.lastShownAt = Date.now();
 
 				await this.storage.saveChunkData(chunkData);
-				logger.debug(`[IRSchedulerV3] 同步更新 chunk 投影视图: ${block.id}, status=${newStatus}`);
+				logger.debug(
+					`[IRSchedulerV3] 同步更新 chunk 投影视图: ${block.id}, status=${newStatus}`,
+				);
 			}
 		} catch (chunkError) {
 			// chunk 更新失败不影响主流程
@@ -505,7 +539,9 @@ export class IRSchedulerV3 {
 			id: `session-${Date.now()}`,
 			blockId: block.id,
 			deckId,
-			startTime: new Date(now.getTime() - data.readingTimeSeconds * 1000).toISOString(),
+			startTime: new Date(
+				now.getTime() - data.readingTimeSeconds * 1000,
+			).toISOString(),
 			endTime: now.toISOString(),
 			duration: data.readingTimeSeconds,
 			action: "completed",
@@ -515,7 +551,7 @@ export class IRSchedulerV3 {
 		logger.debug(
 			`[IRSchedulerV3] 完成内容块 ${block.id}: ` +
 				`${block.state}->${newState}, 间隔=${newInterval.toFixed(2)}天, ` +
-				`优先级Eff=${currentPriorityEff.toFixed(2)}`
+				`优先级Eff=${currentPriorityEff.toFixed(2)}`,
 		);
 
 		return updatedBlock;
@@ -585,7 +621,10 @@ export class IRSchedulerV3 {
 			const chunkData = await this.storage.getChunkData(block.id);
 			if (chunkData) {
 				// 状态映射：IRBlockState -> IRBlockStatus
-				const statusMap: Record<string, import("../../types/ir-types").IRBlockStatus> = {
+				const statusMap: Record<
+					string,
+					import("../../types/ir-types").IRBlockStatus
+				> = {
 					new: "new",
 					learning: "queued",
 					review: "scheduled",
@@ -639,7 +678,8 @@ export class IRSchedulerV3 {
 
 		// 优先使用 advancedSettings 中的设置，否则回退到策略默认值
 		const maxAppearances =
-			this.advancedSettings.maxAppearancesPerDay ?? this.strategy.maxAppearancesPerBlockPerDay;
+			this.advancedSettings.maxAppearancesPerDay ??
+			this.strategy.maxAppearancesPerBlockPerDay;
 
 		// 1. 过滤到期内容块
 		let dueBlocks = allBlocks.filter((_block) => {
@@ -664,7 +704,9 @@ export class IRSchedulerV3 {
 		// 2. 排序
 		dueBlocks = this.sortBlocks(dueBlocks, todayDate);
 
-		logger.info(`[IRSchedulerV3] 获取到期块: deck=${deckId}, 到期=${dueBlocks.length}`);
+		logger.info(
+			`[IRSchedulerV3] 获取到期块: deck=${deckId}, 到期=${dueBlocks.length}`,
+		);
 
 		return dueBlocks;
 	}
@@ -733,7 +775,10 @@ export class IRSchedulerV3 {
 		for (const block of dueBlocks) {
 			// 检查时间预算
 			const estimatedMinutes = estimateReadingTime(block);
-			if (totalMinutes + estimatedMinutes > this.strategy.dailyTimeBudgetMinutes) {
+			if (
+				totalMinutes + estimatedMinutes >
+				this.strategy.dailyTimeBudgetMinutes
+			) {
 				break;
 			}
 
@@ -748,7 +793,9 @@ export class IRSchedulerV3 {
 
 		logger.info(
 			`[IRSchedulerV3] 生成学习队列: deck=${deckId}, ` +
-				`队列=${queue.length}/${dueBlocks.length}, 预估时间=${totalMinutes.toFixed(1)}min`
+				`队列=${queue.length}/${
+					dueBlocks.length
+				}, 预估时间=${totalMinutes.toFixed(1)}min`,
 		);
 
 		return queue;
@@ -803,7 +850,8 @@ export class IRSchedulerV3 {
 
 			// 检查每日上限
 			const maxAppearances =
-				this.advancedSettings.maxAppearancesPerDay ?? this.strategy.maxAppearancesPerBlockPerDay;
+				this.advancedSettings.maxAppearancesPerDay ??
+				this.strategy.maxAppearancesPerBlockPerDay;
 			if (hasReachedDailyLimit(block, maxAppearances)) {
 				reachedDailyLimit++;
 			}

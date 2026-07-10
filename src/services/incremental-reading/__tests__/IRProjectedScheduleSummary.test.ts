@@ -1,11 +1,11 @@
-
 vi.mock("obsidian", async () => {
-	const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
-		"../../../tests/mocks/obsidian"
-	);
+	const actual = await vi.importActual<
+		typeof import("../../../tests/mocks/obsidian")
+	>("../../../tests/mocks/obsidian");
 	return {
 		...actual,
-		normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/{2,}/g, "/"),
+		normalizePath: (path: string) =>
+			path.replace(/\\/g, "/").replace(/\/{2,}/g, "/"),
 	};
 });
 
@@ -14,15 +14,21 @@ import {
 	getProjectedDayLoad,
 	getProjectedScheduleSummary,
 } from "../IRProjectedScheduleSummary";
-import type { IRPlannedSchedule, IRPlannedScheduleItem } from "../IRScheduleKernel";
+import type {
+	IRPlannedSchedule,
+	IRPlannedScheduleItem,
+} from "../IRScheduleKernel";
 
 function formatDateKey(date: Date): string {
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-		date.getDate()
-	).padStart(2, "0")}`;
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function createPlannedItem(input: Partial<IRPlannedScheduleItem> & Pick<IRPlannedScheduleItem, "id">): IRPlannedScheduleItem {
+function createPlannedItem(
+	input: Partial<IRPlannedScheduleItem> & Pick<IRPlannedScheduleItem, "id">,
+): IRPlannedScheduleItem {
 	const nextReviewDate = input.nextReviewDate ?? new Date();
 	return {
 		id: input.id,
@@ -38,7 +44,8 @@ function createPlannedItem(input: Partial<IRPlannedScheduleItem> & Pick<IRPlanne
 		deckId: input.deckId ?? "deck-1",
 		sourceType: input.sourceType ?? "chunk",
 		explanation:
-			input.explanation ?? ({
+			input.explanation ??
+			({
 				primaryReason: "test",
 				secondaryReasons: [],
 				isOverdue: false,
@@ -56,14 +63,19 @@ function createPlannedItem(input: Partial<IRPlannedScheduleItem> & Pick<IRPlanne
 	};
 }
 
-function createSchedule(itemsByDate: Map<string, IRPlannedScheduleItem[]>): IRPlannedSchedule {
+function createSchedule(
+	itemsByDate: Map<string, IRPlannedScheduleItem[]>,
+): IRPlannedSchedule {
 	return {
 		generatedAt: Date.now(),
 		version: 1,
 		days: Array.from(itemsByDate.entries()).map(([dateKey, items]) => ({
 			dateKey,
 			items,
-			totalEstimatedMinutes: items.reduce((sum, item) => sum + item.estimatedMinutes, 0),
+			totalEstimatedMinutes: items.reduce(
+				(sum, item) => sum + item.estimatedMinutes,
+				0,
+			),
 			overloadLevel: "normal" as const,
 		})),
 		itemsByDate,
@@ -91,7 +103,7 @@ describe("IRProjectedScheduleSummary", () => {
 						}),
 					],
 				],
-			])
+			]),
 		);
 
 		const summary = await getProjectedScheduleSummary({} as any, {
@@ -131,7 +143,11 @@ describe("IRProjectedScheduleSummary", () => {
 						updatedAt: new Date(today).toISOString(),
 						contentPreview: "Legacy preview",
 						tags: [],
-						associatedNotePaths: ["Notes/Legacy", "Notes/Legacy.md", "Notes/Appendix.md"],
+						associatedNotePaths: [
+							"Notes/Legacy",
+							"Notes/Legacy.md",
+							"Notes/Appendix.md",
+						],
 					} as any,
 				},
 				history: { sessions: [] },
@@ -142,7 +158,9 @@ describe("IRProjectedScheduleSummary", () => {
 		const tomorrowLoad = getProjectedDayLoad(summary, tomorrow, ["deck-1"]);
 
 		expect(todayLoad.items.map((item) => item.id)).toContain("legacy-1");
-		expect(todayLoad.items.find((item) => item.id === "legacy-1")).toMatchObject({
+		expect(
+			todayLoad.items.find((item) => item.id === "legacy-1"),
+		).toMatchObject({
 			sourceType: "legacy-block",
 			associatedNotePath: "Notes/Legacy.md",
 			associatedNoteScope: "point",
@@ -204,6 +222,8 @@ describe("IRProjectedScheduleSummary", () => {
 		const todayLoad = loadMap.get(formatDateKey(today));
 
 		expect(todayLoad?.items.map((item) => item.id)).toContain("legacy-2");
-		expect(todayLoad?.items.find((item) => item.id === "legacy-2")?.deckId).toBe("deck-1");
+		expect(
+			todayLoad?.items.find((item) => item.id === "legacy-2")?.deckId,
+		).toBe("deck-1");
 	});
 });

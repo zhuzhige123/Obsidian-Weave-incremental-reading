@@ -2,7 +2,6 @@ import { pathToFileURL } from "url";
 import { createRequire } from "module";
 import { builtinModules as builtins } from "node:module";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import UnoCSS from "unocss/vite";
 import { defineConfig } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import commonjs from "vite-plugin-commonjs";
@@ -223,7 +222,6 @@ export default defineConfig(({ mode }) => {
 					},
 				},
 			}),
-			UnoCSS(),
 			{
 				name: "desktop-hot-reload-sync",
 				buildStart() {

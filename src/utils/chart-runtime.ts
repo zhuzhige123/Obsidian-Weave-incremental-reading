@@ -1,5 +1,8 @@
-import echarts, { type EChartsOption, type EChartsType } from "./echarts-loader";
-import { getThemeColors, type ThemeColors } from "./echarts-theme";
+import echarts, {
+	type EChartsOption,
+	type EChartsType,
+} from "./echarts-loader";
+import { type ThemeColors, getThemeColors } from "./echarts-theme";
 import { bindPinchRangeGesture } from "./pinch-range-gesture";
 
 interface ChartRangeInteraction {
@@ -13,9 +16,13 @@ export interface ChartRuntimeOptions<TPayload> {
 	buildOption: (
 		payload: TPayload,
 		theme: ThemeColors,
-		chart: EChartsType
+		chart: EChartsType,
 	) => EChartsOption | undefined;
-	onRendered?: (chart: EChartsType, payload: TPayload, theme: ThemeColors) => void;
+	onRendered?: (
+		chart: EChartsType,
+		payload: TPayload,
+		theme: ThemeColors,
+	) => void;
 	rangeInteraction?: ChartRangeInteraction;
 	replaceOption?: boolean;
 }
@@ -29,7 +36,7 @@ export interface ManagedChartRuntime<TPayload> {
 }
 
 export function createManagedChartRuntime<TPayload>(
-	options: ChartRuntimeOptions<TPayload>
+	options: ChartRuntimeOptions<TPayload>,
 ): ManagedChartRuntime<TPayload> {
 	let container: HTMLElement | null = null;
 	let chart: EChartsType | null = null;
@@ -41,7 +48,8 @@ export function createManagedChartRuntime<TPayload>(
 
 	const cooldownMs = Math.max(120, options.rangeInteraction?.cooldownMs ?? 180);
 
-	const isRangeInteractionEnabled = () => options.rangeInteraction?.enabled?.() ?? true;
+	const isRangeInteractionEnabled = () =>
+		options.rangeInteraction?.enabled?.() ?? true;
 
 	const ensureChart = (): EChartsType | null => {
 		if (!container) {
@@ -88,7 +96,10 @@ export function createManagedChartRuntime<TPayload>(
 	};
 
 	const handleWheel = (event: WheelEvent) => {
-		if (!options.rangeInteraction?.onWheelStep || !isRangeInteractionEnabled()) {
+		if (
+			!options.rangeInteraction?.onWheelStep ||
+			!isRangeInteractionEnabled()
+		) {
 			return;
 		}
 
@@ -106,7 +117,11 @@ export function createManagedChartRuntime<TPayload>(
 
 	const bindRangeInteraction = () => {
 		clearRangeInteraction();
-		if (!container || !options.rangeInteraction || !isRangeInteractionEnabled()) {
+		if (
+			!container ||
+			!options.rangeInteraction ||
+			!isRangeInteractionEnabled()
+		) {
 			return;
 		}
 

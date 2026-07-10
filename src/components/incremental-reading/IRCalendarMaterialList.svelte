@@ -38,7 +38,8 @@
     formatSiblingDueDate,
     batchSelectionMode,
     isBatchSelected,
-    toggleBatchSelection
+    toggleBatchSelection,
+    readOnlyHistoryMode = false
   }: IRCalendarMaterialListProps = $props();
 
   function handleBatchCheckboxClick(event: MouseEvent, materialId: string): void {
@@ -58,6 +59,16 @@
     }
     return Date.now() - autoSubscribedAt <= 3 * 24 * 60 * 60 * 1000;
   }
+
+  function isMaterialScheduleCompleted(materialId: string): boolean {
+    return processedChunkIds.has(materialId);
+  }
+
+  function getHistoryScheduleCheckboxLabel(materialId: string): string {
+    return isMaterialScheduleCompleted(materialId)
+      ? t('irSidebar.calendar.historyScheduleCompleted')
+      : t('irSidebar.calendar.historySchedulePending');
+  }
 </script>
 
 {#each displayedMaterials as material, index}
@@ -71,8 +82,8 @@
   {@const isBatchSelectedItem = isBatchSelected(material.id)}
   {@const typeIndicator = getReadingPointTypeIndicator(material)}
   <div class="reading-item-wrapper">
-    <div class="reading-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelectedItem}>
-      {#if batchSelectionMode}
+    <div class="reading-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelectedItem} class:history-readonly={readOnlyHistoryMode}>
+      {#if batchSelectionMode && !readOnlyHistoryMode}
         <button
           type="button"
           class="batch-select-checkbox"
@@ -139,7 +150,7 @@
       </div>
       <div class="reading-item-controls">
         {#if !batchSelectionMode}
-          {#if hasVisibleAssociatedNote(material)}
+          {#if hasVisibleAssociatedNote(material) && !readOnlyHistoryMode}
             <button
               type="button"
               class="associated-note-link"
@@ -151,14 +162,30 @@
               <span>{t('irSidebar.associatedNote.badge')}</span>
             </button>
           {/if}
-          <button
-            class="schedule-checkbox"
-            aria-label={t('irSidebar.controls.schedule')}
-            onclick={(event) => openSchedulingMenu(event, material)}
-          >
-            <span class="checkbox-box" class:checked={processedChunkIds.has(material.id)} aria-hidden="true"></span>
-          </button>
+          {#if readOnlyHistoryMode}
+            <span
+              class="schedule-checkbox schedule-checkbox--readonly"
+              role="img"
+              aria-label={getHistoryScheduleCheckboxLabel(material.id)}
+              title={getHistoryScheduleCheckboxLabel(material.id)}
+            >
+              <span
+                class="checkbox-box"
+                class:checked={isMaterialScheduleCompleted(material.id)}
+                aria-hidden="true"
+              ></span>
+            </span>
+          {:else}
+            <button
+              class="schedule-checkbox"
+              aria-label={t('irSidebar.controls.schedule')}
+              onclick={(event) => openSchedulingMenu(event, material)}
+            >
+              <span class="checkbox-box" class:checked={processedChunkIds.has(material.id)} aria-hidden="true"></span>
+            </button>
+          {/if}
         {/if}
+        {#if !readOnlyHistoryMode}
         <button
           type="button"
           class="clickable-icon reading-timer-btn"
@@ -183,6 +210,7 @@
             {formatCompactTimerDuration(getDisplayedTimerSeconds(material.id))}
           </span>
         {/if}
+        {/if}
         <span class="priority-badge {priorityClass}">P{priority}</span>
       </div>
     </div>
@@ -193,8 +221,8 @@
           {@const siblingPriorityClass = siblingPriority >= 8 ? 'high' : siblingPriority >= 4 ? 'medium' : 'low'}
           {@const dueText = sibling.nextRepDate > 0 ? formatSiblingDueDate(sibling.nextRepDate) : t('irSidebar.controls.unscheduled')}
           {@const siblingTypeIndicator = getReadingPointTypeIndicator(sibling)}
-          <div class="sibling-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelected(sibling.id)}>
-            {#if batchSelectionMode}
+          <div class="sibling-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelected(sibling.id)} class:history-readonly={readOnlyHistoryMode}>
+            {#if batchSelectionMode && !readOnlyHistoryMode}
               <button
                 type="button"
                 class="batch-select-checkbox sibling-batch-select-checkbox"
@@ -234,7 +262,7 @@
             </div>
             <div class="reading-item-controls">
               {#if !batchSelectionMode}
-                {#if hasVisibleAssociatedNote(sibling)}
+                {#if hasVisibleAssociatedNote(sibling) && !readOnlyHistoryMode}
                   <button
                     type="button"
                     class="associated-note-link sibling-associated-note-link"
@@ -246,14 +274,30 @@
                     <span>{t('irSidebar.associatedNote.badge')}</span>
                   </button>
                 {/if}
-                <button
-                  class="schedule-checkbox"
-                  aria-label={t('irSidebar.controls.schedule')}
-                  onclick={(event) => openSchedulingMenu(event, sibling)}
-                >
-                  <span class="checkbox-box" class:checked={processedChunkIds.has(sibling.id)} aria-hidden="true"></span>
-                </button>
+                {#if readOnlyHistoryMode}
+                  <span
+                    class="schedule-checkbox schedule-checkbox--readonly"
+                    role="img"
+                    aria-label={getHistoryScheduleCheckboxLabel(sibling.id)}
+                    title={getHistoryScheduleCheckboxLabel(sibling.id)}
+                  >
+                    <span
+                      class="checkbox-box"
+                      class:checked={isMaterialScheduleCompleted(sibling.id)}
+                      aria-hidden="true"
+                    ></span>
+                  </span>
+                {:else}
+                  <button
+                    class="schedule-checkbox"
+                    aria-label={t('irSidebar.controls.schedule')}
+                    onclick={(event) => openSchedulingMenu(event, sibling)}
+                  >
+                    <span class="checkbox-box" class:checked={processedChunkIds.has(sibling.id)} aria-hidden="true"></span>
+                  </button>
+                {/if}
               {/if}
+              {#if !readOnlyHistoryMode}
               <button
                 type="button"
                 class="clickable-icon reading-timer-btn"
@@ -277,6 +321,7 @@
                 >
                   {formatCompactTimerDuration(getDisplayedTimerSeconds(sibling.id))}
                 </span>
+              {/if}
               {/if}
               <span class="priority-badge {siblingPriorityClass}">P{siblingPriority}</span>
             </div>
@@ -492,6 +537,16 @@
     outline: 2px solid var(--interactive-accent);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  .schedule-checkbox--readonly {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .reading-item.history-readonly .item-title:not(.processed) .item-title-text,
+  .sibling-item.history-readonly .sibling-title-text {
+    color: var(--text-muted);
   }
 
   .checkbox-box {

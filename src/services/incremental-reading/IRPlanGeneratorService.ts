@@ -1,26 +1,29 @@
 import { IRCognitiveProfileService } from "./IRCognitiveProfileService";
 import {
+	type IRDailyLoadDayStats,
+	type IRLoadDeferralRecord,
 	allocateDailyLoadByPriority,
 	computeStretchCeilingMinutes,
 	resolveScheduleItemLoadMinutes,
-	type IRDailyLoadDayStats,
-	type IRLoadDeferralRecord,
 } from "./IRDailyLoadAllocator";
+import { isItemLoadDeferPinned } from "./IRDailyLoadAllocator";
 import {
+	type IRHorizonLoadPolicy,
 	buildHorizonLoadPolicy,
 	findLowestLoadDayKey,
 	recordLoadDeferral,
 	smoothHorizonLoad,
-	type IRHorizonLoadPolicy,
 } from "./IRHorizonLoadPlanner";
-import { sequenceItemsForDailyReading, type IRInterleaveProfile } from "./IRInterleaveSequencer";
-import type { IRPlannedDay, IRPlannedScheduleItem } from "./IRScheduleKernel";
 import {
-	compareScheduleItemsSourceSequenceWithinDay,
+	type IRInterleaveProfile,
+	sequenceItemsForDailyReading,
+} from "./IRInterleaveSequencer";
+import {
 	compareScheduleItemsForDailyQueue,
+	compareScheduleItemsSourceSequenceWithinDay,
 	isScheduleItemInitialSequenceLockedForDay,
 } from "./IRScheduleItemSort";
-import { isItemLoadDeferPinned } from "./IRDailyLoadAllocator";
+import type { IRPlannedDay, IRPlannedScheduleItem } from "./IRScheduleKernel";
 
 export interface IRPlanGeneratorOptions {
 	horizonDays?: number;
@@ -68,9 +71,15 @@ interface IRPlanningOrigin {
 	frozenUntilOriginalDay: boolean;
 }
 
-function isPinnedToOriginalDay(item: IRPlannedScheduleItem, origin: IRPlanningOrigin | undefined, day: Date): boolean {
+function isPinnedToOriginalDay(
+	item: IRPlannedScheduleItem,
+	origin: IRPlanningOrigin | undefined,
+	day: Date,
+): boolean {
 	return Boolean(
-		origin?.frozenUntilOriginalDay && formatDateKey(day) === origin.originalDayKey && item.sourceSequenceAnchorDateKey
+		origin?.frozenUntilOriginalDay &&
+			formatDateKey(day) === origin.originalDayKey &&
+			item.sourceSequenceAnchorDateKey,
 	);
 }
 
@@ -97,9 +106,10 @@ interface IRPlanningCursor {
 }
 
 function formatDateKey(date: Date): string {
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-		date.getDate()
-	).padStart(2, "0")}`;
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function startOfDay(date: Date): Date {
@@ -118,11 +128,14 @@ function roundScore(value: number): number {
 
 function diffDays(target: Date, base: Date): number {
 	return Math.round(
-		(startOfDay(target).getTime() - startOfDay(base).getTime()) / (24 * 60 * 60 * 1000)
+		(startOfDay(target).getTime() - startOfDay(base).getTime()) /
+			(24 * 60 * 60 * 1000),
 	);
 }
 
-function computeLegacyOverloadLevel(totalEstimatedMinutes: number): "normal" | "warning" | "overloaded" {
+function computeLegacyOverloadLevel(
+	totalEstimatedMinutes: number,
+): "normal" | "warning" | "overloaded" {
 	if (totalEstimatedMinutes >= 60) return "overloaded";
 	if (totalEstimatedMinutes >= 40) return "warning";
 	return "normal";
@@ -137,7 +150,7 @@ export class IRPlanGeneratorService {
 
 	generatePlan(
 		items: IRPlannedScheduleItem[],
-		options?: IRPlanGeneratorOptions
+		options?: IRPlanGeneratorOptions,
 	): IRPlanGeneratorResult {
 		const horizonDays = options?.horizonDays ?? 7;
 		const dailyBudgetMinutes = options?.dailyBudgetMinutes ?? 45;
@@ -146,7 +159,10 @@ export class IRPlanGeneratorService {
 		const volatilityPenaltyFactor = options?.volatilityPenaltyFactor ?? 1.6;
 		const continuityBonus = options?.continuityBonus ?? 0.6;
 		const enableInterleaving = options?.enableInterleaving ?? true;
-		const maxConsecutiveSameTopic = Math.max(1, options?.maxConsecutiveSameTopic ?? 3);
+		const maxConsecutiveSameTopic = Math.max(
+			1,
+			options?.maxConsecutiveSameTopic ?? 3,
+		);
 		const loadPolicy = buildHorizonLoadPolicy({
 			baselineMinutes: dailyBudgetMinutes,
 			flowStretchPercent: options?.flowStretchPercent,
@@ -178,17 +194,20 @@ export class IRPlanGeneratorService {
 			const anchorDate = item.sourceSequenceAnchorDateKey
 				? startOfDay(new Date(`${item.sourceSequenceAnchorDateKey}T00:00:00`))
 				: null;
-			const targetDate = anchorDate && !Number.isNaN(anchorDate.getTime())
-				? anchorDate
-				: startOfDay(item.nextReviewDate ?? today);
-			const hoursUntilOriginalDay = (targetDate.getTime() - today.getTime()) / (60 * 60 * 1000);
+			const targetDate =
+				anchorDate && !Number.isNaN(anchorDate.getTime())
+					? anchorDate
+					: startOfDay(item.nextReviewDate ?? today);
+			const hoursUntilOriginalDay =
+				(targetDate.getTime() - today.getTime()) / (60 * 60 * 1000);
 			origins.set(item.id, {
 				originalReviewDate: targetDate,
 				originalDayKey: formatDateKey(targetDate),
 				frozenUntilOriginalDay:
 					item.sourceSequenceLocked && item.sourceSequenceAnchorDateKey
 						? hoursUntilOriginalDay >= 0
-						: hoursUntilOriginalDay >= 0 && hoursUntilOriginalDay <= freezeWindowHours,
+						: hoursUntilOriginalDay >= 0 &&
+						  hoursUntilOriginalDay <= freezeWindowHours,
 			});
 
 			if (targetDate <= horizonEnd) {
@@ -212,15 +231,18 @@ export class IRPlanGeneratorService {
 
 		const assigned = new Set<string>();
 		const itemsByDate = new Map<string, IRPlannedScheduleItem[]>();
-		const totalNearTermMinutes = nearTerm.reduce((sum, item) => sum + item.estimatedMinutes, 0);
+		const totalNearTermMinutes = nearTerm.reduce(
+			(sum, item) => sum + item.estimatedMinutes,
+			0,
+		);
 		const targetDailyLoad =
 			horizonDays > 0
 				? Math.min(
 						dailyBudgetMinutes,
 						Math.max(
 							Math.min(dailyBudgetMinutes * 0.55, dailyBudgetMinutes),
-							totalNearTermMinutes / horizonDays
-						)
+							totalNearTermMinutes / horizonDays,
+						),
 				  )
 				: dailyBudgetMinutes;
 		const planningContext: IRPlanningContext = {
@@ -243,7 +265,7 @@ export class IRPlanGeneratorService {
 		const projectedCount = new Map<string, number>();
 		const stretchMinutes = computeStretchCeilingMinutes(
 			loadPolicy.baselineMinutes,
-			loadPolicy.flowStretchPercent
+			loadPolicy.flowStretchPercent,
 		);
 		const stretchCount = loadPolicy.dailyReadingPointStretchCap;
 
@@ -265,7 +287,9 @@ export class IRPlanGeneratorService {
 
 			const dueCandidates = nearTerm
 				.filter((item) => !assigned.has(item.id))
-				.filter((item) => !item.nextReviewDate || item.nextReviewDate <= endOfDay);
+				.filter(
+					(item) => !item.nextReviewDate || item.nextReviewDate <= endOfDay,
+				);
 
 			let currentLoad = 0;
 			const selected: IRPlannedScheduleItem[] = [];
@@ -276,9 +300,14 @@ export class IRPlanGeneratorService {
 			};
 
 			if (useSmartScheduling) {
-				const allocation = allocateDailyLoadByPriority(dueCandidates, dayKey, loadPolicy, {
-					isPinned: (item) => isItemLoadDeferPinned(item, dayKey),
-				});
+				const allocation = allocateDailyLoadByPriority(
+					dueCandidates,
+					dayKey,
+					loadPolicy,
+					{
+						isPinned: (item) => isItemLoadDeferPinned(item, dayKey),
+					},
+				);
 				dayLoadStats.set(dayKey, allocation.stats);
 
 				for (const item of allocation.assigned) {
@@ -288,17 +317,20 @@ export class IRPlanGeneratorService {
 					assigned.add(item.id);
 					const load = resolveScheduleItemLoadMinutes(
 						item,
-						loadPolicy.maxEstimatedMinutesPerItem
+						loadPolicy.maxEstimatedMinutesPerItem,
 					);
 					currentLoad += load;
-					projectedMinutes.set(dayKey, (projectedMinutes.get(dayKey) || 0) + load);
+					projectedMinutes.set(
+						dayKey,
+						(projectedMinutes.get(dayKey) || 0) + load,
+					);
 					projectedCount.set(dayKey, (projectedCount.get(dayKey) || 0) + 1);
 				}
 
 				for (const item of allocation.deferred) {
 					const itemLoad = resolveScheduleItemLoadMinutes(
 						item,
-						loadPolicy.maxEstimatedMinutesPerItem
+						loadPolicy.maxEstimatedMinutesPerItem,
 					);
 					const fromNextRepDate = item.nextRepDate;
 					const targetDayKey =
@@ -309,7 +341,7 @@ export class IRPlanGeneratorService {
 							offset + 1,
 							stretchMinutes,
 							stretchCount,
-							itemLoad
+							itemLoad,
 						) || dayKeys[Math.min(offset + 1, dayKeys.length - 1)];
 					const targetDay = new Date(`${targetDayKey}T00:00:00`);
 					item.nextReviewDate = targetDay;
@@ -322,14 +354,17 @@ export class IRPlanGeneratorService {
 							fromNextRepDate,
 							toNextRepDate: targetDay.getTime(),
 							action: "load_defer",
-						})
+						}),
 					);
 					if (targetDayKey) {
 						projectedMinutes.set(
 							targetDayKey,
-							(projectedMinutes.get(targetDayKey) || 0) + itemLoad
+							(projectedMinutes.get(targetDayKey) || 0) + itemLoad,
 						);
-						projectedCount.set(targetDayKey, (projectedCount.get(targetDayKey) || 0) + 1);
+						projectedCount.set(
+							targetDayKey,
+							(projectedCount.get(targetDayKey) || 0) + 1,
+						);
 					}
 				}
 			} else {
@@ -341,7 +376,7 @@ export class IRPlanGeneratorService {
 					selected,
 					assigned,
 					origins,
-					planningContext
+					planningContext,
 				));
 			}
 
@@ -358,7 +393,7 @@ export class IRPlanGeneratorService {
 			const fromDateKey = formatDateKey(
 				item.nextReviewDate && !Number.isNaN(item.nextReviewDate.getTime())
 					? item.nextReviewDate
-					: today
+					: today,
 			);
 			item.nextReviewDate = overflowDate;
 			item.nextRepDate = overflowDate.getTime();
@@ -371,7 +406,7 @@ export class IRPlanGeneratorService {
 						fromNextRepDate,
 						toNextRepDate: overflowDate.getTime(),
 						action: "load_defer",
-					})
+					}),
 				);
 			}
 			const list = itemsByDate.get(overflowKey) || [];
@@ -387,7 +422,13 @@ export class IRPlanGeneratorService {
 		}
 
 		if (!useSmartScheduling) {
-			this.rebalanceAdjacentDays(itemsByDate, today, horizonDays, origins, planningContext);
+			this.rebalanceAdjacentDays(
+				itemsByDate,
+				today,
+				horizonDays,
+				origins,
+				planningContext,
+			);
 		}
 
 		const days = Array.from(itemsByDate.entries())
@@ -395,24 +436,32 @@ export class IRPlanGeneratorService {
 			.map(([dateKey, dayItems]) => {
 				const totalEstimatedMinutes = dayItems.reduce(
 					(sum, item) => sum + item.estimatedMinutes,
-					0
+					0,
 				);
 				let sortedItems = useSmartScheduling
 					? [...dayItems].sort((left, right) =>
-							compareScheduleItemsForDailyQueue(left, right, dateKey)
+							compareScheduleItemsForDailyQueue(left, right, dateKey),
 					  )
 					: [...dayItems].sort((a, b) => {
-							const sequenceCompare = compareScheduleItemsSourceSequenceWithinDay(a, b, dateKey);
+							const sequenceCompare =
+								compareScheduleItemsSourceSequenceWithinDay(a, b, dateKey);
 							if (sequenceCompare !== 0) {
 								return sequenceCompare;
 							}
-							return (b.explanation.compositeScore ?? 0) - (a.explanation.compositeScore ?? 0);
+							return (
+								(b.explanation.compositeScore ?? 0) -
+								(a.explanation.compositeScore ?? 0)
+							);
 					  });
 				if (useSmartScheduling && planningContext.interleaveProfile !== "off") {
-					sortedItems = sequenceItemsForDailyReading(sortedItems, planningContext.interleaveProfile, {
-						maxConsecutiveSameTopic: planningContext.maxConsecutiveSameTopic,
-						maxTopicSharePercent: planningContext.maxTopicSharePercent,
-					});
+					sortedItems = sequenceItemsForDailyReading(
+						sortedItems,
+						planningContext.interleaveProfile,
+						{
+							maxConsecutiveSameTopic: planningContext.maxConsecutiveSameTopic,
+							maxTopicSharePercent: planningContext.maxTopicSharePercent,
+						},
+					);
 				}
 				const loadStats = dayLoadStats.get(dateKey);
 				return {
@@ -442,17 +491,27 @@ export class IRPlanGeneratorService {
 		selected: IRPlannedScheduleItem[],
 		assigned: Set<string>,
 		origins: Map<string, IRPlanningOrigin>,
-		context: IRPlanningContext
+		context: IRPlanningContext,
 	): { currentLoad: number; cursor: IRPlanningCursor } {
 		const dayKey = formatDateKey(day);
 		while (candidates.length > 0) {
 			const selectableCandidates = candidates.filter(
-				(candidate) => !this.hasPendingInitialSequencePredecessor(candidate, candidates, dayKey)
+				(candidate) =>
+					!this.hasPendingInitialSequencePredecessor(
+						candidate,
+						candidates,
+						dayKey,
+					),
 			);
-			const evaluationPool = selectableCandidates.length > 0 ? selectableCandidates : candidates;
+			const evaluationPool =
+				selectableCandidates.length > 0 ? selectableCandidates : candidates;
 			const candidateTopicCounts = this.buildTopicCounts(evaluationPool);
 			evaluationPool.sort((a, b) => {
-				const sequenceCompare = compareScheduleItemsSourceSequenceWithinDay(a, b, dayKey);
+				const sequenceCompare = compareScheduleItemsSourceSequenceWithinDay(
+					a,
+					b,
+					dayKey,
+				);
 				if (sequenceCompare !== 0) return sequenceCompare;
 				const aEvaluation = this.evaluateCandidateForDay(
 					a,
@@ -461,7 +520,7 @@ export class IRPlanGeneratorService {
 					cursor,
 					candidateTopicCounts,
 					origins,
-					context
+					context,
 				);
 				const bEvaluation = this.evaluateCandidateForDay(
 					b,
@@ -470,13 +529,19 @@ export class IRPlanGeneratorService {
 					cursor,
 					candidateTopicCounts,
 					origins,
-					context
+					context,
 				);
 				const aUtility = aEvaluation.utility;
 				const bUtility = bEvaluation.utility;
 				if (bUtility !== aUtility) return bUtility - aUtility;
-				if (bEvaluation.carryoverRecoveryBoost !== aEvaluation.carryoverRecoveryBoost) {
-					return bEvaluation.carryoverRecoveryBoost - aEvaluation.carryoverRecoveryBoost;
+				if (
+					bEvaluation.carryoverRecoveryBoost !==
+					aEvaluation.carryoverRecoveryBoost
+				) {
+					return (
+						bEvaluation.carryoverRecoveryBoost -
+						aEvaluation.carryoverRecoveryBoost
+					);
 				}
 				if (bEvaluation.tagGroupBoost !== aEvaluation.tagGroupBoost) {
 					return bEvaluation.tagGroupBoost - aEvaluation.tagGroupBoost;
@@ -486,7 +551,9 @@ export class IRPlanGeneratorService {
 
 			const next = evaluationPool[0];
 			if (!next) break;
-			const nextIndex = candidates.findIndex((candidate) => candidate.id === next.id);
+			const nextIndex = candidates.findIndex(
+				(candidate) => candidate.id === next.id,
+			);
 			if (nextIndex < 0) {
 				break;
 			}
@@ -499,11 +566,19 @@ export class IRPlanGeneratorService {
 				cursor,
 				candidateTopicCounts,
 				origins,
-				context
+				context,
 			);
 			const origin = origins.get(next.id);
 
-			if (!this.canAssignCandidateToDay(currentLoad, next, context.dailyBudgetMinutes, origin, day)) {
+			if (
+				!this.canAssignCandidateToDay(
+					currentLoad,
+					next,
+					context.dailyBudgetMinutes,
+					origin,
+					day,
+				)
+			) {
 				continue;
 			}
 
@@ -511,8 +586,10 @@ export class IRPlanGeneratorService {
 			next.nextReviewDate = new Date(day);
 			next.nextRepDate = next.nextReviewDate.getTime();
 			next.explanation.scoreBreakdown.loadPenalty = evaluation.loadPenalty;
-			next.explanation.scoreBreakdown.fatiguePenalty = evaluation.fatiguePenalty;
-			next.explanation.scoreBreakdown.volatilityPenalty = evaluation.volatilityPenalty;
+			next.explanation.scoreBreakdown.fatiguePenalty =
+				evaluation.fatiguePenalty;
+			next.explanation.scoreBreakdown.volatilityPenalty =
+				evaluation.volatilityPenalty;
 			next.explanation.compositeScore = evaluation.utility;
 			selected.push(next);
 			assigned.add(next.id);
@@ -525,7 +602,7 @@ export class IRPlanGeneratorService {
 	private hasPendingInitialSequencePredecessor(
 		candidate: IRPlannedScheduleItem,
 		candidates: IRPlannedScheduleItem[],
-		dayKey: string
+		dayKey: string,
 	): boolean {
 		if (!isScheduleItemInitialSequenceLockedForDay(candidate, dayKey)) {
 			return false;
@@ -541,7 +618,10 @@ export class IRPlanGeneratorService {
 			if (other.sourceSequenceGroup !== candidate.sourceSequenceGroup) {
 				return false;
 			}
-			return Number(other.sourceSequenceOrder || 0) < Number(candidate.sourceSequenceOrder || 0);
+			return (
+				Number(other.sourceSequenceOrder || 0) <
+				Number(candidate.sourceSequenceOrder || 0)
+			);
 		});
 	}
 
@@ -550,7 +630,7 @@ export class IRPlanGeneratorService {
 		item: IRPlannedScheduleItem,
 		dailyBudgetMinutes: number,
 		origin?: IRPlanningOrigin,
-		day?: Date
+		day?: Date,
 	): boolean {
 		if (origin && day && isPinnedToOriginalDay(item, origin, day)) {
 			return true;
@@ -561,7 +641,9 @@ export class IRPlanGeneratorService {
 			dailyBudgetMinutes > 0 &&
 			currentLoad / dailyBudgetMinutes >= 0.8 &&
 			projectedLoad <= dailyBudgetMinutes * 1.15;
-		return projectedLoad <= dailyBudgetMinutes || allowOverflow || currentLoad === 0;
+		return (
+			projectedLoad <= dailyBudgetMinutes || allowOverflow || currentLoad === 0
+		);
 	}
 
 	private evaluateCandidateForDay(
@@ -571,7 +653,7 @@ export class IRPlanGeneratorService {
 		cursor: IRPlanningCursor,
 		candidateTopicCounts: Map<string, number>,
 		origins: Map<string, IRPlanningOrigin>,
-		context: IRPlanningContext
+		context: IRPlanningContext,
 	): IRCandidateEvaluation {
 		const origin = origins.get(item.id) ?? {
 			originalReviewDate: startOfDay(item.nextReviewDate ?? day),
@@ -581,41 +663,58 @@ export class IRPlanGeneratorService {
 		const dayShift = diffDays(day, origin.originalReviewDate);
 		const projectedLoad = currentLoad + item.estimatedMinutes;
 		const loadRatio =
-			context.dailyBudgetMinutes > 0 ? projectedLoad / context.dailyBudgetMinutes : 0;
+			context.dailyBudgetMinutes > 0
+				? projectedLoad / context.dailyBudgetMinutes
+				: 0;
 		const overloadDelta = Math.max(0, projectedLoad - context.targetDailyLoad);
 		const smoothingPenalty =
 			context.dailyBudgetMinutes > 0
 				? Math.min(
 						3,
-						(overloadDelta / context.dailyBudgetMinutes) * 4 * context.loadSmoothingPenalty
+						(overloadDelta / context.dailyBudgetMinutes) *
+							4 *
+							context.loadSmoothingPenalty,
 				  )
 				: 0;
-		const freezePenalty = origin.frozenUntilOriginalDay && dayShift !== 0 ? 8 : 0;
-		const postponePenalty = dayShift > 0 ? dayShift * context.volatilityPenaltyFactor : 0;
-		const manualSchedulePenalty = item.explanation.hasManualSchedule && dayShift > 0 ? 0.8 : 0;
-		const volatilityPenalty = clampScore(freezePenalty + postponePenalty + manualSchedulePenalty);
-		const fatiguePenalty = clampScore(
-			projectedLoad >= context.dailyBudgetMinutes * 0.8 && item.estimatedMinutes >= 8
-				? item.explanation.scoreBreakdown.fatiguePenalty + 1.2
-				: item.explanation.scoreBreakdown.fatiguePenalty
+		const freezePenalty =
+			origin.frozenUntilOriginalDay && dayShift !== 0 ? 8 : 0;
+		const postponePenalty =
+			dayShift > 0 ? dayShift * context.volatilityPenaltyFactor : 0;
+		const manualSchedulePenalty =
+			item.explanation.hasManualSchedule && dayShift > 0 ? 0.8 : 0;
+		const volatilityPenalty = clampScore(
+			freezePenalty + postponePenalty + manualSchedulePenalty,
 		);
-		const baseUtility = this.profileService.computeUtility(item.explanation.scoreBreakdown, {
-			loadRatio,
-			fatiguePenalty,
-			volatilityPenalty,
-		});
+		const fatiguePenalty = clampScore(
+			projectedLoad >= context.dailyBudgetMinutes * 0.8 &&
+			item.estimatedMinutes >= 8
+				? item.explanation.scoreBreakdown.fatiguePenalty + 1.2
+				: item.explanation.scoreBreakdown.fatiguePenalty,
+		);
+		const baseUtility = this.profileService.computeUtility(
+			item.explanation.scoreBreakdown,
+			{
+				loadRatio,
+				fatiguePenalty,
+				volatilityPenalty,
+			},
+		);
 		const tagGroupBoost = item.tagGroupPriorityBias ?? 0;
 		const continuityBoost =
 			cursor.lastSourceFile && cursor.lastSourceFile === item.sourceFile
 				? context.continuityBonus
 				: 0;
-		const carryoverRecoveryBoost = this.calculateCarryoverRecoveryBoost(item, dayShift, origin);
+		const carryoverRecoveryBoost = this.calculateCarryoverRecoveryBoost(
+			item,
+			dayShift,
+			origin,
+		);
 		const interleavePenalty = this.calculateInterleavePenalty(
 			item,
 			dayShift,
 			cursor,
 			candidateTopicCounts,
-			context
+			context,
 		);
 		const scheduleFidelityBoost =
 			dayShift === 0
@@ -633,10 +732,12 @@ export class IRPlanGeneratorService {
 					tagGroupBoost +
 					carryoverRecoveryBoost -
 					smoothingPenalty -
-					interleavePenalty
-			)
+					interleavePenalty,
+			),
 		);
-		const loadPenalty = roundScore(clampScore(loadRatio * 4 + smoothingPenalty));
+		const loadPenalty = roundScore(
+			clampScore(loadRatio * 4 + smoothingPenalty),
+		);
 
 		return {
 			utility,
@@ -652,7 +753,7 @@ export class IRPlanGeneratorService {
 	private calculateCarryoverRecoveryBoost(
 		item: IRPlannedScheduleItem,
 		dayShift: number,
-		origin: IRPlanningOrigin
+		origin: IRPlanningOrigin,
 	): number {
 		if (dayShift <= 0 || origin.frozenUntilOriginalDay) {
 			return 0;
@@ -662,10 +763,13 @@ export class IRPlanGeneratorService {
 		const overdueBoost = item.explanation.isOverdue ? 0.35 : 0;
 		const stalenessBoost = Math.min(
 			0.55,
-			Math.max(0, (item.explanation.scoreBreakdown.stalenessScore ?? 0) - 1.5) * 0.18
+			Math.max(0, (item.explanation.scoreBreakdown.stalenessScore ?? 0) - 1.5) *
+				0.18,
 		);
 		const priorityProtectionBoost = item.priority >= 7 ? 0 : 0.15;
-		const manualScheduleRelief = item.explanation.hasManualSchedule ? 0.95 : 0.35;
+		const manualScheduleRelief = item.explanation.hasManualSchedule
+			? 0.95
+			: 0.35;
 		return roundScore(
 			Math.min(
 				3.1,
@@ -673,12 +777,14 @@ export class IRPlanGeneratorService {
 					overdueBoost +
 					stalenessBoost +
 					priorityProtectionBoost +
-					manualScheduleRelief
-			)
+					manualScheduleRelief,
+			),
 		);
 	}
 
-	private buildTopicCounts(items: IRPlannedScheduleItem[]): Map<string, number> {
+	private buildTopicCounts(
+		items: IRPlannedScheduleItem[],
+	): Map<string, number> {
 		const counts = new Map<string, number>();
 		for (const item of items) {
 			counts.set(item.topicKey, (counts.get(item.topicKey) || 0) + 1);
@@ -686,7 +792,10 @@ export class IRPlanGeneratorService {
 		return counts;
 	}
 
-	private advanceCursor(cursor: IRPlanningCursor, item: IRPlannedScheduleItem): IRPlanningCursor {
+	private advanceCursor(
+		cursor: IRPlanningCursor,
+		item: IRPlannedScheduleItem,
+	): IRPlanningCursor {
 		if (cursor.lastTopicKey === item.topicKey) {
 			return {
 				lastSourceFile: item.sourceFile,
@@ -732,7 +841,7 @@ export class IRPlanGeneratorService {
 		dayShift: number,
 		cursor: IRPlanningCursor,
 		candidateTopicCounts: Map<string, number>,
-		context: IRPlanningContext
+		context: IRPlanningContext,
 	): number {
 		if (!context.enableInterleaving) {
 			return 0;
@@ -747,7 +856,8 @@ export class IRPlanGeneratorService {
 			return 0;
 		}
 
-		const overflow = cursor.sameTopicRunLength + 1 - context.maxConsecutiveSameTopic;
+		const overflow =
+			cursor.sameTopicRunLength + 1 - context.maxConsecutiveSameTopic;
 		if (overflow <= 0) {
 			return 0;
 		}
@@ -756,7 +866,10 @@ export class IRPlanGeneratorService {
 		if (dayShift < 0) {
 			penalty *= 0.7;
 		}
-		if (item.priority >= 8 || item.explanation.scoreBreakdown.urgencyScore >= 6.5) {
+		if (
+			item.priority >= 8 ||
+			item.explanation.scoreBreakdown.urgencyScore >= 6.5
+		) {
 			penalty *= 0.4;
 		} else if (item.priority >= 7) {
 			penalty *= 0.7;
@@ -765,7 +878,10 @@ export class IRPlanGeneratorService {
 		return roundScore(penalty);
 	}
 
-	private hasAlternativeTopic(candidateTopicCounts: Map<string, number>, topicKey: string): boolean {
+	private hasAlternativeTopic(
+		candidateTopicCounts: Map<string, number>,
+		topicKey: string,
+	): boolean {
 		for (const [candidateTopic, count] of candidateTopicCounts.entries()) {
 			if (candidateTopic !== topicKey && count > 0) {
 				return true;
@@ -776,7 +892,7 @@ export class IRPlanGeneratorService {
 
 	private incrementTopicCount(
 		candidateTopicCounts: Map<string, number>,
-		topicKey: string
+		topicKey: string,
 	): Map<string, number> {
 		const next = new Map(candidateTopicCounts);
 		next.set(topicKey, (next.get(topicKey) || 0) + 1);
@@ -788,7 +904,7 @@ export class IRPlanGeneratorService {
 		today: Date,
 		horizonDays: number,
 		origins: Map<string, IRPlanningOrigin>,
-		context: IRPlanningContext
+		context: IRPlanningContext,
 	): void {
 		if (horizonDays <= 1) return;
 
@@ -806,7 +922,7 @@ export class IRPlanGeneratorService {
 		sourceDay: Date,
 		destinationDay: Date,
 		origins: Map<string, IRPlanningOrigin>,
-		context: IRPlanningContext
+		context: IRPlanningContext,
 	): void {
 		const sourceKey = formatDateKey(sourceDay);
 		const destinationKey = formatDateKey(destinationDay);
@@ -814,14 +930,23 @@ export class IRPlanGeneratorService {
 		if (!sourceItems || sourceItems.length <= 1) return;
 
 		const destinationItems = itemsByDate.get(destinationKey) || [];
-		let sourceLoad = sourceItems.reduce((sum, item) => sum + item.estimatedMinutes, 0);
-		let destinationLoad = destinationItems.reduce((sum, item) => sum + item.estimatedMinutes, 0);
+		let sourceLoad = sourceItems.reduce(
+			(sum, item) => sum + item.estimatedMinutes,
+			0,
+		);
+		let destinationLoad = destinationItems.reduce(
+			(sum, item) => sum + item.estimatedMinutes,
+			0,
+		);
 
 		const sourceNeedsRelief =
 			sourceLoad > context.dailyBudgetMinutes ||
-			sourceLoad > context.targetDailyLoad + Math.max(4, context.dailyBudgetMinutes * 0.15);
+			sourceLoad >
+				context.targetDailyLoad +
+					Math.max(4, context.dailyBudgetMinutes * 0.15);
 		const destinationCanAccept =
-			destinationLoad < context.dailyBudgetMinutes || destinationLoad < context.targetDailyLoad;
+			destinationLoad < context.dailyBudgetMinutes ||
+			destinationLoad < context.targetDailyLoad;
 
 		if (!sourceNeedsRelief || !destinationCanAccept) return;
 
@@ -834,23 +959,27 @@ export class IRPlanGeneratorService {
 				sourceLoad,
 				destinationLoad,
 				origins,
-				context
+				context,
 			);
 			if (!moveCandidate) break;
 
-			const itemIndex = sourceItems.findIndex((item) => item.id === moveCandidate.item.id);
+			const itemIndex = sourceItems.findIndex(
+				(item) => item.id === moveCandidate.item.id,
+			);
 			if (itemIndex < 0) break;
 
 			sourceItems.splice(itemIndex, 1);
 			moveCandidate.item.nextReviewDate = new Date(destinationDay);
-			moveCandidate.item.nextRepDate = moveCandidate.item.nextReviewDate.getTime();
+			moveCandidate.item.nextRepDate =
+				moveCandidate.item.nextReviewDate.getTime();
 			moveCandidate.item.explanation.scoreBreakdown.loadPenalty =
 				moveCandidate.destinationEvaluation.loadPenalty;
 			moveCandidate.item.explanation.scoreBreakdown.fatiguePenalty =
 				moveCandidate.destinationEvaluation.fatiguePenalty;
 			moveCandidate.item.explanation.scoreBreakdown.volatilityPenalty =
 				moveCandidate.destinationEvaluation.volatilityPenalty;
-			moveCandidate.item.explanation.compositeScore = moveCandidate.destinationEvaluation.utility;
+			moveCandidate.item.explanation.compositeScore =
+				moveCandidate.destinationEvaluation.utility;
 			destinationItems.push(moveCandidate.item);
 
 			sourceLoad -= moveCandidate.item.estimatedMinutes;
@@ -865,10 +994,14 @@ export class IRPlanGeneratorService {
 
 			const stillNeedsRelief =
 				sourceLoad > context.dailyBudgetMinutes ||
-				sourceLoad > context.targetDailyLoad + Math.max(4, context.dailyBudgetMinutes * 0.15);
+				sourceLoad >
+					context.targetDailyLoad +
+						Math.max(4, context.dailyBudgetMinutes * 0.15);
 			const stillCanAccept =
 				destinationLoad < context.dailyBudgetMinutes * 1.05 &&
-				destinationLoad <= context.targetDailyLoad + Math.max(6, context.dailyBudgetMinutes * 0.2);
+				destinationLoad <=
+					context.targetDailyLoad +
+						Math.max(6, context.dailyBudgetMinutes * 0.2);
 			if (!stillNeedsRelief || !stillCanAccept) {
 				break;
 			}
@@ -883,14 +1016,17 @@ export class IRPlanGeneratorService {
 		sourceLoad: number,
 		destinationLoad: number,
 		origins: Map<string, IRPlanningOrigin>,
-		context: IRPlanningContext
+		context: IRPlanningContext,
 	): IRMoveCandidate | null {
 		const destinationCursor = this.getTailCursor(destinationItems);
 		const destinationTopicCounts = this.buildTopicCounts(destinationItems);
 		const candidates = sourceItems
 			.map((item): IRMoveCandidate | null => {
 				const origin = origins.get(item.id);
-				if (origin?.frozenUntilOriginalDay && formatDateKey(sourceDay) === origin.originalDayKey) {
+				if (
+					origin?.frozenUntilOriginalDay &&
+					formatDateKey(sourceDay) === origin.originalDayKey
+				) {
 					return null;
 				}
 
@@ -903,9 +1039,11 @@ export class IRPlanGeneratorService {
 						lastTopicKey: null,
 						sameTopicRunLength: 0,
 					},
-					this.buildTopicCounts(sourceItems.filter((sourceItem) => sourceItem.id !== item.id)),
+					this.buildTopicCounts(
+						sourceItems.filter((sourceItem) => sourceItem.id !== item.id),
+					),
 					origins,
-					context
+					context,
 				);
 				const destinationEvaluation = this.evaluateCandidateForDay(
 					item,
@@ -914,26 +1052,33 @@ export class IRPlanGeneratorService {
 					destinationCursor,
 					this.incrementTopicCount(destinationTopicCounts, item.topicKey),
 					origins,
-					context
+					context,
 				);
 
 				const sourceOverflowAfterMove = Math.max(
 					0,
-					sourceLoad - item.estimatedMinutes - context.targetDailyLoad
+					sourceLoad - item.estimatedMinutes - context.targetDailyLoad,
 				);
 				const destinationOverflowAfterMove = Math.max(
 					0,
-					destinationLoad + item.estimatedMinutes - context.targetDailyLoad
+					destinationLoad + item.estimatedMinutes - context.targetDailyLoad,
 				);
 				const smoothingGain = roundScore(
-					(sourceLoad - context.targetDailyLoad - sourceOverflowAfterMove) * 0.08
+					(sourceLoad - context.targetDailyLoad - sourceOverflowAfterMove) *
+						0.08,
 				);
 				const destinationRisk = roundScore(destinationOverflowAfterMove * 0.1);
 				const utilityDelta = roundScore(
-					destinationEvaluation.utility - sourceEvaluation.utility + smoothingGain - destinationRisk
+					destinationEvaluation.utility -
+						sourceEvaluation.utility +
+						smoothingGain -
+						destinationRisk,
 				);
 
-				if (destinationLoad + item.estimatedMinutes > context.dailyBudgetMinutes * 1.1) {
+				if (
+					destinationLoad + item.estimatedMinutes >
+					context.dailyBudgetMinutes * 1.1
+				) {
 					return null;
 				}
 				if (utilityDelta < -0.9) {
@@ -951,7 +1096,8 @@ export class IRPlanGeneratorService {
 		if (candidates.length === 0) return null;
 
 		candidates.sort((a, b) => {
-			if (b.utilityDelta !== a.utilityDelta) return b.utilityDelta - a.utilityDelta;
+			if (b.utilityDelta !== a.utilityDelta)
+				return b.utilityDelta - a.utilityDelta;
 			return b.item.estimatedMinutes - a.item.estimatedMinutes;
 		});
 

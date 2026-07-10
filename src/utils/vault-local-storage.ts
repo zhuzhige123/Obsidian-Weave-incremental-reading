@@ -274,7 +274,9 @@ class VaultLocalStorage {
 				return {};
 			}
 
-			const parsed = JSON.parse(await adapter.read(this.storagePath)) as unknown;
+			const parsed = JSON.parse(
+				await adapter.read(this.storagePath),
+			) as unknown;
 			if (!isRecord(parsed)) {
 				return {};
 			}
@@ -292,7 +294,9 @@ class VaultLocalStorage {
 		}
 	}
 
-	private async writeEntriesSnapshot(entries: Record<string, string>): Promise<boolean> {
+	private async writeEntriesSnapshot(
+		entries: Record<string, string>,
+	): Promise<boolean> {
 		if (!this.app || !this.storagePath) {
 			return false;
 		}
@@ -355,7 +359,9 @@ class VaultLocalStorage {
 		this.pendingLegacyCleanup.clear();
 	}
 
-	private async writeConflictSnapshot(conflicts: ConflictEntry[]): Promise<void> {
+	private async writeConflictSnapshot(
+		conflicts: ConflictEntry[],
+	): Promise<void> {
 		if (!this.app) {
 			return;
 		}

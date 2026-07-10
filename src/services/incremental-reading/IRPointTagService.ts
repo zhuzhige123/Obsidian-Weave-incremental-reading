@@ -1,8 +1,14 @@
-import { normalizePath, TFile, type App } from "obsidian";
+import { type App, TFile, normalizePath } from "obsidian";
 import type { IRChunkFileData, IRTagGroup } from "../../types/ir-types";
 import { createYAMLFrontmatterManager } from "../../utils/yaml-frontmatter-utils";
-import { IREpubBookmarkTaskService, type IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
-import { IRPdfBookmarkTaskService, type IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
+import {
+	type IREpubBookmarkTask,
+	IREpubBookmarkTaskService,
+} from "./IREpubBookmarkTaskService";
+import {
+	type IRPdfBookmarkTask,
+	IRPdfBookmarkTaskService,
+} from "./IRPdfBookmarkTaskService";
 import { IRStorageService } from "./IRStorageService";
 import { IRTagGroupService, matchTagGroupByTags } from "./IRTagGroupService";
 
@@ -19,7 +25,9 @@ export function normalizeReadingPointTags(tags: string[]): string[] {
 	return Array.from(ordered.values());
 }
 
-function readFrontmatterTags(frontmatter: Record<string, unknown> | null | undefined): string[] {
+function readFrontmatterTags(
+	frontmatter: Record<string, unknown> | null | undefined,
+): string[] {
 	if (!frontmatter) return [];
 	const rawValue = frontmatter[READING_POINT_TAGS_YAML_KEY];
 	if (Array.isArray(rawValue)) {
@@ -30,7 +38,7 @@ function readFrontmatterTags(frontmatter: Record<string, unknown> | null | undef
 			rawValue
 				.split(",")
 				.map((tag) => tag.trim())
-				.filter(Boolean)
+				.filter(Boolean),
 		);
 	}
 	return [];
@@ -70,10 +78,15 @@ export class IRPointTagService {
 			return [];
 		}
 		const cache = this.app.metadataCache.getFileCache(file);
-		return readFrontmatterTags((cache?.frontmatter as Record<string, unknown> | undefined) || {});
+		return readFrontmatterTags(
+			(cache?.frontmatter as Record<string, unknown> | undefined) || {},
+		);
 	}
 
-	async writeMarkdownReadingTags(filePath: string, tags: string[]): Promise<string[]> {
+	async writeMarkdownReadingTags(
+		filePath: string,
+		tags: string[],
+	): Promise<string[]> {
 		const normalizedPath = normalizePath(String(filePath || "").trim());
 		const file = this.app.vault.getAbstractFileByPath(normalizedPath);
 		if (!(file instanceof TFile)) {
@@ -95,10 +108,15 @@ export class IRPointTagService {
 				return markdownTags;
 			}
 		}
-		return normalizeReadingPointTags(((chunk as { tags?: string[] }).tags || []).map((tag) => String(tag)));
+		return normalizeReadingPointTags(
+			((chunk as { tags?: string[] }).tags || []).map((tag) => String(tag)),
+		);
 	}
 
-	async saveChunkTags(chunkId: string, tags: string[]): Promise<IRChunkFileData | null> {
+	async saveChunkTags(
+		chunkId: string,
+		tags: string[],
+	): Promise<IRChunkFileData | null> {
 		await this.initialize();
 		const chunk = await this.storage.getChunkData(chunkId);
 		if (!chunk) return null;
@@ -123,7 +141,10 @@ export class IRPointTagService {
 		return updatedChunk as IRChunkFileData & { tags?: string[] };
 	}
 
-	async savePdfTaskTags(taskId: string, tags: string[]): Promise<IRPdfBookmarkTask | null> {
+	async savePdfTaskTags(
+		taskId: string,
+		tags: string[],
+	): Promise<IRPdfBookmarkTask | null> {
 		await this.initialize();
 		const task = await this.pdfService.getTask(taskId);
 		if (!task) return null;
@@ -138,7 +159,10 @@ export class IRPointTagService {
 		});
 	}
 
-	async saveEpubTaskTags(taskId: string, tags: string[]): Promise<IREpubBookmarkTask | null> {
+	async saveEpubTaskTags(
+		taskId: string,
+		tags: string[],
+	): Promise<IREpubBookmarkTask | null> {
 		await this.initialize();
 		const task = await this.epubService.getTask(taskId);
 		if (!task) return null;
@@ -170,7 +194,7 @@ export class IRPointTagService {
 
 		const collected = new Set<string>();
 		for (const chunk of chunks) {
-			for (const tag of ((chunk as { tags?: string[] }).tags || [])) {
+			for (const tag of (chunk as { tags?: string[] }).tags || []) {
 				const normalized = normalizeReadingPointTags([String(tag)]);
 				if (normalized[0]) collected.add(normalized[0]);
 			}
@@ -197,7 +221,10 @@ export class IRPointTagService {
 		}
 
 		const allChunks = Object.values(await this.storage.getAllChunkData());
-		const affectedChunks = allChunks.filter((chunk) => normalizePath(String(chunk.filePath || "").trim()) === normalizedPath);
+		const affectedChunks = allChunks.filter(
+			(chunk) =>
+				normalizePath(String(chunk.filePath || "").trim()) === normalizedPath,
+		);
 		if (affectedChunks.length === 0) {
 			return false;
 		}
@@ -207,7 +234,9 @@ export class IRPointTagService {
 		let changed = false;
 
 		for (const chunk of affectedChunks) {
-			const currentTags = normalizeReadingPointTags(((chunk as { tags?: string[] }).tags || []).map((tag) => String(tag)));
+			const currentTags = normalizeReadingPointTags(
+				((chunk as { tags?: string[] }).tags || []).map((tag) => String(tag)),
+			);
 			const currentGroupId = String(chunk.meta?.tagGroup || "default");
 			const tagsChanged =
 				currentTags.length !== nextTags.length ||

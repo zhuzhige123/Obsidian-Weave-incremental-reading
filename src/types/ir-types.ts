@@ -513,7 +513,11 @@ export const DEFAULT_IR_BLOCK_META: IRBlockMeta = {
 /**
  * 创建默认 IRBlockV4
  */
-export function createDefaultIRBlockV4(id: string, sourcePath: string, blockId = ""): IRBlockV4 {
+export function createDefaultIRBlockV4(
+	id: string,
+	sourcePath: string,
+	blockId = "",
+): IRBlockV4 {
 	const now = Date.now();
 	return {
 		id,
@@ -555,10 +559,18 @@ export function mapStateToStatus(state: IRBlockState): IRBlockStatus {
  */
 export function migrateToIRBlockV4(oldBlock: IRBlock): IRBlockV4 {
 	const now = Date.now();
-	const createdAt = oldBlock.createdAt ? new Date(oldBlock.createdAt).getTime() : now;
-	const updatedAt = oldBlock.updatedAt ? new Date(oldBlock.updatedAt).getTime() : now;
-	const lastReview = oldBlock.lastReview ? new Date(oldBlock.lastReview).getTime() : 0;
-	const nextReview = oldBlock.nextReview ? new Date(oldBlock.nextReview).getTime() : 0;
+	const createdAt = oldBlock.createdAt
+		? new Date(oldBlock.createdAt).getTime()
+		: now;
+	const updatedAt = oldBlock.updatedAt
+		? new Date(oldBlock.updatedAt).getTime()
+		: now;
+	const lastReview = oldBlock.lastReview
+		? new Date(oldBlock.lastReview).getTime()
+		: 0;
+	const nextReview = oldBlock.nextReview
+		? new Date(oldBlock.nextReview).getTime()
+		: 0;
 
 	return {
 		id: oldBlock.id,
@@ -654,7 +666,12 @@ export interface IRHistoryStore {
  * - archived: 搁置（保留但暂不调度，可恢复）
  * - removed: 移除（从队列永久移除）
  */
-export type ChunkFileStatus = "active" | "processing" | "done" | "archived" | "removed";
+export type ChunkFileStatus =
+	| "active"
+	| "processing"
+	| "done"
+	| "archived"
+	| "removed";
 
 /**
  * 源材料文件元数据（存储在插件 JSON 中）
@@ -825,7 +842,7 @@ export function createDefaultChunkFileYAML(
 	chunkId: string,
 	sourceId: string,
 	deckTag?: string,
-	deckNames?: string[]
+	deckNames?: string[],
 ): IRChunkFileYAML {
 	const normalizeDeckNameForTag = (name: string): string => {
 		return (
@@ -845,7 +862,11 @@ export function createDefaultChunkFileYAML(
 	const primaryName = names[0] || inferredName || "未分配";
 	const deckTagSegment = normalizeDeckNameForTag(primaryName);
 
-	const tags = new Set<string>(["ir/chunk", "ir/deck", `ir/deck/${deckTagSegment}`]);
+	const tags = new Set<string>([
+		"ir/chunk",
+		"ir/deck",
+		`ir/deck/${deckTagSegment}`,
+	]);
 	return {
 		chunk_id: chunkId,
 		source_id: sourceId,
@@ -864,7 +885,7 @@ export function createDefaultChunkFileYAML(
 export function createDefaultIndexFileYAML(
 	sourceId: string,
 	title: string,
-	deckNames?: string[]
+	deckNames?: string[],
 ): IRIndexFileYAML {
 	const normalizeDeckNameForTag = (name: string): string => {
 		return (
@@ -879,7 +900,11 @@ export function createDefaultIndexFileYAML(
 	const names = (deckNames || []).map((n) => String(n).trim()).filter(Boolean);
 	const primaryName = names[0] || "未分配";
 	const deckTagSegment = normalizeDeckNameForTag(primaryName);
-	const tags = new Set<string>(["ir/source", "ir/deck", `ir/deck/${deckTagSegment}`]);
+	const tags = new Set<string>([
+		"ir/source",
+		"ir/deck",
+		`ir/deck/${deckTagSegment}`,
+	]);
 	return {
 		source_id: sourceId,
 		title,
@@ -895,7 +920,7 @@ export function createDefaultIndexFileYAML(
 export function createDefaultChunkFileData(
 	chunkId: string,
 	sourceId: string,
-	filePath: string
+	filePath: string,
 ): IRChunkFileData {
 	const now = Date.now();
 	// v5.4: 新块初始化时设置 nextRepDate = now，使其立即可被调度
@@ -1224,7 +1249,6 @@ export const DEFAULT_TAG_GROUP_PROFILE: IRTagGroupProfile = {
 	updatedAt: new Date().toISOString(),
 };
 
-
 // ============================================
 // 工具类型
 // ============================================
@@ -1274,7 +1298,7 @@ export function createDefaultIRBlock(
 	filePath: string,
 	headingPath: string[],
 	headingLevel: number,
-	startLine: number
+	startLine: number,
 ): IRBlock {
 	const now = new Date().toISOString();
 	return {
@@ -1315,7 +1339,7 @@ export function createDefaultIRBlock(
 export function createDefaultIRDeck(
 	name: string,
 	blockIds: string[] = [],
-	sourceFiles: string[] = []
+	sourceFiles: string[] = [],
 ): IRDeck {
 	const now = new Date().toISOString();
 	return {

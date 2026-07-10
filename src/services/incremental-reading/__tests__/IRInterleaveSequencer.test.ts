@@ -33,11 +33,9 @@ describe("IRInterleaveSequencer", () => {
 			createItem({ id: "a2", priority: 8, sourceFile: "/a.md" }),
 			createItem({ id: "b1", priority: 7, sourceFile: "/b.md" }),
 		];
-		expect(sequenceItemsForDailyReading(items, "off").map((item) => item.id)).toEqual([
-			"a1",
-			"a2",
-			"b1",
-		]);
+		expect(
+			sequenceItemsForDailyReading(items, "off").map((item) => item.id),
+		).toEqual(["a1", "a2", "b1"]);
 	});
 
 	test("soft profile breaks long same-topic runs", () => {

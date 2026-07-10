@@ -1,9 +1,9 @@
 import type { App } from "obsidian";
-import { logger } from "../../utils/logger";
 import type {
 	IRPointSourcePathNormalizationResult,
 	IRPointSourcePathScanResult,
 } from "../../types/ir-point-source-path-types";
+import { logger } from "../../utils/logger";
 import { getSharedIRPointStorageService } from "./IRPointStorageService";
 
 export type {
@@ -26,14 +26,17 @@ export class IRPointSourcePathNormalizationService {
 		const pointStorage = getSharedIRPointStorageService(this.app);
 		const result = await pointStorage.normalizeAllPointSourcePathsOnDisk();
 		if (result.filesUpdated > 0) {
-			logger.info("[IRPointSourcePathNormalizationService] 已写回规范化来源路径", result);
+			logger.info(
+				"[IRPointSourcePathNormalizationService] 已写回规范化来源路径",
+				result,
+			);
 		}
 		return result;
 	}
 }
 
 export function getSharedIRPointSourcePathNormalizationService(
-	app: App
+	app: App,
 ): IRPointSourcePathNormalizationService {
 	return new IRPointSourcePathNormalizationService(app);
 }

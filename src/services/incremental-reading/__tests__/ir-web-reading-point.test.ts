@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
+import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import {
 	buildWebReadingPointMarkdown,
 	deriveWebPageTitleFromUrl,
 	resolveScheduleItemWebUrl,
 } from "../ir-web-reading-point";
-import type { ScheduleItem } from "../IRCalendarScheduleItem";
 
 describe("ir-web-reading-point", () => {
 	it("derives a readable title from URL host and path", () => {
-		expect(deriveWebPageTitleFromUrl("https://www.example.com/docs/guide")).toBe(
-			"example.com/docs/guide"
-		);
+		expect(
+			deriveWebPageTitleFromUrl("https://www.example.com/docs/guide"),
+		).toBe("example.com/docs/guide");
 	});
 
 	it("prefers resumeLink when it is an http(s) URL", () => {
@@ -24,7 +24,9 @@ describe("ir-web-reading-point", () => {
 			sourceFile: "weave/incremental-reading/IR/page.md",
 		} as ScheduleItem;
 
-		expect(resolveScheduleItemWebUrl(app, material)).toBe("https://obsidian.md/blog");
+		expect(resolveScheduleItemWebUrl(app, material)).toBe(
+			"https://obsidian.md/blog",
+		);
 	});
 
 	it("falls back to weave-ir-web-url frontmatter", () => {
@@ -32,7 +34,11 @@ describe("ir-web-reading-point", () => {
 			metadataCache: {
 				getCache: (path: string) =>
 					path === "weave/incremental-reading/IR/page.md"
-						? { frontmatter: { "weave-ir-web-url": "https://example.org/article" } }
+						? {
+								frontmatter: {
+									"weave-ir-web-url": "https://example.org/article",
+								},
+						  }
 						: null,
 			},
 		} as any;
@@ -41,13 +47,19 @@ describe("ir-web-reading-point", () => {
 			sourceFile: "weave/incremental-reading/IR/page.md",
 		} as ScheduleItem;
 
-		expect(resolveScheduleItemWebUrl(app, material)).toBe("https://example.org/article");
+		expect(resolveScheduleItemWebUrl(app, material)).toBe(
+			"https://example.org/article",
+		);
 	});
 
 	it("builds markdown with selected excerpt section", () => {
-		const markdown = buildWebReadingPointMarkdown("Article", "https://example.com/post", {
-			selectedText: "Important quote",
-		});
+		const markdown = buildWebReadingPointMarkdown(
+			"Article",
+			"https://example.com/post",
+			{
+				selectedText: "Important quote",
+			},
+		);
 		expect(markdown).toContain("## 选区摘录");
 		expect(markdown).toContain("Important quote");
 	});

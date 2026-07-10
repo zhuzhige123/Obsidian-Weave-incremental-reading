@@ -6,7 +6,8 @@ import {
 } from "../IRSourceTraceStats";
 
 function createCard(
-	partial: Partial<Card> & Pick<Card, "uuid" | "content" | "stats" | "created" | "modified">
+	partial: Partial<Card> &
+		Pick<Card, "uuid" | "content" | "stats" | "created" | "modified">,
 ): Card {
 	return {
 		uuid: partial.uuid,
@@ -41,10 +42,14 @@ body`,
 		});
 
 		const sources = collectCardTraceSources(card);
-		const markdownSources = sources.filter((source) => source.sourceKind === "markdown");
+		const markdownSources = sources.filter(
+			(source) => source.sourceKind === "markdown",
+		);
 
 		expect(markdownSources).toHaveLength(1);
-		expect(markdownSources[0].sourceDocumentKey).toBe(normalizeTraceDocumentKey("Notes/Alpha.md"));
+		expect(markdownSources[0].sourceDocumentKey).toBe(
+			normalizeTraceDocumentKey("Notes/Alpha.md"),
+		);
 	});
 });
 
@@ -53,7 +58,10 @@ describe("buildIRTraceOverviewStats", () => {
 		const units = [
 			{
 				sourceKind: "markdown" as const,
-				sourceDocumentKey: normalizeTraceDocumentKey("Notes/Alpha.md", "markdown")!,
+				sourceDocumentKey: normalizeTraceDocumentKey(
+					"Notes/Alpha.md",
+					"markdown",
+				)!,
 				associatedNotePath: "Permanent/Alpha Note",
 			},
 		];
@@ -108,7 +116,7 @@ test`,
 				units,
 				cards,
 				extractCardIds: ["extract-2"],
-			})
+			}),
 		).toEqual({
 			extractCount: 2,
 			memoryCardCount: 1,
@@ -125,7 +133,10 @@ test`,
 			},
 			{
 				sourceKind: "epub" as const,
-				sourceDocumentKey: normalizeTraceDocumentKey("Books/demo.epub", "epub")!,
+				sourceDocumentKey: normalizeTraceDocumentKey(
+					"Books/demo.epub",
+					"epub",
+				)!,
 				sourceSubunitKey: "chapter-2",
 			},
 		];
@@ -168,7 +179,7 @@ other pdf`,
 			buildIRTraceOverviewStats({
 				units,
 				cards,
-			})
+			}),
 		).toEqual({
 			extractCount: 1,
 			memoryCardCount: 1,
@@ -180,8 +191,15 @@ other pdf`,
 		const units = [
 			{
 				sourceKind: "markdown" as const,
-				sourceDocumentKey: normalizeTraceDocumentKey("Notes/Alpha.md", "markdown")!,
-				associatedNotePaths: ["Permanent/Alpha", "Permanent/Alpha.md", "Permanent/Appendix.md"],
+				sourceDocumentKey: normalizeTraceDocumentKey(
+					"Notes/Alpha.md",
+					"markdown",
+				)!,
+				associatedNotePaths: [
+					"Permanent/Alpha",
+					"Permanent/Alpha.md",
+					"Permanent/Appendix.md",
+				],
 			},
 		];
 
@@ -189,7 +207,7 @@ other pdf`,
 			buildIRTraceOverviewStats({
 				units,
 				cards: [],
-			})
+			}),
 		).toEqual({
 			extractCount: 0,
 			memoryCardCount: 0,

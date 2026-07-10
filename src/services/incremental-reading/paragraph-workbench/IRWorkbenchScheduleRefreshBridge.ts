@@ -1,8 +1,8 @@
 import type { App } from "obsidian";
-import type { ScheduleRecomputeReason } from "../IRScheduleKernel";
+import { mergePriorityDateKeys } from "../IRCalendarProjectionUtils";
 import { getSharedIRProjectionRuntime } from "../IRProjectionRuntime";
 import { getSharedIRRefreshScheduler } from "../IRRefreshScheduler";
-import { mergePriorityDateKeys } from "../IRCalendarProjectionUtils";
+import type { ScheduleRecomputeReason } from "../IRScheduleKernel";
 import {
 	getLocalTodayDateKey,
 	recomputeAndBroadcastIRData,
@@ -21,10 +21,15 @@ export type IRWorkbenchScheduleRefreshOptions = {
 export async function refreshIRAfterWorkbenchScheduleMutation(
 	app: App,
 	reason: ScheduleRecomputeReason,
-	options?: IRWorkbenchScheduleRefreshOptions
+	options?: IRWorkbenchScheduleRefreshOptions,
 ): Promise<void> {
-	const deckIds = options?.deckIds?.map((id) => String(id || "").trim()).filter(Boolean);
-	const priorityDateKeys = mergePriorityDateKeys(options?.extraPriorityDateKeys, [getLocalTodayDateKey()]);
+	const deckIds = options?.deckIds
+		?.map((id) => String(id || "").trim())
+		.filter(Boolean);
+	const priorityDateKeys = mergePriorityDateKeys(
+		options?.extraPriorityDateKeys,
+		[getLocalTodayDateKey()],
+	);
 
 	await recomputeAndBroadcastIRData(app, reason, {
 		deckIds,
@@ -53,7 +58,7 @@ export function dateToLocalDateKey(date: Date): string {
 export function subscribeIRWorkbenchProjectionRefresh(
 	app: App,
 	onRefresh: () => void,
-	getTopicId?: () => string | undefined
+	getTopicId?: () => string | undefined,
 ): () => void {
 	return getSharedIRProjectionRuntime(app).subscribe((patch) => {
 		if (patch.reconcileFailed) {
@@ -62,7 +67,9 @@ export function subscribeIRWorkbenchProjectionRefresh(
 
 		const topicId = String(getTopicId?.() || "").trim();
 		if (topicId && patch.deckIds?.length) {
-			const deckIds = patch.deckIds.map((id) => String(id || "").trim()).filter(Boolean);
+			const deckIds = patch.deckIds
+				.map((id) => String(id || "").trim())
+				.filter(Boolean);
 			if (deckIds.length > 0 && !deckIds.includes(topicId)) {
 				return;
 			}

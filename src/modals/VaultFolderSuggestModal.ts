@@ -1,16 +1,19 @@
 import { App, FuzzySuggestModal, TFolder } from "obsidian";
-import { ensureSuggestModalTheme, markLatestSuggestionContainer } from "./suggestModalTheme";
-import { applyStyleProps } from "../utils/style-props";
 import { i18n } from "../utils/i18n";
+import { applyStyleProps } from "../utils/style-props";
+import {
+	ensureSuggestModalTheme,
+	markLatestSuggestionContainer,
+} from "./suggestModalTheme";
 
- interface AnchorRect {
- 	left: number;
- 	right: number;
- 	top: number;
- 	bottom: number;
- 	width: number;
- 	height: number;
- }
+interface AnchorRect {
+	left: number;
+	right: number;
+	top: number;
+	bottom: number;
+	width: number;
+	height: number;
+}
 
 interface VaultFolderSuggestModalOptions {
 	placeholder?: string;
@@ -35,7 +38,9 @@ export class VaultFolderSuggestModal extends FuzzySuggestModal<string> {
 			.sort((a, b) => a.localeCompare(b));
 
 		this.items = ["/", ...folderPaths];
-		this.setPlaceholder(options.placeholder ?? i18n.t("irModals.vaultFolderSuggest.placeholder"));
+		this.setPlaceholder(
+			options.placeholder ?? i18n.t("irModals.vaultFolderSuggest.placeholder"),
+		);
 	}
 
 	getItems(): string[] {
@@ -61,7 +66,9 @@ export class VaultFolderSuggestModal extends FuzzySuggestModal<string> {
 	}
 
 	getItemText(folderPath: string): string {
-		return folderPath === "/" ? i18n.t("irModals.vaultFolderSuggest.vaultRoot") : folderPath;
+		return folderPath === "/"
+			? i18n.t("irModals.vaultFolderSuggest.vaultRoot")
+			: folderPath;
 	}
 
 	private settle(folderPath: string | null): void {
@@ -90,7 +97,7 @@ export class VaultFolderSuggestModal extends FuzzySuggestModal<string> {
 		window.dispatchEvent(
 			new CustomEvent("Weave:emergent-child-popup-close", {
 				detail: { graceMs: 220 },
-			})
+			}),
 		);
 		if (this.settled) {
 			this.selectedFolderPath = null;
@@ -140,12 +147,18 @@ export class VaultFolderSuggestModal extends FuzzySuggestModal<string> {
 			const spacing = 8;
 			const preferredWidth = Math.min(
 				Math.max(anchorRect.width, 280),
-				Math.min(420, viewportWidth - 24)
+				Math.min(420, viewportWidth - 24),
 			);
-			const spaceBelow = Math.max(0, viewportHeight - anchorRect.bottom - spacing - 12);
+			const spaceBelow = Math.max(
+				0,
+				viewportHeight - anchorRect.bottom - spacing - 12,
+			);
 			const spaceAbove = Math.max(0, anchorRect.top - spacing - 12);
 			const placeAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-			const maxHeight = Math.max(180, Math.min(360, placeAbove ? spaceAbove : spaceBelow));
+			const maxHeight = Math.max(
+				180,
+				Math.min(360, placeAbove ? spaceAbove : spaceBelow),
+			);
 
 			containerEl.classList.add("weave-suggest-modal-container--anchored");
 			modalEl.classList.add("weave-suggest-modal--anchored");

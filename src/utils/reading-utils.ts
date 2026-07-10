@@ -43,7 +43,10 @@ export function countWords(content: string): number {
  * @param position 字符位置
  * @returns 该位置之前的字数
  */
-export function countWordsUpToPosition(content: string, position: number): number {
+export function countWordsUpToPosition(
+	content: string,
+	position: number,
+): number {
 	const contentUpToPosition = content.substring(0, position);
 	return countWords(contentUpToPosition);
 }

@@ -14,7 +14,11 @@
  * @version 4.0.0
  */
 
-import type { IRBlockStats, IRBlockV4, IRPriorityLogEntry } from "../../types/ir-types";
+import type {
+	IRBlockStats,
+	IRBlockV4,
+	IRPriorityLogEntry,
+} from "../../types/ir-types";
 
 // ============================================
 // 常量配置（权威规范 Section 11）
@@ -77,7 +81,7 @@ export function calculatePriorityEWMA(
 	priorityUi: number,
 	priorityEffOld: number,
 	alphaOrHalfLife: number = EWMA_ALPHA,
-	lastUpdatedMs?: number
+	lastUpdatedMs?: number,
 ): number {
 	let priorityEffNew: number;
 
@@ -115,7 +119,7 @@ export function calculatePriorityEWMATimeAware(
 	priorityEffOld: number,
 	lastPriorityUpdateMs: number,
 	alphaBase: number = EWMA_ALPHA,
-	deltaRefMs: number = 24 * 60 * 60 * 1000
+	deltaRefMs: number = 24 * 60 * 60 * 1000,
 ): number {
 	const now = Date.now();
 	const deltaT = now - lastPriorityUpdateMs;
@@ -124,7 +128,8 @@ export function calculatePriorityEWMATimeAware(
 	const alphaEff = 1 - (1 - alphaBase) ** (deltaT / deltaRefMs);
 
 	// EWMA 计算
-	const priorityEffNew = alphaEff * priorityUi + (1 - alphaEff) * priorityEffOld;
+	const priorityEffNew =
+		alphaEff * priorityUi + (1 - alphaEff) * priorityEffOld;
 
 	return Math.max(0, Math.min(10, priorityEffNew));
 }
@@ -182,7 +187,7 @@ export function calculateNextInterval(
 	mBase: number = M_BASE,
 	mGroup = 1.0,
 	pEff: number = PRIORITY_NEUTRAL,
-	iMax: number = I_MAX
+	iMax: number = I_MAX,
 ): number {
 	// 新块规则：若 I_curr = 0，则 I_next = 1
 	if (iCurr === 0) {
@@ -224,7 +229,7 @@ export function calculateNextRepDate(intervalDays: number): number {
 export function estimateCost(
 	wordCount: number,
 	speedAvg: number = SPEED_AVG,
-	bufferMin = 1
+	bufferMin = 1,
 ): number {
 	return wordCount / speedAvg + bufferMin;
 }
@@ -236,7 +241,10 @@ export function estimateCost(
  * @param defaultMinutes 默认分钟数（无历史数据时）
  * @returns 预估成本（分钟）
  */
-export function estimateBlockCost(block: IRBlockV4, defaultMinutes = 2): number {
+export function estimateBlockCost(
+	block: IRBlockV4,
+	defaultMinutes = 2,
+): number {
 	// 如果有历史数据，使用平均值
 	if (block.stats.impressions > 0 && block.stats.effectiveReadingTimeSec > 0) {
 		return block.stats.effectiveReadingTimeSec / block.stats.impressions / 60;
@@ -261,7 +269,7 @@ export function estimateBlockCost(block: IRBlockV4, defaultMinutes = 2): number 
 export function calculateAgeBoost(
 	lastShownAtMs: number,
 	ageSlopeOrStrength: number | "low" | "medium" | "high" = AGE_SLOPE,
-	ageCap: number = AGE_CAP
+	ageCap: number = AGE_CAP,
 ): number {
 	if (lastShownAtMs === 0) return 0;
 
@@ -294,7 +302,11 @@ export function calculateAgeBoost(
  * @param r0 阈值，默认 0.2
  * @returns EngageBoost 加分
  */
-export function calculateEngageBoost(stats: IRBlockStats, kEngage = 1.0, r0 = 0.2): number {
+export function calculateEngageBoost(
+	stats: IRBlockStats,
+	kEngage = 1.0,
+	r0 = 0.2,
+): number {
 	const outputCount = stats.extracts + stats.cardsCreated + stats.notesWritten;
 	const minutes = Math.max(1, stats.effectiveReadingTimeSec / 60);
 	const engageRate = outputCount / minutes;
@@ -317,7 +329,7 @@ export function calculateSelectionScore(
 	block: IRBlockV4,
 	currentSourcePath: string | null = null,
 	switchPenalty = 0.5,
-	agingStrength: "low" | "medium" | "high" = "low"
+	agingStrength: "low" | "medium" | "high" = "low",
 ): number {
 	const pEff = block.priorityEff;
 	const ageBoost = calculateAgeBoost(block.stats.lastShownAt, agingStrength);
@@ -358,7 +370,7 @@ export function calculateEffectiveReadingTime(
 	rawSeconds: number,
 	wordCount: number,
 	speedAvg: number = SPEED_AVG,
-	maxRatio = 1.5
+	maxRatio = 1.5,
 ): number {
 	// T_expected（秒）
 	const tExpected = (wordCount / speedAvg) * 60;
@@ -383,7 +395,7 @@ export function isLowQualityTime(
 	rawSeconds: number,
 	wordCount: number,
 	outputCount: number,
-	threshold = 2.0
+	threshold = 2.0,
 ): boolean {
 	const tExpected = (wordCount / SPEED_AVG) * 60;
 	return rawSeconds > threshold * tExpected && outputCount === 0;
@@ -404,7 +416,7 @@ export function isLowQualityTime(
 export function createPriorityLogEntry(
 	oldP: number,
 	newP: number,
-	reason: string
+	reason: string,
 ): IRPriorityLogEntry {
 	if (!reason || reason.trim().length === 0) {
 		throw new Error("[IRCoreAlgorithmsV4] 优先级变更必须提供理由");
@@ -427,7 +439,7 @@ export function createPriorityLogEntry(
  */
 export function checkTimeoutPause(
 	lastInteractionMs: number,
-	timeoutSeconds: number = TIMEOUT_SECONDS
+	timeoutSeconds: number = TIMEOUT_SECONDS,
 ): boolean {
 	const now = Date.now();
 	const elapsedSeconds = (now - lastInteractionMs) / 1000;
@@ -469,7 +481,7 @@ export function checkBankruptcy(
 	blocks: IRBlockV4[],
 	highPriorityThreshold = 8,
 	overdueThreshold = 7,
-	countThreshold = 20
+	countThreshold = 20,
 ): BankruptcyCheckResult {
 	const now = Date.now();
 	const oneDayMs = 24 * 60 * 60 * 1000;
@@ -477,7 +489,10 @@ export function checkBankruptcy(
 	let highPriorityOverdueCount = 0;
 
 	for (const block of blocks) {
-		if (block.status === "scheduled" && block.priorityEff >= highPriorityThreshold) {
+		if (
+			block.status === "scheduled" &&
+			block.priorityEff >= highPriorityThreshold
+		) {
 			const overdueDays = (now - block.nextRepDate) / oneDayMs;
 			if (overdueDays > overdueThreshold) {
 				highPriorityOverdueCount++;

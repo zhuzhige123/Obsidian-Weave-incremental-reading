@@ -1,10 +1,8 @@
 import type { App } from "obsidian";
-import { IR_RUNTIME } from "../incremental-reading/ir-runtime";
 import { i18n } from "../../utils/i18n";
-import {
-	IR_PREMIUM_BENEFIT_FEATURE_ORDER,
-} from "./ir-premium-features";
+import { IR_RUNTIME } from "../incremental-reading/ir-runtime";
 import { PremiumFeatureGuard } from "./PremiumFeatureGuard";
+import { IR_PREMIUM_BENEFIT_FEATURE_ORDER } from "./ir-premium-features";
 
 export interface IRFeatureTierPreviewItem {
 	title: string;
@@ -29,7 +27,7 @@ function buildIRFreeFeaturePreviewItems(): IRFeatureTierPreviewItem[] {
 }
 
 function buildIRPremiumFeaturePreviewMeta(): Record<
-	(typeof IR_PREMIUM_BENEFIT_FEATURE_ORDER)[number],
+	typeof IR_PREMIUM_BENEFIT_FEATURE_ORDER[number],
 	IRFeatureTierPreviewItem
 > {
 	return Object.fromEntries(
@@ -38,10 +36,15 @@ function buildIRPremiumFeaturePreviewMeta(): Record<
 			{
 				featureId,
 				title: i18n.t(`ir.premium.premiumFeatures.${featureId}.title`),
-				description: i18n.t(`ir.premium.premiumFeatures.${featureId}.description`),
+				description: i18n.t(
+					`ir.premium.premiumFeatures.${featureId}.description`,
+				),
 			},
-		])
-	) as Record<(typeof IR_PREMIUM_BENEFIT_FEATURE_ORDER)[number], IRFeatureTierPreviewItem>;
+		]),
+	) as Record<
+		typeof IR_PREMIUM_BENEFIT_FEATURE_ORDER[number],
+		IRFeatureTierPreviewItem
+	>;
 }
 
 export function getIRFeatureTierPreview(): {
@@ -53,7 +56,7 @@ export function getIRFeatureTierPreview(): {
 	return {
 		freeFeatures,
 		premiumFeatures: IR_PREMIUM_BENEFIT_FEATURE_ORDER.map(
-			(featureId) => premiumFeaturePreviewMeta[featureId]
+			(featureId) => premiumFeaturePreviewMeta[featureId],
 		),
 	};
 }
@@ -69,19 +72,23 @@ export function getIRPremiumFeaturePreviewContent(featureId: string): {
 	const normalizedFeatureId = String(featureId || "").trim();
 	const featurePreview =
 		premiumFeaturePreviewMeta[
-			normalizedFeatureId as (typeof IR_PREMIUM_BENEFIT_FEATURE_ORDER)[number]
+			normalizedFeatureId as typeof IR_PREMIUM_BENEFIT_FEATURE_ORDER[number]
 		];
 	return {
 		title: featurePreview?.title ?? i18n.t("ir.premium.defaultTitle"),
-		description: featurePreview?.description ?? i18n.t("ir.premium.defaultDescription"),
+		description:
+			featurePreview?.description ?? i18n.t("ir.premium.defaultDescription"),
 		freeFeatures,
 		premiumFeatures: IR_PREMIUM_BENEFIT_FEATURE_ORDER.map(
-			(currentFeatureId) => premiumFeaturePreviewMeta[currentFeatureId]
+			(currentFeatureId) => premiumFeaturePreviewMeta[currentFeatureId],
 		),
 	};
 }
 
-export function requestIRPremiumFeaturePreview(_app: App, featureId: string): void {
+export function requestIRPremiumFeaturePreview(
+	_app: App,
+	featureId: string,
+): void {
 	const normalizedFeatureId = String(featureId || "").trim();
 	if (!normalizedFeatureId || typeof window === "undefined") {
 		return;
@@ -90,7 +97,7 @@ export function requestIRPremiumFeaturePreview(_app: App, featureId: string): vo
 	window.dispatchEvent(
 		new CustomEvent(IR_RUNTIME.events.premiumFeaturePreviewRequest, {
 			detail: { featureId: normalizedFeatureId },
-		})
+		}),
 	);
 }
 

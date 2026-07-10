@@ -15,7 +15,8 @@ export const IR_PREMIUM_FEATURES = {
 	CALENDAR_BACKGROUND_WALL: "calendar-background-wall",
 } as const;
 
-export type IRPremiumFeatureId = (typeof IR_PREMIUM_FEATURES)[keyof typeof IR_PREMIUM_FEATURES];
+export type IRPremiumFeatureId =
+	typeof IR_PREMIUM_FEATURES[keyof typeof IR_PREMIUM_FEATURES];
 
 export const IR_FEATURE_METADATA: Record<
 	IRPremiumFeatureId,
@@ -43,7 +44,8 @@ export const IR_FEATURE_METADATA: Record<
 	},
 	[IR_PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS]: {
 		name: "Scheduling strategy settings",
-		description: "Configure processing-flow / reading-list and scheduling parameters",
+		description:
+			"Configure processing-flow / reading-list and scheduling parameters",
 		icon: "calendar-cog",
 	},
 	[IR_PREMIUM_FEATURES.INTERLEAVE_LEARNING_SETTINGS]: {

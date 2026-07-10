@@ -16,7 +16,11 @@ export function isCloudLicenseConfigured(): boolean {
 	if (/YOUR_FC|REPLACE_ME|example\.com/i.test(url)) {
 		return false;
 	}
-	return url.startsWith("https://") || url.startsWith("http://127.0.0.1") || url.startsWith("http://localhost");
+	return (
+		url.startsWith("https://") ||
+		url.startsWith("http://127.0.0.1") ||
+		url.startsWith("http://localhost")
+	);
 }
 
 export function getLicenseCloudApiBaseUrl(): string {

@@ -1,7 +1,6 @@
 import { type App, Menu, Notice } from "obsidian";
 import { i18n } from "../../../utils/i18n";
 import { logger } from "../../../utils/logger";
-import type { IRDeck } from "../../../types/ir-types";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import { IRStorageService } from "../IRStorageService";
 import { IRReadingPointEditService } from "./IRReadingPointEditService";
@@ -11,7 +10,7 @@ export async function populateReadingPointTopicSubmenu(
 	submenu: Menu,
 	app: App,
 	material: ScheduleItem,
-	onSaved?: () => void
+	onSaved?: () => void,
 ): Promise<void> {
 	try {
 		const service = new IRReadingPointEditService(app);
@@ -30,7 +29,7 @@ export async function populateReadingPointTopicSubmenu(
 		await storage.initialize();
 		const decks = Object.values(await storage.getAllDecks())
 			.filter((deck) => !deck.archivedAt)
-			.sort((left, right) => left.name.localeCompare(right.name, "zh-CN")) as IRDeck[];
+			.sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
 
 		if (decks.length === 0) {
 			submenu.addItem((item) => {
@@ -47,7 +46,7 @@ export async function populateReadingPointTopicSubmenu(
 				.setTitle(
 					i18n.t("irServiceNotices.topicSubmenu.currentTopic", {
 						topic: draft.deckName || draft.deckId,
-					})
+					}),
 				)
 				.setDisabled(true);
 		});
@@ -64,8 +63,10 @@ export async function populateReadingPointTopicSubmenu(
 						const result = await service.saveTopicChange(material, deck.id);
 						if (result.changed) {
 							new Notice(
-								i18n.t("irServiceNotices.topicSubmenu.movedToTopic", { deckName: deck.name }),
-								2500
+								i18n.t("irServiceNotices.topicSubmenu.movedToTopic", {
+									deckName: deck.name,
+								}),
+								2500,
 							);
 						}
 						onSaved?.();

@@ -1,7 +1,10 @@
 import { type App, SuggestModal, setIcon } from "obsidian";
 import type { IRDeck } from "../types/ir-types";
 import { i18n } from "../utils/i18n";
-import { ensureSuggestModalTheme, markLatestSuggestionContainer } from "./suggestModalTheme";
+import {
+	ensureSuggestModalTheme,
+	markLatestSuggestionContainer,
+} from "./suggestModalTheme";
 
 export class IRDeckSelectorModal extends SuggestModal<IRDeck> {
 	private decks: IRDeck[];
@@ -14,9 +17,18 @@ export class IRDeckSelectorModal extends SuggestModal<IRDeck> {
 
 		this.setPlaceholder(i18n.t("irModals.deckSelector.placeholder"));
 		this.setInstructions([
-			{ command: "↑↓", purpose: i18n.t("irModals.deckSelector.instructions.navigate") },
-			{ command: "↵", purpose: i18n.t("irModals.deckSelector.instructions.select") },
-			{ command: "esc", purpose: i18n.t("irModals.deckSelector.instructions.close") },
+			{
+				command: "↑↓",
+				purpose: i18n.t("irModals.deckSelector.instructions.navigate"),
+			},
+			{
+				command: "↵",
+				purpose: i18n.t("irModals.deckSelector.instructions.select"),
+			},
+			{
+				command: "esc",
+				purpose: i18n.t("irModals.deckSelector.instructions.close"),
+			},
 		]);
 	}
 
@@ -24,7 +36,7 @@ export class IRDeckSelectorModal extends SuggestModal<IRDeck> {
 		if (!query) return this.decks;
 		const q = query.toLowerCase();
 		return this.decks.filter(
-			(d) => d.name.toLowerCase().includes(q) || d.id.toLowerCase().includes(q)
+			(d) => d.name.toLowerCase().includes(q) || d.id.toLowerCase().includes(q),
 		);
 	}
 
@@ -48,7 +60,7 @@ export class IRDeckSelectorModal extends SuggestModal<IRDeck> {
 		window.dispatchEvent(
 			new CustomEvent("Weave:emergent-child-popup-close", {
 				detail: { graceMs: 220 },
-			})
+			}),
 		);
 	}
 

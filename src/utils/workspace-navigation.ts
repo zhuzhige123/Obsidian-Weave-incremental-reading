@@ -1,5 +1,10 @@
-import { TFile } from "obsidian";
 import type { App, TAbstractFile, WorkspaceLeaf } from "obsidian";
+import { TFile } from "obsidian";
+import {
+	isObsidianProtocolUrl,
+	openObsidianProtocolUrl,
+	resolveResumeLinkForOpen,
+} from "../services/obsidian/obsidian-open-protocol-url";
 
 type WorkspaceCompat = App["workspace"] & {
 	iterateAllLeaves?: (callback: (leaf: WorkspaceLeaf) => void) => void;
@@ -42,7 +47,15 @@ function collectAllLeaves(app: App): WorkspaceLeaf[] {
 		return leaves;
 	}
 
-	const fallbackTypes = ["markdown", "pdf", "canvas", "image", "audio", "video", "media"];
+	const fallbackTypes = [
+		"markdown",
+		"pdf",
+		"canvas",
+		"image",
+		"audio",
+		"video",
+		"media",
+	];
 	const seen = new Set<WorkspaceLeaf>();
 
 	for (const type of fallbackTypes) {
@@ -89,11 +102,18 @@ export function revealLeaf(app: App, leaf: WorkspaceLeaf, focus = true): void {
 	}
 }
 
-function resolveLinkFile(app: App, linkText: string, contextPath: string): TFile | null {
+function resolveLinkFile(
+	app: App,
+	linkText: string,
+	contextPath: string,
+): TFile | null {
 	const targetPath = getLinkTargetPath(linkText);
 	if (!targetPath) return null;
 
-	const linked = app.metadataCache.getFirstLinkpathDest(targetPath, contextPath);
+	const linked = app.metadataCache.getFirstLinkpathDest(
+		targetPath,
+		contextPath,
+	);
 	if (linked) return linked;
 
 	const direct = app.vault.getAbstractFileByPath(targetPath);
@@ -103,7 +123,8 @@ function resolveLinkFile(app: App, linkText: string, contextPath: string): TFile
 function resolveFile(app: App, fileOrPath: TFile | string): TFile | null {
 	if (typeof fileOrPath !== "string") return fileOrPath;
 
-	const abstractFile: TAbstractFile | null = app.vault.getAbstractFileByPath(fileOrPath);
+	const abstractFile: TAbstractFile | null =
+		app.vault.getAbstractFileByPath(fileOrPath);
 	return abstractFile instanceof TFile ? abstractFile : null;
 }
 
@@ -114,9 +135,15 @@ export async function openLinkWithExistingLeaf(
 	options: {
 		openInNewTab?: boolean;
 		focus?: boolean;
-	} = {}
+	} = {},
 ): Promise<WorkspaceLeaf | null> {
 	const { openInNewTab = false, focus = true } = options;
+	const protocolUrl = resolveResumeLinkForOpen(linkText);
+	if (isObsidianProtocolUrl(protocolUrl)) {
+		openObsidianProtocolUrl(app, protocolUrl);
+		return app.workspace.getMostRecentLeaf?.() ?? null;
+	}
+
 	const targetFile = resolveLinkFile(app, linkText, contextPath);
 	const hasSubpath = unwrapLinkText(linkText).includes("#");
 
@@ -126,7 +153,9 @@ export async function openLinkWithExistingLeaf(
 			revealLeaf(app, existingLeaf, focus);
 
 			if (hasSubpath) {
-				await app.workspace.openLinkText(linkText, targetFile.path, false, { active: focus });
+				await app.workspace.openLinkText(linkText, targetFile.path, false, {
+					active: focus,
+				});
 			}
 
 			return existingLeaf;
@@ -140,10 +169,17 @@ export async function openLinkWithExistingLeaf(
 		}
 	}
 
-	await app.workspace.openLinkText(linkText, contextPath, openInNewTab ? "tab" : false, {
-		active: focus,
-	});
-	return targetFile ? findLeafByFile(app, targetFile) : app.workspace.getMostRecentLeaf?.() ?? null;
+	await app.workspace.openLinkText(
+		linkText,
+		contextPath,
+		openInNewTab ? "tab" : false,
+		{
+			active: focus,
+		},
+	);
+	return targetFile
+		? findLeafByFile(app, targetFile)
+		: app.workspace.getMostRecentLeaf?.() ?? null;
 }
 
 export async function openFileWithExistingLeaf(
@@ -153,7 +189,7 @@ export async function openFileWithExistingLeaf(
 		openInNewTab?: boolean;
 		focus?: boolean;
 		openState?: Record<string, unknown>;
-	} = {}
+	} = {},
 ): Promise<WorkspaceLeaf | null> {
 	const { openInNewTab = false, focus = true, openState } = options;
 	const file = resolveFile(app, fileOrPath);
@@ -165,7 +201,9 @@ export async function openFileWithExistingLeaf(
 		return existingLeaf;
 	}
 
-	const leaf = openInNewTab ? app.workspace.getLeaf("tab") : app.workspace.getLeaf(false);
+	const leaf = openInNewTab
+		? app.workspace.getLeaf("tab")
+		: app.workspace.getLeaf(false);
 	await leaf.openFile(file, { active: focus, state: openState });
 
 	if (focus) {

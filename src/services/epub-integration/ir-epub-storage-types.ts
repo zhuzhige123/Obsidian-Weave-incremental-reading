@@ -11,7 +11,10 @@ export interface EpubSourceRegistryEntry {
 export interface IrEpubStorageLike {
 	ensureSourceIdentity(
 		filePath: string,
-		options?: { preferredSourceId?: string }
+		options?: { preferredSourceId?: string },
 	): Promise<EpubSourceRegistryEntry | null>;
-	resolveSourceFilePath(sourceId?: string, fallbackFilePath?: string): Promise<string | null>;
+	resolveSourceFilePath(
+		sourceId?: string,
+		fallbackFilePath?: string,
+	): Promise<string | null>;
 }

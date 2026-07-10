@@ -1,36 +1,50 @@
-import { normalizePath, type App } from "obsidian";
+import { type App, normalizePath } from "obsidian";
+import type {
+	IRParameterContext,
+	IRTraceState,
+} from "../../../types/ir-point-storage-types";
+import {
+	type IRBlock,
+	type IRChunkFileData,
+	migrateToIRBlockV4,
+} from "../../../types/ir-types";
 import { i18n } from "../../../utils/i18n";
-import type { ScheduleItem } from "../IRCalendarScheduleItem";
+import {
+	getChunkTopicIds,
+	getTaskTopicId,
+} from "../../../utils/ir-topic-compat";
 import { resolveAssociatedNotePaths } from "../IRAssociatedNoteSignals";
+import type { ScheduleItem } from "../IRCalendarScheduleItem";
+import {
+	type IREpubBookmarkTask,
+	IREpubBookmarkTaskService,
+	isEpubBookmarkTaskId,
+} from "../IREpubBookmarkTaskService";
 import { IRHostSharedService } from "../IRHostSharedService";
 import { supportsPointLinkedNotesForScheduleItem } from "../IRLinkedNotePolicy";
 import {
-	IREpubBookmarkTaskService,
-	isEpubBookmarkTaskId,
-	type IREpubBookmarkTask,
-} from "../IREpubBookmarkTaskService";
-import {
+	type IRPdfBookmarkTask,
 	IRPdfBookmarkTaskService,
 	isPdfBookmarkTaskId,
-	type IRPdfBookmarkTask,
 } from "../IRPdfBookmarkTaskService";
 import { IRPointDataReadService } from "../IRPointDataReadService";
 import { IRPointStorageService } from "../IRPointStorageService";
-import { IRPointTagService, normalizeReadingPointTags } from "../IRPointTagService";
+import {
+	IRPointTagService,
+	normalizeReadingPointTags,
+} from "../IRPointTagService";
 import {
 	IRPointWriteService,
 	type IRPointWriteTarget,
 } from "../IRPointWriteService";
-import { broadcastIRDataUpdated, recomputeAndBroadcastIRData } from "../IRScheduleRefreshService";
+import {
+	broadcastIRDataUpdated,
+	recomputeAndBroadcastIRData,
+} from "../IRScheduleRefreshService";
 import { IRStorageService } from "../IRStorageService";
-import { getReadingTargetKindLabel } from "../reading-target/IRReadingTargetTitleResolver";
 import { parseReadingTargetInput } from "../reading-target/IRReadingTargetParser";
+import { getReadingTargetKindLabel } from "../reading-target/IRReadingTargetTitleResolver";
 import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
-import { migrateToIRBlockV4, type IRBlock, type IRChunkFileData } from "../../../types/ir-types";
-import type { IRParameterContext, IRPointSnapshot, IRTraceState } from "../../../types/ir-point-storage-types";
-import { resolveReadingPointStoredSchedule } from "./IRReadingPointStoredSchedule";
-import { IRReadingPointTopicMigrationService } from "./IRReadingPointTopicMigrationService";
-import { getChunkTopicIds, getTaskTopicId } from "../../../utils/ir-topic-compat";
 import {
 	canEditReadingPointLink,
 	resolveReadingPointLinkInputFromParts,
@@ -42,21 +56,29 @@ import type {
 	IRReadingPointEditSaveInput,
 	IRReadingPointEditSaveResult,
 } from "./IRReadingPointEditTypes";
+import { resolveReadingPointStoredSchedule } from "./IRReadingPointStoredSchedule";
+import { IRReadingPointTopicMigrationService } from "./IRReadingPointTopicMigrationService";
 
 const MATERIAL_CLASS_OPTIONS: Array<{ value: string; label: string }> = [
 	{ value: "reference-note", label: "参考笔记" },
 	{ value: "academic-book", label: "学术书籍" },
 ];
 
-function readTitleManuallyEdited(metadata: Record<string, unknown> | undefined): boolean {
+function readTitleManuallyEdited(
+	metadata: Record<string, unknown> | undefined,
+): boolean {
 	return metadata?.titleManuallyEdited === true;
 }
 
-function readParameterContextOverride(metadata: Record<string, unknown> | undefined): boolean {
+function readParameterContextOverride(
+	metadata: Record<string, unknown> | undefined,
+): boolean {
 	return metadata?.parameterContextOverride === true;
 }
 
-function buildTraceStateFromValidation(parsedTarget: ParsedReadingTarget | null): IRTraceState {
+function buildTraceStateFromValidation(
+	parsedTarget: ParsedReadingTarget | null,
+): IRTraceState {
 	if (!parsedTarget || parsedTarget.validationError) {
 		return "broken";
 	}
@@ -66,7 +88,9 @@ function buildTraceStateFromValidation(parsedTarget: ParsedReadingTarget | null)
 	return "verified";
 }
 
-function materialTagsMayHaveChanged(_input: IRReadingPointEditSaveInput): boolean {
+function materialTagsMayHaveChanged(
+	_input: IRReadingPointEditSaveInput,
+): boolean {
 	return true;
 }
 
@@ -82,7 +106,10 @@ function resolveReadingPointDisplayTitle(parts: {
 	fallbackTitle?: string;
 	pointId: string;
 }): string {
-	return String(parts.snapshotTitle || parts.fallbackTitle || "").trim() || parts.pointId;
+	return (
+		String(parts.snapshotTitle || parts.fallbackTitle || "").trim() ||
+		parts.pointId
+	);
 }
 
 export class IRReadingPointEditService {
@@ -147,7 +174,9 @@ export class IRReadingPointEditService {
 				snapshotTitle: snapshot.point.userData?.title,
 				pointId,
 			});
-			if (normalizeReadingPointTitleForCompare(displayTitle) !== normalizedTitle) {
+			if (
+				normalizeReadingPointTitleForCompare(displayTitle) !== normalizedTitle
+			) {
 				continue;
 			}
 
@@ -170,7 +199,9 @@ export class IRReadingPointEditService {
 				snapshotTitle: task.title,
 				pointId,
 			});
-			if (normalizeReadingPointTitleForCompare(displayTitle) !== normalizedTitle) {
+			if (
+				normalizeReadingPointTitleForCompare(displayTitle) !== normalizedTitle
+			) {
 				continue;
 			}
 
@@ -187,7 +218,9 @@ export class IRReadingPointEditService {
 				fallbackTitle: block.headingPath?.join(" / "),
 				pointId,
 			});
-			if (normalizeReadingPointTitleForCompare(displayTitle) !== normalizedTitle) {
+			if (
+				normalizeReadingPointTitleForCompare(displayTitle) !== normalizedTitle
+			) {
 				continue;
 			}
 
@@ -195,11 +228,13 @@ export class IRReadingPointEditService {
 		}
 
 		return Array.from(matches.values()).sort((left, right) =>
-			left.pointId.localeCompare(right.pointId, "zh-CN")
+			left.pointId.localeCompare(right.pointId, "zh-CN"),
 		);
 	}
 
-	async loadDraft(material: ScheduleItem): Promise<IRReadingPointEditDraft | null> {
+	async loadDraft(
+		material: ScheduleItem,
+	): Promise<IRReadingPointEditDraft | null> {
 		await this.initialize();
 
 		const pointId = String(material.id || "").trim();
@@ -207,12 +242,28 @@ export class IRReadingPointEditService {
 			return null;
 		}
 
-		const [snapshot, pdfTask, epubTask, legacyBlock, chunk, decks, pointTopicIds] = await Promise.all([
+		const [
+			snapshot,
+			pdfTask,
+			epubTask,
+			legacyBlock,
+			chunk,
+			decks,
+			pointTopicIds,
+		] = await Promise.all([
 			this.pointStorage.getPointSnapshotById(pointId),
-			isPdfBookmarkTaskId(pointId) ? this.pdfService.getTask(pointId) : Promise.resolve(null),
-			isEpubBookmarkTaskId(pointId) ? this.epubService.getTask(pointId) : Promise.resolve(null),
-			material.sourceType === "legacy-block" ? this.storage.getBlock(pointId) : Promise.resolve(null),
-			material.sourceType === "chunk" ? this.storage.getChunkData(pointId) : Promise.resolve(null),
+			isPdfBookmarkTaskId(pointId)
+				? this.pdfService.getTask(pointId)
+				: Promise.resolve(null),
+			isEpubBookmarkTaskId(pointId)
+				? this.epubService.getTask(pointId)
+				: Promise.resolve(null),
+			material.sourceType === "legacy-block"
+				? this.storage.getBlock(pointId)
+				: Promise.resolve(null),
+			material.sourceType === "chunk"
+				? this.storage.getChunkData(pointId)
+				: Promise.resolve(null),
 			this.storage.getAllDecks(),
 			this.pointRead.getPointTopicIds(pointId),
 		]);
@@ -233,8 +284,10 @@ export class IRReadingPointEditService {
 			String(pointTopicIds[0] || "").trim() ||
 			String(
 				getChunkTopicIds(
-					snapshot ? { topicIds: snapshot.point.relations?.topicIds } : undefined
-				)[0] || ""
+					snapshot
+						? { topicIds: snapshot.point.relations?.topicIds }
+						: undefined,
+				)[0] || "",
 			).trim() ||
 			String(snapshot?.topicId || "").trim() ||
 			String(getTaskTopicId(pdfTask || epubTask || undefined) || "").trim() ||
@@ -252,21 +305,29 @@ export class IRReadingPointEditService {
 			String(material.displayName || material.title || "").trim() ||
 			pointId;
 
-		const metadata = (snapshot?.point.metadata || {}) as Record<string, unknown>;
+		const metadata = snapshot?.point.metadata || {};
 		const tags = await this.loadTags(material, pdfTask, epubTask, null);
-		const tagGroupId = tags.length > 0 ? await this.pointTagService.matchGroupForTags(tags) : "default";
+		const tagGroupId =
+			tags.length > 0
+				? await this.pointTagService.matchGroupForTags(tags)
+				: "default";
 		const allGroups = await this.pointTagService.getTagGroups();
-		const tagGroupName = allGroups.find((group) => group.id === tagGroupId)?.name || i18n.t("irSidebar.calendar.defaultTagGroup");
+		const tagGroupName =
+			allGroups.find((group) => group.id === tagGroupId)?.name ||
+			i18n.t("irSidebar.calendar.defaultTagGroup");
 
-		const associatedNotePaths = supportsPointLinkedNotesForScheduleItem(material)
+		const associatedNotePaths = supportsPointLinkedNotesForScheduleItem(
+			material,
+		)
 			? resolveAssociatedNotePaths({
 					associatedNotePath:
 						material.primaryAssociatedNotePath ||
 						material.associatedNotePath ||
 						snapshot?.point.relations.linkedNotePaths?.[0],
 					associatedNotePaths:
-						material.associatedNotePaths || snapshot?.point.relations.linkedNotePaths,
-				})
+						material.associatedNotePaths ||
+						snapshot?.point.relations.linkedNotePaths,
+			  })
 			: [];
 
 		const storedNextRepDate = Number(
@@ -276,19 +337,25 @@ export class IRReadingPointEditService {
 				pdfTask?.nextRepDate ||
 				epubTask?.nextRepDate ||
 				chunk?.nextRepDate ||
-				(legacyBlock ? Number(migrateToIRBlockV4(legacyBlock).nextRepDate || 0) : 0) ||
-				0
+				(legacyBlock
+					? Number(migrateToIRBlockV4(legacyBlock).nextRepDate || 0)
+					: 0) ||
+				0,
 		);
 
 		return {
 			pointId,
 			sourceType: material.sourceType || "unknown",
-			kindLabel: parsedTarget ? getReadingTargetKindLabel(parsedTarget.kind) : i18n.t("irAddTarget.kindLabels.readingPoint"),
+			kindLabel: parsedTarget
+				? getReadingTargetKindLabel(parsedTarget.kind)
+				: i18n.t("irAddTarget.kindLabels.readingPoint"),
 			title,
 			titleManuallyEdited: readTitleManuallyEdited(metadata),
 			linkInput,
 			originalLinkInput: linkInput,
-			note: String(snapshot?.point.userData?.note || legacyBlock?.notes || "").trim(),
+			note: String(
+				snapshot?.point.userData?.note || legacyBlock?.notes || "",
+			).trim(),
 			deckId,
 			deckName,
 			priority: Number(
@@ -297,21 +364,27 @@ export class IRReadingPointEditService {
 					epubTask?.priorityUi ??
 					chunk?.priorityUi ??
 					material.priority ??
-					5
+					5,
 			),
 			nextRepDate:
-				storedNextRepDate > 0 ? storedNextRepDate : Number(material.nextRepDate || 0),
+				storedNextRepDate > 0
+					? storedNextRepDate
+					: Number(material.nextRepDate || 0),
 			tags,
 			tagGroupName,
 			associatedNotePaths,
-			isStarred: Boolean(snapshot?.point.userData?.isStarred || pdfTask?.favorite),
+			isStarred: Boolean(
+				snapshot?.point.userData?.isStarred || pdfTask?.favorite,
+			),
 			traceState: snapshot?.point.trace?.traceState || null,
 			traceConfidence:
 				typeof snapshot?.point.trace?.traceConfidence === "number"
 					? snapshot.point.trace.traceConfidence
 					: null,
 			lastVerifiedAt: snapshot?.point.trace?.lastVerifiedAt || null,
-			sourceFile: String(material.sourceFile || snapshot?.point.source?.path || "").trim(),
+			sourceFile: String(
+				material.sourceFile || snapshot?.point.source?.path || "",
+			).trim(),
 			topicName: deckName,
 			parameterContext: snapshot?.point.parameterContext || null,
 			parameterContextOverride: readParameterContextOverride(metadata),
@@ -326,7 +399,7 @@ export class IRReadingPointEditService {
 	 */
 	async saveTopicChange(
 		material: ScheduleItem,
-		targetDeckId: string
+		targetDeckId: string,
 	): Promise<IRReadingPointEditSaveResult> {
 		await this.initialize();
 
@@ -348,7 +421,9 @@ export class IRReadingPointEditService {
 		};
 	}
 
-	async saveEdit(input: IRReadingPointEditSaveInput): Promise<IRReadingPointEditSaveResult> {
+	async saveEdit(
+		input: IRReadingPointEditSaveInput,
+	): Promise<IRReadingPointEditSaveResult> {
 		await this.initialize();
 
 		const pointId = String(input.pointId || "").trim();
@@ -375,8 +450,12 @@ export class IRReadingPointEditService {
 			associatedNotePaths: input.associatedNotePaths,
 		});
 		const linkChanged =
-			String(input.linkInput || "").trim() !== String(input.originalLinkInput || "").trim();
-		const storedSchedule = await resolveReadingPointStoredSchedule(this.app, pointId);
+			String(input.linkInput || "").trim() !==
+			String(input.originalLinkInput || "").trim();
+		const storedSchedule = await resolveReadingPointStoredSchedule(
+			this.app,
+			pointId,
+		);
 		const preserveScheduleFields = !linkChanged;
 		const preserveTopic = topicChanged;
 		const effectiveDeckId =
@@ -384,20 +463,30 @@ export class IRReadingPointEditService {
 				? previousDeckId
 				: storedSchedule?.deckId || previousDeckId || deckId;
 		const effectivePriority =
-			preserveScheduleFields && storedSchedule ? storedSchedule.priority : input.priority;
+			preserveScheduleFields && storedSchedule
+				? storedSchedule.priority
+				: input.priority;
 		const effectiveNextRepDate =
-			preserveScheduleFields && storedSchedule ? storedSchedule.nextRepDate : input.nextRepDate;
+			preserveScheduleFields && storedSchedule
+				? storedSchedule.nextRepDate
+				: input.nextRepDate;
 		const parsedTarget = linkChanged
 			? parseReadingTargetInput(
 					this.app,
 					String(input.linkInput || "").trim(),
-					input.sourceFile || ""
-				)
+					input.sourceFile || "",
+			  )
 			: input.parsedTarget;
 
 		if (linkChanged) {
-			if (!parsedTarget || parsedTarget.validationError || parsedTarget.kind === "unknown") {
-				throw new Error(parsedTarget?.validationError || "reading-point-edit-invalid-link");
+			if (
+				!parsedTarget ||
+				parsedTarget.validationError ||
+				parsedTarget.kind === "unknown"
+			) {
+				throw new Error(
+					parsedTarget?.validationError || "reading-point-edit-invalid-link",
+				);
 			}
 		}
 
@@ -412,12 +501,12 @@ export class IRReadingPointEditService {
 				input.sourceType === "legacy-block"
 					? "block"
 					: input.sourceType === "chunk"
-						? "chunk"
-						: input.sourceType === "pdf"
-							? "pdf"
-							: input.sourceType === "epub"
-								? "epub"
-								: undefined,
+					? "chunk"
+					: input.sourceType === "pdf"
+					? "pdf"
+					: input.sourceType === "epub"
+					? "epub"
+					: undefined,
 			sourceDocumentPath: input.sourceFile || undefined,
 		};
 
@@ -441,7 +530,9 @@ export class IRReadingPointEditService {
 				preserveTopic,
 				associatedNotePaths: normalizedNotes,
 				titleManuallyEdited: input.titleManuallyEdited,
-				parameterContext: input.parameterContextOverride ? input.parameterContext : null,
+				parameterContext: input.parameterContextOverride
+					? input.parameterContext
+					: null,
 			});
 			changed = changed || result.changed;
 			sourceDocumentPath = result.sourceDocumentPath || sourceDocumentPath;
@@ -462,7 +553,9 @@ export class IRReadingPointEditService {
 				preserveTopic,
 				associatedNotePaths: normalizedNotes,
 				titleManuallyEdited: input.titleManuallyEdited,
-				parameterContext: input.parameterContextOverride ? input.parameterContext : null,
+				parameterContext: input.parameterContextOverride
+					? input.parameterContext
+					: null,
 			});
 			changed = changed || result.changed;
 			sourceDocumentPath = result.sourceDocumentPath || sourceDocumentPath;
@@ -485,7 +578,9 @@ export class IRReadingPointEditService {
 					preserveTopic,
 					associatedNotePaths: normalizedNotes,
 					titleManuallyEdited: input.titleManuallyEdited,
-					parameterContext: input.parameterContextOverride ? input.parameterContext : null,
+					parameterContext: input.parameterContextOverride
+						? input.parameterContext
+						: null,
 				});
 				changed = changed || result.changed;
 				sourceDocumentPath = result.sourceDocumentPath || sourceDocumentPath;
@@ -509,7 +604,9 @@ export class IRReadingPointEditService {
 					preserveScheduleFields,
 					preserveTopic,
 					titleManuallyEdited: input.titleManuallyEdited,
-					parameterContext: input.parameterContextOverride ? input.parameterContext : null,
+					parameterContext: input.parameterContextOverride
+						? input.parameterContext
+						: null,
 				});
 				changed = changed || result.changed;
 				sourceDocumentPath = result.sourceDocumentPath || sourceDocumentPath;
@@ -517,15 +614,25 @@ export class IRReadingPointEditService {
 		}
 
 		if (normalizedTags.length > 0 || materialTagsMayHaveChanged(input)) {
-			const tagResult = await this.pointWrite.updatePointTags(writeTarget, normalizedTags);
+			const tagResult = await this.pointWrite.updatePointTags(
+				writeTarget,
+				normalizedTags,
+			);
 			changed = changed || Boolean(tagResult);
 			if (tagResult?.sourceDocumentPath) {
 				sourceDocumentPath = tagResult.sourceDocumentPath;
 			}
 		}
 
-		if (normalizedNotes.length > 0 || writeTarget.kind === "pdf" || writeTarget.kind === "epub") {
-			const noteResult = await this.pointWrite.updatePointAssociatedNotes(writeTarget, normalizedNotes);
+		if (
+			normalizedNotes.length > 0 ||
+			writeTarget.kind === "pdf" ||
+			writeTarget.kind === "epub"
+		) {
+			const noteResult = await this.pointWrite.updatePointAssociatedNotes(
+				writeTarget,
+				normalizedNotes,
+			);
 			changed = changed || Boolean(noteResult);
 			if (noteResult?.sourceDocumentPath) {
 				sourceDocumentPath = noteResult.sourceDocumentPath;
@@ -577,7 +684,7 @@ export class IRReadingPointEditService {
 		material: ScheduleItem,
 		pdfTask: IRPdfBookmarkTask | null,
 		epubTask: IREpubBookmarkTask | null,
-		chunk: IRChunkFileData | null
+		chunk: IRChunkFileData | null,
 	): Promise<string[]> {
 		if (isPdfBookmarkTaskId(material.id)) {
 			return normalizeReadingPointTags(pdfTask?.tags || []);
@@ -594,7 +701,7 @@ export class IRReadingPointEditService {
 
 	private buildMetadataPatch(
 		existing: Record<string, unknown> | undefined,
-		patch: Record<string, unknown>
+		patch: Record<string, unknown>,
 	): Record<string, unknown> {
 		return {
 			...(existing || {}),
@@ -621,7 +728,7 @@ export class IRReadingPointEditService {
 			associatedNotePaths: string[];
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
-		}
+		},
 	): Promise<{ changed: boolean; sourceDocumentPath?: string }> {
 		const existing = await this.pdfService.getTask(pointId);
 		if (!existing) {
@@ -629,14 +736,17 @@ export class IRReadingPointEditService {
 		}
 
 		const snapshot = await this.pointStorage.getPointSnapshotById(pointId);
-		const metadata = this.buildMetadataPatch(snapshot?.point.metadata as Record<string, unknown>, {
-			titleManuallyEdited: input.titleManuallyEdited,
-			parameterContextOverride: Boolean(input.parameterContext),
-			pointTitle: input.title,
-			...(input.linkChanged && input.savedResumeLink
-				? { resumeLink: input.savedResumeLink }
-				: {}),
-		});
+		const metadata = this.buildMetadataPatch(
+			snapshot?.point.metadata as Record<string, unknown>,
+			{
+				titleManuallyEdited: input.titleManuallyEdited,
+				parameterContextOverride: Boolean(input.parameterContext),
+				pointTitle: input.title,
+				...(input.linkChanged && input.savedResumeLink
+					? { resumeLink: input.savedResumeLink }
+					: {}),
+			},
+		);
 
 		const topicId = input.preserveTopic
 			? String(existing.topicId || existing.deckId || input.deckId || "").trim()
@@ -691,7 +801,7 @@ export class IRReadingPointEditService {
 					: {
 							priorityUi: input.priority,
 							priorityEff: input.priority,
-						}),
+					  }),
 				intervalDays: updated?.intervalDays ?? existing.intervalDays,
 				nextRepDate: updated?.nextRepDate ?? existing.nextRepDate,
 				sourceType: "pdf-bookmark",
@@ -705,11 +815,15 @@ export class IRReadingPointEditService {
 				metadata,
 				parameterContext: input.parameterContext || undefined,
 			},
-			{ preserveExisting: true }
+			{ preserveExisting: true },
 		);
 
 		if (input.linkChanged && input.parsedTarget && input.savedResumeLink) {
-			await this.updateTraceRecord(pointId, input.parsedTarget, input.savedResumeLink);
+			await this.updateTraceRecord(
+				pointId,
+				input.parsedTarget,
+				input.savedResumeLink,
+			);
 		}
 
 		return {
@@ -737,7 +851,7 @@ export class IRReadingPointEditService {
 			associatedNotePaths: string[];
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
-		}
+		},
 	): Promise<{ changed: boolean; sourceDocumentPath?: string }> {
 		const existing = await this.epubService.getTask(pointId);
 		if (!existing) {
@@ -745,14 +859,17 @@ export class IRReadingPointEditService {
 		}
 
 		const snapshot = await this.pointStorage.getPointSnapshotById(pointId);
-		const metadata = this.buildMetadataPatch(snapshot?.point.metadata as Record<string, unknown>, {
-			titleManuallyEdited: input.titleManuallyEdited,
-			parameterContextOverride: Boolean(input.parameterContext),
-			pointTitle: input.title,
-			...(input.linkChanged && input.savedResumeLink
-				? { resumeLink: input.savedResumeLink }
-				: {}),
-		});
+		const metadata = this.buildMetadataPatch(
+			snapshot?.point.metadata as Record<string, unknown>,
+			{
+				titleManuallyEdited: input.titleManuallyEdited,
+				parameterContextOverride: Boolean(input.parameterContext),
+				pointTitle: input.title,
+				...(input.linkChanged && input.savedResumeLink
+					? { resumeLink: input.savedResumeLink }
+					: {}),
+			},
+		);
 
 		const topicId = input.preserveTopic
 			? String(existing.topicId || existing.deckId || input.deckId || "").trim()
@@ -767,8 +884,8 @@ export class IRReadingPointEditService {
 					locator.tocHref = input.parsedTarget.epubTocHref;
 				}
 			} else {
-				delete locator.resumeCfi;
-				delete locator.tocHref;
+				locator.resumeCfi = undefined;
+				locator.tocHref = undefined;
 			}
 			locator.resumeLink = input.savedResumeLink;
 		}
@@ -795,7 +912,9 @@ export class IRReadingPointEditService {
 		await this.epubService.updateTask(pointId, {
 			...epubUpdates,
 			tocHref:
-				input.linkChanged && input.parsedTarget?.kind === "epub" && input.parsedTarget.epubTocHref
+				input.linkChanged &&
+				input.parsedTarget?.kind === "epub" &&
+				input.parsedTarget.epubTocHref
 					? input.parsedTarget.epubTocHref
 					: existing.tocHref,
 			meta: {
@@ -823,10 +942,11 @@ export class IRReadingPointEditService {
 					: {
 							priorityUi: input.priority,
 							priorityEff: input.priority,
-						}),
+					  }),
 				intervalDays: existing.intervalDays,
 				nextRepDate:
-					input.preserveScheduleFields || (input.preserveScheduleOnLinkChange && input.linkChanged)
+					input.preserveScheduleFields ||
+					(input.preserveScheduleOnLinkChange && input.linkChanged)
 						? existing.nextRepDate
 						: input.nextRepDate,
 				sourceType: "epub-bookmark",
@@ -838,11 +958,15 @@ export class IRReadingPointEditService {
 				metadata,
 				parameterContext: input.parameterContext || undefined,
 			},
-			{ preserveExisting: true }
+			{ preserveExisting: true },
 		);
 
 		if (input.linkChanged && input.parsedTarget && input.savedResumeLink) {
-			await this.updateTraceRecord(pointId, input.parsedTarget, input.savedResumeLink);
+			await this.updateTraceRecord(
+				pointId,
+				input.parsedTarget,
+				input.savedResumeLink,
+			);
 		}
 
 		return {
@@ -870,17 +994,22 @@ export class IRReadingPointEditService {
 			associatedNotePaths: string[];
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
-		}
+		},
 	): Promise<{ changed: boolean; sourceDocumentPath?: string }> {
-		const snapshot = await this.pointStorage.getPointSnapshotById(chunk.chunkId);
-		const metadata = this.buildMetadataPatch(snapshot?.point.metadata as Record<string, unknown>, {
-			titleManuallyEdited: input.titleManuallyEdited,
-			parameterContextOverride: Boolean(input.parameterContext),
-			pointTitle: input.title,
-			...(input.linkChanged && input.savedResumeLink
-				? { resumeLink: input.savedResumeLink }
-				: {}),
-		});
+		const snapshot = await this.pointStorage.getPointSnapshotById(
+			chunk.chunkId,
+		);
+		const metadata = this.buildMetadataPatch(
+			snapshot?.point.metadata as Record<string, unknown>,
+			{
+				titleManuallyEdited: input.titleManuallyEdited,
+				parameterContextOverride: Boolean(input.parameterContext),
+				pointTitle: input.title,
+				...(input.linkChanged && input.savedResumeLink
+					? { resumeLink: input.savedResumeLink }
+					: {}),
+			},
+		);
 
 		if (!input.preserveTopic) {
 			chunk.topicIds = [input.deckId];
@@ -908,7 +1037,9 @@ export class IRReadingPointEditService {
 			{
 				id: chunk.chunkId,
 				topicId: input.preserveTopic
-					? String(chunk.topicIds?.[0] || chunk.deckIds?.[0] || input.deckId || "").trim()
+					? String(
+							chunk.topicIds?.[0] || chunk.deckIds?.[0] || input.deckId || "",
+					  ).trim()
 					: input.deckId,
 				title: input.title,
 				note: input.note,
@@ -920,7 +1051,7 @@ export class IRReadingPointEditService {
 					: {
 							priorityUi: input.priority,
 							priorityEff: input.priority,
-						}),
+					  }),
 				intervalDays: chunk.intervalDays,
 				nextRepDate: chunk.nextRepDate,
 				sourceType: "ir-chunk",
@@ -938,11 +1069,15 @@ export class IRReadingPointEditService {
 				metadata,
 				parameterContext: input.parameterContext || undefined,
 			},
-			{ preserveExisting: true }
+			{ preserveExisting: true },
 		);
 
 		if (input.linkChanged && input.parsedTarget && input.savedResumeLink) {
-			await this.updateTraceRecord(chunk.chunkId, input.parsedTarget, input.savedResumeLink);
+			await this.updateTraceRecord(
+				chunk.chunkId,
+				input.parsedTarget,
+				input.savedResumeLink,
+			);
 		}
 
 		return {
@@ -969,7 +1104,7 @@ export class IRReadingPointEditService {
 			preserveTopic: boolean;
 			titleManuallyEdited: boolean;
 			parameterContext: IRParameterContext | null;
-		}
+		},
 	): Promise<{ changed: boolean; sourceDocumentPath?: string }> {
 		block.headingText = input.title;
 		if (!input.preserveScheduleFields) {
@@ -992,24 +1127,30 @@ export class IRReadingPointEditService {
 		}
 		if (input.linkChanged && input.parsedTarget?.blockId) {
 			block.blockIndex = undefined;
-			(block as IRBlock & { blockId?: string }).blockId = input.parsedTarget.blockId;
+			(block as IRBlock & { blockId?: string }).blockId =
+				input.parsedTarget.blockId;
 		}
 
 		await this.storage.saveBlock(block);
 
 		const snapshot = await this.pointStorage.getPointSnapshotById(block.id);
-		const metadata = this.buildMetadataPatch(snapshot?.point.metadata as Record<string, unknown>, {
-			titleManuallyEdited: input.titleManuallyEdited,
-			parameterContextOverride: Boolean(input.parameterContext),
-			...(input.linkChanged && input.savedResumeLink
-				? { resumeLink: input.savedResumeLink }
-				: {}),
-		});
+		const metadata = this.buildMetadataPatch(
+			snapshot?.point.metadata as Record<string, unknown>,
+			{
+				titleManuallyEdited: input.titleManuallyEdited,
+				parameterContextOverride: Boolean(input.parameterContext),
+				...(input.linkChanged && input.savedResumeLink
+					? { resumeLink: input.savedResumeLink }
+					: {}),
+			},
+		);
 
 		await this.pointStorage.syncLegacyPoint(
 			{
 				id: block.id,
-				topicId: input.preserveTopic ? String(block.deckPath || input.deckId || "").trim() : input.deckId,
+				topicId: input.preserveTopic
+					? String(block.deckPath || input.deckId || "").trim()
+					: input.deckId,
 				title: input.title,
 				note: input.note,
 				isStarred: input.isStarred,
@@ -1020,7 +1161,7 @@ export class IRReadingPointEditService {
 					: {
 							priorityUi: input.priority,
 							priorityEff: input.priority,
-						}),
+					  }),
 				intervalDays: block.interval ?? 1,
 				nextRepDate: input.preserveScheduleFields
 					? Number(migrateToIRBlockV4(block).nextRepDate || 0)
@@ -1043,11 +1184,15 @@ export class IRReadingPointEditService {
 				metadata,
 				parameterContext: input.parameterContext || undefined,
 			},
-			{ preserveExisting: true }
+			{ preserveExisting: true },
 		);
 
 		if (input.linkChanged && input.parsedTarget && input.savedResumeLink) {
-			await this.updateTraceRecord(block.id, input.parsedTarget, input.savedResumeLink);
+			await this.updateTraceRecord(
+				block.id,
+				input.parsedTarget,
+				input.savedResumeLink,
+			);
 		}
 
 		return {
@@ -1059,7 +1204,7 @@ export class IRReadingPointEditService {
 	private async updateTraceRecord(
 		pointId: string,
 		parsedTarget: ParsedReadingTarget,
-		savedResumeLink: string
+		savedResumeLink: string,
 	): Promise<void> {
 		const snapshot = await this.pointStorage.getPointSnapshotById(pointId);
 		if (!snapshot) {
@@ -1078,10 +1223,10 @@ export class IRReadingPointEditService {
 					snapshot.point.source.type === "pdf"
 						? "pdf-bookmark"
 						: snapshot.point.source.type === "epub"
-							? "epub-bookmark"
-							: snapshot.point.pointType === "chunk-entry"
-								? "ir-chunk"
-								: "legacy-block",
+						? "epub-bookmark"
+						: snapshot.point.pointType === "chunk-entry"
+						? "ir-chunk"
+						: "legacy-block",
 				sourcePath: snapshot.point.source.path,
 				locatorType: snapshot.point.trace.locatorType,
 				locator: {
@@ -1092,7 +1237,7 @@ export class IRReadingPointEditService {
 				traceConfidence: traceState === "verified" ? 1 : 0.5,
 				lastVerifiedAt: nowIso,
 			},
-			{ preserveExisting: true }
+			{ preserveExisting: true },
 		);
 	}
 }
