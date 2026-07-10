@@ -7,12 +7,21 @@ export interface IRInterleaveSequencerOptions {
 	maxTopicSharePercent?: number;
 }
 
-function resolveTopicKey(item: IRScheduleSortableItem & { topicKey?: string; sourceFile?: string }): string {
-	return String(item.topicKey || item.sourceFile || item.id || "").trim() || "unknown";
+function resolveTopicKey(
+	item: IRScheduleSortableItem & { topicKey?: string; sourceFile?: string },
+): string {
+	return (
+		String(item.topicKey || item.sourceFile || item.id || "").trim() ||
+		"unknown"
+	);
 }
 
 function resolveRelatedGroup(
-	item: IRScheduleSortableItem & { topicKey?: string; tagGroupId?: string; sourceFile?: string }
+	item: IRScheduleSortableItem & {
+		topicKey?: string;
+		tagGroupId?: string;
+		sourceFile?: string;
+	},
 ): string {
 	const tagGroup = String(item.tagGroupId || "").trim();
 	if (tagGroup && tagGroup !== "default") {
@@ -22,8 +31,16 @@ function resolveRelatedGroup(
 }
 
 function areRelated(
-	left: IRScheduleSortableItem & { topicKey?: string; tagGroupId?: string; sourceFile?: string },
-	right: IRScheduleSortableItem & { topicKey?: string; tagGroupId?: string; sourceFile?: string }
+	left: IRScheduleSortableItem & {
+		topicKey?: string;
+		tagGroupId?: string;
+		sourceFile?: string;
+	},
+	right: IRScheduleSortableItem & {
+		topicKey?: string;
+		tagGroupId?: string;
+		sourceFile?: string;
+	},
 ): boolean {
 	return resolveRelatedGroup(left) === resolveRelatedGroup(right);
 }
@@ -34,14 +51,17 @@ function areRelated(
 export function sequenceItemsForDailyReading<T extends IRScheduleSortableItem>(
 	items: T[],
 	profile: IRInterleaveProfile,
-	options?: IRInterleaveSequencerOptions
+	options?: IRInterleaveSequencerOptions,
 ): T[] {
 	if (profile === "off" || items.length <= 2) {
 		return items;
 	}
 
 	const maxRun = Math.max(1, options?.maxConsecutiveSameTopic ?? 3);
-	const maxTopicShare = Math.max(40, Math.min(90, options?.maxTopicSharePercent ?? 60));
+	const maxTopicShare = Math.max(
+		40,
+		Math.min(90, options?.maxTopicSharePercent ?? 60),
+	);
 	const sequenced = [...items];
 	const total = sequenced.length;
 
@@ -70,7 +90,9 @@ export function sequenceItemsForDailyReading<T extends IRScheduleSortableItem>(
 
 		const sameTopicCount = sequenced
 			.slice(0, index + 1)
-			.filter((item) => resolveTopicKey(item) === resolveTopicKey(current)).length;
+			.filter(
+				(item) => resolveTopicKey(item) === resolveTopicKey(current),
+			).length;
 		const topicShare = total > 0 ? (sameTopicCount / total) * 100 : 0;
 		const needsSwap = runLength >= maxRun || topicShare > maxTopicShare;
 		if (!needsSwap) {

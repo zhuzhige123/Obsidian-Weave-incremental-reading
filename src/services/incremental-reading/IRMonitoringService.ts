@@ -12,10 +12,10 @@
 
 import type { App, Vault } from "obsidian";
 import { getPluginPaths, getV2PathsFromApp } from "../../config/paths";
-import { isRecord } from "../../utils/unknown-record";
 import type { IRBlock, IRTagGroupProfile } from "../../types/ir-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
+import { isRecord } from "../../utils/unknown-record";
 
 // ============================================
 // 类型定义
@@ -220,7 +220,9 @@ export class IRMonitoringService {
 		const resolvedBasePath =
 			basePath || getPluginPaths(vault.app).state.incrementalReading.root;
 		this.storagePath = `${resolvedBasePath}/monitoring.json`;
-		this.legacyStoragePath = `${getV2PathsFromApp(vault?.app).ir.root}/monitoring.json`;
+		this.legacyStoragePath = `${
+			getV2PathsFromApp(vault?.app).ir.root
+		}/monitoring.json`;
 		this.data = { ...DEFAULT_MONITORING_DATA };
 	}
 
@@ -250,7 +252,10 @@ export class IRMonitoringService {
 				};
 				return;
 			} catch (error) {
-				logger.warn(`[IRMonitoringService] 加载监控数据失败，已尝试回退: ${path}`, error);
+				logger.warn(
+					`[IRMonitoringService] 加载监控数据失败，已尝试回退: ${path}`,
+					error,
+				);
 			}
 		}
 
@@ -269,7 +274,10 @@ export class IRMonitoringService {
 
 			const content = JSON.stringify(this.data);
 
-			await DirectoryUtils.ensureDirForFile(this.vault.adapter, this.storagePath);
+			await DirectoryUtils.ensureDirForFile(
+				this.vault.adapter,
+				this.storagePath,
+			);
 			await this.vault.adapter.write(this.storagePath, content);
 		} catch (error) {
 			logger.error("[IRMonitoringService] 保存监控数据失败:", error);
@@ -287,18 +295,26 @@ export class IRMonitoringService {
 
 		// 保留最近 N 条优先级变更
 		if (this.data.priorityChanges.length > MAX_PRIORITY_CHANGES) {
-			this.data.priorityChanges = this.data.priorityChanges.slice(-MAX_PRIORITY_CHANGES);
+			this.data.priorityChanges = this.data.priorityChanges.slice(
+				-MAX_PRIORITY_CHANGES,
+			);
 		}
 
 		// 保留最近 N 条组参数变更
 		if (this.data.groupParamChanges.length > MAX_GROUP_PARAM_CHANGES) {
-			this.data.groupParamChanges = this.data.groupParamChanges.slice(-MAX_GROUP_PARAM_CHANGES);
+			this.data.groupParamChanges = this.data.groupParamChanges.slice(
+				-MAX_GROUP_PARAM_CHANGES,
+			);
 		}
 		if (this.data.decisionEvents.length > MAX_DECISION_EVENTS) {
-			this.data.decisionEvents = this.data.decisionEvents.slice(-MAX_DECISION_EVENTS);
+			this.data.decisionEvents = this.data.decisionEvents.slice(
+				-MAX_DECISION_EVENTS,
+			);
 		}
 		if (this.data.decisionOutcomes.length > MAX_DECISION_OUTCOMES) {
-			this.data.decisionOutcomes = this.data.decisionOutcomes.slice(-MAX_DECISION_OUTCOMES);
+			this.data.decisionOutcomes = this.data.decisionOutcomes.slice(
+				-MAX_DECISION_OUTCOMES,
+			);
 		}
 	}
 
@@ -366,7 +382,8 @@ export class IRMonitoringService {
 	 */
 	recordTagGroupAppearance(groupId: string): void {
 		const stats = this.getTodayStats();
-		stats.tagGroupAppearances[groupId] = (stats.tagGroupAppearances[groupId] || 0) + 1;
+		stats.tagGroupAppearances[groupId] =
+			(stats.tagGroupAppearances[groupId] || 0) + 1;
 	}
 
 	/**
@@ -397,7 +414,7 @@ export class IRMonitoringService {
 		oldPriorityUi: number,
 		newPriorityUi: number,
 		oldPriorityEff: number,
-		newPriorityEff: number
+		newPriorityEff: number,
 	): void {
 		this.data.priorityChanges.push({
 			blockId,
@@ -427,7 +444,7 @@ export class IRMonitoringService {
 		groupId: string,
 		oldIntervalFactor: number,
 		newIntervalFactor: number,
-		sampleCount: number
+		sampleCount: number,
 	): void {
 		this.data.groupParamChanges.push({
 			groupId,
@@ -455,7 +472,9 @@ export class IRMonitoringService {
 	getRecentDecisionEvents(limit = 20): IRDecisionEventRecord[] {
 		return this.data.decisionEvents.slice(-limit);
 	}
-	recordDecisionOutcome(event: Omit<IRDecisionOutcomeRecord, "timestamp">): void {
+	recordDecisionOutcome(
+		event: Omit<IRDecisionOutcomeRecord, "timestamp">,
+	): void {
 		this.data.decisionOutcomes.push({
 			...event,
 			timestamp: new Date().toISOString(),
@@ -469,10 +488,10 @@ export class IRMonitoringService {
 	getDecisionCalibrationSummary(windowDays = 30): IRDecisionCalibrationSummary {
 		const cutoffMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
 		const recentEvents = this.data.decisionEvents.filter(
-			(event) => Date.parse(event.timestamp) >= cutoffMs
+			(event) => Date.parse(event.timestamp) >= cutoffMs,
 		);
 		const recentOutcomes = this.data.decisionOutcomes.filter(
-			(event) => Date.parse(event.timestamp) >= cutoffMs
+			(event) => Date.parse(event.timestamp) >= cutoffMs,
 		);
 		const latestOutcomeByItem = new Map<string, IRDecisionOutcomeRecord>();
 		for (const outcome of recentOutcomes) {
@@ -492,13 +511,15 @@ export class IRMonitoringService {
 		const outcomeDistribution: Record<string, number> = {};
 
 		for (const event of recentEvents) {
-			actionDistribution[event.action] = (actionDistribution[event.action] || 0) + 1;
+			actionDistribution[event.action] =
+				(actionDistribution[event.action] || 0) + 1;
 
 			if (event.beforeDate && event.afterDate) {
 				const beforeMs = Date.parse(event.beforeDate);
 				const afterMs = Date.parse(event.afterDate);
 				if (!Number.isNaN(beforeMs) && !Number.isNaN(afterMs)) {
-					plannedShiftDaysTotal += Math.abs(afterMs - beforeMs) / (24 * 60 * 60 * 1000);
+					plannedShiftDaysTotal +=
+						Math.abs(afterMs - beforeMs) / (24 * 60 * 60 * 1000);
 					plannedShiftCount += 1;
 				}
 			}
@@ -525,7 +546,8 @@ export class IRMonitoringService {
 				const afterMs = Date.parse(outcome.afterDate);
 				const outcomeMs = Date.parse(outcome.timestamp);
 				if (!Number.isNaN(afterMs) && !Number.isNaN(outcomeMs)) {
-					completionLagDaysTotal += (outcomeMs - afterMs) / (24 * 60 * 60 * 1000);
+					completionLagDaysTotal +=
+						(outcomeMs - afterMs) / (24 * 60 * 60 * 1000);
 					completionLagCount += 1;
 				}
 			}
@@ -535,14 +557,18 @@ export class IRMonitoringService {
 			windowDays,
 			decisionCount: recentEvents.length,
 			outcomeCount: recentOutcomes.length,
-			linkedOutcomeRate: recentEvents.length > 0 ? linkedOutcomeCount / recentEvents.length : 0,
+			linkedOutcomeRate:
+				recentEvents.length > 0 ? linkedOutcomeCount / recentEvents.length : 0,
 			averagePlannedShiftDays:
 				plannedShiftCount > 0 ? plannedShiftDaysTotal / plannedShiftCount : 0,
 			averageCompletionLagDays:
-				completionLagCount > 0 ? completionLagDaysTotal / completionLagCount : 0,
+				completionLagCount > 0
+					? completionLagDaysTotal / completionLagCount
+					: 0,
 			averageReadingSeconds:
 				readingSecondsCount > 0 ? readingSecondsTotal / readingSecondsCount : 0,
-			averageCardsCreated: cardsCreatedCount > 0 ? cardsCreatedTotal / cardsCreatedCount : 0,
+			averageCardsCreated:
+				cardsCreatedCount > 0 ? cardsCreatedTotal / cardsCreatedCount : 0,
 			actionDistribution,
 			outcomeDistribution,
 		};
@@ -564,7 +590,7 @@ export class IRMonitoringService {
 	 */
 	calculateTagGroupRatios(
 		blocks: IRBlock[],
-		profiles: Map<string, IRTagGroupProfile>
+		profiles: Map<string, IRTagGroupProfile>,
 	): TagGroupSummary[] {
 		const today = getTodayDateString();
 		const todayStats = this.data.dailyStats.find((s) => s.date === today);
@@ -585,7 +611,8 @@ export class IRMonitoringService {
 			const appearances = todayStats?.tagGroupAppearances[groupId] || 0;
 			const avgPriority =
 				groupBlocks.length > 0
-					? groupBlocks.reduce((sum, b) => sum + (b.priorityEff ?? 5), 0) / groupBlocks.length
+					? groupBlocks.reduce((sum, b) => sum + (b.priorityEff ?? 5), 0) /
+					  groupBlocks.length
 					: 5;
 
 			summaries.push({
@@ -593,7 +620,8 @@ export class IRMonitoringService {
 				groupName: profile.groupId, // 可以从 TagGroup 定义中获取名称
 				blockCount: groupBlocks.length,
 				dueCount: dueBlocks.length,
-				appearanceRatio: totalAppearances > 0 ? appearances / totalAppearances : 0,
+				appearanceRatio:
+					totalAppearances > 0 ? appearances / totalAppearances : 0,
 				intervalFactorBase: profile.intervalFactorBase,
 				avgPriority,
 			});
@@ -619,7 +647,8 @@ export class IRMonitoringService {
 		};
 	} {
 		const recentStats = this.getRecentStats(7);
-		const today = this.data.dailyStats.find((s) => s.date === getTodayDateString()) || null;
+		const today =
+			this.data.dailyStats.find((s) => s.date === getTodayDateString()) || null;
 
 		// 计算周平均
 		const weeklyAvg = {
@@ -630,14 +659,20 @@ export class IRMonitoringService {
 		};
 
 		if (recentStats.length > 0) {
-			weeklyAvg.dueCount = recentStats.reduce((sum, s) => sum + s.dueCount, 0) / recentStats.length;
-			weeklyAvg.scheduledCount =
-				recentStats.reduce((sum, s) => sum + s.scheduledCount, 0) / recentStats.length;
-			weeklyAvg.completedCount =
-				recentStats.reduce((sum, s) => sum + s.completedBlocksCount, 0) / recentStats.length;
-			weeklyAvg.readingMinutes =
-				recentStats.reduce((sum, s) => sum + s.totalActualReadingSeconds / 60, 0) /
+			weeklyAvg.dueCount =
+				recentStats.reduce((sum, s) => sum + s.dueCount, 0) /
 				recentStats.length;
+			weeklyAvg.scheduledCount =
+				recentStats.reduce((sum, s) => sum + s.scheduledCount, 0) /
+				recentStats.length;
+			weeklyAvg.completedCount =
+				recentStats.reduce((sum, s) => sum + s.completedBlocksCount, 0) /
+				recentStats.length;
+			weeklyAvg.readingMinutes =
+				recentStats.reduce(
+					(sum, s) => sum + s.totalActualReadingSeconds / 60,
+					0,
+				) / recentStats.length;
 		}
 
 		// 计算趋势（比较前3天和后3天）
@@ -649,16 +684,27 @@ export class IRMonitoringService {
 			const secondHalf = recentStats.slice(-3);
 
 			const firstAvgDue = firstHalf.reduce((sum, s) => sum + s.dueCount, 0) / 3;
-			const secondAvgDue = secondHalf.reduce((sum, s) => sum + s.dueCount, 0) / 3;
+			const secondAvgDue =
+				secondHalf.reduce((sum, s) => sum + s.dueCount, 0) / 3;
 			dueCountTrend = secondAvgDue - firstAvgDue;
 
 			const firstCompletionRate =
 				firstHalf.reduce((sum, s) => {
-					return sum + (s.scheduledCount > 0 ? s.completedBlocksCount / s.scheduledCount : 0);
+					return (
+						sum +
+						(s.scheduledCount > 0
+							? s.completedBlocksCount / s.scheduledCount
+							: 0)
+					);
 				}, 0) / 3;
 			const secondCompletionRate =
 				secondHalf.reduce((sum, s) => {
-					return sum + (s.scheduledCount > 0 ? s.completedBlocksCount / s.scheduledCount : 0);
+					return (
+						sum +
+						(s.scheduledCount > 0
+							? s.completedBlocksCount / s.scheduledCount
+							: 0)
+					);
 				}, 0) / 3;
 			completionRateTrend = secondCompletionRate - firstCompletionRate;
 		}
@@ -695,6 +741,9 @@ export class IRMonitoringService {
 /**
  * 创建监控服务实例
  */
-export function createIRMonitoringService(vault: MonitoringVault, basePath?: string): IRMonitoringService {
+export function createIRMonitoringService(
+	vault: MonitoringVault,
+	basePath?: string,
+): IRMonitoringService {
 	return new IRMonitoringService(vault, basePath);
 }

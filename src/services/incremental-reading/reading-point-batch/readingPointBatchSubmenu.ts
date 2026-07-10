@@ -5,8 +5,8 @@ import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import { IRStorageService } from "../IRStorageService";
 import { resolveReadingPointSaveErrorMessage } from "../reading-point-edit/reading-point-modal-utils";
 import {
-	IRReadingPointBatchService,
 	type IRReadingPointBatchResult,
+	IRReadingPointBatchService,
 } from "./IRReadingPointBatchService";
 
 export interface ReadingPointBatchSubmenuOptions {
@@ -22,7 +22,7 @@ export interface ReadingPointBatchSubmenuOptions {
 
 export async function populateReadingPointBatchSubmenu(
 	submenu: Menu,
-	options: ReadingPointBatchSubmenuOptions
+	options: ReadingPointBatchSubmenuOptions,
 ): Promise<void> {
 	const {
 		app,
@@ -94,7 +94,7 @@ export async function populateReadingPointBatchSubmenu(
 				void runBatchMenuAction(
 					() => batchService.batchDelete(targets),
 					onApplied,
-					"delete"
+					"delete",
 				);
 			});
 	});
@@ -107,7 +107,7 @@ export async function populateReadingPointBatchSubmenu(
 				void runBatchMenuAction(
 					() => batchService.batchRemove(targets),
 					onApplied,
-					"remove"
+					"remove",
 				);
 			});
 	});
@@ -117,7 +117,13 @@ export async function populateReadingPointBatchSubmenu(
 			.setTitle(i18n.t("irSidebar.menu.moveReadingPointTopic"))
 			.setIcon("layers");
 		const topicSubmenu = item.setSubmenu();
-		void populateBatchTopicSubmenu(topicSubmenu, app, targets, batchService, onApplied);
+		void populateBatchTopicSubmenu(
+			topicSubmenu,
+			app,
+			targets,
+			batchService,
+			onApplied,
+		);
 	});
 }
 
@@ -126,7 +132,7 @@ async function populateBatchTopicSubmenu(
 	app: App,
 	targets: ScheduleItem[],
 	batchService: IRReadingPointBatchService,
-	onApplied?: () => void
+	onApplied?: () => void,
 ): Promise<void> {
 	try {
 		const storage = new IRStorageService(app);
@@ -147,7 +153,11 @@ async function populateBatchTopicSubmenu(
 
 		submenu.addItem((item) => {
 			item
-				.setTitle(i18n.t("irSidebar.batch.moveTopicMenuTitle", { count: targets.length }))
+				.setTitle(
+					i18n.t("irSidebar.batch.moveTopicMenuTitle", {
+						count: targets.length,
+					}),
+				)
 				.setDisabled(true);
 		});
 		submenu.addSeparator();
@@ -158,7 +168,7 @@ async function populateBatchTopicSubmenu(
 					void runBatchMenuAction(
 						() => batchService.batchMoveTopic(targets, deck.id),
 						onApplied,
-						"move-topic"
+						"move-topic",
 					);
 				});
 			});
@@ -177,7 +187,7 @@ async function populateBatchTopicSubmenu(
 async function runBatchMenuAction(
 	action: () => Promise<IRReadingPointBatchResult>,
 	onApplied: (() => void) | undefined,
-	operation: "delete" | "remove" | "move-topic"
+	operation: "delete" | "remove" | "move-topic",
 ): Promise<void> {
 	try {
 		const result = await action();
@@ -190,11 +200,13 @@ async function runBatchMenuAction(
 			operation === "delete"
 				? "irSidebar.notices.deleteFailed"
 				: operation === "remove"
-					? "irSidebar.notices.removeFailed"
-					: null;
+				? "irSidebar.notices.removeFailed"
+				: null;
 		new Notice(
-			noticeKey ? i18n.t(noticeKey) : resolveReadingPointSaveErrorMessage(error),
-			3500
+			noticeKey
+				? i18n.t(noticeKey)
+				: resolveReadingPointSaveErrorMessage(error),
+			3500,
 		);
 	}
 }

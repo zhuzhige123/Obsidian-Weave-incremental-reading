@@ -29,7 +29,13 @@ describe("IRAssociatedNoteSignals", () => {
 			createCard({
 				uuid: "memory-block-link",
 				priority: 2,
-				content: ["---", "we_source:", '  - "[[Notes/Topic#^block-123|Topic]]"', "---", "正文"].join("\n"),
+				content: [
+					"---",
+					"we_source:",
+					'  - "[[Notes/Topic#^block-123|Topic]]"',
+					"---",
+					"正文",
+				].join("\n"),
 			}),
 			createCard({
 				uuid: "test-card",
@@ -54,7 +60,9 @@ describe("IRAssociatedNoteSignals", () => {
 		expect(topicSignal?.prioritySignal).toBe(7.1);
 
 		expect(getAssociatedNoteSignal(index, "Notes/Topic")?.cardCount).toBe(2);
-		expect(getAssociatedNoteSignal(index, "notes/topic#^another-block")?.cardCount).toBe(2);
+		expect(
+			getAssociatedNoteSignal(index, "notes/topic#^another-block")?.cardCount,
+		).toBe(2);
 		expect(getAssociatedNoteSignal(index, "Notes/Other.md")?.cardCount).toBe(1);
 	});
 
@@ -73,20 +81,40 @@ describe("IRAssociatedNoteSignals", () => {
 		]);
 
 		expect(Array.from(index.values())).toHaveLength(0);
-		expect(getAssociatedNoteSignal(index, "Books/Deep-Work.pdf")).toBeUndefined();
-		expect(getAssociatedNoteSignal(index, "Books/Atomic-Habits.epub")).toBeUndefined();
+		expect(
+			getAssociatedNoteSignal(index, "Books/Deep-Work.pdf"),
+		).toBeUndefined();
+		expect(
+			getAssociatedNoteSignal(index, "Books/Atomic-Habits.epub"),
+		).toBeUndefined();
 	});
 
 	test("resolveAssociatedNotePath 允许 Markdown/Canvas 笔记路径并拒绝外部文档路径", () => {
-		expect(resolveAssociatedNotePath({ associatedNotePath: "Folder/Linked-Note.md" } as any)).toBe("Folder/Linked-Note.md");
-		expect(resolveAssociatedNotePath({ associatedNotePath: "Folder/Linked-Note" } as any)).toBe("Folder/Linked-Note");
-		expect(resolveAssociatedNotePath({ associatedNotePath: "Boards/Topic.canvas" } as any)).toBe(
-			"Boards/Topic.canvas"
-		);
-		expect(resolveAssociatedNotePath({ associatedNotePath: "Draw/Sketch.excalidraw.md" } as any)).toBe(
-			"Draw/Sketch.excalidraw.md"
-		);
-		expect(resolveAssociatedNotePath({ associatedNotePath: "Folder/Reference.pdf" } as any)).toBeUndefined();
+		expect(
+			resolveAssociatedNotePath({
+				associatedNotePath: "Folder/Linked-Note.md",
+			} as any),
+		).toBe("Folder/Linked-Note.md");
+		expect(
+			resolveAssociatedNotePath({
+				associatedNotePath: "Folder/Linked-Note",
+			} as any),
+		).toBe("Folder/Linked-Note");
+		expect(
+			resolveAssociatedNotePath({
+				associatedNotePath: "Boards/Topic.canvas",
+			} as any),
+		).toBe("Boards/Topic.canvas");
+		expect(
+			resolveAssociatedNotePath({
+				associatedNotePath: "Draw/Sketch.excalidraw.md",
+			} as any),
+		).toBe("Draw/Sketch.excalidraw.md");
+		expect(
+			resolveAssociatedNotePath({
+				associatedNotePath: "Folder/Reference.pdf",
+			} as any),
+		).toBeUndefined();
 		expect(resolveAssociatedNotePath(null)).toBeUndefined();
 	});
 
@@ -96,21 +124,26 @@ describe("IRAssociatedNoteSignals", () => {
 				primaryAssociatedNotePath: "Folder/Primary.md",
 				associatedNotePath: "Folder/Legacy.md",
 				associatedNotePaths: ["Folder/Secondary.md"],
-			} as any)
+			} as any),
 		).toBe("Folder/Primary.md");
 
 		expect(
 			resolveAssociatedNotePrimaryPath({
 				associatedNotePaths: ["Folder/Secondary.md", "Folder/Tertiary.md"],
-			} as any)
+			} as any),
 		).toBe("Folder/Secondary.md");
 	});
 
 	test("resolveAssociatedNotePaths 会去重并优先保留带扩展名的主路径", () => {
 		expect(
 			resolveAssociatedNotePaths({
-				associatedNotePaths: ["Folder/Topic", "Folder/Topic.md", "Folder/Other.md", "Folder/Other"],
-			})
+				associatedNotePaths: [
+					"Folder/Topic",
+					"Folder/Topic.md",
+					"Folder/Other.md",
+					"Folder/Other",
+				],
+			}),
 		).toEqual(["Folder/Topic.md", "Folder/Other.md"]);
 	});
 
@@ -119,8 +152,8 @@ describe("IRAssociatedNoteSignals", () => {
 			remapAssociatedNotePaths(
 				["Folder/Topic", "Folder/Appendix.md", "Folder/Topic.md"],
 				"Folder/Topic.md",
-				"Folder/Renamed Topic.md"
-			)
+				"Folder/Renamed Topic.md",
+			),
 		).toEqual(["Folder/Renamed Topic.md", "Folder/Appendix.md"]);
 	});
 });

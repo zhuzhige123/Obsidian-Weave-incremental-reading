@@ -14,7 +14,6 @@ import { logger } from "./logger";
  */
 export type ServiceReadyEventType =
 	| "dataStorage"
-	| "questionBankService"
 	| "annotationSystem"
 	| "readingMaterialManager"
 	| "allCoreServices";
@@ -34,7 +33,8 @@ class ServiceReadyEventManager {
 	private readyServices: Set<ServiceReadyEventType> = new Set();
 
 	/** 等待中的监听器 */
-	private pendingListeners: Map<ServiceReadyEventType, ServiceReadyListener[]> = new Map();
+	private pendingListeners: Map<ServiceReadyEventType, ServiceReadyListener[]> =
+		new Map();
 
 	private constructor() {}
 
@@ -143,7 +143,7 @@ export function markServiceReady(serviceType: ServiceReadyEventType): void {
  */
 export function waitForServiceReady(
 	serviceType: ServiceReadyEventType,
-	timeout?: number
+	timeout?: number,
 ): Promise<void> {
 	return serviceReadyEvent.waitFor(serviceType, timeout);
 }

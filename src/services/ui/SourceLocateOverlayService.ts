@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { applyStyleProps } from "../../utils/style-props";
 import {
 	buildSourceLocateCandidateVariants,
 	buildSourceLocateTimestampCandidates,
@@ -7,7 +8,6 @@ import {
 	normalizeSourceLocateMatchValue,
 	parseTaggedSourceLocateCandidates,
 } from "./source-locate-candidates";
-import { applyStyleProps } from "../../utils/style-props";
 
 interface LocateOverlayOptions {
 	label?: string;
@@ -17,12 +17,16 @@ interface LocateOverlayOptions {
 
 const DEFAULT_DURATION = 2600;
 
-function asHTMLElement(element: Element | null | undefined): HTMLElement | null {
+function asHTMLElement(
+	element: Element | null | undefined,
+): HTMLElement | null {
 	return element?.instanceOf(HTMLElement) ? element : null;
 }
 
 function asHTMLElementList(elements: Element[]): HTMLElement[] {
-	return elements.filter((element): element is HTMLElement => element.instanceOf(HTMLElement));
+	return elements.filter((element): element is HTMLElement =>
+		element.instanceOf(HTMLElement),
+	);
 }
 
 interface MarkdownLocateRequest {
@@ -64,7 +68,7 @@ export class SourceLocateOverlayService {
 
 	showAtRect(
 		rect: DOMRect | DOMRectReadOnly | RectLike | null | undefined,
-		options: LocateOverlayOptions = {}
+		options: LocateOverlayOptions = {},
 	): boolean {
 		const normalizedRect = this.normalizeDisplayRect(rect);
 		if (!normalizedRect) return false;
@@ -72,27 +76,36 @@ export class SourceLocateOverlayService {
 
 		const label = options.label || "定位到溯源位置";
 		const icon = options.icon || "map-pinned";
-		const overlay = activeDocument.body.createDiv({ cls: "weave-source-locate-overlay" });
+		const overlay = activeDocument.body.createDiv({
+			cls: "weave-source-locate-overlay",
+		});
 		overlay.classList.add("weave-source-locate-overlay--measuring");
 		applyStyleProps(overlay, {
 			top: "-9999px",
 			left: "-9999px",
 		});
-		const iconWrap = overlay.createDiv({ cls: "weave-source-locate-overlay__icon" });
+		const iconWrap = overlay.createDiv({
+			cls: "weave-source-locate-overlay__icon",
+		});
 		setIcon(iconWrap, icon);
-		overlay.createSpan({ cls: "weave-source-locate-overlay__label", text: label });
+		overlay.createSpan({
+			cls: "weave-source-locate-overlay__label",
+			text: label,
+		});
 
 		const overlayWidth = Math.max(0, overlay.offsetWidth || 220);
 		const overlayHeight = Math.max(0, overlay.offsetHeight || 40);
 		const top = this.clamp(
-			normalizedRect.top + Math.min(12, Math.max(4, normalizedRect.height * 0.18)),
+			normalizedRect.top +
+				Math.min(12, Math.max(4, normalizedRect.height * 0.18)),
 			12,
-			Math.max(12, window.innerHeight - overlayHeight - 12)
+			Math.max(12, window.innerHeight - overlayHeight - 12),
 		);
 		const left = this.clamp(
-			normalizedRect.left + Math.min(18, Math.max(6, normalizedRect.width * 0.12)),
+			normalizedRect.left +
+				Math.min(18, Math.max(6, normalizedRect.width * 0.12)),
 			12,
-			Math.max(12, window.innerWidth - overlayWidth - 12)
+			Math.max(12, window.innerWidth - overlayWidth - 12),
 		);
 
 		overlay.classList.remove("weave-source-locate-overlay--measuring");
@@ -101,31 +114,45 @@ export class SourceLocateOverlayService {
 			left: `${left}px`,
 		});
 		this.overlayEl = overlay;
-		this.timer = window.setTimeout(() => this.clear(), options.durationMs ?? DEFAULT_DURATION);
+		this.timer = window.setTimeout(
+			() => this.clear(),
+			options.durationMs ?? DEFAULT_DURATION,
+		);
 		return true;
 	}
 
 	showTopCenter(anchor: HTMLElement, options: LocateOverlayOptions = {}): void {
 		const rect = anchor.getBoundingClientRect();
-		const virtualRect = new DOMRect(rect.left + rect.width / 2 - 70, rect.top + 24, 140, 24);
+		const virtualRect = new DOMRect(
+			rect.left + rect.width / 2 - 70,
+			rect.top + 24,
+			140,
+			24,
+		);
 		this.showAtRect(virtualRect, options);
 	}
 
 	findMarkdownLocateTarget(
 		container: HTMLElement,
-		candidates: string[]
+		candidates: string[],
 	): MarkdownLocateTarget | null {
 		return this.resolveMarkdownLocateTarget(container, candidates);
 	}
 
-	findMarkdownTarget(container: HTMLElement, candidates: string[]): HTMLElement | null {
-		return this.resolveMarkdownLocateTarget(container, candidates)?.scrollTarget || null;
+	findMarkdownTarget(
+		container: HTMLElement,
+		candidates: string[],
+	): HTMLElement | null {
+		return (
+			this.resolveMarkdownLocateTarget(container, candidates)?.scrollTarget ||
+			null
+		);
 	}
 
 	showForMarkdownTarget(
 		container: HTMLElement,
 		candidates: string[],
-		options: LocateOverlayOptions = {}
+		options: LocateOverlayOptions = {},
 	): boolean {
 		const target = this.resolveMarkdownLocateTarget(container, candidates);
 		if (!target) return false;
@@ -134,60 +161,91 @@ export class SourceLocateOverlayService {
 
 	private resolveMarkdownLocateTarget(
 		container: HTMLElement,
-		candidates: string[]
+		candidates: string[],
 	): MarkdownLocateTarget | null {
 		const request = this.parseMarkdownLocateRequest(candidates);
 		const cleanCandidates = request.searchCandidates;
 		if (request.hasEpubTarget) {
-			const epubCalloutTarget = this.findPreviewTargetByEpubCallout(container, request);
+			const epubCalloutTarget = this.findPreviewTargetByEpubCallout(
+				container,
+				request,
+			);
 			if (epubCalloutTarget) {
 				return this.buildLocateTarget(
 					epubCalloutTarget,
-					request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates
+					request.textCandidates.length > 0
+						? request.textCandidates
+						: cleanCandidates,
 				);
 			}
 		}
 		if (cleanCandidates.length === 0) return null;
 
 		if (request.hasEpubTarget) {
-			const directTarget = this.findPreviewTargetByAttributes(container, cleanCandidates);
+			const directTarget = this.findPreviewTargetByAttributes(
+				container,
+				cleanCandidates,
+			);
 			if (directTarget) {
 				return this.buildLocateTarget(
 					directTarget,
-					request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates
+					request.textCandidates.length > 0
+						? request.textCandidates
+						: cleanCandidates,
 				);
 			}
 
 			const previewBlock = this.findPreviewTargetByText(
 				container,
-				request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates
+				request.textCandidates.length > 0
+					? request.textCandidates
+					: cleanCandidates,
 			);
 			if (previewBlock) {
 				return this.buildLocateTarget(
 					previewBlock,
-					request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates
+					request.textCandidates.length > 0
+						? request.textCandidates
+						: cleanCandidates,
 				);
 			}
 
-			const sourceEditorTarget = this.findSourceEditorTargetByEpubCallout(container, request);
+			const sourceEditorTarget = this.findSourceEditorTargetByEpubCallout(
+				container,
+				request,
+			);
 			if (sourceEditorTarget) {
 				return sourceEditorTarget;
 			}
 		} else {
-			const previewBlockByText = this.findPreviewTargetByText(container, request.textCandidates);
+			const previewBlockByText = this.findPreviewTargetByText(
+				container,
+				request.textCandidates,
+			);
 			if (previewBlockByText) {
-				return this.buildLocateTarget(previewBlockByText, request.textCandidates);
-			}
-
-			const directTarget = this.findPreviewTargetByAttributes(container, cleanCandidates);
-			if (directTarget) {
 				return this.buildLocateTarget(
-					directTarget,
-					request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates
+					previewBlockByText,
+					request.textCandidates,
 				);
 			}
 
-			const previewBlock = this.findPreviewTargetByText(container, cleanCandidates);
+			const directTarget = this.findPreviewTargetByAttributes(
+				container,
+				cleanCandidates,
+			);
+			if (directTarget) {
+				return this.buildLocateTarget(
+					directTarget,
+					request.textCandidates.length > 0
+						? request.textCandidates
+						: cleanCandidates,
+				);
+			}
+
+			const previewBlock = this.findPreviewTargetByText(
+				container,
+				cleanCandidates,
+			);
 			if (previewBlock) {
 				return this.buildLocateTarget(previewBlock, cleanCandidates);
 			}
@@ -195,48 +253,65 @@ export class SourceLocateOverlayService {
 
 		const previewLinks = Array.from(
 			container.querySelectorAll(
-				".markdown-preview-view a.internal-link, .markdown-preview-view a[href]"
-			)
+				".markdown-preview-view a.internal-link, .markdown-preview-view a[href]",
+			),
 		);
 		const previewLink = previewLinks.find((link) => {
-			const href = `${link.getAttribute("href") || ""} ${link.getAttribute("data-href") || ""}`;
-			return cleanCandidates.some((candidate) => this.matchesCandidate(href, candidate));
+			const href = `${link.getAttribute("href") || ""} ${
+				link.getAttribute("data-href") || ""
+			}`;
+			return cleanCandidates.some((candidate) =>
+				this.matchesCandidate(href, candidate),
+			);
 		});
 
 		const previewLinkElement = asHTMLElement(previewLink);
 		if (previewLinkElement) {
 			const target = asHTMLElement(
-				previewLinkElement.closest(".callout, blockquote, p, li, div")
+				previewLinkElement.closest(".callout, blockquote, p, li, div"),
 			);
 			const locateTarget = target || previewLinkElement;
 			return this.buildLocateTarget(
 				locateTarget,
-				request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates,
-				previewLinkElement
+				request.textCandidates.length > 0
+					? request.textCandidates
+					: cleanCandidates,
+				previewLinkElement,
 			);
 		}
 
-		const sourceLines = asHTMLElementList(Array.from(container.querySelectorAll(".cm-line")));
+		const sourceLines = asHTMLElementList(
+			Array.from(container.querySelectorAll(".cm-line")),
+		);
 		const sourceLineCandidates = Array.from(
 			new Set([
 				...(request.textCandidates.length > 0 ? request.textCandidates : []),
 				...cleanCandidates,
-			])
+			]),
 		);
-		const sourceLine = this.findBestSourceEditorLine(sourceLines, sourceLineCandidates);
+		const sourceLine = this.findBestSourceEditorLine(
+			sourceLines,
+			sourceLineCandidates,
+		);
 		if (sourceLine) {
 			return this.buildLocateTarget(
 				sourceLine,
-				request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates
+				request.textCandidates.length > 0
+					? request.textCandidates
+					: cleanCandidates,
 			);
 		}
 
 		if (!request.hasEpubTarget) {
-			const activeLine = asHTMLElement(container.querySelector(".cm-active, .cm-line"));
+			const activeLine = asHTMLElement(
+				container.querySelector(".cm-active, .cm-line"),
+			);
 			if (activeLine) {
 				return this.buildLocateTarget(
 					activeLine,
-					request.textCandidates.length > 0 ? request.textCandidates : cleanCandidates
+					request.textCandidates.length > 0
+						? request.textCandidates
+						: cleanCandidates,
 				);
 			}
 		}
@@ -244,26 +319,46 @@ export class SourceLocateOverlayService {
 		return null;
 	}
 
-	private parseMarkdownLocateRequest(candidates: string[]): MarkdownLocateRequest {
+	private parseMarkdownLocateRequest(
+		candidates: string[],
+	): MarkdownLocateRequest {
 		const parsed = parseTaggedSourceLocateCandidates(candidates);
 
 		return {
 			searchCandidates: Array.from(
 				new Set(
-					parsed.rawSearchCandidates.flatMap((candidate) => this.buildCandidateVariants(candidate))
-				)
+					parsed.rawSearchCandidates.flatMap((candidate) =>
+						this.buildCandidateVariants(candidate),
+					),
+				),
 			),
 			textCandidates: Array.from(
-				new Set(parsed.textCandidates.filter((candidate) => this.isDescriptiveTextCandidate(candidate)))
+				new Set(
+					parsed.textCandidates.filter((candidate) =>
+						this.isDescriptiveTextCandidate(candidate),
+					),
+				),
 			),
 			epubLinkCandidates: Array.from(
-				new Set(parsed.epubLinkCandidates.flatMap((candidate) => this.buildCandidateVariants(candidate)))
+				new Set(
+					parsed.epubLinkCandidates.flatMap((candidate) =>
+						this.buildCandidateVariants(candidate),
+					),
+				),
 			),
 			epubCfiCandidates: Array.from(
-				new Set(parsed.epubCfiCandidates.flatMap((candidate) => this.buildCandidateVariants(candidate)))
+				new Set(
+					parsed.epubCfiCandidates.flatMap((candidate) =>
+						this.buildCandidateVariants(candidate),
+					),
+				),
 			),
 			excerptCandidates: Array.from(
-				new Set(parsed.excerptCandidates.flatMap((candidate) => this.buildCandidateVariants(candidate)))
+				new Set(
+					parsed.excerptCandidates.flatMap((candidate) =>
+						this.buildCandidateVariants(candidate),
+					),
+				),
 			),
 			createdTime: parsed.createdTime,
 			hasEpubTarget: parsed.hasEpubTarget,
@@ -285,13 +380,13 @@ export class SourceLocateOverlayService {
 
 	private findPreviewTargetByAttributes(
 		container: HTMLElement,
-		candidates: string[]
+		candidates: string[],
 	): HTMLElement | null {
 		if (candidates.length === 0) return null;
 		const previewTargets = Array.from(
 			container.querySelectorAll(
-				".markdown-preview-view [id], .markdown-preview-view [data-heading], .markdown-preview-view [data-block-id], .markdown-preview-view [data-blockid], .markdown-preview-view [href], .markdown-preview-view [data-href]"
-			)
+				".markdown-preview-view [id], .markdown-preview-view [data-heading], .markdown-preview-view [data-block-id], .markdown-preview-view [data-blockid], .markdown-preview-view [href], .markdown-preview-view [data-href]",
+			),
 		);
 
 		let bestElement: HTMLElement | null = null;
@@ -321,13 +416,13 @@ export class SourceLocateOverlayService {
 
 	private findPreviewTargetByText(
 		container: HTMLElement,
-		candidates: string[]
+		candidates: string[],
 	): HTMLElement | null {
 		if (candidates.length === 0) return null;
 		const previewBlocks = Array.from(
 			container.querySelectorAll(
-				".markdown-preview-view .callout, .markdown-preview-view blockquote, .markdown-preview-view li, .markdown-preview-view p, .markdown-preview-view pre, .markdown-preview-view h1, .markdown-preview-view h2, .markdown-preview-view h3, .markdown-preview-view h4, .markdown-preview-view h5, .markdown-preview-view h6"
-			)
+				".markdown-preview-view .callout, .markdown-preview-view blockquote, .markdown-preview-view li, .markdown-preview-view p, .markdown-preview-view pre, .markdown-preview-view h1, .markdown-preview-view h2, .markdown-preview-view h3, .markdown-preview-view h4, .markdown-preview-view h5, .markdown-preview-view h6",
+			),
 		);
 
 		let bestElement: HTMLElement | null = null;
@@ -351,7 +446,7 @@ export class SourceLocateOverlayService {
 
 	private findPreviewTargetByEpubCallout(
 		container: HTMLElement,
-		request: MarkdownLocateRequest
+		request: MarkdownLocateRequest,
 	): HTMLElement | null {
 		const blockSet = new Set<HTMLElement>();
 		for (const selector of [
@@ -360,7 +455,9 @@ export class SourceLocateOverlayService {
 			".markdown-rendered .callout",
 			".markdown-rendered blockquote",
 		]) {
-			for (const block of asHTMLElementList(Array.from(container.querySelectorAll(selector)))) {
+			for (const block of asHTMLElementList(
+				Array.from(container.querySelectorAll(selector)),
+			)) {
 				blockSet.add(block);
 			}
 		}
@@ -381,9 +478,11 @@ export class SourceLocateOverlayService {
 
 	private findSourceEditorTargetByEpubCallout(
 		container: HTMLElement,
-		request: MarkdownLocateRequest
+		request: MarkdownLocateRequest,
 	): MarkdownLocateTarget | null {
-		const sourceLines = asHTMLElementList(Array.from(container.querySelectorAll(".cm-line")));
+		const sourceLines = asHTMLElementList(
+			Array.from(container.querySelectorAll(".cm-line")),
+		);
 		if (sourceLines.length === 0) {
 			return null;
 		}
@@ -405,12 +504,16 @@ export class SourceLocateOverlayService {
 		}
 
 		const preferredTextCandidates =
-			request.textCandidates.length > 0 ? request.textCandidates : request.searchCandidates;
+			request.textCandidates.length > 0
+				? request.textCandidates
+				: request.searchCandidates;
 		const headerCandidates = [
 			...request.epubLinkCandidates,
 			...request.epubCfiCandidates,
 			...request.excerptCandidates,
-			...(request.createdTime ? this.buildTimestampCandidates(request.createdTime) : []),
+			...(request.createdTime
+				? this.buildTimestampCandidates(request.createdTime)
+				: []),
 		];
 		const scrollTarget =
 			this.findBestSourceEditorLine(bestBlock, preferredTextCandidates) ||
@@ -420,7 +523,9 @@ export class SourceLocateOverlayService {
 		return this.buildLocateTarget(scrollTarget, preferredTextCandidates);
 	}
 
-	private collectSourceEditorEpubCalloutBlocks(lines: HTMLElement[]): HTMLElement[][] {
+	private collectSourceEditorEpubCalloutBlocks(
+		lines: HTMLElement[],
+	): HTMLElement[][] {
 		const blocks: HTMLElement[][] = [];
 		for (let index = 0; index < lines.length; index += 1) {
 			const line = lines[index];
@@ -452,7 +557,7 @@ export class SourceLocateOverlayService {
 
 	private scoreSourceEditorEpubCalloutBlock(
 		lines: HTMLElement[],
-		request: MarkdownLocateRequest
+		request: MarkdownLocateRequest,
 	): number {
 		const linkCandidates = [
 			...request.epubLinkCandidates,
@@ -463,7 +568,9 @@ export class SourceLocateOverlayService {
 			return 0;
 		}
 
-		const content = lines.map((line) => this.buildElementMatchText(line)).join("\n");
+		const content = lines
+			.map((line) => this.buildElementMatchText(line))
+			.join("\n");
 		const linkScore = this.scoreBestCandidateMatch(content, linkCandidates);
 		if (linkScore === 0) {
 			return 0;
@@ -471,22 +578,29 @@ export class SourceLocateOverlayService {
 
 		let totalScore = 5000 + linkScore * 100;
 		if (request.excerptCandidates.length > 0) {
-			totalScore += this.scoreBestCandidateMatch(content, request.excerptCandidates) * 20;
+			totalScore +=
+				this.scoreBestCandidateMatch(content, request.excerptCandidates) * 20;
 		}
 		if (request.createdTime) {
 			totalScore +=
 				this.scoreBestCandidateMatch(
 					content,
-					this.buildTimestampCandidates(request.createdTime)
+					this.buildTimestampCandidates(request.createdTime),
 				) * 10;
 		}
 		if (request.textCandidates.length > 0) {
-			totalScore += this.scoreBestCandidateMatch(content, request.textCandidates);
+			totalScore += this.scoreBestCandidateMatch(
+				content,
+				request.textCandidates,
+			);
 		}
 		return totalScore;
 	}
 
-	private scoreEpubCalloutBlock(block: HTMLElement, request: MarkdownLocateRequest): number {
+	private scoreEpubCalloutBlock(
+		block: HTMLElement,
+		request: MarkdownLocateRequest,
+	): number {
 		const linkCandidates = [
 			...request.epubLinkCandidates,
 			...request.epubCfiCandidates,
@@ -495,7 +609,7 @@ export class SourceLocateOverlayService {
 		if (linkCandidates.length === 0) return 0;
 
 		const links = Array.from(
-			block.querySelectorAll("a.internal-link, a[href], [data-href], [href]")
+			block.querySelectorAll("a.internal-link, a[href], [data-href], [href]"),
 		);
 		let bestLinkScore = 0;
 
@@ -507,24 +621,33 @@ export class SourceLocateOverlayService {
 				link.getAttribute("title") || "",
 				link.textContent || "",
 			].join(" ");
-			bestLinkScore = Math.max(bestLinkScore, this.scoreBestCandidateMatch(values, linkCandidates));
+			bestLinkScore = Math.max(
+				bestLinkScore,
+				this.scoreBestCandidateMatch(values, linkCandidates),
+			);
 		}
 
 		if (bestLinkScore === 0) {
-			bestLinkScore = this.scoreBestCandidateMatch(this.serializeElement(block), linkCandidates);
+			bestLinkScore = this.scoreBestCandidateMatch(
+				this.serializeElement(block),
+				linkCandidates,
+			);
 		}
 		if (bestLinkScore === 0) return 0;
 
 		let totalScore = 5000 + bestLinkScore * 100;
 		if (request.excerptCandidates.length > 0) {
 			totalScore +=
-				this.scoreBestCandidateMatch(this.serializeElement(block), request.excerptCandidates) * 20;
+				this.scoreBestCandidateMatch(
+					this.serializeElement(block),
+					request.excerptCandidates,
+				) * 20;
 		}
 		if (request.createdTime) {
 			totalScore +=
 				this.scoreBestCandidateMatch(
 					block.textContent || "",
-					this.buildTimestampCandidates(request.createdTime)
+					this.buildTimestampCandidates(request.createdTime),
 				) * 10;
 		}
 		return totalScore;
@@ -537,7 +660,10 @@ export class SourceLocateOverlayService {
 		return normalizedHaystack.includes(normalizedCandidate);
 	}
 
-	private scoreBestCandidateMatch(haystack: string, candidates: string[]): number {
+	private scoreBestCandidateMatch(
+		haystack: string,
+		candidates: string[],
+	): number {
 		let bestScore = 0;
 		for (const candidate of candidates) {
 			const score = this.scoreCandidateMatch(haystack, candidate);
@@ -550,7 +676,7 @@ export class SourceLocateOverlayService {
 
 	private findBestSourceEditorLine(
 		lines: HTMLElement[],
-		candidates: string[]
+		candidates: string[],
 	): HTMLElement | null {
 		if (lines.length === 0 || candidates.length === 0) {
 			return null;
@@ -590,7 +716,7 @@ export class SourceLocateOverlayService {
 			pushValue(element.getAttribute("title"));
 
 			const descendants = element.querySelectorAll(
-				"a.internal-link, a[href], [data-href], [href], .internal-link"
+				"a.internal-link, a[href], [data-href], [href], .internal-link",
 			);
 			for (const node of Array.from(descendants)) {
 				if (!node.instanceOf(HTMLElement)) {
@@ -623,7 +749,9 @@ export class SourceLocateOverlayService {
 		}
 
 		const candidateLength = normalizedCandidate.length;
-		const descriptiveBoost = this.isDescriptiveTextCandidate(candidate) ? 1000 : 0;
+		const descriptiveBoost = this.isDescriptiveTextCandidate(candidate)
+			? 1000
+			: 0;
 		return descriptiveBoost + Math.min(candidateLength, 400);
 	}
 
@@ -652,13 +780,14 @@ export class SourceLocateOverlayService {
 	private buildLocateTarget(
 		scrollTarget: HTMLElement,
 		textCandidates: string[],
-		rectSource?: HTMLElement | null
+		rectSource?: HTMLElement | null,
 	): MarkdownLocateTarget {
 		const preciseRect = this.normalizeDisplayRect(
-			this.findTextRectInElement(rectSource || scrollTarget, textCandidates) || null
+			this.findTextRectInElement(rectSource || scrollTarget, textCandidates) ||
+				null,
 		);
 		const fallbackRect = this.normalizeDisplayRect(
-			(rectSource || scrollTarget).getBoundingClientRect()
+			(rectSource || scrollTarget).getBoundingClientRect(),
 		);
 		return {
 			scrollTarget,
@@ -667,7 +796,7 @@ export class SourceLocateOverlayService {
 	}
 
 	private normalizeDisplayRect(
-		rect: DOMRect | DOMRectReadOnly | RectLike | null | undefined
+		rect: DOMRect | DOMRectReadOnly | RectLike | null | undefined,
 	): DOMRect | null {
 		if (!rect) {
 			return null;
@@ -680,12 +809,18 @@ export class SourceLocateOverlayService {
 		const right = this.pickFiniteNumber(rect.right);
 		const bottom = this.pickFiniteNumber(rect.bottom);
 
-		const resolvedWidth = width ?? (left !== null && right !== null ? right - left : null);
-		const resolvedHeight = height ?? (top !== null && bottom !== null ? bottom - top : null);
+		const resolvedWidth =
+			width ?? (left !== null && right !== null ? right - left : null);
+		const resolvedHeight =
+			height ?? (top !== null && bottom !== null ? bottom - top : null);
 		const resolvedLeft =
-			left ?? (right !== null && resolvedWidth !== null ? right - resolvedWidth : null);
+			left ??
+			(right !== null && resolvedWidth !== null ? right - resolvedWidth : null);
 		const resolvedTop =
-			top ?? (bottom !== null && resolvedHeight !== null ? bottom - resolvedHeight : null);
+			top ??
+			(bottom !== null && resolvedHeight !== null
+				? bottom - resolvedHeight
+				: null);
 
 		if (
 			resolvedLeft === null ||
@@ -713,18 +848,20 @@ export class SourceLocateOverlayService {
 			resolvedLeft,
 			resolvedTop,
 			Math.max(0, resolvedWidth),
-			Math.max(0, resolvedHeight)
+			Math.max(0, resolvedHeight),
 		);
 	}
 
-	private pickFiniteNumber(...values: Array<number | string | undefined>): number | null {
+	private pickFiniteNumber(
+		...values: Array<number | string | undefined>
+	): number | null {
 		for (const value of values) {
 			const numericValue =
 				typeof value === "number"
 					? value
 					: typeof value === "string" && value.trim()
-						? Number(value)
-						: Number.NaN;
+					? Number(value)
+					: Number.NaN;
 			if (Number.isFinite(numericValue)) {
 				return numericValue;
 			}
@@ -750,15 +887,17 @@ export class SourceLocateOverlayService {
 
 	private findTextRectInElement(
 		element: HTMLElement,
-		candidates: string[]
+		candidates: string[],
 	): DOMRect | null {
 		const textCandidates = Array.from(
 			new Set(
 				candidates
-					.map((candidate) => this.tryDecodeURIComponent(String(candidate || "").trim()))
+					.map((candidate) =>
+						this.tryDecodeURIComponent(String(candidate || "").trim()),
+					)
 					.filter((candidate) => this.isDescriptiveTextCandidate(candidate))
-					.sort((a, b) => b.length - a.length)
-			)
+					.sort((a, b) => b.length - a.length),
+			),
 		);
 		if (textCandidates.length === 0) {
 			return null;
@@ -776,7 +915,12 @@ export class SourceLocateOverlayService {
 			if (!offsets) {
 				continue;
 			}
-			const range = this.createRangeFromOffsets(doc, segments, offsets.start, offsets.end);
+			const range = this.createRangeFromOffsets(
+				doc,
+				segments,
+				offsets.start,
+				offsets.end,
+			);
 			if (!range) {
 				continue;
 			}
@@ -821,7 +965,7 @@ export class SourceLocateOverlayService {
 
 	private findCandidateOffsets(
 		haystack: string,
-		candidate: string
+		candidate: string,
 	): { start: number; end: number } | null {
 		const exactIndex = haystack.toLowerCase().indexOf(candidate.toLowerCase());
 		if (exactIndex >= 0) {
@@ -837,14 +981,17 @@ export class SourceLocateOverlayService {
 			return null;
 		}
 
-		const normalizedIndex = normalizedHaystack.normalized.indexOf(normalizedCandidate);
+		const normalizedIndex =
+			normalizedHaystack.normalized.indexOf(normalizedCandidate);
 		if (normalizedIndex < 0) {
 			return null;
 		}
 
 		const normalizedEndIndex = normalizedIndex + normalizedCandidate.length - 1;
-		const rawStart = normalizedHaystack.rawIndexByNormalizedIndex[normalizedIndex];
-		const rawEndInclusive = normalizedHaystack.rawIndexByNormalizedIndex[normalizedEndIndex];
+		const rawStart =
+			normalizedHaystack.rawIndexByNormalizedIndex[normalizedIndex];
+		const rawEndInclusive =
+			normalizedHaystack.rawIndexByNormalizedIndex[normalizedEndIndex];
 		if (!Number.isFinite(rawStart) || !Number.isFinite(rawEndInclusive)) {
 			return null;
 		}
@@ -885,7 +1032,10 @@ export class SourceLocateOverlayService {
 			previousWasSpace = false;
 		}
 
-		while (normalizedChars.length > 0 && normalizedChars[normalizedChars.length - 1] === " ") {
+		while (
+			normalizedChars.length > 0 &&
+			normalizedChars[normalizedChars.length - 1] === " "
+		) {
 			normalizedChars.pop();
 			rawIndexByNormalizedIndex.pop();
 		}
@@ -916,7 +1066,7 @@ export class SourceLocateOverlayService {
 		doc: Document,
 		segments: TextSegment[],
 		start: number,
-		end: number
+		end: number,
 	): Range | null {
 		const startBoundary = this.resolveTextBoundary(segments, start, false);
 		const endBoundary = this.resolveTextBoundary(segments, end, true);
@@ -933,7 +1083,7 @@ export class SourceLocateOverlayService {
 	private resolveTextBoundary(
 		segments: TextSegment[],
 		offset: number,
-		isEndBoundary: boolean
+		isEndBoundary: boolean,
 	): { node: Text; offset: number } | null {
 		for (const segment of segments) {
 			const matches = isEndBoundary
@@ -948,7 +1098,9 @@ export class SourceLocateOverlayService {
 			};
 		}
 
-		const edgeSegment = isEndBoundary ? segments[segments.length - 1] : segments[0];
+		const edgeSegment = isEndBoundary
+			? segments[segments.length - 1]
+			: segments[0];
 		if (!edgeSegment) {
 			return null;
 		}

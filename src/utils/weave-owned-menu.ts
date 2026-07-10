@@ -5,7 +5,10 @@ export const WEAVE_OWNED_MENU_COMPACT_CLASS = "weave-owned-menu--compact";
 
 type MenuWithDom = Menu & { dom?: HTMLElement };
 
-export function markWeaveOwnedMenu(menu: Menu, variant: "default" | "compact" = "default"): void {
+export function markWeaveOwnedMenu(
+	menu: Menu,
+	variant: "default" | "compact" = "default",
+): void {
 	if (typeof window === "undefined") {
 		return;
 	}
@@ -26,7 +29,7 @@ export function markWeaveOwnedMenu(menu: Menu, variant: "default" | "compact" = 
 export function showWeaveMenuAtMouseEvent(
 	menu: Menu,
 	event: MouseEvent,
-	options: { variant?: "default" | "compact" } = {}
+	options: { variant?: "default" | "compact" } = {},
 ): void {
 	menu.showAtMouseEvent(event);
 	markWeaveOwnedMenu(menu, options.variant);
@@ -35,7 +38,7 @@ export function showWeaveMenuAtMouseEvent(
 export function showWeaveMenuAtPosition(
 	menu: Menu,
 	position: { x: number; y: number },
-	options: { variant?: "default" | "compact" } = {}
+	options: { variant?: "default" | "compact" } = {},
 ): void {
 	menu.showAtPosition(position);
 	markWeaveOwnedMenu(menu, options.variant);

@@ -34,7 +34,7 @@ function isBlockCompletedToday(block: IRBlock, todayKey: string): boolean {
 
 export async function resolveTopicQueueProgress(
 	app: App,
-	topicId: string
+	topicId: string,
 ): Promise<ParagraphTopicQueueProgress | null> {
 	const normalizedTopicId = String(topicId || "").trim();
 	if (!normalizedTopicId) {
@@ -74,14 +74,16 @@ export async function resolveTopicQueueProgress(
 	}
 
 	const queueTotal = dueBlocks.length;
-	const queueDone = dueBlocks.filter((block) => isBlockCompletedToday(block, todayKey)).length;
+	const queueDone = dueBlocks.filter((block) =>
+		isBlockCompletedToday(block, todayKey),
+	).length;
 	return { queueDone, queueTotal };
 }
 
 export async function recordLegacyBlockInteraction(
 	app: App,
 	blockId: string,
-	readingTimeSeconds: number
+	readingTimeSeconds: number,
 ): Promise<void> {
 	const normalizedId = String(blockId || "").trim();
 	if (!normalizedId) {
@@ -98,7 +100,8 @@ export async function recordLegacyBlockInteraction(
 	const nowIso = new Date().toISOString();
 	block.reviewCount = (block.reviewCount || 0) + 1;
 	block.lastReview = nowIso;
-	block.totalReadingTime = (block.totalReadingTime || 0) + Math.max(0, readingTimeSeconds);
+	block.totalReadingTime =
+		(block.totalReadingTime || 0) + Math.max(0, readingTimeSeconds);
 	block.updatedAt = nowIso;
 	await storage.saveBlock(block);
 }

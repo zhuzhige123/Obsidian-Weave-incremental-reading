@@ -1,4 +1,4 @@
-import { normalizePath, type App } from "obsidian";
+import { type App, normalizePath } from "obsidian";
 import { buildPointWriteCardStub } from "../../../utils/ir-card-point-access";
 import type { ScheduleItemSourceType } from "../IRCalendarScheduleItem";
 import {
@@ -14,7 +14,12 @@ import { IRPointStorageService } from "../IRPointStorageService";
 import { IRPointWriteService } from "../IRPointWriteService";
 import { IRStorageService } from "../IRStorageService";
 
-export type IRReadingPointTopicMigrationKind = "pdf" | "epub" | "chunk" | "block" | "point";
+export type IRReadingPointTopicMigrationKind =
+	| "pdf"
+	| "epub"
+	| "chunk"
+	| "block"
+	| "point";
 
 export interface IRReadingPointTopicMigrationInput {
 	pointId: string;
@@ -49,7 +54,7 @@ export class IRReadingPointTopicMigrationService {
 	}
 
 	async movePointToTopic(
-		input: IRReadingPointTopicMigrationInput
+		input: IRReadingPointTopicMigrationInput,
 	): Promise<IRReadingPointTopicMigrationResult> {
 		await this.initialize();
 
@@ -136,7 +141,7 @@ export class IRReadingPointTopicMigrationService {
 						kind: "block",
 						sourceDocumentPath,
 					}),
-					[targetDeckId]
+					[targetDeckId],
 				);
 				changed = changed || Boolean(deckResult);
 				break;
@@ -149,16 +154,24 @@ export class IRReadingPointTopicMigrationService {
 			const syncedTopicIds = await this.pointRead.getPointTopicIds(pointId);
 			if (String(syncedTopicIds[0] || "").trim() !== targetDeckId) {
 				const topicNamesById = await this.buildTopicNamesByIdMap();
-				const topicMoved = await this.pointStorage.updatePointTopicIds(pointId, [targetDeckId], {
-					topicNamesById,
-				});
+				const topicMoved = await this.pointStorage.updatePointTopicIds(
+					pointId,
+					[targetDeckId],
+					{
+						topicNamesById,
+					},
+				);
 				changed = changed || topicMoved;
 			}
 		} else {
 			const topicNamesById = await this.buildTopicNamesByIdMap();
-			const topicMoved = await this.pointStorage.updatePointTopicIds(pointId, [targetDeckId], {
-				topicNamesById,
-			});
+			const topicMoved = await this.pointStorage.updatePointTopicIds(
+				pointId,
+				[targetDeckId],
+				{
+					topicNamesById,
+				},
+			);
 			changed = changed || topicMoved;
 		}
 
@@ -173,7 +186,7 @@ export class IRReadingPointTopicMigrationService {
 
 	async resolveKind(
 		pointId: string,
-		sourceTypeHint?: ScheduleItemSourceType | "unknown"
+		sourceTypeHint?: ScheduleItemSourceType | "unknown",
 	): Promise<IRReadingPointTopicMigrationKind> {
 		if (isPdfBookmarkTaskId(pointId)) {
 			return "pdf";
@@ -197,7 +210,12 @@ export class IRReadingPointTopicMigrationService {
 			return "point";
 		}
 
-		if (sourceTypeHint === "pdf" || sourceTypeHint === "epub" || sourceTypeHint === "chunk" || sourceTypeHint === "legacy-block") {
+		if (
+			sourceTypeHint === "pdf" ||
+			sourceTypeHint === "epub" ||
+			sourceTypeHint === "chunk" ||
+			sourceTypeHint === "legacy-block"
+		) {
 			throw new Error("reading-point-edit-not-found");
 		}
 
@@ -208,8 +226,12 @@ export class IRReadingPointTopicMigrationService {
 		const decks = await this.storage.getAllDecks();
 		return new Map(
 			Object.values(decks).map(
-				(deck) => [String(deck.id || "").trim(), String(deck.name || "").trim()] as const
-			)
+				(deck) =>
+					[
+						String(deck.id || "").trim(),
+						String(deck.name || "").trim(),
+					] as const,
+			),
 		);
 	}
 

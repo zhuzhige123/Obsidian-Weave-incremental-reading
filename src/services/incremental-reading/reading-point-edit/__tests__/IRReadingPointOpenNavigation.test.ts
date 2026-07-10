@@ -10,7 +10,7 @@ describe("IRReadingPointOpenNavigation", () => {
 				resumeLink: "Notes/demo.md#^weea92dv",
 				sourceFilePath: "Notes/demo.md",
 				blockId: "weea92dv",
-			})
+			}),
 		).toBe(true);
 	});
 
@@ -20,7 +20,7 @@ describe("IRReadingPointOpenNavigation", () => {
 				kind: "epub",
 				rawInput: "obsidian://weave-epub-reader?file=Books/demo.epub&cfi=abc",
 				resumeLink: "obsidian://weave-epub-reader?file=Books/demo.epub&cfi=abc",
-			})
+			}),
 		).toBe(true);
 	});
 
@@ -33,7 +33,7 @@ describe("IRReadingPointOpenNavigation", () => {
 				rawInput: protocolUrl,
 				resumeLink: protocolUrl,
 				validationError: "epub file not found",
-			})
+			}),
 		).toBe(true);
 	});
 
@@ -44,7 +44,7 @@ describe("IRReadingPointOpenNavigation", () => {
 				rawInput: "Boards/demo.canvas",
 				resumeLink: "Boards/demo.canvas",
 				sourceFilePath: "Boards/demo.canvas",
-			})
+			}),
 		).toBe(true);
 	});
 });

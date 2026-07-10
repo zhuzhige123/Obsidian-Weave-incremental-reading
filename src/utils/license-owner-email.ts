@@ -1,12 +1,14 @@
 import { ACTIVATION_EMAIL_BOUND_USER_MESSAGE } from "./activation-privacy";
 
 export function normalizeLicenseEmail(email: string): string {
-	return String(email || "").trim().toLowerCase();
+	return String(email || "")
+		.trim()
+		.toLowerCase();
 }
 
 export function assertSubmittedEmailMatchesActivationOwner(
 	_submittedEmail: string,
-	_data?: unknown
+	_data?: unknown,
 ): { ok: true } | { ok: false; error: string } {
 	return { ok: true };
 }
@@ -14,7 +16,7 @@ export function assertSubmittedEmailMatchesActivationOwner(
 export function resolveBindEmailForActivation(
 	submittedEmail: string,
 	_data?: unknown,
-	existingRecord?: { email?: string } | null
+	existingRecord?: { email?: string } | null,
 ): { ok: true; bindEmail: string } | { ok: false; error: string } {
 	const submitted = normalizeLicenseEmail(submittedEmail);
 

@@ -16,7 +16,9 @@ export function patchDocumentBodyChrome(patch: DocumentBodyChromePatch): void {
 }
 
 /** Clear specific activeDocument.body chrome overrides. */
-export function clearDocumentBodyChrome(keys: (keyof DocumentBodyChromePatch)[]): void {
+export function clearDocumentBodyChrome(
+	keys: (keyof DocumentBodyChromePatch)[],
+): void {
 	if (typeof document === "undefined") {
 		return;
 	}

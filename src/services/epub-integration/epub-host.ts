@@ -84,21 +84,33 @@ export interface EpubHostReaderCapabilities {
 
 export interface EpubHostIRCapabilities {
 	openIRReadingPointFromExternalSelection?: (
-		input: EpubHostReadingPointInput
+		input: EpubHostReadingPointInput,
 	) => Promise<void>;
-	getAvailableEpubIncrementalReadingTopics?: () => Promise<EpubHostIncrementalReadingTopicOption[]>;
+	getAvailableEpubIncrementalReadingTopics?: () => Promise<
+		EpubHostIncrementalReadingTopicOption[]
+	>;
 	scheduleEpubChapterForIncrementalReading?: (
-		input: EpubHostScheduleChapterInput
+		input: EpubHostScheduleChapterInput,
 	) => Promise<void>;
-	markEpubResumePointFromReader?: (input: EpubHostResumePointInput) => Promise<void>;
+	markEpubResumePointFromReader?: (
+		input: EpubHostResumePointInput,
+	) => Promise<void>;
 }
 
 export interface EpubHostCardCapabilities {
 	openCreateCardModal?: (input: EpubHostCreateCardInput) => Promise<void>;
-	exportEpubChapterToMarkdown?: (input: EpubHostExportChapterInput) => Promise<void>;
-	exportEpubBookNotesToMarkdown?: (input: EpubHostExportBookNotesInput) => Promise<void>;
-	openSelectedTextAISplitMenu?: (options: EpubHostSelectedTextAISplitMenuOptions) => void;
-	openSelectedTextAIPanelFromEpub?: (input: EpubHostSelectedTextAIPanelInput) => Promise<void>;
+	exportEpubChapterToMarkdown?: (
+		input: EpubHostExportChapterInput,
+	) => Promise<void>;
+	exportEpubBookNotesToMarkdown?: (
+		input: EpubHostExportBookNotesInput,
+	) => Promise<void>;
+	openSelectedTextAISplitMenu?: (
+		options: EpubHostSelectedTextAISplitMenuOptions,
+	) => void;
+	openSelectedTextAIPanelFromEpub?: (
+		input: EpubHostSelectedTextAIPanelInput,
+	) => Promise<void>;
 	closeSelectedTextAIPanelFromEpub?: (filePath: string) => Promise<void>;
 	openCardBacklinkFromEpub?: (cardUuid: string) => Promise<void>;
 }
@@ -118,16 +130,21 @@ export function unregisterEpubHost(app: App): void {
 	registeredEpubHosts.delete(app);
 }
 
-function hasHostCapability(host: EpubHostCapabilities | null | undefined, key: PropertyKey): boolean {
+function hasHostCapability(
+	host: EpubHostCapabilities | null | undefined,
+	key: PropertyKey,
+): boolean {
 	if (!host || (typeof key !== "string" && typeof key !== "symbol")) {
 		return false;
 	}
-	return key in host && (host as Record<PropertyKey, unknown>)[key] !== undefined;
+	return (
+		key in host && (host as Record<PropertyKey, unknown>)[key] !== undefined
+	);
 }
 
 function resolveHostCapabilityValue(
 	host: EpubHostCapabilities,
-	key: PropertyKey
+	key: PropertyKey,
 ): unknown {
 	const value = (host as Record<PropertyKey, unknown>)[key];
 	return typeof value === "function" ? value.bind(host) : value;
@@ -182,7 +199,9 @@ function resolveCollaboratorHosts(app: App): EpubHostCapabilities[] {
 		.filter((plugin): plugin is EpubHostCapabilities => Boolean(plugin));
 }
 
-function resolveTypedEpubHost<TCapability extends object>(app: App): TCapability | null {
+function resolveTypedEpubHost<TCapability extends object>(
+	app: App,
+): TCapability | null {
 	const host = resolveEpubHost(app);
 	return host as TCapability | null;
 }
@@ -190,7 +209,8 @@ function resolveTypedEpubHost<TCapability extends object>(app: App): TCapability
 export function resolveEpubHost(app: App): EpubHostCapabilities | null {
 	const localHost = registeredEpubHosts.get(app) ?? null;
 	const collaboratorHosts = resolveCollaboratorHosts(app);
-	const collaboratorHost = collaboratorHosts.length > 0 ? mergeEpubHosts(collaboratorHosts) : null;
+	const collaboratorHost =
+		collaboratorHosts.length > 0 ? mergeEpubHosts(collaboratorHosts) : null;
 
 	if (!localHost && !collaboratorHost) {
 		const runtime = getEpubRuntime();
@@ -204,7 +224,9 @@ export function resolveEpubHost(app: App): EpubHostCapabilities | null {
 	return localHost ?? collaboratorHost;
 }
 
-export function resolveEpubReaderHost(app: App): EpubHostReaderCapabilities | null {
+export function resolveEpubReaderHost(
+	app: App,
+): EpubHostReaderCapabilities | null {
 	return resolveTypedEpubHost<EpubHostReaderCapabilities>(app);
 }
 

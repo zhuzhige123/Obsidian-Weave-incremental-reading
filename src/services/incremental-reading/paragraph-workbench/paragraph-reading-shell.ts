@@ -23,51 +23,64 @@ export function clampParagraphWorkbenchFontScale(value: unknown): number {
 	}
 	return Math.max(
 		PARAGRAPH_WORKBENCH_FONT_SCALE_MIN,
-		Math.min(PARAGRAPH_WORKBENCH_FONT_SCALE_MAX, Math.round(numeric))
+		Math.min(PARAGRAPH_WORKBENCH_FONT_SCALE_MAX, Math.round(numeric)),
 	);
 }
 
 export function normalizeParagraphWorkbenchSurfaceStyle(
 	value: unknown,
-	fallback: IRParagraphWorkbenchSurfaceStyle = DEFAULT_PARAGRAPH_WORKBENCH_DISPLAY_SETTINGS.surfaceStyle
+	fallback: IRParagraphWorkbenchSurfaceStyle = DEFAULT_PARAGRAPH_WORKBENCH_DISPLAY_SETTINGS.surfaceStyle,
 ): IRParagraphWorkbenchSurfaceStyle {
-	return value === "blend" || value === "dashed" || value === "spotlight" ? value : fallback;
+	return value === "blend" || value === "dashed" || value === "spotlight"
+		? value
+		: fallback;
 }
 
 export function normalizeParagraphWorkbenchTransitionStyle(
 	value: unknown,
-	fallback: IRParagraphWorkbenchTransitionStyle = DEFAULT_PARAGRAPH_WORKBENCH_DISPLAY_SETTINGS.transitionStyle
+	fallback: IRParagraphWorkbenchTransitionStyle = DEFAULT_PARAGRAPH_WORKBENCH_DISPLAY_SETTINGS.transitionStyle,
 ): IRParagraphWorkbenchTransitionStyle {
-	return value === "steady" || value === "fade" || value === "settle" || value === "slide"
+	return value === "steady" ||
+		value === "fade" ||
+		value === "settle" ||
+		value === "slide"
 		? value
 		: fallback;
 }
 
 export function resolveParagraphWorkbenchDisplaySettings(
-	settings?: IRParagraphWorkbenchDisplaySettings | null
+	settings?: IRParagraphWorkbenchDisplaySettings | null,
 ): Required<IRParagraphWorkbenchDisplaySettings> {
 	return {
 		fontScale: clampParagraphWorkbenchFontScale(settings?.fontScale),
-		surfaceStyle: normalizeParagraphWorkbenchSurfaceStyle(settings?.surfaceStyle),
-		transitionStyle: normalizeParagraphWorkbenchTransitionStyle(settings?.transitionStyle),
+		surfaceStyle: normalizeParagraphWorkbenchSurfaceStyle(
+			settings?.surfaceStyle,
+		),
+		transitionStyle: normalizeParagraphWorkbenchTransitionStyle(
+			settings?.transitionStyle,
+		),
 	};
 }
 
 export const PARAGRAPH_SCHEDULE_INTERVAL_DAYS = [1, 3, 7, 14] as const;
-export type ParagraphScheduleIntervalDays = (typeof PARAGRAPH_SCHEDULE_INTERVAL_DAYS)[number];
+export type ParagraphScheduleIntervalDays =
+	typeof PARAGRAPH_SCHEDULE_INTERVAL_DAYS[number];
 
 export const PARAGRAPH_PRIORITY_UI_MIN = 0;
 export const PARAGRAPH_PRIORITY_UI_MAX = 10;
 export const PARAGRAPH_PRIORITY_UI_DEFAULT = 5;
 
-export function clampParagraphPriorityUi(value: unknown, fallback = PARAGRAPH_PRIORITY_UI_DEFAULT): number {
+export function clampParagraphPriorityUi(
+	value: unknown,
+	fallback = PARAGRAPH_PRIORITY_UI_DEFAULT,
+): number {
 	const numeric = typeof value === "number" ? value : Number(value);
 	if (!Number.isFinite(numeric)) {
 		return fallback;
 	}
 	return Math.max(
 		PARAGRAPH_PRIORITY_UI_MIN,
-		Math.min(PARAGRAPH_PRIORITY_UI_MAX, Math.round(numeric * 2) / 2)
+		Math.min(PARAGRAPH_PRIORITY_UI_MAX, Math.round(numeric * 2) / 2),
 	);
 }
 
@@ -81,18 +94,26 @@ export function buildParagraphWorkbenchDisplay(input: {
 	queueTotal?: number;
 }): ParagraphWorkbenchDisplay {
 	const segmentTotal = Math.max(1, input.segmentTotal);
-	const segmentIndex = Math.max(0, Math.min(input.segmentIndex, segmentTotal - 1));
+	const segmentIndex = Math.max(
+		0,
+		Math.min(input.segmentIndex, segmentTotal - 1),
+	);
 	const bookPercent = Math.max(0, Math.min(100, Math.round(input.bookPercent)));
 	const remainingMs =
 		typeof input.remainingMs === "number" && Number.isFinite(input.remainingMs)
 			? Math.max(0, input.remainingMs)
 			: undefined;
 	const estimatedBookMinutes =
-		remainingMs !== undefined ? Math.max(1, Math.round(remainingMs / 60_000)) : undefined;
+		remainingMs !== undefined
+			? Math.max(1, Math.round(remainingMs / 60_000))
+			: undefined;
 	const remainingSegments = Math.max(0, segmentTotal - segmentIndex - 1);
 	const estimatedBlockMinutes =
 		estimatedBookMinutes !== undefined && segmentTotal > 0
-			? Math.max(1, Math.round((estimatedBookMinutes * remainingSegments) / segmentTotal))
+			? Math.max(
+					1,
+					Math.round((estimatedBookMinutes * remainingSegments) / segmentTotal),
+			  )
 			: undefined;
 
 	return {
@@ -115,13 +136,20 @@ export function buildParagraphWorkbenchDisplay(input: {
 }
 
 export function resolveParagraphPostponeMinutes(
-	display: ParagraphWorkbenchDisplay | null | undefined
+	display: ParagraphWorkbenchDisplay | null | undefined,
 ): number | undefined {
 	if (!display) {
 		return undefined;
 	}
-	const minutes = display.postponeMinutes ?? display.estimatedBlockMinutes ?? display.estimatedBookMinutes;
-	if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) {
+	const minutes =
+		display.postponeMinutes ??
+		display.estimatedBlockMinutes ??
+		display.estimatedBookMinutes;
+	if (
+		typeof minutes !== "number" ||
+		!Number.isFinite(minutes) ||
+		minutes <= 0
+	) {
 		return undefined;
 	}
 	return Math.max(1, Math.round(minutes));
@@ -129,7 +157,7 @@ export function resolveParagraphPostponeMinutes(
 
 export function normalizeParagraphScheduleIntervalDays(
 	value: unknown,
-	fallback: ParagraphScheduleIntervalDays = 7
+	fallback: ParagraphScheduleIntervalDays = 7,
 ): ParagraphScheduleIntervalDays {
 	const numeric = typeof value === "number" ? value : Number(value);
 	if (numeric === 1 || numeric === 3 || numeric === 7 || numeric === 14) {
@@ -137,4 +165,3 @@ export function normalizeParagraphScheduleIntervalDays(
 	}
 	return fallback;
 }
-

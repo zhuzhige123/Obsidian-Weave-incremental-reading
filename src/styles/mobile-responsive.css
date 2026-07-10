@@ -32,35 +32,6 @@
   --weave-font-size-sm: 0.75rem;
 }
 
-.force-mobile-view .deck-grid-card,
-.force-mobile-view .chinese-elegant-card {
-  width: 100% !important;
-  margin: 0 !important;
-  height: 180px !important;
-}
-
-.force-mobile-view .vertical-toolbar {
-  width: 56px !important;
-  padding: 0.5rem 0 !important;
-}
-
-.force-mobile-view .vertical-toolbar .btn-label {
-  display: none !important;
-}
-
-.force-mobile-view .grid-card-view .cards-grid {
-  grid-template-columns: 1fr !important;
-  gap: 12px !important;
-  padding: 8px !important;
-}
-
-.force-mobile-view .rating-modern .rate-grid,
-.force-mobile-view .rate-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 8px !important;
-}
-
 /* ==================== 手机端媒体查询 (max-width: 480px) ==================== */
 /* ⚠️ 这些样式仅在桌面端窄窗口时生效，不在 Obsidian 移动端生效 */
 /* Obsidian 移动端使用 obsidian-mobile.css 中的 body.is-mobile 样式 */
@@ -83,9 +54,7 @@
   }
 
   /* 主要操作按钮使用更大尺寸 */
-  body:not(.is-mobile) .weave-app .weave-button.primary,
-  body:not(.is-mobile) .weave-app .study-btn,
-  body:not(.is-mobile) .weave-app .show-answer-btn {
+  body:not(.is-mobile) .weave-app .weave-button.primary {
     min-height: var(--weave-touch-md, 48px);
   }
 
@@ -183,59 +152,6 @@
   /* ✅ 保留 !important：响应式隐藏工具类 */
   body:not(.is-mobile) .weave-app .weave-hide-mobile-xs {
     display: none !important;
-  }
-
-  /* 牌组卡片进一步缩小 */
-  /* ✅ 移除 !important：body:not(.is-mobile) 选择器已有足够优先级 */
-  body:not(.is-mobile) .deck-grid-card,
-  body:not(.is-mobile) .chinese-elegant-card {
-    height: 160px;
-  }
-
-  body:not(.is-mobile) .deck-grid-card .deck-title,
-  body:not(.is-mobile) .chinese-elegant-card .card-title {
-    font-size: 18px;
-  }
-
-  body:not(.is-mobile) .deck-grid-card .stat-number,
-  body:not(.is-mobile) .chinese-elegant-card .stat-value {
-    font-size: 12px;
-  }
-
-  body:not(.is-mobile) .deck-grid-card .stat-label,
-  body:not(.is-mobile) .chinese-elegant-card .stat-label {
-    font-size: 10px;
-  }
-
-  /* 评分按钮单列布局 */
-  /* ✅ 移除 !important：选择器已有足够优先级 */
-  body:not(.is-mobile) .rating-modern .rate-grid,
-  body:not(.is-mobile) .rate-grid {
-    grid-template-columns: 1fr;
-  }
-
-  /* 侧边栏隐藏 */
-  /* ✅ 保留 !important：响应式隐藏，需要强制覆盖 */
-  body:not(.is-mobile) .vertical-toolbar {
-    display: none !important;
-  }
-
-  body:not(.is-mobile) .sidebar-content {
-    display: none !important;
-  }
-
-  /* 学习界面全屏 */
-  /* ✅ 移除 !important：选择器已有足够优先级 */
-  body:not(.is-mobile) .study-content {
-    grid-template-columns: 1fr;
-  }
-
-  /* 考试配置单列 */
-  /* ✅ 移除 !important：选择器已有足够优先级 */
-  body:not(.is-mobile) .weave-quiz-config-options,
-  body:not(.is-mobile) .quiz-config-options,
-  body:not(.is-mobile) .config-options-grid {
-    grid-template-columns: 1fr;
   }
 }
 

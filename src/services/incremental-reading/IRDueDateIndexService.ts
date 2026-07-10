@@ -13,7 +13,9 @@ export interface IRDueDateIndexStore {
 	byPointId: Record<string, string>;
 }
 
-export function formatDueDateKeyFromTimestamp(timestamp: number | undefined | null): string | null {
+export function formatDueDateKeyFromTimestamp(
+	timestamp: number | undefined | null,
+): string | null {
 	if (!timestamp || !Number.isFinite(timestamp) || timestamp <= 0) {
 		return null;
 	}
@@ -35,7 +37,7 @@ function createEmptyDueDateIndexStore(): IRDueDateIndexStore {
 
 function normalizePointIdList(ids: string[] | undefined): string[] {
 	return Array.from(
-		new Set((ids || []).map((id) => String(id || "").trim()).filter(Boolean))
+		new Set((ids || []).map((id) => String(id || "").trim()).filter(Boolean)),
 	);
 }
 
@@ -72,7 +74,7 @@ export class IRDueDateIndexService {
 	async updatePointDueDate(
 		pointId: string,
 		previousNextRepDate: number | undefined,
-		nextNextRepDate: number | undefined
+		nextNextRepDate: number | undefined,
 	): Promise<void> {
 		const normalizedId = String(pointId || "").trim();
 		if (!normalizedId) {
@@ -81,13 +83,15 @@ export class IRDueDateIndexService {
 
 		const store = await this.ensureStore();
 		const previousKey =
-			formatDueDateKeyFromTimestamp(previousNextRepDate) || store.byPointId[normalizedId] || null;
+			formatDueDateKeyFromTimestamp(previousNextRepDate) ||
+			store.byPointId[normalizedId] ||
+			null;
 		const nextKey = formatDueDateKeyFromTimestamp(nextNextRepDate);
 
 		if (previousKey && previousKey !== nextKey) {
-			const previousList = normalizePointIdList(store.byDate[previousKey]).filter(
-				(id) => id !== normalizedId
-			);
+			const previousList = normalizePointIdList(
+				store.byDate[previousKey],
+			).filter((id) => id !== normalizedId);
 			if (previousList.length > 0) {
 				store.byDate[previousKey] = previousList;
 			} else {
@@ -111,7 +115,9 @@ export class IRDueDateIndexService {
 	}
 
 	async rebuildFromScheduleIndex(): Promise<void> {
-		const index = await getSharedIRScheduleIndexService(this.app).getScheduleSources();
+		const index = await getSharedIRScheduleIndexService(
+			this.app,
+		).getScheduleSources();
 		const byDate: Record<string, string[]> = {};
 		const byPointId: Record<string, string> = {};
 
@@ -130,7 +136,10 @@ export class IRDueDateIndexService {
 		};
 
 		for (const chunk of index.chunks || []) {
-			ingest(String(chunk.chunkId || "").trim(), Number(chunk.nextRepDate || 0));
+			ingest(
+				String(chunk.chunkId || "").trim(),
+				Number(chunk.nextRepDate || 0),
+			);
 		}
 		for (const task of index.pdfTasks || []) {
 			ingest(String(task.id || "").trim(), Number(task.nextRepDate || 0));
@@ -190,11 +199,11 @@ export class IRDueDateIndexService {
 				updatedAt: String(parsed.updatedAt || new Date(0).toISOString()),
 				byDate:
 					parsed.byDate && typeof parsed.byDate === "object"
-						? (parsed.byDate)
+						? parsed.byDate
 						: {},
 				byPointId:
 					parsed.byPointId && typeof parsed.byPointId === "object"
-						? (parsed.byPointId)
+						? parsed.byPointId
 						: {},
 			};
 		} catch {
@@ -225,7 +234,9 @@ export class IRDueDateIndexService {
 
 const dueDateIndexByApp = new WeakMap<App, IRDueDateIndexService>();
 
-export function getSharedIRDueDateIndexService(app: App): IRDueDateIndexService {
+export function getSharedIRDueDateIndexService(
+	app: App,
+): IRDueDateIndexService {
 	let service = dueDateIndexByApp.get(app);
 	if (!service) {
 		service = new IRDueDateIndexService(app);

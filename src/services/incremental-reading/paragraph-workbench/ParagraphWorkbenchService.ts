@@ -1,23 +1,37 @@
 import type { App } from "obsidian";
 import { Notice } from "obsidian";
-import { i18n } from "../../../utils/i18n";
-import { resolveEpubHost } from "../../epub-integration/epub-host";
 import { IRParagraphAddToTopicModal } from "../../../modals/IRParagraphAddToTopicModal";
+import {
+	createDefaultIRBlock,
+	generateIRBlockId,
+	migrateToIRBlockV4,
+} from "../../../types/ir-types";
+import { i18n } from "../../../utils/i18n";
+import { logger } from "../../../utils/logger";
+import { generateReadingUUID } from "../../../utils/reading-utils";
+import { readString } from "../../../utils/unknown-record";
+import { isDetachedEditorTempFilePath } from "../../editor/editor-temp-file-policy";
+import { resolveEpubHost } from "../../epub-integration/epub-host";
+import {
+	isWeaveMemoryHostAvailable,
+	resolveWeaveMemoryHost,
+} from "../../weave-integration/weave-memory-host";
 import { IRDeckManager } from "../IRDeckManager";
 import { IREpubBookmarkTaskService } from "../IREpubBookmarkTaskService";
 import { IRPointStorageService } from "../IRPointStorageService";
 import { IRPointWriteService } from "../IRPointWriteService";
-import { recomputeAndBroadcastIRData, broadcastPriorityChangeUpdate } from "../IRScheduleRefreshService";
+import {
+	broadcastPriorityChangeUpdate,
+	recomputeAndBroadcastIRData,
+} from "../IRScheduleRefreshService";
+import { IRStorageAdapterV4 } from "../IRStorageAdapterV4";
+import { IRStorageService } from "../IRStorageService";
+import { IRV4SchedulerService } from "../IRV4SchedulerService";
 import {
 	dateToLocalDateKey,
 	refreshIRAfterWorkbenchScheduleMutation,
 	subscribeIRWorkbenchProjectionRefresh,
 } from "./IRWorkbenchScheduleRefreshBridge";
-import { IRStorageAdapterV4 } from "../IRStorageAdapterV4";
-import { IRStorageService } from "../IRStorageService";
-import { IRV4SchedulerService } from "../IRV4SchedulerService";
-import { createDefaultIRBlock, generateIRBlockId, migrateToIRBlockV4 } from "../../../types/ir-types";
-import { generateReadingUUID } from "../../../utils/reading-utils";
 import {
 	buildCanvasNodeEmbedWikiLink,
 	buildObsidianEmbedBlockWikiLink,
@@ -30,30 +44,26 @@ import {
 	resolveParagraphWorkbenchSourcePath,
 } from "./paragraph-block-reference";
 import {
-	isWeaveMemoryHostAvailable,
-	resolveWeaveMemoryHost,
-} from "../../weave-integration/weave-memory-host";
-import {
-	estimateSegmentReadingSeconds,
-	recordLegacyBlockInteraction,
-	resolveTopicQueueProgress,
-} from "./paragraph-workbench-queue";
-import {
-	buildParagraphWorkbenchDisplay,
-	clampParagraphPriorityUi,
-	normalizeParagraphScheduleIntervalDays,
-	type ParagraphScheduleIntervalDays,
-} from "./paragraph-reading-shell";
-import {
 	createParagraphWorkbenchSession,
 	getCurrentWorkbenchSegment,
 	navigateParagraphWorkbenchSession,
 	reloadParagraphWorkbenchSession,
 } from "./paragraph-content-providers";
-import type { ParagraphWorkbenchOpenInput, ParagraphWorkbenchSession } from "./types";
-import { logger } from "../../../utils/logger";
-import { readString } from "../../../utils/unknown-record";
-import { isDetachedEditorTempFilePath } from "../../editor/editor-temp-file-policy";
+import {
+	type ParagraphScheduleIntervalDays,
+	buildParagraphWorkbenchDisplay,
+	clampParagraphPriorityUi,
+	normalizeParagraphScheduleIntervalDays,
+} from "./paragraph-reading-shell";
+import {
+	estimateSegmentReadingSeconds,
+	recordLegacyBlockInteraction,
+	resolveTopicQueueProgress,
+} from "./paragraph-workbench-queue";
+import type {
+	ParagraphWorkbenchOpenInput,
+	ParagraphWorkbenchSession,
+} from "./types";
 
 export class ParagraphWorkbenchService {
 	private session: ParagraphWorkbenchSession | null = null;
@@ -95,7 +105,10 @@ export class ParagraphWorkbenchService {
 	}
 
 	setScheduleIntervalDays(days: unknown): void {
-		this.scheduleIntervalDays = normalizeParagraphScheduleIntervalDays(days, this.scheduleIntervalDays);
+		this.scheduleIntervalDays = normalizeParagraphScheduleIntervalDays(
+			days,
+			this.scheduleIntervalDays,
+		);
 	}
 
 	subscribeProjectionScheduleRefresh(onUpdated: () => void): () => void {
@@ -104,11 +117,13 @@ export class ParagraphWorkbenchService {
 			() => {
 				void this.refreshSessionQueueProgress().then(onUpdated);
 			},
-			() => this.session?.topicId
+			() => this.session?.topicId,
 		);
 	}
 
-	async open(input: ParagraphWorkbenchOpenInput): Promise<ParagraphWorkbenchSession | null> {
+	async open(
+		input: ParagraphWorkbenchOpenInput,
+	): Promise<ParagraphWorkbenchSession | null> {
 		this.session = await createParagraphWorkbenchSession(this.app, input);
 		this.registeredPointId = input.pointId ?? null;
 		await this.refreshSessionQueueProgress();
@@ -119,11 +134,17 @@ export class ParagraphWorkbenchService {
 		return this.session;
 	}
 
-	async navigateRelative(direction: -1 | 1): Promise<ParagraphWorkbenchSession | null> {
+	async navigateRelative(
+		direction: -1 | 1,
+	): Promise<ParagraphWorkbenchSession | null> {
 		if (!this.session) {
 			return null;
 		}
-		const next = await navigateParagraphWorkbenchSession(this.app, this.session, direction);
+		const next = await navigateParagraphWorkbenchSession(
+			this.app,
+			this.session,
+			direction,
+		);
 		if (next) {
 			this.session = next;
 			this.registeredPointId = next.pointId ?? null;
@@ -138,9 +159,13 @@ export class ParagraphWorkbenchService {
 		await this.recordCurrentSegmentProgress();
 		const next = await this.navigateRelative(1);
 		if (next) {
-			await refreshIRAfterWorkbenchScheduleMutation(this.app, "complete_block", {
-				deckIds: this.session?.topicId ? [this.session.topicId] : undefined,
-			});
+			await refreshIRAfterWorkbenchScheduleMutation(
+				this.app,
+				"complete_block",
+				{
+					deckIds: this.session?.topicId ? [this.session.topicId] : undefined,
+				},
+			);
 		}
 		return this.session;
 	}
@@ -151,7 +176,7 @@ export class ParagraphWorkbenchService {
 
 	getSelectedTextFromWorkbench(
 		rootEl: HTMLElement | null,
-		viewportEl?: HTMLElement | null
+		viewportEl?: HTMLElement | null,
 	): string {
 		const selection = window.getSelection();
 		if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
@@ -167,15 +192,17 @@ export class ParagraphWorkbenchService {
 			const anchorNode = selection.anchorNode;
 			const focusNode = selection.focusNode;
 			return Boolean(
-				(anchorNode && container.contains(anchorNode))
-				|| (focusNode && container.contains(focusNode))
+				(anchorNode && container.contains(anchorNode)) ||
+					(focusNode && container.contains(focusNode)),
 			);
 		});
 		if (!isInsideWorkbench) {
 			return "";
 		}
 
-		return String(selection.toString() || "").replace(/\r\n?/g, "\n").trim();
+		return String(selection.toString() || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
 	}
 
 	async openAddToTopicModal(): Promise<ParagraphWorkbenchSession | null> {
@@ -218,14 +245,23 @@ export class ParagraphWorkbenchService {
 				modal.open();
 			});
 		} catch (error) {
-			logger.error("[ParagraphWorkbenchService] openAddToTopicModal failed:", error);
-			new Notice(i18n.t("irServiceNotices.workbench.openDeckSelectFailed"), 3000);
+			logger.error(
+				"[ParagraphWorkbenchService] openAddToTopicModal failed:",
+				error,
+			);
+			new Notice(
+				i18n.t("irServiceNotices.workbench.openDeckSelectFailed"),
+				3000,
+			);
 		}
 
 		return this.session;
 	}
 
-	async addCurrentSegmentToTopic(deckId: string, rawTitle: string): Promise<void> {
+	async addCurrentSegmentToTopic(
+		deckId: string,
+		rawTitle: string,
+	): Promise<void> {
 		if (!this.session) {
 			throw new Error("paragraph-workbench-session-missing");
 		}
@@ -235,7 +271,9 @@ export class ParagraphWorkbenchService {
 			throw new Error("paragraph-workbench-segment-missing");
 		}
 
-		const sourcePath = resolveParagraphWorkbenchSourcePath(this.session.sourcePath);
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
 		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
 			throw new Error("paragraph-workbench-invalid-source-path");
 		}
@@ -255,16 +293,31 @@ export class ParagraphWorkbenchService {
 		}
 
 		if (this.session.sourceType === "canvas") {
-			await this.addCanvasSegmentToTopic(storage, deckId, deck.name, sourcePath, segment, title);
+			await this.addCanvasSegmentToTopic(
+				storage,
+				deckId,
+				deck.name,
+				sourcePath,
+				segment,
+				title,
+			);
 			return;
 		}
 		if (this.session.sourceType === "epub") {
-			await this.addEpubSegmentToTopic(deckId, deck.name, sourcePath, segment, title);
+			await this.addEpubSegmentToTopic(
+				deckId,
+				deck.name,
+				sourcePath,
+				segment,
+				title,
+			);
 			return;
 		}
 
 		const startLine =
-			typeof segment.metadata?.startLine === "number" ? Number(segment.metadata.startLine) : 0;
+			typeof segment.metadata?.startLine === "number"
+				? Number(segment.metadata.startLine)
+				: 0;
 		const endLine =
 			typeof segment.metadata?.endLine === "number"
 				? Number(segment.metadata.endLine)
@@ -272,24 +325,49 @@ export class ParagraphWorkbenchService {
 
 		let obsidianBlockId = extractObsidianBlockIdFromSegment(segment);
 		const existingBlocks = await storage.getBlocksByFile(sourcePath);
-		const duplicate = findDuplicateBlockForSegment(existingBlocks, segment, obsidianBlockId);
+		const duplicate = findDuplicateBlockForSegment(
+			existingBlocks,
+			segment,
+			obsidianBlockId,
+		);
 		if (duplicate) {
 			await storage.addBlocksToDeck(deckId, [duplicate.id]);
 			this.applyTopicToSession(deckId, deck.name, duplicate.id);
 			await this.syncPriorityFromRegisteredPoint();
 			await this.refreshSessionQueueProgress();
-			new Notice(i18n.t("irServiceNotices.workbench.paragraphAlreadyInDeck", { deckName: deck.name }), 3000);
-			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
+			new Notice(
+				i18n.t("irServiceNotices.workbench.paragraphAlreadyInDeck", {
+					deckName: deck.name,
+				}),
+				3000,
+			);
+			await recomputeAndBroadcastIRData(this.app, "import_materials", {
+				deckIds: [deckId],
+			});
 			return;
 		}
 
-		obsidianBlockId = await ensureSegmentBlockIdInSourceFile(this.app, sourcePath, segment);
+		obsidianBlockId = await ensureSegmentBlockIdInSourceFile(
+			this.app,
+			sourcePath,
+			segment,
+		);
 		await this.reloadCurrentSessionSegments();
 
-		const blockRefLink = buildObsidianEmbedBlockWikiLink(sourcePath, obsidianBlockId, title);
+		const blockRefLink = buildObsidianEmbedBlockWikiLink(
+			sourcePath,
+			obsidianBlockId,
+			title,
+		);
 		const blockId = generateIRBlockId();
 		const headingPath = title ? [title] : [];
-		const block = createDefaultIRBlock(blockId, sourcePath, headingPath, 0, startLine);
+		const block = createDefaultIRBlock(
+			blockId,
+			sourcePath,
+			headingPath,
+			0,
+			startLine,
+		);
 		block.endLine = endLine;
 		block.headingText = title;
 		block.contentPreview = String(segment.text || "")
@@ -308,8 +386,13 @@ export class ParagraphWorkbenchService {
 		this.applyTopicToSession(deckId, deck.name, block.id);
 		await this.syncPriorityFromRegisteredPoint();
 		await this.refreshSessionQueueProgress();
-		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-		new Notice(i18n.t("irServiceNotices.workbench.addedToDeck", { deckName: deck.name }), 2500);
+		await recomputeAndBroadcastIRData(this.app, "import_materials", {
+			deckIds: [deckId],
+		});
+		new Notice(
+			i18n.t("irServiceNotices.workbench.addedToDeck", { deckName: deck.name }),
+			2500,
+		);
 	}
 
 	async createMemoryCardFromSelection(selectedText: string): Promise<boolean> {
@@ -318,18 +401,25 @@ export class ParagraphWorkbenchService {
 			return false;
 		}
 
-		const normalizedSelection = String(selectedText || "").replace(/\r\n?/g, "\n").trim();
+		const normalizedSelection = String(selectedText || "")
+			.replace(/\r\n?/g, "\n")
+			.trim();
 		if (!normalizedSelection) {
 			new Notice(i18n.t("irServiceNotices.workbench.selectExcerptFirst"), 3000);
 			return false;
 		}
 
 		if (!isWeaveMemoryHostAvailable(this.app)) {
-			new Notice(i18n.t("irServiceNotices.workbench.weaveMainPluginRequired"), 4000);
+			new Notice(
+				i18n.t("irServiceNotices.workbench.weaveMainPluginRequired"),
+				4000,
+			);
 			return false;
 		}
 
-		const sourcePath = resolveParagraphWorkbenchSourcePath(this.session.sourcePath);
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
 		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
 			new Notice(i18n.t("irServiceNotices.workbench.sourcePathUnknown"), 3500);
 			return false;
@@ -337,20 +427,30 @@ export class ParagraphWorkbenchService {
 
 		const segment = getCurrentWorkbenchSegment(this.session);
 		if (!segment) {
-			new Notice(i18n.t("irServiceNotices.workbench.paragraphUnavailable"), 3000);
+			new Notice(
+				i18n.t("irServiceNotices.workbench.paragraphUnavailable"),
+				3000,
+			);
 			return false;
 		}
 
 		try {
 			let obsidianBlockId = extractObsidianBlockIdFromSegment(segment);
 			if (!obsidianBlockId && this.session.sourceType === "markdown") {
-				obsidianBlockId = await ensureSegmentBlockIdInSourceFile(this.app, sourcePath, segment);
+				obsidianBlockId = await ensureSegmentBlockIdInSourceFile(
+					this.app,
+					sourcePath,
+					segment,
+				);
 				await this.reloadCurrentSessionSegments();
 			}
 
 			const host = resolveWeaveMemoryHost(this.app);
 			if (!host) {
-				new Notice(i18n.t("irServiceNotices.workbench.weaveMainPluginRequired"), 4000);
+				new Notice(
+					i18n.t("irServiceNotices.workbench.weaveMainPluginRequired"),
+					4000,
+				);
 				return false;
 			}
 			const cardMetadata: { sourceFile: string; sourceBlock?: string } = {
@@ -369,26 +469,40 @@ export class ParagraphWorkbenchService {
 						if (this.registeredPointId) {
 							await this.incrementExtractStat(this.registeredPointId);
 						}
-						new Notice(i18n.t("irServiceNotices.workbench.memoryCardCreated"), 2500);
+						new Notice(
+							i18n.t("irServiceNotices.workbench.memoryCardCreated"),
+							2500,
+						);
 					})();
 				},
 			});
 
 			return true;
 		} catch (error) {
-			logger.error("[ParagraphWorkbenchService] createMemoryCardFromSelection failed:", error);
-			new Notice(i18n.t("irServiceNotices.workbench.createMemoryCardFailed"), 3000);
+			logger.error(
+				"[ParagraphWorkbenchService] createMemoryCardFromSelection failed:",
+				error,
+			);
+			new Notice(
+				i18n.t("irServiceNotices.workbench.createMemoryCardFailed"),
+				3000,
+			);
 			return false;
 		}
 	}
 
-	async applyPostpone(noticeSuccess: string, noticeFailed: string): Promise<boolean> {
+	async applyPostpone(
+		noticeSuccess: string,
+		noticeFailed: string,
+	): Promise<boolean> {
 		if (!this.session || this.session.sourceType !== "epub") {
 			new Notice(noticeFailed);
 			return false;
 		}
 		const segment = getCurrentWorkbenchSegment(this.session);
-		const cfi = readString(segment?.metadata?.cfiRange) || readString(segment?.sourceLink);
+		const cfi =
+			readString(segment?.metadata?.cfiRange) ||
+			readString(segment?.sourceLink);
 		if (!cfi) {
 			new Notice(noticeFailed);
 			return false;
@@ -413,7 +527,10 @@ export class ParagraphWorkbenchService {
 
 	async applyPriority(notice: string): Promise<void> {
 		if (!this.registeredPointId || !this.session?.topicId) {
-			new Notice(i18n.t("irServiceNotices.workbench.addParagraphToDeckFirst"), 3000);
+			new Notice(
+				i18n.t("irServiceNotices.workbench.addParagraphToDeckFirst"),
+				3000,
+			);
 			return;
 		}
 		try {
@@ -428,12 +545,13 @@ export class ParagraphWorkbenchService {
 			const scheduler = new IRV4SchedulerService(this.app);
 			await scheduler.initialize();
 			const blockV4 =
-				(await adapter.getBlockV4(this.registeredPointId)) || migrateToIRBlockV4(blockRecord);
+				(await adapter.getBlockV4(this.registeredPointId)) ||
+				migrateToIRBlockV4(blockRecord);
 			await scheduler.updatePriorityWithPreviewV4(
 				blockV4,
 				this.priorityUi,
 				"paragraph_workbench",
-				this.session.topicId
+				this.session.topicId,
 			);
 			broadcastPriorityChangeUpdate(this.app, {
 				deckIds: [this.session.topicId],
@@ -462,7 +580,8 @@ export class ParagraphWorkbenchService {
 			const scheduler = new IRV4SchedulerService(this.app);
 			await scheduler.initialize();
 			const blockV4 =
-				(await adapter.getBlockV4(this.registeredPointId)) || migrateToIRBlockV4(blockRecord);
+				(await adapter.getBlockV4(this.registeredPointId)) ||
+				migrateToIRBlockV4(blockRecord);
 			const nextDate = new Date();
 			nextDate.setHours(9, 0, 0, 0);
 			nextDate.setDate(nextDate.getDate() + this.scheduleIntervalDays);
@@ -473,15 +592,22 @@ export class ParagraphWorkbenchService {
 					intervalDays: this.scheduleIntervalDays,
 					scheduleStatus: "queued",
 				},
-				this.session.topicId
+				this.session.topicId,
 			);
-			await refreshIRAfterWorkbenchScheduleMutation(this.app, "manual_reschedule", {
-				deckIds: [this.session.topicId],
-				extraPriorityDateKeys: [dateToLocalDateKey(nextDate)],
-			});
+			await refreshIRAfterWorkbenchScheduleMutation(
+				this.app,
+				"manual_reschedule",
+				{
+					deckIds: [this.session.topicId],
+					extraPriorityDateKeys: [dateToLocalDateKey(nextDate)],
+				},
+			);
 			new Notice(notice);
 		} catch (error) {
-			logger.warn("[ParagraphWorkbenchService] applyScheduleInterval failed:", error);
+			logger.warn(
+				"[ParagraphWorkbenchService] applyScheduleInterval failed:",
+				error,
+			);
 			new Notice(notice);
 		}
 	}
@@ -503,12 +629,20 @@ export class ParagraphWorkbenchService {
 			const scheduler = new IRV4SchedulerService(this.app);
 			await scheduler.initialize();
 			const blockV4 =
-				(await adapter.getBlockV4(this.registeredPointId)) || migrateToIRBlockV4(blockRecord);
-			await scheduler.archiveBlockWithPreviewV4(blockV4, this.session?.topicId || "");
+				(await adapter.getBlockV4(this.registeredPointId)) ||
+				migrateToIRBlockV4(blockRecord);
+			await scheduler.archiveBlockWithPreviewV4(
+				blockV4,
+				this.session?.topicId || "",
+			);
 			if (this.session?.topicId) {
-				await refreshIRAfterWorkbenchScheduleMutation(this.app, "archive_block", {
-					deckIds: [this.session.topicId],
-				});
+				await refreshIRAfterWorkbenchScheduleMutation(
+					this.app,
+					"archive_block",
+					{
+						deckIds: [this.session.topicId],
+					},
+				);
 			}
 			new Notice(notice);
 		} catch (error) {
@@ -523,25 +657,39 @@ export class ParagraphWorkbenchService {
 		deckName: string,
 		sourcePath: string,
 		segment: NonNullable<ReturnType<typeof getCurrentWorkbenchSegment>>,
-		title: string
+		title: string,
 	): Promise<void> {
-		const nodeId = readString(segment.metadata?.canvasNodeId) || readString(segment.id);
+		const nodeId =
+			readString(segment.metadata?.canvasNodeId) || readString(segment.id);
 		if (!nodeId) {
 			throw new Error("paragraph-workbench-canvas-node-missing");
 		}
 
 		const existingBlocks = await storage.getBlocksByFile(sourcePath);
-		const duplicate = existingBlocks.find((block) => block.notes?.includes(`node=${encodeURIComponent(nodeId)}`));
+		const duplicate = existingBlocks.find((block) =>
+			block.notes?.includes(`node=${encodeURIComponent(nodeId)}`),
+		);
 		if (duplicate) {
 			await storage.addBlocksToDeck(deckId, [duplicate.id]);
 			this.applyTopicToSession(deckId, deckName, duplicate.id);
 			await this.refreshSessionQueueProgress();
-			new Notice(i18n.t("irServiceNotices.workbench.canvasNodeAlreadyInDeck", { deckName }), 3000);
-			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
+			new Notice(
+				i18n.t("irServiceNotices.workbench.canvasNodeAlreadyInDeck", {
+					deckName,
+				}),
+				3000,
+			);
+			await recomputeAndBroadcastIRData(this.app, "import_materials", {
+				deckIds: [deckId],
+			});
 			return;
 		}
 
-		const blockRefLink = buildCanvasNodeEmbedWikiLink(sourcePath, nodeId, title);
+		const blockRefLink = buildCanvasNodeEmbedWikiLink(
+			sourcePath,
+			nodeId,
+			title,
+		);
 		const blockId = generateIRBlockId();
 		const block = createDefaultIRBlock(blockId, sourcePath, [title], 0, 0);
 		block.headingText = title;
@@ -577,8 +725,13 @@ export class ParagraphWorkbenchService {
 
 		this.applyTopicToSession(deckId, deckName, block.id);
 		await this.refreshSessionQueueProgress();
-		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-		new Notice(i18n.t("irServiceNotices.workbench.addedToDeck", { deckName }), 2500);
+		await recomputeAndBroadcastIRData(this.app, "import_materials", {
+			deckIds: [deckId],
+		});
+		new Notice(
+			i18n.t("irServiceNotices.workbench.addedToDeck", { deckName }),
+			2500,
+		);
 	}
 
 	private async addEpubSegmentToTopic(
@@ -586,12 +739,16 @@ export class ParagraphWorkbenchService {
 		deckName: string,
 		sourcePath: string,
 		segment: NonNullable<ReturnType<typeof getCurrentWorkbenchSegment>>,
-		title: string
+		title: string,
 	): Promise<void> {
-		const cfi = readString(segment.metadata?.cfiRange) || readString(segment.sourceLink);
+		const cfi =
+			readString(segment.metadata?.cfiRange) || readString(segment.sourceLink);
 		const chapterHref = readString(segment.metadata?.chapterHref);
 		if (!cfi && !chapterHref) {
-			new Notice(i18n.t("irServiceNotices.workbench.epubParagraphLocationFailed"), 3500);
+			new Notice(
+				i18n.t("irServiceNotices.workbench.epubParagraphLocationFailed"),
+				3500,
+			);
 			throw new Error("paragraph-workbench-epub-locator-missing");
 		}
 
@@ -602,14 +759,25 @@ export class ParagraphWorkbenchService {
 			if (cfi && task.resumeCfi === cfi) {
 				return true;
 			}
-			return Boolean(chapterHref && task.tocHref === chapterHref && task.title === title);
+			return Boolean(
+				chapterHref && task.tocHref === chapterHref && task.title === title,
+			);
 		});
 		if (duplicate) {
-			await new IRStorageService(this.app).addBlocksToDeck(deckId, [duplicate.id]);
+			await new IRStorageService(this.app).addBlocksToDeck(deckId, [
+				duplicate.id,
+			]);
 			this.applyTopicToSession(deckId, deckName, duplicate.id);
 			await this.refreshSessionQueueProgress();
-			new Notice(i18n.t("irServiceNotices.workbench.epubParagraphAlreadyInDeck", { deckName }), 3000);
-			await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
+			new Notice(
+				i18n.t("irServiceNotices.workbench.epubParagraphAlreadyInDeck", {
+					deckName,
+				}),
+				3000,
+			);
+			await recomputeAndBroadcastIRData(this.app, "import_materials", {
+				deckIds: [deckId],
+			});
 			return;
 		}
 
@@ -631,15 +799,20 @@ export class ParagraphWorkbenchService {
 		await this.attachBlockToDeck(storage, deckId, sourcePath, created.id);
 		this.applyTopicToSession(deckId, deckName, created.id);
 		await this.refreshSessionQueueProgress();
-		await recomputeAndBroadcastIRData(this.app, "import_materials", { deckIds: [deckId] });
-		new Notice(i18n.t("irServiceNotices.workbench.addedToDeck", { deckName }), 2500);
+		await recomputeAndBroadcastIRData(this.app, "import_materials", {
+			deckIds: [deckId],
+		});
+		new Notice(
+			i18n.t("irServiceNotices.workbench.addedToDeck", { deckName }),
+			2500,
+		);
 	}
 
 	private async attachBlockToDeck(
 		storage: IRStorageService,
 		deckId: string,
 		sourcePath: string,
-		blockId: string
+		blockId: string,
 	): Promise<void> {
 		const latestDeck = await storage.getDeckById(deckId);
 		if (!latestDeck) {
@@ -659,7 +832,10 @@ export class ParagraphWorkbenchService {
 		if (!this.session) {
 			return;
 		}
-		const reloaded = await reloadParagraphWorkbenchSession(this.app, this.session);
+		const reloaded = await reloadParagraphWorkbenchSession(
+			this.app,
+			this.session,
+		);
 		if (reloaded) {
 			this.session = reloaded;
 		}
@@ -669,7 +845,10 @@ export class ParagraphWorkbenchService {
 		if (!this.session?.topicId) {
 			return;
 		}
-		const progress = await resolveTopicQueueProgress(this.app, this.session.topicId);
+		const progress = await resolveTopicQueueProgress(
+			this.app,
+			this.session.topicId,
+		);
 		if (!progress || !this.session) {
 			return;
 		}
@@ -688,19 +867,26 @@ export class ParagraphWorkbenchService {
 		if (!segment) {
 			return;
 		}
-		const sourcePath = resolveParagraphWorkbenchSourcePath(this.session.sourcePath);
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
 		const storage = new IRStorageService(this.app);
 		await storage.initialize();
 		const blocks = await storage.getBlocksByFile(sourcePath);
 		const obsidianBlockId = extractObsidianBlockIdFromSegment(segment);
-		const matched = findDuplicateBlockForSegment(blocks, segment, obsidianBlockId);
+		const matched = findDuplicateBlockForSegment(
+			blocks,
+			segment,
+			obsidianBlockId,
+		);
 		if (!matched) {
 			return;
 		}
 		const matchedBlock = blocks.find((block) => block.id === matched.id);
 		const deck = await storage.getDeckById(this.session.topicId);
 		const inDeck =
-			deck?.blockIds?.includes(matched.id) || matchedBlock?.deckPath === this.session.topicId;
+			deck?.blockIds?.includes(matched.id) ||
+			matchedBlock?.deckPath === this.session.topicId;
 		if (!inDeck) {
 			return;
 		}
@@ -736,7 +922,9 @@ export class ParagraphWorkbenchService {
 			return;
 		}
 		const segment = getCurrentWorkbenchSegment(this.session);
-		const readingTimeSeconds = estimateSegmentReadingSeconds(segment?.text || "");
+		const readingTimeSeconds = estimateSegmentReadingSeconds(
+			segment?.text || "",
+		);
 		try {
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
@@ -757,17 +945,28 @@ export class ParagraphWorkbenchService {
 					createdExtractCount: 0,
 					createdNoteCount: 0,
 				},
-				this.session.topicId
+				this.session.topicId,
 			);
 			await this.refreshSessionQueueProgress();
 		} catch (error) {
-			logger.warn("[ParagraphWorkbenchService] complete on push failed, fallback interaction:", error);
-			await recordLegacyBlockInteraction(this.app, this.registeredPointId, readingTimeSeconds);
+			logger.warn(
+				"[ParagraphWorkbenchService] complete on push failed, fallback interaction:",
+				error,
+			);
+			await recordLegacyBlockInteraction(
+				this.app,
+				this.registeredPointId,
+				readingTimeSeconds,
+			);
 			await this.refreshSessionQueueProgress();
 		}
 	}
 
-	private applyTopicToSession(deckId: string, deckName: string, pointId: string): void {
+	private applyTopicToSession(
+		deckId: string,
+		deckName: string,
+		pointId: string,
+	): void {
 		if (!this.session) {
 			return;
 		}
@@ -797,12 +996,13 @@ export class ParagraphWorkbenchService {
 		if (!block) {
 			return;
 		}
-		const cards = Array.isArray(block.extractedCards) ? [...block.extractedCards] : [];
+		const cards = Array.isArray(block.extractedCards)
+			? [...block.extractedCards]
+			: [];
 		const excerptMarker = generateReadingUUID();
 		cards.push(excerptMarker);
 		block.extractedCards = cards;
 		block.updatedAt = new Date().toISOString();
 		await storage.saveBlock(block);
 	}
-
 }

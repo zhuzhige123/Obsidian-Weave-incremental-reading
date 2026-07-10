@@ -63,9 +63,6 @@ const HEURISTIC_SELECTORS = [
 
 const IGNORED_MEASUREMENT_SELECTORS = [
 	".weave-app",
-	".weave-create-card-modal-container",
-	".weave-edit-card-modal-container",
-	".weave-view-card-modal-container",
 	".weave-modal-backdrop",
 	".weave-modal-container",
 	".modal-overlay",
@@ -77,7 +74,13 @@ const IGNORED_MEASUREMENT_SELECTORS = [
 	"[data-weave-safe-area-probe='true']",
 ].join(", ");
 
-const OBSERVER_ATTRIBUTE_FILTER = ["class", "style", "hidden", "open", "aria-hidden"] as const;
+const OBSERVER_ATTRIBUTE_FILTER = [
+	"class",
+	"style",
+	"hidden",
+	"open",
+	"aria-hidden",
+] as const;
 
 let cachedSafeAreaKey = "";
 let cachedSafeAreaInsets: { top: number; bottom: number } | null = null;
@@ -139,7 +142,10 @@ function measureSafeAreaInsets(): { top: number; bottom: number } {
 	return insets;
 }
 
-function isVisibleCandidate(element: HTMLElement, viewportHeight: number): boolean {
+function isVisibleCandidate(
+	element: HTMLElement,
+	viewportHeight: number,
+): boolean {
 	if (!element.isConnected || shouldIgnoreMeasurementElement(element)) {
 		return false;
 	}
@@ -202,7 +208,7 @@ function computeInsetForElement(
 	edge: Edge,
 	element: HTMLElement,
 	viewport: { width: number; height: number },
-	isHeuristicCandidate = false
+	isHeuristicCandidate = false,
 ): number | null {
 	if (!isVisibleCandidate(element, viewport.height)) {
 		return null;
@@ -247,7 +253,7 @@ function measureEdgeInset(
 	selectors: string[],
 	safeAreaInset: number,
 	viewport: { width: number; height: number },
-	detected: string[]
+	detected: string[],
 ): number {
 	let inset = safeAreaInset;
 	let matched = false;
@@ -260,7 +266,9 @@ function measureEdgeInset(
 
 		inset = candidateInset;
 		matched = true;
-		detected.push(`${edge}:${describeElement(element)}=${Math.round(candidateInset)}px`);
+		detected.push(
+			`${edge}:${describeElement(element)}=${Math.round(candidateInset)}px`,
+		);
 	}
 
 	if (matched) {
@@ -268,21 +276,30 @@ function measureEdgeInset(
 	}
 
 	for (const element of collectUniqueElements(HEURISTIC_SELECTORS)) {
-		const candidateInset = computeInsetForElement(edge, element, viewport, true);
+		const candidateInset = computeInsetForElement(
+			edge,
+			element,
+			viewport,
+			true,
+		);
 		if (candidateInset === null || candidateInset <= inset) {
 			continue;
 		}
 
 		inset = candidateInset;
-		detected.push(`${edge}:heuristic:${describeElement(element)}=${Math.round(candidateInset)}px`);
+		detected.push(
+			`${edge}:heuristic:${describeElement(element)}=${Math.round(
+				candidateInset,
+			)}px`,
+		);
 	}
 
 	return inset;
 }
 
 function getObservedChromeElements(): HTMLElement[] {
-	return collectUniqueElements([...TOP_SELECTORS, ...BOTTOM_SELECTORS]).filter((element) =>
-		isVisibleCandidate(element, getViewportMetrics().height)
+	return collectUniqueElements([...TOP_SELECTORS, ...BOTTOM_SELECTORS]).filter(
+		(element) => isVisibleCandidate(element, getViewportMetrics().height),
 	);
 }
 
@@ -295,13 +312,19 @@ export function getWorkspaceBounds(): WorkspaceBounds {
 	const safeAreaInsets = measureSafeAreaInsets();
 	const detected: string[] = [];
 
-	const top = measureEdgeInset("top", TOP_SELECTORS, safeAreaInsets.top, viewport, detected);
+	const top = measureEdgeInset(
+		"top",
+		TOP_SELECTORS,
+		safeAreaInsets.top,
+		viewport,
+		detected,
+	);
 	const bottom = measureEdgeInset(
 		"bottom",
 		BOTTOM_SELECTORS,
 		safeAreaInsets.bottom,
 		viewport,
-		detected
+		detected,
 	);
 
 	if (top === safeAreaInsets.top && top > 0) {
@@ -318,7 +341,10 @@ export function getWorkspaceBounds(): WorkspaceBounds {
 	return {
 		top: roundedTop,
 		bottom: roundedBottom,
-		height: Math.max(0, Math.round(viewport.height) - roundedTop - roundedBottom),
+		height: Math.max(
+			0,
+			Math.round(viewport.height) - roundedTop - roundedBottom,
+		),
 		detected: detected.join(", "),
 	};
 }
@@ -329,7 +355,8 @@ export function getWorkspaceBounds(): WorkspaceBounds {
 export function isMobileDevice(): boolean {
 	return Boolean(
 		activeDocument.body &&
-			(activeDocument.body.classList.contains("is-phone") || activeDocument.body.classList.contains("is-mobile"))
+			(activeDocument.body.classList.contains("is-phone") ||
+				activeDocument.body.classList.contains("is-mobile")),
 	);
 }
 
@@ -409,9 +436,15 @@ export function injectMobileBoundsCSSVariables(): void {
 		root.style.setProperty("--weave-modal-top", `${bounds.top}px`);
 		root.style.setProperty("--weave-modal-bottom", `${bounds.bottom}px`);
 		root.style.setProperty("--weave-modal-height", `${bounds.height}px`);
-		root.style.setProperty("--weave-modal-max-height", `${Math.max(0, bounds.height - 24)}px`);
+		root.style.setProperty(
+			"--weave-modal-max-height",
+			`${Math.max(0, bounds.height - 24)}px`,
+		);
 		root.style.setProperty("--weave-workspace-top-offset", `${bounds.top}px`);
-		root.style.setProperty("--weave-workspace-bottom-offset", `${bounds.bottom}px`);
+		root.style.setProperty(
+			"--weave-workspace-bottom-offset",
+			`${bounds.bottom}px`,
+		);
 
 		refreshObservedElements();
 	};
@@ -562,5 +595,6 @@ export function initMobileModalAdaptation(): void {
 	injectGlobalModalStyles();
 
 	const mobileWindow = window as MobileBoundsWindow;
-	mobileWindow.__weaveMobileModalAdaptationCleanup = destroyMobileModalAdaptation;
+	mobileWindow.__weaveMobileModalAdaptationCleanup =
+		destroyMobileModalAdaptation;
 }

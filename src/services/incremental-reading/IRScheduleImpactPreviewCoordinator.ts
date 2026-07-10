@@ -10,14 +10,17 @@ type ImpactPreviewKey = string;
  */
 export class IRScheduleImpactPreviewCoordinator {
 	private chain: Promise<void> = Promise.resolve();
-	private readonly previewCache = new Map<ImpactPreviewKey, IRFuturePlanPreview | undefined>();
+	private readonly previewCache = new Map<
+		ImpactPreviewKey,
+		IRFuturePlanPreview | undefined
+	>();
 
 	constructor(private readonly app: App) {}
 
 	private buildCacheKey(
 		deckPath: string,
 		originalBlock: IRBlockV4,
-		updatedBlock: IRBlockV4
+		updatedBlock: IRBlockV4,
 	): ImpactPreviewKey {
 		return [
 			deckPath,
@@ -33,7 +36,7 @@ export class IRScheduleImpactPreviewCoordinator {
 	async previewBlockMutationImpact(
 		originalBlock: IRBlockV4,
 		updatedBlock: IRBlockV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRFuturePlanPreview | undefined> {
 		if (!deckPath) {
 			return undefined;
@@ -45,11 +48,15 @@ export class IRScheduleImpactPreviewCoordinator {
 
 		const run = this.chain.then(async () => {
 			const scheduler = new IRV4SchedulerService(this.app);
-			return scheduler.previewFuturePlanForBlockMutation(deckPath, originalBlock, updatedBlock);
+			return scheduler.previewFuturePlanForBlockMutation(
+				deckPath,
+				originalBlock,
+				updatedBlock,
+			);
 		});
 		this.chain = run.then(
 			() => undefined,
-			() => undefined
+			() => undefined,
 		);
 
 		try {
@@ -70,7 +77,7 @@ export class IRScheduleImpactPreviewCoordinator {
 const coordinatorByApp = new WeakMap<App, IRScheduleImpactPreviewCoordinator>();
 
 export function getSharedIRScheduleImpactPreviewCoordinator(
-	app: App
+	app: App,
 ): IRScheduleImpactPreviewCoordinator {
 	let coordinator = coordinatorByApp.get(app);
 	if (!coordinator) {

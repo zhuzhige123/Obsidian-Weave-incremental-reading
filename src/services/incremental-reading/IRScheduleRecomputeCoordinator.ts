@@ -1,11 +1,14 @@
 import type { App } from "obsidian";
 import { logger } from "../../utils/logger";
-import {
-	recomputeAndBroadcastIRData,
-	type UpdatedEventDetail,
-} from "./IRScheduleRefreshService";
 import { mergePriorityDateKeys } from "./IRCalendarProjectionUtils";
-import type { RecomputeOptions, ScheduleRecomputeReason } from "./IRScheduleKernel";
+import type {
+	RecomputeOptions,
+	ScheduleRecomputeReason,
+} from "./IRScheduleKernel";
+import {
+	type UpdatedEventDetail,
+	recomputeAndBroadcastIRData,
+} from "./IRScheduleRefreshService";
 
 const DEFAULT_DEBOUNCE_MS = 750;
 
@@ -38,12 +41,12 @@ export class IRScheduleRecomputeCoordinator {
 
 	constructor(
 		private readonly app: App,
-		private readonly debounceMs = DEFAULT_DEBOUNCE_MS
+		private readonly debounceMs = DEFAULT_DEBOUNCE_MS,
 	) {}
 
 	scheduleRecompute(
 		reason: ScheduleRecomputeReason,
-		options?: RecomputeOptions
+		options?: RecomputeOptions,
 	): Promise<UpdatedEventDetail> {
 		if (!shouldDebounceReason(reason)) {
 			return recomputeAndBroadcastIRData(this.app, reason, options);
@@ -56,7 +59,10 @@ export class IRScheduleRecomputeCoordinator {
 		});
 	}
 
-	private mergePending(reason: ScheduleRecomputeReason, options?: RecomputeOptions): void {
+	private mergePending(
+		reason: ScheduleRecomputeReason,
+		options?: RecomputeOptions,
+	): void {
 		if (!this.pending) {
 			this.pending = {
 				reason,
@@ -120,13 +126,18 @@ export class IRScheduleRecomputeCoordinator {
 		}
 
 		const deckIds = Array.from(pending.deckIds);
-		const priorityDateKeys = mergePriorityDateKeys(Array.from(pending.priorityDateKeys), []);
+		const priorityDateKeys = mergePriorityDateKeys(
+			Array.from(pending.priorityDateKeys),
+			[],
+		);
 		const l1PatchedDateKeys = Array.from(pending.l1PatchedDateKeys);
 
 		this.flushPromise = recomputeAndBroadcastIRData(this.app, pending.reason, {
 			deckIds: deckIds.length > 0 ? deckIds : undefined,
-			priorityDateKeys: priorityDateKeys.length > 0 ? priorityDateKeys : undefined,
-			l1PatchedDateKeys: l1PatchedDateKeys.length > 0 ? l1PatchedDateKeys : undefined,
+			priorityDateKeys:
+				priorityDateKeys.length > 0 ? priorityDateKeys : undefined,
+			l1PatchedDateKeys:
+				l1PatchedDateKeys.length > 0 ? l1PatchedDateKeys : undefined,
 			leanSchedule: pending.leanSchedule,
 		});
 
@@ -136,7 +147,10 @@ export class IRScheduleRecomputeCoordinator {
 				resolve(detail);
 			}
 		} catch (error) {
-			logger.error("[IRScheduleRecomputeCoordinator] debounced recompute failed", error);
+			logger.error(
+				"[IRScheduleRecomputeCoordinator] debounced recompute failed",
+				error,
+			);
 			for (const { reject } of resolvers) {
 				reject(error);
 			}
@@ -148,7 +162,9 @@ export class IRScheduleRecomputeCoordinator {
 
 const coordinatorByApp = new WeakMap<App, IRScheduleRecomputeCoordinator>();
 
-export function getSharedIRScheduleRecomputeCoordinator(app: App): IRScheduleRecomputeCoordinator {
+export function getSharedIRScheduleRecomputeCoordinator(
+	app: App,
+): IRScheduleRecomputeCoordinator {
 	let coordinator = coordinatorByApp.get(app);
 	if (!coordinator) {
 		coordinator = new IRScheduleRecomputeCoordinator(app);
@@ -161,7 +177,10 @@ export function getSharedIRScheduleRecomputeCoordinator(app: App): IRScheduleRec
 export function scheduleDebouncedRecomputeAndBroadcastIRData(
 	app: App,
 	reason: ScheduleRecomputeReason,
-	options?: RecomputeOptions
+	options?: RecomputeOptions,
 ): Promise<UpdatedEventDetail> {
-	return getSharedIRScheduleRecomputeCoordinator(app).scheduleRecompute(reason, options);
+	return getSharedIRScheduleRecomputeCoordinator(app).scheduleRecompute(
+		reason,
+		options,
+	);
 }

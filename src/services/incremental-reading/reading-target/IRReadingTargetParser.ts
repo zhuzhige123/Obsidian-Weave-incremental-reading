@@ -1,12 +1,10 @@
-import { normalizePath, type App } from "obsidian";
-import { parsePdfCallouts } from "../../../utils/pdf-callout-parser";
+import { type App, normalizePath } from "obsidian";
 import { i18n } from "../../../utils/i18n";
+import { parsePdfCallouts } from "../../../utils/pdf-callout-parser";
 import { EpubLinkService } from "../../epub-integration/EpubLinkService";
 import { EPUB_RUNTIME } from "../../epub-integration/epub-runtime";
 import { isHttpUrl } from "../../obsidian/obsidian-open-web-url";
-import {
-	normalizeObsidianBlockId,
-} from "../paragraph-workbench/paragraph-block-reference";
+import { normalizeObsidianBlockId } from "../paragraph-workbench/paragraph-block-reference";
 import type { ParsedReadingTarget } from "./IRReadingTargetTypes";
 
 const WIKI_LINK_CAPTURE_REGEX = /!?\[\[([^\]]+)\]\]/;
@@ -19,7 +17,10 @@ function stripOuterWikiSyntax(raw: string): string {
 		.trim();
 }
 
-function splitWikiLinkParts(inner: string): { pathPart: string; alias?: string } {
+function splitWikiLinkParts(inner: string): {
+	pathPart: string;
+	alias?: string;
+} {
 	const pipeIndex = inner.indexOf("|");
 	if (pipeIndex < 0) {
 		return { pathPart: inner.trim() };
@@ -56,18 +57,25 @@ function parseWikiLinkInner(inner: string): {
 }
 
 function extractWikiLinkFromText(raw: string): string {
-	const match = String(raw || "").trim().match(WIKI_LINK_CAPTURE_REGEX);
+	const match = String(raw || "")
+		.trim()
+		.match(WIKI_LINK_CAPTURE_REGEX);
 	if (match?.[1]) {
 		return match[1];
 	}
 	const stripped = stripOuterWikiSyntax(raw);
-	return stripped.includes("#") || stripped.includes("|") || stripped.includes("/") || stripped.endsWith(".md")
+	return stripped.includes("#") ||
+		stripped.includes("|") ||
+		stripped.includes("/") ||
+		stripped.endsWith(".md")
 		? stripped
 		: "";
 }
 
 function matchesEpubProtocolHref(value: string): boolean {
-	return EPUB_RUNTIME.protocol.allNames.some((name) => value.startsWith(`obsidian://${name}?`));
+	return EPUB_RUNTIME.protocol.allNames.some((name) =>
+		value.startsWith(`obsidian://${name}?`),
+	);
 }
 
 function parseObsidianOpenUri(raw: string): string | null {
@@ -81,7 +89,8 @@ function parseObsidianOpenUri(raw: string): string | null {
 
 	try {
 		const url = new URL(normalized);
-		const fileParam = url.searchParams.get("file") || url.searchParams.get("filepath");
+		const fileParam =
+			url.searchParams.get("file") || url.searchParams.get("filepath");
 		if (fileParam) {
 			return decodeURIComponent(fileParam);
 		}
@@ -93,7 +102,9 @@ function parseObsidianOpenUri(raw: string): string | null {
 }
 
 function extractMarkdownLinkLabel(raw: string): string | undefined {
-	const match = String(raw || "").trim().match(/^\[([^\]]+)\]\(/);
+	const match = String(raw || "")
+		.trim()
+		.match(/^\[([^\]]+)\]\(/);
 	return match?.[1]?.trim() || undefined;
 }
 
@@ -106,7 +117,10 @@ function normalizeEpubResumeLink(raw: string): string {
 	return match?.[1] || trimmed;
 }
 
-function parseEpubReadingTarget(app: App, raw: string): ParsedReadingTarget | null {
+function parseEpubReadingTarget(
+	app: App,
+	raw: string,
+): ParsedReadingTarget | null {
 	const label = extractMarkdownLinkLabel(raw);
 	const parsed = EpubLinkService.parseLinkMarkup(raw);
 	if (!parsed?.cfi && !parsed?.tocHref) {
@@ -115,7 +129,9 @@ function parseEpubReadingTarget(app: App, raw: string): ParsedReadingTarget | nu
 
 	const filePath = parsed.filePath ? normalizePath(parsed.filePath) : "";
 	const sourceId = String(parsed.sourceId || "").trim() || undefined;
-	const hasVaultFile = Boolean(filePath && app.vault.getAbstractFileByPath(filePath));
+	const hasVaultFile = Boolean(
+		filePath && app.vault.getAbstractFileByPath(filePath),
+	);
 	const normalizedResumeLink = normalizeEpubResumeLink(raw);
 
 	if (!hasVaultFile && !sourceId) {
@@ -142,8 +158,8 @@ function parseEpubReadingTarget(app: App, raw: string): ParsedReadingTarget | nu
 		(typeof parsed.chapter === "number" && Number.isFinite(parsed.chapter)
 			? `#chapter-${parsed.chapter}`
 			: parsed.cfi
-				? undefined
-				: filePath);
+			? undefined
+			: filePath);
 
 	return {
 		kind: "epub",
@@ -160,7 +176,11 @@ function parseEpubReadingTarget(app: App, raw: string): ParsedReadingTarget | nu
 	};
 }
 
-function resolveVaultFilePath(app: App, linkPath: string, contextPath = ""): string | null {
+function resolveVaultFilePath(
+	app: App,
+	linkPath: string,
+	contextPath = "",
+): string | null {
 	const normalized = String(linkPath || "").trim();
 	if (!normalized) {
 		return null;
@@ -175,7 +195,11 @@ function resolveVaultFilePath(app: App, linkPath: string, contextPath = ""): str
 	return direct ? normalizePath(direct.path) : null;
 }
 
-function validateVaultBlock(app: App, filePath: string, blockId: string): string | null {
+function validateVaultBlock(
+	app: App,
+	filePath: string,
+	blockId: string,
+): string | null {
 	const cache = app.metadataCache.getCache(filePath);
 	const blockRef = cache?.blocks?.[blockId];
 	if (!blockRef) {
@@ -184,7 +208,11 @@ function validateVaultBlock(app: App, filePath: string, blockId: string): string
 	return null;
 }
 
-export function parseReadingTargetInput(app: App, rawInput: string, contextPath = ""): ParsedReadingTarget {
+export function parseReadingTargetInput(
+	app: App,
+	rawInput: string,
+	contextPath = "",
+): ParsedReadingTarget {
 	const raw = String(rawInput || "").trim();
 	if (!raw) {
 		return {
@@ -266,7 +294,9 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 			kind: "unknown",
 			rawInput: raw,
 			resumeLink: wikiInner,
-			validationError: i18n.t("irAddTarget.parser.fileNotFound", { filePath: parsed.filePart }),
+			validationError: i18n.t("irAddTarget.parser.fileNotFound", {
+				filePath: parsed.filePart,
+			}),
 		};
 	}
 
@@ -283,8 +313,8 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 	const resumeLink = parsed.blockId
 		? `${resolvedPath}#^${parsed.blockId}`
 		: parsed.fragment
-			? `${resolvedPath}#${parsed.fragment}`
-			: resolvedPath;
+		? `${resolvedPath}#${parsed.fragment}`
+		: resolvedPath;
 	const displayLink = parsed.alias
 		? `[[${resumeLink}|${parsed.alias}]]`
 		: `[[${resumeLink}]]`;
@@ -316,7 +346,10 @@ export function parseReadingTargetInput(app: App, rawInput: string, contextPath 
 		};
 	}
 
-	if (/page=\d+/i.test(parsed.fragment || resumeLink) && /\.pdf$/i.test(resolvedPath)) {
+	if (
+		/page=\d+/i.test(parsed.fragment || resumeLink) &&
+		/\.pdf$/i.test(resolvedPath)
+	) {
 		return {
 			kind: "pdf",
 			rawInput: raw,

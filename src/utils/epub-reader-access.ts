@@ -1,4 +1,4 @@
-import { Notice, type App } from "obsidian";
+import { type App, Notice } from "obsidian";
 import type { EpubHostReaderCapabilities } from "../services/epub-integration/epub-host";
 import { i18n } from "./i18n";
 import { getObsidianPluginAs } from "./obsidian-plugin-registry";
@@ -9,15 +9,23 @@ const EPUB_READER_NOTICE_COOLDOWN_MS = 8_000;
 
 const recentEpubReaderNotices = new WeakMap<App, number>();
 
-export type EpubReaderPluginAvailability = "available" | "disabled" | "failed" | "missing";
+export type EpubReaderPluginAvailability =
+	| "available"
+	| "disabled"
+	| "failed"
+	| "missing";
 
 function getPluginManifest(app: App, pluginId: string): unknown {
-	const manifests = (app.plugins as { manifests?: Record<string, unknown> } | undefined)?.manifests;
+	const manifests = (
+		app.plugins as { manifests?: Record<string, unknown> } | undefined
+	)?.manifests;
 	return manifests?.[pluginId] ?? null;
 }
 
 function isPluginEnabledInSettings(app: App, pluginId: string): boolean {
-	const enabledPlugins = (app.plugins as { enabledPlugins?: Set<string> } | undefined)?.enabledPlugins;
+	const enabledPlugins = (
+		app.plugins as { enabledPlugins?: Set<string> } | undefined
+	)?.enabledPlugins;
 	return enabledPlugins?.has(pluginId) ?? false;
 }
 
@@ -28,7 +36,9 @@ export function getEpubReaderDisplayName(): string {
 /** @deprecated Use {@link getEpubReaderDisplayName} for localized display name. */
 export const EPUB_READER_DISPLAY_NAME = "Weave EPUB 阅读器";
 
-export function getEpubReaderPluginAvailability(app: App): EpubReaderPluginAvailability {
+export function getEpubReaderPluginAvailability(
+	app: App,
+): EpubReaderPluginAvailability {
 	if (getObsidianPluginAs(app, EPUB_READER_PLUGIN_ID)) {
 		return "available";
 	}
@@ -46,7 +56,10 @@ export function isEpubReaderPluginAvailable(app: App): boolean {
 }
 
 export function getEpubReaderHost(app: App): EpubHostReaderCapabilities | null {
-	return getObsidianPluginAs<EpubHostReaderCapabilities>(app, EPUB_READER_PLUGIN_ID);
+	return getObsidianPluginAs<EpubHostReaderCapabilities>(
+		app,
+		EPUB_READER_PLUGIN_ID,
+	);
 }
 
 export function getEpubReaderUnavailableMessage(app: App): string {

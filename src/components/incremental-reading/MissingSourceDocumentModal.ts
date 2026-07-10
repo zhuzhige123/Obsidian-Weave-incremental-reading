@@ -15,13 +15,15 @@ type MissingSourceDocumentModalResult = "dismiss" | "remove";
 
 class MissingSourceDocumentModal extends Modal {
 	private readonly options: MissingSourceDocumentModalOptions;
-	private readonly onResolve: (result: MissingSourceDocumentModalResult) => void;
+	private readonly onResolve: (
+		result: MissingSourceDocumentModalResult,
+	) => void;
 	private resolved = false;
 
 	constructor(
 		app: App,
 		options: MissingSourceDocumentModalOptions,
-		onResolve: (result: MissingSourceDocumentModalResult) => void
+		onResolve: (result: MissingSourceDocumentModalResult) => void,
 	) {
 		super(app);
 		this.options = options;
@@ -41,19 +43,25 @@ class MissingSourceDocumentModal extends Modal {
 
 		if (this.options.onRemove) {
 			new Setting(contentEl)
-			.setName(this.options.removeButtonText || i18n.t("irSidebar.calendar.removeThisPoint"))
-			.setDesc(
-				this.options.removeDescription ||
-					i18n.t("irSidebar.calendar.removeSourceMissingDesc")
-			)
-			.addButton((button) =>
-				button
-					.setButtonText(this.options.removeButtonText || i18n.t("irSidebar.calendar.removeThisPoint"))
-					.setWarning()
-					.onClick(() => {
-						void this.handleRemove();
-					})
-			);
+				.setName(
+					this.options.removeButtonText ||
+						i18n.t("irSidebar.calendar.removeThisPoint"),
+				)
+				.setDesc(
+					this.options.removeDescription ||
+						i18n.t("irSidebar.calendar.removeSourceMissingDesc"),
+				)
+				.addButton((button) =>
+					button
+						.setButtonText(
+							this.options.removeButtonText ||
+								i18n.t("irSidebar.calendar.removeThisPoint"),
+						)
+						.setWarning()
+						.onClick(() => {
+							void this.handleRemove();
+						}),
+				);
 		}
 
 		const actions = contentEl.createDiv();
@@ -101,7 +109,7 @@ class MissingSourceDocumentModal extends Modal {
 
 export function showMissingSourceDocumentModal(
 	app: App,
-	options: MissingSourceDocumentModalOptions
+	options: MissingSourceDocumentModalOptions,
 ): Promise<MissingSourceDocumentModalResult> {
 	return new Promise((resolve) => {
 		const modal = new MissingSourceDocumentModal(app, options, resolve);

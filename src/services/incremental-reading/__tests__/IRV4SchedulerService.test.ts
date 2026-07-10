@@ -1,7 +1,7 @@
+import { createStandaloneIRTestApp } from "./standalone-ir-test-app";
 import { createDefaultIRBlockV4 } from "../../../types/ir-types";
-import { createStandaloneIRTestApp } from "../../../tests/mocks/test-app";
-import * as IRScheduleModeMutationService from "../IRScheduleModeMutationService";
 import * as IRPointScheduleMutator from "../IRPointScheduleMutator";
+import * as IRScheduleModeMutationService from "../IRScheduleModeMutationService";
 import { IRV4SchedulerService } from "../IRV4SchedulerService";
 
 vi.mock("../IRLoadDeferService", () => ({
@@ -10,7 +10,10 @@ vi.mock("../IRLoadDeferService", () => ({
 
 vi.mock("../../epub-integration/ir-epub-storage-access", () => ({
 	getIrEpubStorageService: () => ({
-		async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+		async ensureSourceIdentity(
+			filePath: string,
+			options?: { preferredSourceId?: string },
+		) {
 			return {
 				sourceId: options?.preferredSourceId || `src-${filePath}`,
 				filePath,
@@ -61,17 +64,21 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 
 		const result = await (service as any).collectBookmarkTaskBlocks("deck-1");
 
-		expect((service as any).storageAdapterV4.getDeckById).toHaveBeenCalledWith("deck-1");
-		expect((service as any)._pdfBookmarkTaskService.getTasksByDeck).toHaveBeenCalledWith("deck-1");
-		expect((service as any)._pdfBookmarkTaskService.getTasksByDeck).toHaveBeenCalledWith(
-			"topics/demo"
+		expect((service as any).storageAdapterV4.getDeckById).toHaveBeenCalledWith(
+			"deck-1",
 		);
-		expect((service as any)._epubBookmarkTaskService.getTasksByDeck).toHaveBeenCalledWith(
-			"deck-1"
-		);
-		expect((service as any)._epubBookmarkTaskService.getTasksByDeck).toHaveBeenCalledWith(
-			"topics/demo"
-		);
+		expect(
+			(service as any)._pdfBookmarkTaskService.getTasksByDeck,
+		).toHaveBeenCalledWith("deck-1");
+		expect(
+			(service as any)._pdfBookmarkTaskService.getTasksByDeck,
+		).toHaveBeenCalledWith("topics/demo");
+		expect(
+			(service as any)._epubBookmarkTaskService.getTasksByDeck,
+		).toHaveBeenCalledWith("deck-1");
+		expect(
+			(service as any)._epubBookmarkTaskService.getTasksByDeck,
+		).toHaveBeenCalledWith("topics/demo");
 		expect(result.pdfTaskBlocks).toHaveLength(1);
 		expect(result.epubTaskBlocks).toHaveLength(1);
 		expect(result.pdfTaskBlocks[0].id).toBe("pdf-task-1");
@@ -106,17 +113,19 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 				createdNoteCount: 0,
 			},
 			"topics/demo",
-			"completed"
+			"completed",
 		);
 
-		expect((service as any).storageAdapterV4.getDeckById).toHaveBeenCalledWith("topics/demo");
+		expect((service as any).storageAdapterV4.getDeckById).toHaveBeenCalledWith(
+			"topics/demo",
+		);
 		expect(addSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				blockId: "chunk-1",
 				deckId: "deck-1",
 				action: "completed",
 				duration: 45,
-			})
+			}),
 		);
 	});
 
@@ -171,9 +180,16 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 			}),
 		};
 
-		const result = await (service as any).generateUnifiedQueue([denseBlock, looseBlock], 15, null);
+		const result = await (service as any).generateUnifiedQueue(
+			[denseBlock, looseBlock],
+			15,
+			null,
+		);
 
-		expect(result.queue.map((block: any) => block.id)).toEqual(["dense", "loose"]);
+		expect(result.queue.map((block: any) => block.id)).toEqual([
+			"dense",
+			"loose",
+		]);
 	});
 
 	it("关闭 enableTagGroupPrior 时不会应用标签组排序偏置", async () => {
@@ -225,9 +241,16 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 			}),
 		};
 
-		const result = await (service as any).generateUnifiedQueue([denseBlock, looseBlock], 15, null);
+		const result = await (service as any).generateUnifiedQueue(
+			[denseBlock, looseBlock],
+			15,
+			null,
+		);
 
-		expect(result.queue.map((block: any) => block.id)).toEqual(["loose", "dense"]);
+		expect(result.queue.map((block: any) => block.id)).toEqual([
+			"loose",
+			"dense",
+		]);
 	});
 
 	it("manualRescheduleBlockWithPreviewV4 通过 persistBlockScheduleState 写入", async () => {
@@ -235,9 +258,10 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 		const persistSpy = vi
 			.spyOn(IRPointScheduleMutator, "persistBlockScheduleState")
 			.mockResolvedValue({ pointId: "legacy-block-1" });
-		vi.spyOn(IRScheduleModeMutationService, "recordScheduleMenuActionInteraction").mockResolvedValue(
-			undefined
-		);
+		vi.spyOn(
+			IRScheduleModeMutationService,
+			"recordScheduleMenuActionInteraction",
+		).mockResolvedValue(undefined);
 
 		const service = new IRV4SchedulerService(app);
 		await (service as any).initialize();
@@ -251,7 +275,7 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 				intervalDays: block.intervalDays,
 				scheduleStatus: block.status,
 			},
-			""
+			"",
 		);
 
 		expect(persistSpy).toHaveBeenCalledWith(
@@ -259,7 +283,7 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 			block,
 			expect.objectContaining({
 				nextRepDate,
-			})
+			}),
 		);
 	});
 });

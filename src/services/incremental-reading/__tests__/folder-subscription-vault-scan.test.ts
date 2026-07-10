@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import { TFile, TFolder } from "obsidian";
+import { describe, expect, it, vi } from "vitest";
 import { collectMarkdownFilesForFolderSubscriptionRules } from "../folder-subscription-vault-scan";
 
 function createMarkdownFile(path: string): TFile {

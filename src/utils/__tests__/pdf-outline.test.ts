@@ -1,4 +1,7 @@
-import { extractPdfOutlineFromDocument, getPdfOutlineForFile } from "../pdf-outline";
+import {
+	extractPdfOutlineFromDocument,
+	getPdfOutlineForFile,
+} from "../pdf-outline";
 
 function createPdfFile(path = "Books/demo.pdf", size = 1024): any {
 	return {
@@ -16,7 +19,7 @@ function createPdfFile(path = "Books/demo.pdf", size = 1024): any {
 
 describe("pdf-outline", () => {
 	afterEach(() => {
-		delete (window as any).pdfjsLib;
+		(window as any).pdfjsLib = undefined;
 		vi.restoreAllMocks();
 	});
 
@@ -67,13 +70,21 @@ describe("pdf-outline", () => {
 			},
 		};
 
-		const items = await getPdfOutlineForFile(app, createPdfFile("Books/demo.pdf", 64 * 1024 * 1024), {
-			maxDirectLoadFileSizeBytes: 32 * 1024 * 1024,
-		});
+		const items = await getPdfOutlineForFile(
+			app,
+			createPdfFile("Books/demo.pdf", 64 * 1024 * 1024),
+			{
+				maxDirectLoadFileSizeBytes: 32 * 1024 * 1024,
+			},
+		);
 
 		expect(items).toEqual([
 			{ title: "Chapter 1", pageNumber: 1, path: ["Chapter 1"] },
-			{ title: "Section 1.1", pageNumber: 5, path: ["Chapter 1", "Section 1.1"] },
+			{
+				title: "Section 1.1",
+				pageNumber: 5,
+				path: ["Chapter 1", "Section 1.1"],
+			},
 			{ title: "Chapter 2", pageNumber: 10, path: ["Chapter 2"] },
 		]);
 		expect(app.vault.adapter.readBinary).not.toHaveBeenCalled();
@@ -83,7 +94,9 @@ describe("pdf-outline", () => {
 		const pdfDocumentDestroy = vi.fn();
 		const loadingTaskDestroy = vi.fn();
 		const pdfDocument = {
-			getOutline: vi.fn().mockResolvedValue([{ title: "Preface", dest: "preface", items: [] }]),
+			getOutline: vi
+				.fn()
+				.mockResolvedValue([{ title: "Preface", dest: "preface", items: [] }]),
 			getDestination: vi.fn(async () => [{ ref: "preface" }]),
 			getPageIndex: vi.fn(async () => 2),
 			destroy: pdfDocumentDestroy,
@@ -113,7 +126,9 @@ describe("pdf-outline", () => {
 			includeEntriesWithoutPage: true,
 		});
 
-		expect(items).toEqual([{ title: "Preface", pageNumber: 3, path: ["Preface"] }]);
+		expect(items).toEqual([
+			{ title: "Preface", pageNumber: 3, path: ["Preface"] },
+		]);
 		expect(app.vault.adapter.readBinary).toHaveBeenCalledTimes(1);
 		expect((window as any).pdfjsLib.getDocument).toHaveBeenCalledTimes(1);
 		expect(pdfDocumentDestroy).toHaveBeenCalledTimes(1);
@@ -134,6 +149,8 @@ describe("pdf-outline", () => {
 			includeEntriesWithoutPage: false,
 		});
 
-		expect(items).toEqual([{ title: "有效目录", pageNumber: 7, path: ["有效目录"] }]);
+		expect(items).toEqual([
+			{ title: "有效目录", pageNumber: 7, path: ["有效目录"] },
+		]);
 	});
 });

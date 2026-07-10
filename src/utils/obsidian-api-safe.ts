@@ -25,7 +25,9 @@ export function isObsidianCompatibilityError(error: Error): boolean {
 		/Cannot read properties of undefined \(reading 'show'\)/,
 	];
 
-	return patterns.some((pattern) => pattern.test(message) || pattern.test(stack));
+	return patterns.some(
+		(pattern) => pattern.test(message) || pattern.test(stack),
+	);
 }
 
 /**
@@ -138,7 +140,10 @@ export class SafeNotice {
 /**
  * 安全创建 Notice
  */
-export function createSafeNotice(message: string, timeout?: number): SafeNotice {
+export function createSafeNotice(
+	message: string,
+	timeout?: number,
+): SafeNotice {
 	return new SafeNotice(message, timeout);
 }
 
@@ -175,7 +180,10 @@ export function safeOpenSettings(app: App, tabId?: string): void {
 /**
  * 安全的 DOM 操作包装器
  */
-export function safeDomOperation<T>(operation: () => T, fallback?: T): T | undefined {
+export function safeDomOperation<T>(
+	operation: () => T,
+	fallback?: T,
+): T | undefined {
 	try {
 		return untrack(() => operation());
 	} catch (error) {
@@ -192,7 +200,9 @@ export function safeDomOperation<T>(operation: () => T, fallback?: T): T | undef
 /**
  * 安全的事件处理器包装
  */
-export function safeEventHandler<T extends Event>(handler: (event: T) => void): (event: T) => void {
+export function safeEventHandler<T extends Event>(
+	handler: (event: T) => void,
+): (event: T) => void {
 	return (event: T) => {
 		try {
 			untrack(() => handler(event));
@@ -213,11 +223,15 @@ export function safeEventHandler<T extends Event>(handler: (event: T) => void): 
 export function cleanupCompatibilityIssues(): void {
 	try {
 		// 清理可能的错误标记
-		const errorElements = activeDocument.querySelectorAll("[data-svelte-error]");
+		const errorElements = activeDocument.querySelectorAll(
+			"[data-svelte-error]",
+		);
 		errorElements.forEach((el) => el.removeAttribute("data-svelte-error"));
 
 		// 清理可能的隐藏 Notice
-		const hiddenNotices = activeDocument.querySelectorAll('.notice[style*="display: none"]');
+		const hiddenNotices = activeDocument.querySelectorAll(
+			'.notice[style*="display: none"]',
+		);
 		hiddenNotices.forEach((el) => el.remove());
 
 		// 强制垃圾回收（如果可用）

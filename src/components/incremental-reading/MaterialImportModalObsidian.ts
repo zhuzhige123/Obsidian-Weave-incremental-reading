@@ -2,8 +2,8 @@ import { App, Modal } from "obsidian";
 import { mount, unmount } from "svelte";
 import type WeavePlugin from "../../main";
 import type { BatchImportResult } from "../../services/incremental-reading/ReadingMaterialManager";
-import { configureWeaveObsidianModalLayout } from "../../utils/obsidian-modal-layout";
 import { i18n } from "../../utils/i18n";
+import { configureWeaveObsidianModalLayout } from "../../utils/obsidian-modal-layout";
 import MaterialImportModal from "./MaterialImportModal.svelte";
 
 export interface MaterialImportModalObsidianOptions {

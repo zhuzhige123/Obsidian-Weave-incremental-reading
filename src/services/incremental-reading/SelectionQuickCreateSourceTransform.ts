@@ -14,7 +14,7 @@ function normalizeMarkdownContent(content: string): string {
 
 function compareEditorPosition(
 	left: { line: number; ch: number },
-	right: { line: number; ch: number }
+	right: { line: number; ch: number },
 ): number {
 	if (left.line !== right.line) {
 		return left.line - right.line;
@@ -23,7 +23,7 @@ function compareEditorPosition(
 }
 
 function orderSelectionRange(
-	selectionRange: SelectionQuickCreateRange
+	selectionRange: SelectionQuickCreateRange,
 ): OrderedSelectionQuickCreateRange {
 	return compareEditorPosition(selectionRange.from, selectionRange.to) <= 0
 		? { start: selectionRange.from, end: selectionRange.to }
@@ -32,7 +32,7 @@ function orderSelectionRange(
 
 export function editorPositionToOffset(
 	content: string,
-	position: { line: number; ch: number }
+	position: { line: number; ch: number },
 ): number {
 	const normalized = normalizeMarkdownContent(content);
 	const lines = normalized.split("\n");
@@ -49,14 +49,14 @@ export function editorPositionToOffset(
 	const lineText = lines[targetLine] ?? "";
 	return Math.min(
 		offset + Math.max(0, Math.min(position.ch, lineText.length)),
-		normalized.length
+		normalized.length,
 	);
 }
 
 function replaceWholeLineSelectionInMarkdownContent(
 	content: string,
 	selectionRange: SelectionQuickCreateRange,
-	replacement: string
+	replacement: string,
 ): string {
 	const normalized = normalizeMarkdownContent(content);
 	const lines = normalized.split("\n");
@@ -70,7 +70,10 @@ function replaceWholeLineSelectionInMarkdownContent(
 	const startLineText = lines[startLine] ?? "";
 	const endLineText = lines[endLine] ?? "";
 
-	const blockStartOffset = editorPositionToOffset(normalized, { line: startLine, ch: 0 });
+	const blockStartOffset = editorPositionToOffset(normalized, {
+		line: startLine,
+		ch: 0,
+	});
 	let blockEndOffset = editorPositionToOffset(normalized, {
 		line: endLine,
 		ch: endLineText.length,
@@ -79,7 +82,9 @@ function replaceWholeLineSelectionInMarkdownContent(
 		blockEndOffset += 1;
 	}
 
-	const before = normalized.slice(0, blockStartOffset).replace(/\n{3,}$/g, "\n\n");
+	const before = normalized
+		.slice(0, blockStartOffset)
+		.replace(/\n{3,}$/g, "\n\n");
 	const after = normalized.slice(blockEndOffset).replace(/^\n{3,}/g, "\n\n");
 	const lineIndent = (startLineText.match(/^\s*/) || [""])[0];
 	const replacementLine = `${lineIndent}${String(replacement || "").trim()}`;
@@ -104,7 +109,7 @@ function replaceWholeLineSelectionInMarkdownContent(
 export function replaceSelectionInMarkdownContent(
 	content: string,
 	selectionRange: SelectionQuickCreateRange | null,
-	replacement: string
+	replacement: string,
 ): string {
 	const normalized = normalizeMarkdownContent(content);
 	if (!selectionRange) {
@@ -113,15 +118,22 @@ export function replaceSelectionInMarkdownContent(
 
 	const lines = normalized.split("\n");
 	const { start, end } = orderSelectionRange(selectionRange);
-	const endLineText = lines[Math.max(0, Math.min(end.line, lines.length - 1))] ?? "";
+	const endLineText =
+		lines[Math.max(0, Math.min(end.line, lines.length - 1))] ?? "";
 	const isWholeLineSelection = start.ch === 0 && end.ch >= endLineText.length;
 
 	if (isWholeLineSelection) {
-		return replaceWholeLineSelectionInMarkdownContent(normalized, selectionRange, replacement);
+		return replaceWholeLineSelectionInMarkdownContent(
+			normalized,
+			selectionRange,
+			replacement,
+		);
 	}
 
 	const startOffset = editorPositionToOffset(normalized, start);
 	const endOffset = editorPositionToOffset(normalized, end);
 
-	return `${normalized.slice(0, startOffset)}${replacement}${normalized.slice(endOffset)}`;
+	return `${normalized.slice(0, startOffset)}${replacement}${normalized.slice(
+		endOffset,
+	)}`;
 }

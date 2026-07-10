@@ -1,12 +1,17 @@
 import type { App } from "obsidian";
-import type { EpubParagraphWorkbenchBridge, EpubParagraphWorkbenchSnapshot } from "./types";
+import type {
+	EpubParagraphWorkbenchBridge,
+	EpubParagraphWorkbenchSnapshot,
+} from "./types";
 
 const EPUB_READER_PLUGIN_ID = "weave-epub-reader";
 
-export function getEpubParagraphWorkbenchBridge(app: App): EpubParagraphWorkbenchBridge | null {
-	const plugin = (app as App & { plugins?: { getPlugin?: (id: string) => unknown } }).plugins?.getPlugin?.(
-		EPUB_READER_PLUGIN_ID
-	) as
+export function getEpubParagraphWorkbenchBridge(
+	app: App,
+): EpubParagraphWorkbenchBridge | null {
+	const plugin = (
+		app as App & { plugins?: { getPlugin?: (id: string) => unknown } }
+	).plugins?.getPlugin?.(EPUB_READER_PLUGIN_ID) as
 		| {
 				getEpubParagraphWorkbenchBridge?: () => EpubParagraphWorkbenchBridge | null;
 		  }
@@ -19,7 +24,7 @@ export function getEpubParagraphWorkbenchBridge(app: App): EpubParagraphWorkbenc
 
 export function getEpubParagraphSnapshot(
 	app: App,
-	filePath: string
+	filePath: string,
 ): EpubParagraphWorkbenchSnapshot | null {
 	return getEpubParagraphWorkbenchBridge(app)?.getSnapshot(filePath) ?? null;
 }
@@ -27,7 +32,7 @@ export function getEpubParagraphSnapshot(
 export async function navigateEpubParagraphRelative(
 	app: App,
 	filePath: string,
-	direction: -1 | 1
+	direction: -1 | 1,
 ): Promise<boolean> {
 	const bridge = getEpubParagraphWorkbenchBridge(app);
 	if (!bridge?.navigateRelative) {

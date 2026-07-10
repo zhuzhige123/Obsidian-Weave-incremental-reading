@@ -17,7 +17,11 @@ import type {
 	IRSession,
 	IRSourceFileMeta,
 } from "../../types/ir-types";
-import type { IRBlockStats, IRBlockStatus, IRBlockV4 } from "../../types/ir-types";
+import type {
+	IRBlockStats,
+	IRBlockStatus,
+	IRBlockV4,
+} from "../../types/ir-types";
 import { migrateToIRBlockV4 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
 import { readString } from "../../utils/unknown-record";
@@ -27,10 +31,7 @@ function hasValidChunkFilePath(chunk: IRChunkFileData): boolean {
 	return readString(chunk.filePath).length > 0;
 }
 
-function readTagsFromFileCache(
-	app: App,
-	filePath: string
-): string[] {
+function readTagsFromFileCache(app: App, filePath: string): string[] {
 	const file = app.vault.getAbstractFileByPath(filePath);
 	if (!(file instanceof TFile)) {
 		return [];
@@ -102,7 +103,10 @@ export class IRStorageAdapterV4 {
 	 * 获取牌组的所有内容块 (V4格式)
 	 * v5.4: 优先使用 chunk 阅读点兼容视图，必要时回退到 legacy block 兼容视图
 	 */
-	async getBlocksByDeckV4(deckId: string, includeIgnored = false): Promise<IRBlockV4[]> {
+	async getBlocksByDeckV4(
+		deckId: string,
+		includeIgnored = false,
+	): Promise<IRBlockV4[]> {
 		// 1. 优先从 chunk 阅读点兼容视图获取（旧 chunks 文件已删除时会由新 points 投影）
 		const deck = await this.storage.getDeckById(deckId);
 		if (deck) {
@@ -120,27 +124,34 @@ export class IRStorageAdapterV4 {
 
 			if (matchedChunks.length > 0) {
 				logger.info(
-					`[IRStorageAdapterV4] getBlocksByDeckV4: 从 chunk 阅读点兼容视图获取 ${matchedChunks.length} 个块`
+					`[IRStorageAdapterV4] getBlocksByDeckV4: 从 chunk 阅读点兼容视图获取 ${matchedChunks.length} 个块`,
 				);
 
 				// v5.4: 转换 IRChunkFileData → IRBlockV4，并从块文件读取标题
 				// v6.1: 预先获取 sources 数据，用于设置正确的 sourcePath（源文档路径）
 				const allSources = await this.storage.getAllSources();
 				const blocks = await Promise.all(
-					matchedChunks.map((chunk) => this.chunkToV4WithTitle(chunk, allSources))
+					matchedChunks.map((chunk) =>
+						this.chunkToV4WithTitle(chunk, allSources),
+					),
 				);
 
 				if (includeIgnored) return blocks;
 
 				return blocks.filter((_b) => {
-					if (_b.status === "suspended" || _b.status === "removed") return false;
+					if (_b.status === "suspended" || _b.status === "removed")
+						return false;
 					return !this.hasIgnoreTag(_b);
 				});
 			}
 		}
 
 		// 2. 回退到旧版 block 兼容视图
-		const blocks = await this.storage.getBlocksByDeck(deckId, includeIgnored, "IRStorageAdapterV4");
+		const blocks = await this.storage.getBlocksByDeck(
+			deckId,
+			includeIgnored,
+			"IRStorageAdapterV4",
+		);
 
 		if (blocks.length > 0) {
 			const v3StateCounts: Record<string, number> = {};
@@ -149,8 +160,8 @@ export class IRStorageAdapterV4 {
 			}
 			logger.debug(
 				`[IRStorageAdapterV4] getBlocksByDeckV4: 从 legacy block 兼容视图获取，V3状态分布=${JSON.stringify(
-					v3StateCounts
-				)}`
+					v3StateCounts,
+				)}`,
 			);
 		}
 
@@ -162,7 +173,10 @@ export class IRStorageAdapterV4 {
 		});
 	}
 
-	async getBlocksByDeckV4Fast(deckId: string, includeIgnored = false): Promise<IRBlockV4[]> {
+	async getBlocksByDeckV4Fast(
+		deckId: string,
+		includeIgnored = false,
+	): Promise<IRBlockV4[]> {
 		const deck = await this.storage.getDeckById(deckId);
 		if (deck) {
 			const allChunks = await this.storage.getAllChunkData();
@@ -179,12 +193,15 @@ export class IRStorageAdapterV4 {
 
 			if (matchedChunks.length > 0) {
 				const allSources = await this.storage.getAllSources();
-				const blocks = matchedChunks.map((chunk) => this.chunkToV4Fast(chunk, allSources));
+				const blocks = matchedChunks.map((chunk) =>
+					this.chunkToV4Fast(chunk, allSources),
+				);
 
 				if (includeIgnored) return blocks;
 
 				return blocks.filter((_b) => {
-					if (_b.status === "suspended" || _b.status === "removed") return false;
+					if (_b.status === "suspended" || _b.status === "removed")
+						return false;
 					return !this.hasIgnoreTag(_b);
 				});
 			}
@@ -194,7 +211,7 @@ export class IRStorageAdapterV4 {
 		const blocks = await this.storage.getBlocksByDeck(
 			deckId,
 			includeIgnored,
-			"IRStorageAdapterV4Fast"
+			"IRStorageAdapterV4Fast",
 		);
 		const result = blocks.map((b) => this.toV4(b));
 		if (includeIgnored) return result;
@@ -209,13 +226,20 @@ export class IRStorageAdapterV4 {
 	 * @param chunk 块数据
 	 * @param sourceOriginalPath 可选的源文档原始路径（用于文档关联筛选）
 	 */
-	private chunkToV4(chunk: IRChunkFileData, _sourceOriginalPath?: string): IRBlockV4 {
+	private chunkToV4(
+		chunk: IRChunkFileData,
+		_sourceOriginalPath?: string,
+	): IRBlockV4 {
 		// v6.1: sourcePath 优先使用源文档的原始路径，便于卡片管理界面的文档关联筛选
 		const sourcePath =
-			readString(_sourceOriginalPath).length > 0 ? readString(_sourceOriginalPath) : readString(chunk.filePath);
+			readString(_sourceOriginalPath).length > 0
+				? readString(_sourceOriginalPath)
+				: readString(chunk.filePath);
 
 		const priorityUi =
-			typeof chunk.priorityUi === "number" ? chunk.priorityUi : chunk.priorityEff;
+			typeof chunk.priorityUi === "number"
+				? chunk.priorityUi
+				: chunk.priorityEff;
 		return {
 			id: chunk.chunkId,
 			sourcePath,
@@ -239,7 +263,7 @@ export class IRStorageAdapterV4 {
 	 */
 	private async chunkToV4WithTitle(
 		chunk: IRChunkFileData,
-		sources?: Record<string, IRSourceFileMeta>
+		sources?: Record<string, IRSourceFileMeta>,
 	): Promise<IRBlockV4> {
 		// v6.1: 通过 sourceId 查找源文档的原始路径
 		const sourceOriginalPath = sources?.[chunk.sourceId]?.originalPath;
@@ -258,7 +282,9 @@ export class IRStorageAdapterV4 {
 
 		try {
 			if (!hasValidChunkFilePath(chunk)) {
-				logger.warn(`[IRStorageAdapterV4] 块 filePath 无效: ${String(chunk.filePath)}`);
+				logger.warn(
+					`[IRStorageAdapterV4] 块 filePath 无效: ${String(chunk.filePath)}`,
+				);
 				return block;
 			}
 
@@ -319,7 +345,9 @@ export class IRStorageAdapterV4 {
 			// 如果没有找到 # 标题，使用第一行内容作为标题
 			if (!title && firstNonEmptyLine) {
 				// 移除可能的链接语法 [[ ]]
-				title = firstNonEmptyLine.replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, "$1").substring(0, 50);
+				title = firstNonEmptyLine
+					.replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, "$1")
+					.substring(0, 50);
 			}
 
 			// 生成内容预览（前200字符，移除标题行）
@@ -328,7 +356,10 @@ export class IRStorageAdapterV4 {
 			block.headingText = title || "未命名内容块";
 			block.contentPreview = contentPreview;
 		} catch (error) {
-			logger.warn(`[IRStorageAdapterV4] 读取块文件失败: ${chunk.filePath}`, error);
+			logger.warn(
+				`[IRStorageAdapterV4] 读取块文件失败: ${chunk.filePath}`,
+				error,
+			);
 		}
 
 		return block;
@@ -336,7 +367,7 @@ export class IRStorageAdapterV4 {
 
 	private chunkToV4Fast(
 		chunk: IRChunkFileData,
-		sources?: Record<string, IRSourceFileMeta>
+		sources?: Record<string, IRSourceFileMeta>,
 	): IRBlockV4 {
 		const sourceOriginalPath = sources?.[chunk.sourceId]?.originalPath;
 		const block = this.chunkToV4(chunk, sourceOriginalPath);
@@ -519,7 +550,7 @@ export class IRStorageAdapterV4 {
 		logger.info(
 			`[IRStorageAdapterV4] getDueBlocksV4: deckId=${deckId}, 总块数=${
 				blocks.length
-			}, 状态分布=${JSON.stringify(statusCounts)}`
+			}, 状态分布=${JSON.stringify(statusCounts)}`,
 		);
 
 		const dueBlocks = blocks.filter((_block) => {
@@ -543,7 +574,9 @@ export class IRStorageAdapterV4 {
 			return true;
 		});
 
-		logger.info(`[IRStorageAdapterV4] getDueBlocksV4 筛选结果: 到期块数=${dueBlocks.length}`);
+		logger.info(
+			`[IRStorageAdapterV4] getDueBlocksV4 筛选结果: 到期块数=${dueBlocks.length}`,
+		);
 
 		return dueBlocks;
 	}
@@ -551,7 +584,10 @@ export class IRStorageAdapterV4 {
 	/**
 	 * 获取指定状态的 V4 内容块
 	 */
-	async getBlocksByStatusV4(deckId: string, status: IRBlockStatus): Promise<IRBlockV4[]> {
+	async getBlocksByStatusV4(
+		deckId: string,
+		status: IRBlockStatus,
+	): Promise<IRBlockV4[]> {
 		const blocks = await this.getBlocksByDeckV4(deckId);
 		return blocks.filter((b) => b.status === status);
 	}
@@ -561,7 +597,7 @@ export class IRStorageAdapterV4 {
 	 */
 	async updateBlockStatsV4(
 		blockId: string,
-		statsUpdate: Partial<IRBlockStats>
+		statsUpdate: Partial<IRBlockStats>,
 	): Promise<IRBlockV4 | null> {
 		const block = await this.getBlockV4(blockId);
 		if (!block) return null;
@@ -584,7 +620,11 @@ export class IRStorageAdapterV4 {
 		block: IRBlockV4,
 		readingTimeSec: number,
 		effectiveTimeSec: number,
-		actions: { extracts?: number; cardsCreated?: number; notesWritten?: number }
+		actions: {
+			extracts?: number;
+			cardsCreated?: number;
+			notesWritten?: number;
+		},
 	): Promise<IRBlockV4> {
 		// 更新统计
 		block.stats.impressions++;
@@ -614,7 +654,9 @@ export class IRStorageAdapterV4 {
 		};
 		await this.addSession(session);
 
-		logger.debug(`[IRStorageAdapterV4] 记录阅读会话: block=${block.id}, time=${readingTimeSec}s`);
+		logger.debug(
+			`[IRStorageAdapterV4] 记录阅读会话: block=${block.id}, time=${readingTimeSec}s`,
+		);
 
 		return block;
 	}
@@ -644,7 +686,10 @@ export class IRStorageAdapterV4 {
 	 */
 	private toV3(block: IRBlockV4): IRBlock {
 		// 将 V4 status 映射回 V3 state
-		const stateMap: Record<IRBlockStatus, "new" | "learning" | "review" | "suspended"> = {
+		const stateMap: Record<
+			IRBlockStatus,
+			"new" | "learning" | "review" | "suspended"
+		> = {
 			new: "new",
 			queued: "learning",
 			scheduled: "review",
@@ -681,7 +726,10 @@ export class IRStorageAdapterV4 {
 				block.stats.lastInteraction > 0
 					? new Date(block.stats.lastInteraction).toISOString()
 					: null,
-			nextReview: block.nextRepDate > 0 ? new Date(block.nextRepDate).toISOString() : null,
+			nextReview:
+				block.nextRepDate > 0
+					? new Date(block.nextRepDate).toISOString()
+					: null,
 			reviewCount: block.stats.impressions,
 
 			// 统计字段
@@ -717,7 +765,9 @@ export class IRStorageAdapterV4 {
 	/**
 	 * 将连续优先级(0-10)映射为枚举
 	 */
-	private mapPriorityUiToEnum(priorityUi: number): "low" | "medium" | "high" | "critical" {
+	private mapPriorityUiToEnum(
+		priorityUi: number,
+	): "low" | "medium" | "high" | "critical" {
 		if (priorityUi >= 8) return "critical";
 		if (priorityUi >= 6) return "high";
 		if (priorityUi >= 4) return "medium";
@@ -756,7 +806,9 @@ export class IRStorageAdapterV4 {
 			await this.storage.saveBlocks(v3Blocks);
 		}
 
-		logger.info(`[IRStorageAdapterV4] 迁移完成: migrated=${migrated}, errors=${errors}`);
+		logger.info(
+			`[IRStorageAdapterV4] 迁移完成: migrated=${migrated}, errors=${errors}`,
+		);
 		return { migrated, errors };
 	}
 }

@@ -5,13 +5,12 @@ import {
 	type IRChunkFileData,
 	type IRDeck,
 } from "../../types/ir-types";
-import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
-import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
-import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
 import {
 	basenameWithoutExtension,
 	isIRInternalScheduleSourcePath,
 } from "../../utils/ir-internal-data-path";
+import { readAdvancedScheduleSettingsSnapshot } from "../../utils/ir-plugin-host-access";
+import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
 import { logger } from "../../utils/logger";
 import {
 	type IRAssociatedNoteSignal,
@@ -21,18 +20,25 @@ import {
 	resolveAssociatedNotePath,
 	resolveAssociatedNotePaths,
 } from "./IRAssociatedNoteSignals";
-import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
-import { type IRCognitiveProfile, IRCognitiveProfileService } from "./IRCognitiveProfileService";
-import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
-import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
-import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
+import {
+	type IRCognitiveProfile,
+	IRCognitiveProfileService,
+} from "./IRCognitiveProfileService";
 import type { IRDailyLoadDayStats } from "./IRDailyLoadAllocator";
+import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
+import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
+import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
+import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
+import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
 import { IRPlanGeneratorService } from "./IRPlanGeneratorService";
-import { IRStorageService } from "./IRStorageService";
+import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
-import { computeTagGroupPriorityBias, IRTagGroupService } from "./IRTagGroupService";
+import { IRStorageService } from "./IRStorageService";
+import {
+	IRTagGroupService,
+	computeTagGroupPriorityBias,
+} from "./IRTagGroupService";
 import { getIncrementalReadingPlugin } from "./ir-runtime";
-import { readAdvancedScheduleSettingsSnapshot } from "../../utils/ir-plugin-host-access";
 
 export type ScheduleRecomputeReason =
 	| "complete_block"
@@ -145,9 +151,10 @@ export interface IRScheduleImpactPreview {
 }
 
 function formatDateKey(date: Date): string {
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-		date.getDate()
-	).padStart(2, "0")}`;
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function estimateMinutesFromStats(stats?: {
@@ -171,17 +178,21 @@ function extractChunkTitle(filePath: string, fallback: string): string {
 function extractChunkTitleWithMeta(
 	filePath: string,
 	fallback: string,
-	meta: Record<string, unknown> | null | undefined
+	meta: Record<string, unknown> | null | undefined,
 ): string {
 	const pointTitle =
-		typeof meta?.pointTitle === "string" && meta.pointTitle.trim() ? meta.pointTitle.trim() : "";
+		typeof meta?.pointTitle === "string" && meta.pointTitle.trim()
+			? meta.pointTitle.trim()
+			: "";
 	if (pointTitle) {
 		return pointTitle;
 	}
 	return extractChunkTitle(filePath, fallback);
 }
 
-export function readSequenceMeta(record: Record<string, unknown> | null | undefined): {
+export function readSequenceMeta(
+	record: Record<string, unknown> | null | undefined,
+): {
 	sourceSequenceGroup?: string;
 	sourceSequenceOrder?: number;
 	sourceSequenceLocked?: boolean;
@@ -189,17 +200,22 @@ export function readSequenceMeta(record: Record<string, unknown> | null | undefi
 	manualSchedulePinnedDateKey?: string;
 } {
 	const sourceSequenceGroup =
-		typeof record?.sourceSequenceGroup === "string" && record.sourceSequenceGroup.trim()
+		typeof record?.sourceSequenceGroup === "string" &&
+		record.sourceSequenceGroup.trim()
 			? record.sourceSequenceGroup.trim()
 			: undefined;
 	const sourceSequenceOrder =
-		typeof record?.sourceSequenceOrder === "number" && Number.isFinite(record.sourceSequenceOrder)
+		typeof record?.sourceSequenceOrder === "number" &&
+		Number.isFinite(record.sourceSequenceOrder)
 			? record.sourceSequenceOrder
 			: undefined;
 	const sourceSequenceLocked =
-		typeof record?.sourceSequenceLocked === "boolean" ? record.sourceSequenceLocked : undefined;
+		typeof record?.sourceSequenceLocked === "boolean"
+			? record.sourceSequenceLocked
+			: undefined;
 	const sourceSequenceAnchorDateKey =
-		typeof record?.sourceSequenceAnchorDateKey === "string" && record.sourceSequenceAnchorDateKey.trim()
+		typeof record?.sourceSequenceAnchorDateKey === "string" &&
+		record.sourceSequenceAnchorDateKey.trim()
 			? record.sourceSequenceAnchorDateKey.trim()
 			: undefined;
 	const manualSchedulePinnedDateKey =
@@ -232,7 +248,10 @@ function buildExplanation(input: {
 	const scoreBreakdown = new IRCognitiveProfileService().computeProfile(input);
 	const overdueDays =
 		input.nextRepDate > 0 && input.nextRepDate < input.nowMs
-			? Math.max(1, Math.floor((input.nowMs - input.nextRepDate) / (24 * 60 * 60 * 1000)))
+			? Math.max(
+					1,
+					Math.floor((input.nowMs - input.nextRepDate) / (24 * 60 * 60 * 1000)),
+			  )
 			: 0;
 	const isOverdue = overdueDays > 0;
 	const hasScheduledDate = input.nextRepDate > 0;
@@ -253,17 +272,22 @@ function buildExplanation(input: {
 	if ((input.manualPriority ?? 0) > 0) {
 		secondaryReasons.push(`手动优先级 P${input.manualPriority}`);
 	}
-	if ((input.effectivePriority ?? 0) > 0 && input.effectivePriority !== input.manualPriority) {
-		secondaryReasons.push(`有效优先级 ${(input.effectivePriority ?? 0).toFixed(1)}`);
+	if (
+		(input.effectivePriority ?? 0) > 0 &&
+		input.effectivePriority !== input.manualPriority
+	) {
+		secondaryReasons.push(
+			`有效优先级 ${(input.effectivePriority ?? 0).toFixed(1)}`,
+		);
 	}
 	secondaryReasons.push(`预计耗时 ${input.estimatedMinutes.toFixed(1)} 分钟`);
 	secondaryReasons.push(`状态 ${input.scheduleStatus}`);
 	secondaryReasons.push(
 		`重要性 ${scoreBreakdown.importanceScore.toFixed(
-			1
+			1,
 		)} / 紧迫性 ${scoreBreakdown.urgencyScore.toFixed(
-			1
-		)} / 难度 ${scoreBreakdown.difficultyScore.toFixed(1)}`
+			1,
+		)} / 难度 ${scoreBreakdown.difficultyScore.toFixed(1)}`,
 	);
 	if (hasScheduledDate) {
 		secondaryReasons.push("已有明确复习日期");
@@ -312,10 +336,11 @@ export class IRScheduleKernel {
 	}
 
 	private buildScheduleCacheKey(options?: RecomputeOptions): string {
-		const normalizedDeckIds = this.normalizeIdentifiers(options?.deckIds || []).sort((a, b) =>
-			a.localeCompare(b)
-		);
-		const deckKey = normalizedDeckIds.length > 0 ? normalizedDeckIds.join("||") : "__all__";
+		const normalizedDeckIds = this.normalizeIdentifiers(
+			options?.deckIds || [],
+		).sort((a, b) => a.localeCompare(b));
+		const deckKey =
+			normalizedDeckIds.length > 0 ? normalizedDeckIds.join("||") : "__all__";
 		return `${deckKey}::${this.resolveHorizonDays(options)}`;
 	}
 
@@ -333,7 +358,10 @@ export class IRScheduleKernel {
 		return readAdvancedScheduleSettingsSnapshot(this.app);
 	}
 
-	private resolveTopicKey(sourceFile: string, tagGroup?: string | null): string {
+	private resolveTopicKey(
+		sourceFile: string,
+		tagGroup?: string | null,
+	): string {
 		const normalizedGroup = String(tagGroup || "").trim();
 		if (normalizedGroup && normalizedGroup !== "default") {
 			return `tag:${normalizedGroup}`;
@@ -346,12 +374,15 @@ export class IRScheduleKernel {
 			new Set(
 				(Array.isArray(values) ? values : [])
 					.map((value) => String(value || "").trim())
-					.filter(Boolean)
-			)
+					.filter(Boolean),
+			),
 		);
 	}
 
-	private buildDeckIdentifierContext(decks: IRDeck[], requestedDeckIds: string[]): {
+	private buildDeckIdentifierContext(
+		decks: IRDeck[],
+		requestedDeckIds: string[],
+	): {
 		targetIdentifiers: Set<string>;
 		canonicalDeckIds: string[];
 		canonicalByIdentifier: Map<string, string>;
@@ -371,7 +402,9 @@ export class IRScheduleKernel {
 
 			const isTarget =
 				normalizedTargets.length === 0 ||
-				identifiers.some((identifier) => normalizedTargets.includes(identifier));
+				identifiers.some((identifier) =>
+					normalizedTargets.includes(identifier),
+				);
 			if (!isTarget) {
 				continue;
 			}
@@ -395,8 +428,14 @@ export class IRScheduleKernel {
 			if (!canonicalByIdentifier.has(identifier)) {
 				canonicalByIdentifier.set(identifier, identifier);
 			}
-			if (!canonicalDeckIds.includes(canonicalByIdentifier.get(identifier) || identifier)) {
-				canonicalDeckIds.push(canonicalByIdentifier.get(identifier) || identifier);
+			if (
+				!canonicalDeckIds.includes(
+					canonicalByIdentifier.get(identifier) || identifier,
+				)
+			) {
+				canonicalDeckIds.push(
+					canonicalByIdentifier.get(identifier) || identifier,
+				);
 			}
 		}
 
@@ -409,19 +448,21 @@ export class IRScheduleKernel {
 
 	private resolveCanonicalDeckId(
 		deckIdentifier: string | null | undefined,
-		canonicalByIdentifier: Map<string, string>
+		canonicalByIdentifier: Map<string, string>,
 	): string {
 		const normalizedIdentifier = String(deckIdentifier || "").trim();
 		if (!normalizedIdentifier) {
 			return "";
 		}
 
-		return canonicalByIdentifier.get(normalizedIdentifier) || normalizedIdentifier;
+		return (
+			canonicalByIdentifier.get(normalizedIdentifier) || normalizedIdentifier
+		);
 	}
 
 	async recomputeScheduleForDeck(
 		reason: ScheduleRecomputeReason,
-		options?: RecomputeOptions
+		options?: RecomputeOptions,
 	): Promise<IRPlannedSchedule> {
 		const cacheKey = this.buildScheduleCacheKey(options);
 		const inflight = this.inflightRecomputes.get(cacheKey);
@@ -429,7 +470,11 @@ export class IRScheduleKernel {
 			return inflight;
 		}
 
-		const recomputePromise = this.recomputeScheduleForDeckInternal(reason, options, cacheKey);
+		const recomputePromise = this.recomputeScheduleForDeckInternal(
+			reason,
+			options,
+			cacheKey,
+		);
 		this.inflightRecomputes.set(cacheKey, recomputePromise);
 
 		try {
@@ -444,7 +489,7 @@ export class IRScheduleKernel {
 	private async recomputeScheduleForDeckInternal(
 		reason: ScheduleRecomputeReason,
 		options: RecomputeOptions | undefined,
-		cacheKey: string
+		cacheKey: string,
 	): Promise<IRPlannedSchedule> {
 		await this.storage.initialize();
 		await this.pdfService.initialize();
@@ -462,7 +507,9 @@ export class IRScheduleKernel {
 
 		const planningSettings = this.getPlanningSettingsSnapshot();
 		const leanSchedule = options?.leanSchedule === true;
-		const readingMaterials = leanSchedule ? [] : await this.getReadingMaterials();
+		const readingMaterials = leanSchedule
+			? []
+			: await this.getReadingMaterials();
 		const readingMaterialByPath = this.getReadingMaterialMap(readingMaterials);
 		const associatedNoteSignalIndex: IRAssociatedNoteSignalIndex = leanSchedule
 			? new Map<string, IRAssociatedNoteSignal>()
@@ -481,7 +528,7 @@ export class IRScheduleKernel {
 				readingMaterialByPath,
 				associatedNoteSignalIndex,
 				nowMs,
-				canonicalByIdentifier
+				canonicalByIdentifier,
 			);
 			if (!item) continue;
 			candidates.push(item);
@@ -489,13 +536,14 @@ export class IRScheduleKernel {
 
 		for (const task of pdfTasks) {
 			const taskDeckIdentifier = getTaskTopicId(task);
-			if (!targetIdentifiers.has(String(taskDeckIdentifier || "").trim())) continue;
+			if (!targetIdentifiers.has(String(taskDeckIdentifier || "").trim()))
+				continue;
 			const item = this.mapPdfTaskToPlannedItem(
 				task,
 				readingMaterialByPath,
 				associatedNoteSignalIndex,
 				nowMs,
-				canonicalByIdentifier
+				canonicalByIdentifier,
 			);
 			if (!item) continue;
 			candidates.push(item);
@@ -503,13 +551,14 @@ export class IRScheduleKernel {
 
 		for (const task of epubTasks) {
 			const taskDeckIdentifier = getTaskTopicId(task);
-			if (!targetIdentifiers.has(String(taskDeckIdentifier || "").trim())) continue;
+			if (!targetIdentifiers.has(String(taskDeckIdentifier || "").trim()))
+				continue;
 			const item = this.mapEpubTaskToPlannedItem(
 				task,
 				readingMaterialByPath,
 				associatedNoteSignalIndex,
 				nowMs,
-				canonicalByIdentifier
+				canonicalByIdentifier,
 			);
 			if (!item) continue;
 			candidates.push(item);
@@ -537,7 +586,9 @@ export class IRScheduleKernel {
 			reason !== "change_priority" &&
 			reason !== "load_defer"
 		) {
-			await applyLoadDeferralsFromPlan(this.app, generated.loadDeferrals, { reason });
+			await applyLoadDeferralsFromPlan(this.app, generated.loadDeferrals, {
+				reason,
+			});
 		}
 		const schedule: IRPlannedSchedule = {
 			generatedAt: Date.now(),
@@ -553,7 +604,7 @@ export class IRScheduleKernel {
 
 	async previewScheduleImpact(
 		changeSet: IRScheduleChangeSet,
-		options?: RecomputeOptions
+		options?: RecomputeOptions,
 	): Promise<IRScheduleImpactPreview> {
 		let before = this.getCachedSchedule(options);
 		if (!before) {
@@ -571,7 +622,9 @@ export class IRScheduleKernel {
 		const now = new Date();
 		now.setHours(0, 0, 0, 0);
 		const nowMs = now.getTime();
-		let targetIndex = flatItems.findIndex((item) => item.id === changeSet.itemId);
+		let targetIndex = flatItems.findIndex(
+			(item) => item.id === changeSet.itemId,
+		);
 
 		if (targetIndex < 0) {
 			if (this.isInactiveScheduleStatus(changeSet.scheduleStatus)) {
@@ -583,16 +636,24 @@ export class IRScheduleKernel {
 			}
 
 			const decks = Object.values(await this.storage.getAllDecks());
-			const requestedDeckIds = options?.deckIds?.length ? options.deckIds : before.deckIds;
-			const { canonicalByIdentifier } = this.buildDeckIdentifierContext(decks, requestedDeckIds);
-			const readingMaterialByPath = this.getReadingMaterialMap(await this.getReadingMaterials());
-			const associatedNoteSignalIndex = await this.getAssociatedNoteSignalIndex();
+			const requestedDeckIds = options?.deckIds?.length
+				? options.deckIds
+				: before.deckIds;
+			const { canonicalByIdentifier } = this.buildDeckIdentifierContext(
+				decks,
+				requestedDeckIds,
+			);
+			const readingMaterialByPath = this.getReadingMaterialMap(
+				await this.getReadingMaterials(),
+			);
+			const associatedNoteSignalIndex =
+				await this.getAssociatedNoteSignalIndex();
 			const potentialItem = await this.loadPotentialPlannedItemById(
 				changeSet.itemId,
 				readingMaterialByPath,
 				associatedNoteSignalIndex,
 				nowMs,
-				canonicalByIdentifier
+				canonicalByIdentifier,
 			);
 
 			if (potentialItem) {
@@ -610,9 +671,12 @@ export class IRScheduleKernel {
 		}
 
 		const target = flatItems[targetIndex];
-		const manualPriority = changeSet.manualPriority ?? target.explanation.manualPriority;
+		const manualPriority =
+			changeSet.manualPriority ?? target.explanation.manualPriority;
 		const effectivePriority =
-			changeSet.effectivePriority ?? target.explanation.effectivePriority ?? target.priority;
+			changeSet.effectivePriority ??
+			target.explanation.effectivePriority ??
+			target.priority;
 		const nextRepDate = changeSet.nextRepDate ?? target.nextRepDate;
 		const intervalDays = changeSet.intervalDays ?? target.intervalDays;
 		const scheduleStatus = changeSet.scheduleStatus ?? target.scheduleStatus;
@@ -629,7 +693,9 @@ export class IRScheduleKernel {
 			manualPriority,
 			effectivePriority,
 			memoryPrioritySignal:
-				(target.linkedCardCount ?? 0) > 0 ? target.linkedCardPrioritySignal : undefined,
+				(target.linkedCardCount ?? 0) > 0
+					? target.linkedCardPrioritySignal
+					: undefined,
 			intervalDays,
 			linkedCardCount: target.linkedCardCount,
 			nowMs,
@@ -640,7 +706,9 @@ export class IRScheduleKernel {
 		const horizonDays = this.resolveHorizonDays(options);
 		await this.applyTagGroupPriorityBiases(flatItems, planningSettings);
 		const generated = this.planGenerator.generatePlan(
-			flatItems.filter((item) => !this.isInactiveScheduleStatus(item.scheduleStatus)),
+			flatItems.filter(
+				(item) => !this.isInactiveScheduleStatus(item.scheduleStatus),
+			),
 			{
 				horizonDays,
 				dailyBudgetMinutes: planningSettings.dailyTimeBudgetMinutes ?? 45,
@@ -650,11 +718,12 @@ export class IRScheduleKernel {
 				enableLoadBasedDefer: planningSettings.enableLoadBasedDefer,
 				maxEstimatedMinutesPerItem: planningSettings.maxEstimatedMinutesPerItem,
 				dailyReadingPointCap: planningSettings.dailyReadingPointCap,
-				dailyReadingPointStretchCap: planningSettings.dailyReadingPointStretchCap,
+				dailyReadingPointStretchCap:
+					planningSettings.dailyReadingPointStretchCap,
 				enableHorizonSmoothing: planningSettings.enableHorizonSmoothing,
 				interleaveProfile: planningSettings.interleaveProfile,
 				maxTopicSharePercent: planningSettings.maxTopicSharePercent,
-			}
+			},
 		);
 		const after: IRPlannedSchedule = {
 			generatedAt: Date.now(),
@@ -694,8 +763,14 @@ export class IRScheduleKernel {
 		return [];
 	}
 
-	private getReadingMaterialMap(readingMaterials: ReadingMaterial[]): Map<string, ReadingMaterial> {
-		return new Map(readingMaterials.map((material) => [material.filePath, material] as const));
+	private getReadingMaterialMap(
+		readingMaterials: ReadingMaterial[],
+	): Map<string, ReadingMaterial> {
+		return new Map(
+			readingMaterials.map(
+				(material) => [material.filePath, material] as const,
+			),
+		);
 	}
 
 	private async getAssociatedNoteSignalIndex(): Promise<IRAssociatedNoteSignalIndex> {
@@ -715,9 +790,10 @@ export class IRScheduleKernel {
 		sourceFile: string,
 		readingMaterialByPath: Map<string, ReadingMaterial>,
 		associatedNoteSignalIndex: IRAssociatedNoteSignalIndex,
-		explicitAssociatedNote?:
-			| Pick<ReadingMaterial, "associatedNotePath" | "associatedNotePaths">
-			| null
+		explicitAssociatedNote?: Pick<
+			ReadingMaterial,
+			"associatedNotePath" | "associatedNotePaths"
+		> | null,
 	): Pick<
 		IRPlannedScheduleItem,
 		| "associatedNotePath"
@@ -729,9 +805,15 @@ export class IRScheduleKernel {
 		const explicitPaths = resolveAssociatedNotePaths({
 			associatedNotePath:
 				resolveAssociatedNotePath(explicitAssociatedNote || null) ||
-				(explicitAssociatedNote as { primaryAssociatedNotePath?: string } | null | undefined)
-					?.primaryAssociatedNotePath,
-			associatedNotePaths: Array.isArray(explicitAssociatedNote?.associatedNotePaths)
+				(
+					explicitAssociatedNote as
+						| { primaryAssociatedNotePath?: string }
+						| null
+						| undefined
+				)?.primaryAssociatedNotePath,
+			associatedNotePaths: Array.isArray(
+				explicitAssociatedNote?.associatedNotePaths,
+			)
 				? explicitAssociatedNote.associatedNotePaths
 				: undefined,
 		});
@@ -743,13 +825,17 @@ export class IRScheduleKernel {
 				? material.associatedNotePaths
 				: undefined,
 		});
-		const associatedNotePaths = explicitPaths.length > 0 ? explicitPaths : materialPaths;
+		const associatedNotePaths =
+			explicitPaths.length > 0 ? explicitPaths : materialPaths;
 		const associatedNotePath = associatedNotePaths[0];
 		if (!associatedNotePath) {
 			return {};
 		}
 
-		const signal = getAssociatedNoteSignal(associatedNoteSignalIndex, associatedNotePath);
+		const signal = getAssociatedNoteSignal(
+			associatedNoteSignalIndex,
+			associatedNotePath,
+		);
 		return {
 			associatedNotePath,
 			associatedNotePaths,
@@ -761,7 +847,7 @@ export class IRScheduleKernel {
 
 	private async applyTagGroupPriorityBiases(
 		items: IRPlannedScheduleItem[],
-		planningSettings: IRAdvancedScheduleSettings
+		planningSettings: IRAdvancedScheduleSettings,
 	): Promise<void> {
 		if (planningSettings.enableTagGroupPrior === false || items.length === 0) {
 			for (const item of items) {
@@ -774,8 +860,8 @@ export class IRScheduleKernel {
 			new Set(
 				items
 					.map((item) => String(item.tagGroupId || "default").trim())
-					.filter((groupId) => groupId && groupId !== "default")
-			)
+					.filter((groupId) => groupId && groupId !== "default"),
+			),
 		);
 		const biasByGroup = new Map<string, number>();
 		await Promise.all(
@@ -786,32 +872,38 @@ export class IRScheduleKernel {
 					computeTagGroupPriorityBias(profile, {
 						groupId,
 						defaultIntervalFactor: planningSettings.defaultIntervalFactor,
-					})
+					}),
 				);
-			})
+			}),
 		);
 
 		for (const item of items) {
 			const groupId = String(item.tagGroupId || "default").trim() || "default";
 			const bias = biasByGroup.get(groupId) ?? 0;
 			item.tagGroupPriorityBias = bias;
-			item.explanation.secondaryReasons = item.explanation.secondaryReasons.filter(
-				(reason) => !reason.startsWith("标签组倾向 ")
-			);
+			item.explanation.secondaryReasons =
+				item.explanation.secondaryReasons.filter(
+					(reason) => !reason.startsWith("标签组倾向 "),
+				);
 			if (Math.abs(bias) >= 0.05) {
 				item.explanation.secondaryReasons.push(
-					`标签组倾向 ${bias > 0 ? "+" : ""}${bias.toFixed(2)}`
+					`标签组倾向 ${bias > 0 ? "+" : ""}${bias.toFixed(2)}`,
 				);
 			}
 		}
 	}
 
-	private belongsToTargetDecks(chunk: IRChunkFileData, targetIdentifiers: Set<string>): boolean {
+	private belongsToTargetDecks(
+		chunk: IRChunkFileData,
+		targetIdentifiers: Set<string>,
+	): boolean {
 		if (targetIdentifiers.size === 0) {
 			return true;
 		}
 
-		if (getChunkTopicIds(chunk).some((deckId) => targetIdentifiers.has(deckId))) {
+		if (
+			getChunkTopicIds(chunk).some((deckId) => targetIdentifiers.has(deckId))
+		) {
 			return true;
 		}
 
@@ -824,7 +916,7 @@ export class IRScheduleKernel {
 		associatedNoteSignalIndex: IRAssociatedNoteSignalIndex,
 		nowMs: number,
 		canonicalByIdentifier: Map<string, string>,
-		includeInactive = false
+		includeInactive = false,
 	): IRPlannedScheduleItem | null {
 		const scheduleStatus = String(chunk.scheduleStatus || "new");
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
@@ -844,13 +936,21 @@ export class IRScheduleKernel {
 			filePath,
 			readingMaterialByPath,
 			associatedNoteSignalIndex,
-			null
+			null,
 		);
-		const { associatedNotePath: _ignoredNotePath, associatedNoteScope: _ignoredNoteScope, associatedNotePaths: _ignoredNotePaths, ...chunkAssociationSignals } =
-			associationMeta;
+		const {
+			associatedNotePath: _ignoredNotePath,
+			associatedNoteScope: _ignoredNoteScope,
+			associatedNotePaths: _ignoredNotePaths,
+			...chunkAssociationSignals
+		} = associationMeta;
 		const estimatedMinutes = estimateMinutesFromStats(chunk.stats);
-		const manualPriority = typeof chunk.priorityUi === "number" ? chunk.priorityUi : undefined;
-		const effectivePriority = typeof chunk.priorityEff === "number" ? chunk.priorityEff : manualPriority;
+		const manualPriority =
+			typeof chunk.priorityUi === "number" ? chunk.priorityUi : undefined;
+		const effectivePriority =
+			typeof chunk.priorityEff === "number"
+				? chunk.priorityEff
+				: manualPriority;
 		const sequenceMeta = readSequenceMeta(chunkMeta);
 		const memoryPrioritySignal =
 			(associationMeta.linkedCardCount ?? 0) > 0
@@ -862,7 +962,9 @@ export class IRScheduleKernel {
 			title,
 			sourceFile: filePath,
 			autoSubscribedAt:
-				typeof chunkMeta.autoSubscribedAt === "string" ? chunkMeta.autoSubscribedAt : undefined,
+				typeof chunkMeta.autoSubscribedAt === "string"
+					? chunkMeta.autoSubscribedAt
+					: undefined,
 			autoSubscribedBadgeUntil:
 				typeof chunkMeta.autoSubscribedBadgeUntil === "string"
 					? chunkMeta.autoSubscribedBadgeUntil
@@ -874,13 +976,16 @@ export class IRScheduleKernel {
 				typeof chunkMeta.resumeLink === "string" && chunkMeta.resumeLink.trim()
 					? chunkMeta.resumeLink.trim()
 					: material?.resumeLink,
-			priority: (chunk.priorityUi) ?? chunk.priorityEff ?? 5,
+			priority: chunk.priorityUi ?? chunk.priorityEff ?? 5,
 			intervalDays: Number(chunk.intervalDays ?? 1),
 			scheduleStatus,
 			nextRepDate,
 			nextReviewDate,
 			estimatedMinutes,
-			deckId: this.resolveCanonicalDeckId(getChunkTopicIds(chunk)[0], canonicalByIdentifier),
+			deckId: this.resolveCanonicalDeckId(
+				getChunkTopicIds(chunk)[0],
+				canonicalByIdentifier,
+			),
 			sourceType: "chunk",
 			...sequenceMeta,
 			explanation: buildExplanation({
@@ -902,11 +1007,13 @@ export class IRScheduleKernel {
 	private pushItem(
 		itemsByDate: Map<string, IRPlannedScheduleItem[]>,
 		item: IRPlannedScheduleItem,
-		explicitDateKey?: string
+		explicitDateKey?: string,
 	): void {
 		const dateKey =
 			explicitDateKey ??
-			(item.nextReviewDate ? formatDateKey(item.nextReviewDate) : formatDateKey(new Date()));
+			(item.nextReviewDate
+				? formatDateKey(item.nextReviewDate)
+				: formatDateKey(new Date()));
 		const current = itemsByDate.get(dateKey) || [];
 		current.push(item);
 		itemsByDate.set(dateKey, current);
@@ -915,12 +1022,15 @@ export class IRScheduleKernel {
 	private buildPlannedScheduleFromMap(
 		itemsByDate: Map<string, IRPlannedScheduleItem[]>,
 		deckIds: string[],
-		reason: ScheduleRecomputeReason
+		reason: ScheduleRecomputeReason,
 	): IRPlannedSchedule {
 		const days = Array.from(itemsByDate.entries())
 			.sort((a, b) => a[0].localeCompare(b[0]))
 			.map(([dateKey, items]) => {
-				const totalEstimatedMinutes = items.reduce((sum, item) => sum + item.estimatedMinutes, 0);
+				const totalEstimatedMinutes = items.reduce(
+					(sum, item) => sum + item.estimatedMinutes,
+					0,
+				);
 				return {
 					dateKey,
 					items,
@@ -955,7 +1065,7 @@ export class IRScheduleKernel {
 		associatedNoteSignalIndex: IRAssociatedNoteSignalIndex,
 		nowMs: number,
 		canonicalByIdentifier: Map<string, string>,
-		includeInactive = false
+		includeInactive = false,
 	): IRPlannedScheduleItem | null {
 		const scheduleStatus = String(task.status || "new");
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
@@ -975,9 +1085,14 @@ export class IRScheduleKernel {
 			task.pdfPath,
 			readingMaterialByPath,
 			associatedNoteSignalIndex,
-			(task.meta || null) as Pick<ReadingMaterial, "associatedNotePath" | "associatedNotePaths">
+			(task.meta || null) as Pick<
+				ReadingMaterial,
+				"associatedNotePath" | "associatedNotePaths"
+			>,
 		);
-		const sequenceMeta = readSequenceMeta((task.meta || {}) as unknown as Record<string, unknown>);
+		const sequenceMeta = readSequenceMeta(
+			(task.meta || {}) as unknown as Record<string, unknown>,
+		);
 		const memoryPrioritySignal =
 			(associationMeta.linkedCardCount ?? 0) > 0
 				? associationMeta.linkedCardPrioritySignal
@@ -987,7 +1102,7 @@ export class IRScheduleKernel {
 			id: task.id,
 			title: String(task.title || "").trim() || "PDF 书签任务",
 			displayName: extractReadingPointDisplayName(
-				String(task.title || "").trim() || "PDF 书签任务"
+				String(task.title || "").trim() || "PDF 书签任务",
 			),
 			sourceFile: task.pdfPath,
 			topicKey: this.resolveTopicKey(task.pdfPath, task.meta?.tagGroup),
@@ -1000,7 +1115,10 @@ export class IRScheduleKernel {
 			nextRepDate,
 			nextReviewDate,
 			estimatedMinutes,
-			deckId: this.resolveCanonicalDeckId(taskDeckIdentifier, canonicalByIdentifier),
+			deckId: this.resolveCanonicalDeckId(
+				taskDeckIdentifier,
+				canonicalByIdentifier,
+			),
 			sourceType: "pdf",
 			...sequenceMeta,
 			explanation: buildExplanation({
@@ -1025,7 +1143,7 @@ export class IRScheduleKernel {
 		associatedNoteSignalIndex: IRAssociatedNoteSignalIndex,
 		nowMs: number,
 		canonicalByIdentifier: Map<string, string>,
-		includeInactive = false
+		includeInactive = false,
 	): IRPlannedScheduleItem | null {
 		const scheduleStatus = String(task.status || "new");
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
@@ -1045,9 +1163,14 @@ export class IRScheduleKernel {
 			task.epubFilePath,
 			readingMaterialByPath,
 			associatedNoteSignalIndex,
-			(task.meta || null) as Pick<ReadingMaterial, "associatedNotePath" | "associatedNotePaths">
+			(task.meta || null) as Pick<
+				ReadingMaterial,
+				"associatedNotePath" | "associatedNotePaths"
+			>,
 		);
-		const sequenceMeta = readSequenceMeta((task.meta || {}) as unknown as Record<string, unknown>);
+		const sequenceMeta = readSequenceMeta(
+			(task.meta || {}) as unknown as Record<string, unknown>,
+		);
 		const memoryPrioritySignal =
 			(associationMeta.linkedCardCount ?? 0) > 0
 				? associationMeta.linkedCardPrioritySignal
@@ -1056,7 +1179,9 @@ export class IRScheduleKernel {
 		return {
 			id: task.id,
 			title: String(task.title || "").trim() || "EPUB",
-			displayName: extractReadingPointDisplayName(String(task.title || "").trim() || "EPUB"),
+			displayName: extractReadingPointDisplayName(
+				String(task.title || "").trim() || "EPUB",
+			),
 			sourceFile: task.epubFilePath,
 			topicKey: this.resolveTopicKey(task.epubFilePath, task.meta?.tagGroup),
 			tagGroupId: String(task.meta?.tagGroup || "default").trim() || "default",
@@ -1067,7 +1192,10 @@ export class IRScheduleKernel {
 			nextRepDate,
 			nextReviewDate,
 			estimatedMinutes,
-			deckId: this.resolveCanonicalDeckId(taskDeckIdentifier, canonicalByIdentifier),
+			deckId: this.resolveCanonicalDeckId(
+				taskDeckIdentifier,
+				canonicalByIdentifier,
+			),
 			sourceType: "epub",
 			...sequenceMeta,
 			explanation: buildExplanation({
@@ -1091,12 +1219,12 @@ export class IRScheduleKernel {
 		readingMaterialByPath: Map<string, ReadingMaterial>,
 		associatedNoteSignalIndex: IRAssociatedNoteSignalIndex,
 		nowMs: number,
-		canonicalByIdentifier: Map<string, string>
+		canonicalByIdentifier: Map<string, string>,
 	): Promise<IRPlannedScheduleItem | null> {
 		const chunks = (await this.storage.getAllChunkData()) || {};
 		const chunk =
 			(chunks[itemId] as IRChunkFileData | undefined) ||
-			(Object.values(chunks).find((entry) => entry?.chunkId === itemId));
+			Object.values(chunks).find((entry) => entry?.chunkId === itemId);
 		if (chunk) {
 			return this.mapChunkToPlannedItem(
 				chunk,
@@ -1104,7 +1232,7 @@ export class IRScheduleKernel {
 				associatedNoteSignalIndex,
 				nowMs,
 				canonicalByIdentifier,
-				true
+				true,
 			);
 		}
 
@@ -1116,7 +1244,7 @@ export class IRScheduleKernel {
 				associatedNoteSignalIndex,
 				nowMs,
 				canonicalByIdentifier,
-				true
+				true,
 			);
 		}
 
@@ -1128,7 +1256,7 @@ export class IRScheduleKernel {
 				associatedNoteSignalIndex,
 				nowMs,
 				canonicalByIdentifier,
-				true
+				true,
 			);
 		}
 
@@ -1164,14 +1292,19 @@ export class IRScheduleKernel {
 		}
 
 		try {
-			const scheduleSources = await getSharedIRScheduleIndexService(this.app).getScheduleSources();
+			const scheduleSources = await getSharedIRScheduleIndexService(
+				this.app,
+			).getScheduleSources();
 			return {
 				chunks: scheduleSources.chunks,
 				pdfTasks: scheduleSources.pdfTasks,
 				epubTasks: scheduleSources.epubTasks,
 			};
 		} catch (error) {
-			logger.debug("[IRScheduleKernel] schedule index unavailable, falling back to storage", error);
+			logger.debug(
+				"[IRScheduleKernel] schedule index unavailable, falling back to storage",
+				error,
+			);
 			return await this.loadScheduleCandidatesFromStorage();
 		}
 	}

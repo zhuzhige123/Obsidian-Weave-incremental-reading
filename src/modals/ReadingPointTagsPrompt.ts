@@ -1,14 +1,14 @@
 import { App, Modal, Notice } from "obsidian";
 import { mount, unmount } from "svelte";
 import ReadingPointTagsPromptPanel from "../components/incremental-reading/reading-point-edit/ReadingPointTagsPromptPanel.svelte";
-import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
-import { buildSaveInputFromDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditSaveBuilder";
-import type { IRReadingPointEditDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
 import { normalizeReadingPointTags } from "../services/incremental-reading/IRPointTagService";
+import { buildSaveInputFromDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditSaveBuilder";
+import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
+import type { IRReadingPointEditDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
 import { resolveReadingPointSaveErrorMessage } from "../services/incremental-reading/reading-point-edit/reading-point-modal-utils";
-import { showObsidianConfirm } from "../utils/obsidian-confirm";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
+import { showObsidianConfirm } from "../utils/obsidian-confirm";
 
 export interface ReadingPointTagsPromptOptions {
 	draft: IRReadingPointEditDraft;
@@ -23,7 +23,7 @@ export class ReadingPointTagsPrompt extends Modal {
 
 	constructor(
 		app: App,
-		private readonly options: ReadingPointTagsPromptOptions
+		private readonly options: ReadingPointTagsPromptOptions,
 	) {
 		super(app);
 		this.tags = [...options.draft.tags];
@@ -38,7 +38,9 @@ export class ReadingPointTagsPrompt extends Modal {
 		const intro = this.contentEl.createDiv({ cls: "setting-item-description" });
 		intro.setText(i18n.t("irModals.readingPointTags.intro"));
 
-		const panelHost = this.contentEl.createDiv({ cls: "weave-reading-point-tags-panel-host" });
+		const panelHost = this.contentEl.createDiv({
+			cls: "weave-reading-point-tags-panel-host",
+		});
 		this.component = mount(ReadingPointTagsPromptPanel, {
 			target: panelHost,
 			props: {
@@ -51,13 +53,20 @@ export class ReadingPointTagsPrompt extends Modal {
 			},
 		});
 
-		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
-		const cancelButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.cancel") });
+		const buttonRow = this.contentEl.createDiv({
+			cls: "modal-button-container",
+		});
+		const cancelButton = buttonRow.createEl("button", {
+			text: i18n.t("irModals.common.cancel"),
+		});
 		cancelButton.onclick = () => {
 			void this.requestClose();
 		};
 
-		const saveButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.save"), cls: "mod-cta" });
+		const saveButton = buttonRow.createEl("button", {
+			text: i18n.t("irModals.common.save"),
+			cls: "mod-cta",
+		});
 		saveButton.disabled = !draft.canEditTags;
 		saveButton.onclick = () => {
 			void this.submit();
@@ -65,7 +74,10 @@ export class ReadingPointTagsPrompt extends Modal {
 	}
 
 	private isDirty(): boolean {
-		return JSON.stringify(normalizeReadingPointTags(this.tags)) !== this.initialTagsKey;
+		return (
+			JSON.stringify(normalizeReadingPointTags(this.tags)) !==
+			this.initialTagsKey
+		);
 	}
 
 	private async requestClose(): Promise<void> {
@@ -73,12 +85,16 @@ export class ReadingPointTagsPrompt extends Modal {
 			this.forceClose();
 			return;
 		}
-		const confirmed = await showObsidianConfirm(this.app, i18n.t("irModals.common.discardChangesMessage"), {
-			title: i18n.t("irModals.common.discardChangesTitle"),
-			confirmText: i18n.t("irModals.common.close"),
-			cancelText: i18n.t("irModals.common.continueEditing"),
-			confirmClass: "mod-warning",
-		});
+		const confirmed = await showObsidianConfirm(
+			this.app,
+			i18n.t("irModals.common.discardChangesMessage"),
+			{
+				title: i18n.t("irModals.common.discardChangesTitle"),
+				confirmText: i18n.t("irModals.common.close"),
+				cancelText: i18n.t("irModals.common.continueEditing"),
+				confirmClass: "mod-warning",
+			},
+		);
 		if (confirmed) {
 			this.forceClose();
 		}
@@ -100,7 +116,7 @@ export class ReadingPointTagsPrompt extends Modal {
 			const result = await service.saveEdit(
 				buildSaveInputFromDraft(this.app, this.options.draft, {
 					tags: normalizeReadingPointTags(this.tags),
-				})
+				}),
 			);
 
 			if (result.changed) {

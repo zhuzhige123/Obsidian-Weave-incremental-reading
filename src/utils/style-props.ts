@@ -3,7 +3,10 @@ type StyleTarget = {
 	setCssProps?: (props: Record<string, string>) => void;
 };
 
-export type DynamicStyleProps = Record<string, string | number | null | undefined>;
+export type DynamicStyleProps = Record<
+	string,
+	string | number | null | undefined
+>;
 
 function toCssPropertyName(property: string): string {
 	if (property.startsWith("--")) {
@@ -35,14 +38,17 @@ function normalizeStyleEntries(styles: DynamicStyleProps): {
 /** Prefer Obsidian `setCssProps` when available; otherwise fall back to CSSOM setProperty. */
 export function setElementCssProps(
 	target: StyleTarget | null | undefined,
-	styles: DynamicStyleProps
+	styles: DynamicStyleProps,
 ): void {
 	if (!target) {
 		return;
 	}
 
 	const { props, remove } = normalizeStyleEntries(styles);
-	if (typeof target.setCssProps === "function" && Object.keys(props).length > 0) {
+	if (
+		typeof target.setCssProps === "function" &&
+		Object.keys(props).length > 0
+	) {
 		target.setCssProps(props);
 	} else if (Object.keys(props).length > 0) {
 		applyStyleProps(target, props);
@@ -55,7 +61,7 @@ export function setElementCssProps(
 
 export function applyStyleProps(
 	target: StyleTarget | null | undefined,
-	styles: DynamicStyleProps
+	styles: DynamicStyleProps,
 ): void {
 	const style = target?.style;
 	if (!style) {

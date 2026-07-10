@@ -1,13 +1,13 @@
-import { requestUrl, type RequestUrlResponse } from "obsidian";
+import { type RequestUrlResponse, requestUrl } from "obsidian";
 import type { App } from "obsidian";
-import { logger } from "../utils/logger";
-import { vaultStorage } from "./vault-local-storage";
 import {
+	LICENSE_CLOUD_CACHE_DAYS,
 	getLicenseCloudApiBaseUrl,
 	isCloudLicenseConfigured,
-	LICENSE_CLOUD_CACHE_DAYS,
 } from "../config/license-cloud-config";
+import { logger } from "../utils/logger";
 import { formatCloudLicenseApiError } from "./cloud-license-api-error";
+import { vaultStorage } from "./vault-local-storage";
 
 export interface CloudActivationResult {
 	success: boolean;
@@ -29,9 +29,10 @@ export interface CloudValidationResult {
 	is_network_error?: boolean;
 }
 
-function parseCloudResponseBody(
-	response: RequestUrlResponse
-): { data: Record<string, unknown> | null; parseError?: string } {
+function parseCloudResponseBody(response: RequestUrlResponse): {
+	data: Record<string, unknown> | null;
+	parseError?: string;
+} {
 	const rawText = (response.text ?? "").trim();
 	if (!rawText) {
 		return { data: null, parseError: "云端返回为空" };
@@ -73,7 +74,7 @@ export class CloudLicenseValidator {
 		activationCode: string,
 		deviceFingerprint: string,
 		email: string,
-		platform: string
+		platform: string,
 	): Promise<CloudActivationResult> {
 		if (!this.isConfigured()) {
 			return {
@@ -120,16 +121,22 @@ export class CloudLicenseValidator {
 			return {
 				success: true,
 				message: typeof data.message === "string" ? data.message : undefined,
-				devices_count: typeof data.devices_count === "number" ? data.devices_count : undefined,
-				max_devices: typeof data.max_devices === "number" ? data.max_devices : undefined,
+				devices_count:
+					typeof data.devices_count === "number"
+						? data.devices_count
+						: undefined,
+				max_devices:
+					typeof data.max_devices === "number" ? data.max_devices : undefined,
 				replaced_old_device: Boolean(data.replaced_old_device),
-				expires_at: typeof data.expires_at === "string" ? data.expires_at : undefined,
+				expires_at:
+					typeof data.expires_at === "string" ? data.expires_at : undefined,
 			};
 		} catch (error) {
 			logger.error("激活请求失败:", error);
 
 			const isNetworkError =
-				error instanceof TypeError || (error instanceof Error && error.name === "AbortError");
+				error instanceof TypeError ||
+				(error instanceof Error && error.name === "AbortError");
 
 			return {
 				success: false,
@@ -143,7 +150,7 @@ export class CloudLicenseValidator {
 		activationCode: string,
 		deviceFingerprint: string,
 		email: string,
-		options?: { bypassCache?: boolean }
+		options?: { bypassCache?: boolean },
 	): Promise<CloudValidationResult> {
 		if (!this.isConfigured()) {
 			return {
@@ -193,9 +200,14 @@ export class CloudLicenseValidator {
 
 			const result: CloudValidationResult = {
 				valid: true,
-				expires_at: typeof data.expires_at === "string" ? data.expires_at : undefined,
-				devices_count: typeof data.devices_count === "number" ? data.devices_count : undefined,
-				max_devices: typeof data.max_devices === "number" ? data.max_devices : undefined,
+				expires_at:
+					typeof data.expires_at === "string" ? data.expires_at : undefined,
+				devices_count:
+					typeof data.devices_count === "number"
+						? data.devices_count
+						: undefined,
+				max_devices:
+					typeof data.max_devices === "number" ? data.max_devices : undefined,
 			};
 
 			this.setCache(result);
@@ -204,7 +216,8 @@ export class CloudLicenseValidator {
 			logger.error("验证请求失败:", error);
 
 			const isNetworkError =
-				error instanceof TypeError || (error instanceof Error && error.name === "AbortError");
+				error instanceof TypeError ||
+				(error instanceof Error && error.name === "AbortError");
 
 			return {
 				valid: false,
@@ -214,11 +227,17 @@ export class CloudLicenseValidator {
 		}
 	}
 
-	private getCache(): { result: CloudValidationResult; cached_at: number } | null {
+	private getCache(): {
+		result: CloudValidationResult;
+		cached_at: number;
+	} | null {
 		try {
 			const cached = vaultStorage.getItem(this.cacheKey);
 			return cached
-				? (JSON.parse(cached) as { result: CloudValidationResult; cached_at: number })
+				? (JSON.parse(cached) as {
+						result: CloudValidationResult;
+						cached_at: number;
+				  })
 				: null;
 		} catch {
 			return null;
@@ -236,7 +255,7 @@ export class CloudLicenseValidator {
 				JSON.stringify({
 					result,
 					cached_at: Date.now(),
-				})
+				}),
 			);
 		} catch {
 			// 忽略存储错误

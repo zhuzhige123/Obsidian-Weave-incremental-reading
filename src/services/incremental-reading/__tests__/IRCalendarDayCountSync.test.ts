@@ -1,8 +1,8 @@
-import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import {
 	buildVisibleDayCountsByDate,
 	mergeCalendarDayCountMaps,
 } from "../IRCalendarDayCountSync";
+import type { ScheduleItem } from "../IRCalendarScheduleItem";
 
 function item(id: string, deckId = "deck-a"): ScheduleItem {
 	return {
@@ -27,7 +27,7 @@ describe("IRCalendarDayCountSync", () => {
 		const counts = buildVisibleDayCountsByDate(
 			materialsByDate,
 			pinnedByDate,
-			(material) => material.deckId === "deck-a"
+			(material) => material.deckId === "deck-a",
 		);
 
 		expect(counts.get("2026-06-18")).toBe(2);
@@ -39,7 +39,7 @@ describe("IRCalendarDayCountSync", () => {
 				["2026-06-17", 3],
 				["2026-06-18", 5],
 			]),
-			new Map([["2026-06-18", 2]])
+			new Map([["2026-06-18", 2]]),
 		);
 
 		expect(merged.get("2026-06-17")).toBe(3);

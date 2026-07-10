@@ -1,7 +1,7 @@
 import type { Plugin } from "obsidian";
 import type { Card } from "../data/types";
-import type { IncrementalReadingSettings } from "./plugin-settings.d";
 import type { ReadingMaterialManager } from "../services/incremental-reading/ReadingMaterialManager";
+import type { IncrementalReadingSettings } from "./plugin-settings.d";
 
 export type IncrementalReadingDataStorage = {
 	getAllCards?: () => Promise<Card[]>;

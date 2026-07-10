@@ -1,8 +1,7 @@
-
 vi.mock("obsidian", async () => {
-	const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
-		"../../../tests/mocks/obsidian"
-	);
+	const actual = await vi.importActual<
+		typeof import("../../../tests/mocks/obsidian")
+	>("../../../tests/mocks/obsidian");
 	return {
 		...actual,
 		normalizePath: (path: string) =>
@@ -22,79 +21,72 @@ vi.mock("../../../config/paths", async (importOriginal) => {
 		getReadableWeaveRoot: () => "weave",
 		normalizeWeaveParentFolder: (value?: string) => value?.trim?.() || "",
 		getPluginPaths: () => ({
-		state: {
-			incrementalReading: {
-				root: ".obsidian/plugins/weave/data/state/incremental-reading",
-				readingMaterialsRuntime:
-					".obsidian/plugins/weave/data/state/incremental-reading/reading-materials-runtime.json",
-				epubReaderData:
-					".obsidian/plugins/weave/data/state/incremental-reading/epub-reader-data.json",
-				monitoring:
-					".obsidian/plugins/weave/data/state/incremental-reading/monitoring.json",
-				history: ".obsidian/plugins/weave/data/state/incremental-reading/history.json",
-				studySessions:
-					".obsidian/plugins/weave/data/state/incremental-reading/study-sessions.json",
-				calendarProgress:
-					".obsidian/plugins/weave/data/state/incremental-reading/calendar-progress.json",
-				readerState: ".obsidian/plugins/weave/data/state/incremental-reading/reader-state",
+			state: {
+				incrementalReading: {
+					root: ".obsidian/plugins/weave/data/state/incremental-reading",
+					readingMaterialsRuntime:
+						".obsidian/plugins/weave/data/state/incremental-reading/reading-materials-runtime.json",
+					epubReaderData:
+						".obsidian/plugins/weave/data/state/incremental-reading/epub-reader-data.json",
+					monitoring:
+						".obsidian/plugins/weave/data/state/incremental-reading/monitoring.json",
+					history:
+						".obsidian/plugins/weave/data/state/incremental-reading/history.json",
+					studySessions:
+						".obsidian/plugins/weave/data/state/incremental-reading/study-sessions.json",
+					calendarProgress:
+						".obsidian/plugins/weave/data/state/incremental-reading/calendar-progress.json",
+					readerState:
+						".obsidian/plugins/weave/data/state/incremental-reading/reader-state",
+				},
 			},
-		},
-		cache: {
-			root: ".obsidian/plugins/weave/data/cache",
-			incrementalReading: {
-				root: ".obsidian/plugins/weave/data/cache/incremental-reading",
-				documentGroupMap:
-					".obsidian/plugins/weave/data/cache/incremental-reading/document-group-map.json",
-				pointFilesIndex:
-					".obsidian/plugins/weave/data/cache/incremental-reading/point-files-index.json",
-				syncState:
-					".obsidian/plugins/weave/data/cache/incremental-reading/sync-state.json",
-				readerArtifacts:
-					".obsidian/plugins/weave/data/cache/incremental-reading/reader-artifacts",
+			cache: {
+				root: ".obsidian/plugins/weave/data/cache",
+				incrementalReading: {
+					root: ".obsidian/plugins/weave/data/cache/incremental-reading",
+					documentGroupMap:
+						".obsidian/plugins/weave/data/cache/incremental-reading/document-group-map.json",
+					pointFilesIndex:
+						".obsidian/plugins/weave/data/cache/incremental-reading/point-files-index.json",
+					syncState:
+						".obsidian/plugins/weave/data/cache/incremental-reading/sync-state.json",
+					readerArtifacts:
+						".obsidian/plugins/weave/data/cache/incremental-reading/reader-artifacts",
+				},
 			},
-		},
-		migration: {
-			root: ".obsidian/plugins/weave/data/cache/migration",
-		},
-		backups: ".obsidian/plugins/weave/data/backups",
-	}),
-	getPluginPathsById: (_app: any, pluginId = "weave") => ({
-		state: {
-			incrementalReading: {
-				root: `.obsidian/plugins/${pluginId}/data/state/incremental-reading`,
-				readingMaterialsRuntime:
-					`.obsidian/plugins/${pluginId}/data/state/incremental-reading/reading-materials-runtime.json`,
-				epubReaderData:
-					`.obsidian/plugins/${pluginId}/data/state/incremental-reading/epub-reader-data.json`,
-				monitoring:
-					`.obsidian/plugins/${pluginId}/data/state/incremental-reading/monitoring.json`,
-				history: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/history.json`,
-				studySessions:
-					`.obsidian/plugins/${pluginId}/data/state/incremental-reading/study-sessions.json`,
-				calendarProgress:
-					`.obsidian/plugins/${pluginId}/data/state/incremental-reading/calendar-progress.json`,
-				readerState: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/reader-state`,
+			migration: {
+				root: ".obsidian/plugins/weave/data/cache/migration",
 			},
-		},
-		cache: {
-			root: `.obsidian/plugins/${pluginId}/data/cache`,
-			incrementalReading: {
-				root: `.obsidian/plugins/${pluginId}/data/cache/incremental-reading`,
-				documentGroupMap:
-					`.obsidian/plugins/${pluginId}/data/cache/incremental-reading/document-group-map.json`,
-				pointFilesIndex:
-					`.obsidian/plugins/${pluginId}/data/cache/incremental-reading/point-files-index.json`,
-				syncState:
-					`.obsidian/plugins/${pluginId}/data/cache/incremental-reading/sync-state.json`,
-				readerArtifacts:
-					`.obsidian/plugins/${pluginId}/data/cache/incremental-reading/reader-artifacts`,
+			backups: ".obsidian/plugins/weave/data/backups",
+		}),
+		getPluginPathsById: (_app: any, pluginId = "weave") => ({
+			state: {
+				incrementalReading: {
+					root: `.obsidian/plugins/${pluginId}/data/state/incremental-reading`,
+					readingMaterialsRuntime: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/reading-materials-runtime.json`,
+					epubReaderData: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/epub-reader-data.json`,
+					monitoring: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/monitoring.json`,
+					history: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/history.json`,
+					studySessions: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/study-sessions.json`,
+					calendarProgress: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/calendar-progress.json`,
+					readerState: `.obsidian/plugins/${pluginId}/data/state/incremental-reading/reader-state`,
+				},
 			},
-		},
-		migration: {
-			root: `.obsidian/plugins/${pluginId}/data/cache/migration`,
-		},
-		backups: `.obsidian/plugins/${pluginId}/data/backups`,
-	}),
+			cache: {
+				root: `.obsidian/plugins/${pluginId}/data/cache`,
+				incrementalReading: {
+					root: `.obsidian/plugins/${pluginId}/data/cache/incremental-reading`,
+					documentGroupMap: `.obsidian/plugins/${pluginId}/data/cache/incremental-reading/document-group-map.json`,
+					pointFilesIndex: `.obsidian/plugins/${pluginId}/data/cache/incremental-reading/point-files-index.json`,
+					syncState: `.obsidian/plugins/${pluginId}/data/cache/incremental-reading/sync-state.json`,
+					readerArtifacts: `.obsidian/plugins/${pluginId}/data/cache/incremental-reading/reader-artifacts`,
+				},
+			},
+			migration: {
+				root: `.obsidian/plugins/${pluginId}/data/cache/migration`,
+			},
+			backups: `.obsidian/plugins/${pluginId}/data/backups`,
+		}),
 	};
 });
 
@@ -104,12 +96,15 @@ vi.mock("../../epub-integration/ir-epub-storage-access", () => {
 	const sourceByFingerprint = new Map<string, string>();
 	return {
 		getIrEpubStorageService: () => ({
-			async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+			async ensureSourceIdentity(
+				filePath: string,
+				options?: { preferredSourceId?: string },
+			) {
 				if (options?.preferredSourceId) {
 					return { sourceId: options.preferredSourceId, filePath };
 				}
 				const fingerprint = epubContentFingerprints.get(
-					filePath.replace(/\\/g, "/").replace(/\/+/g, "/")
+					filePath.replace(/\\/g, "/").replace(/\/+/g, "/"),
 				);
 				if (fingerprint) {
 					let sourceId = sourceByFingerprint.get(fingerprint);
@@ -146,7 +141,7 @@ function parentPath(path: string): string {
 
 function createMemoryApp(
 	initialFiles: Record<string, string> = {},
-	binaryFiles: Record<string, string> = {}
+	binaryFiles: Record<string, string> = {},
 ) {
 	epubContentFingerprints.clear();
 	for (const [path, content] of Object.entries(binaryFiles)) {
@@ -154,9 +149,17 @@ function createMemoryApp(
 	}
 
 	const files = new Map<string, string>();
-	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave"]);
+	const folders = new Set<string>([
+		"",
+		".obsidian",
+		".obsidian/plugins",
+		".obsidian/plugins/weave",
+	]);
 	const binaries = new Map<string, string>(
-		Object.entries(binaryFiles).map(([path, content]) => [normalizeTestPath(path), content])
+		Object.entries(binaryFiles).map(([path, content]) => [
+			normalizeTestPath(path),
+			content,
+		]),
 	);
 
 	const ensureDir = (dir: string) => {
@@ -186,7 +189,11 @@ function createMemoryApp(
 				return false;
 			}
 			const normalized = normalizeTestPath(path);
-			return files.has(normalized) || folders.has(normalized) || binaries.has(normalized);
+			return (
+				files.has(normalized) ||
+				folders.has(normalized) ||
+				binaries.has(normalized)
+			);
 		}),
 		mkdir: vi.fn(async (path: string) => {
 			ensureDir(path);
@@ -198,7 +205,8 @@ function createMemoryApp(
 			const childFiles: string[] = [];
 
 			for (const folder of folders) {
-				if (!folder || folder === normalized || !folder.startsWith(prefix)) continue;
+				if (!folder || folder === normalized || !folder.startsWith(prefix))
+					continue;
 				const rest = folder.slice(prefix.length);
 				if (!rest || rest.includes("/")) continue;
 				childFolders.add(folder);
@@ -360,7 +368,9 @@ describe("bookmark task update merging", () => {
 			"deck-1",
 		]);
 
-		expect(tasks.map((task) => task.id).sort()).toEqual([canonical.id, legacy.id].sort());
+		expect(tasks.map((task) => task.id).sort()).toEqual(
+			[canonical.id, legacy.id].sort(),
+		);
 	});
 
 	it("epub bookmark tasks support mixed deck identifiers", async () => {
@@ -387,7 +397,9 @@ describe("bookmark task update merging", () => {
 			"",
 		]);
 
-		expect(tasks.map((task) => task.id).sort()).toEqual([canonical.id, legacy.id].sort());
+		expect(tasks.map((task) => task.id).sort()).toEqual(
+			[canonical.id, legacy.id].sort(),
+		);
 	});
 
 	it("epub bookmark tasks keep a stable sourceId when the same file is re-added under a new path", async () => {
@@ -397,8 +409,8 @@ describe("bookmark task update merging", () => {
 				{
 					"Books/Test.epub": "same-epub-binary",
 					"Library/Test Renamed.epub": "same-epub-binary",
-				}
-			)
+				},
+			),
 		);
 
 		const original = await service.createTask({
@@ -422,6 +434,8 @@ describe("bookmark task update merging", () => {
 		expect(renamed.sourceId).toBe(original.sourceId);
 
 		const matched = await service.getTasksByEpub("Library/Test Renamed.epub");
-		expect(matched.map((task) => task.id).sort()).toEqual([original.id, renamed.id].sort());
+		expect(matched.map((task) => task.id).sort()).toEqual(
+			[original.id, renamed.id].sort(),
+		);
 	});
 });

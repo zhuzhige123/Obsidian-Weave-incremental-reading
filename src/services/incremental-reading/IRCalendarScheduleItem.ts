@@ -1,20 +1,23 @@
 import {
-	migrateToIRBlockV4,
 	type IRBlock,
 	type IRBlockMeta,
 	type IRChunkFileData,
+	migrateToIRBlockV4,
 } from "../../types/ir-types";
-import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
-import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
-import { supportsPointLinkedNotes, supportsPointLinkedNotesForScheduleItem } from "./IRLinkedNotePolicy";
-import { readString } from "../../utils/unknown-record";
-import { resolveLegacyBlockResumeLink } from "./paragraph-workbench/paragraph-block-reference";
-import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
 import { basenameWithoutExtension } from "../../utils/ir-internal-data-path";
-import type { IRProjectedScheduleItem } from "./IRProjectedScheduleSummary";
+import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
+import { readString } from "../../utils/unknown-record";
+import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
+import {
+	supportsPointLinkedNotes,
+	supportsPointLinkedNotesForScheduleItem,
+} from "./IRLinkedNotePolicy";
 import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
+import type { IRProjectedScheduleItem } from "./IRProjectedScheduleSummary";
+import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
 import type { IRScheduleExplanation } from "./IRScheduleKernel";
+import { resolveLegacyBlockResumeLink } from "./paragraph-workbench/paragraph-block-reference";
 
 export type ScheduleItemSourceType = IRProjectedScheduleItem["sourceType"];
 
@@ -52,37 +55,50 @@ export interface ScheduleItem {
 	manualSchedulePinnedDateKey?: string;
 }
 
-function extractChunkTitleFromFilePath(filePath: string, fallbackId?: string): string {
+function extractChunkTitleFromFilePath(
+	filePath: string,
+	fallbackId?: string,
+): string {
 	const fallback = String(fallbackId || "").trim();
 	const stem = basenameWithoutExtension(filePath, fallback);
 	const cleaned = stem.replace(/^\d+_/, "").trim();
 	return cleaned || stem || fallback || "Untitled";
 }
 
-function extractChunkTitle(chunk: IRChunkFileData, fallbackId?: string): string {
+function extractChunkTitle(
+	chunk: IRChunkFileData,
+	fallbackId?: string,
+): string {
 	const chunkMeta = (chunk?.meta || {}) as unknown as Record<string, unknown>;
 	const pointTitle =
 		typeof chunkMeta.pointTitle === "string"
-			? String((chunkMeta.pointTitle) || "").trim()
+			? String(chunkMeta.pointTitle || "").trim()
 			: "";
 	if (pointTitle) {
 		return pointTitle;
 	}
-	return extractChunkTitleFromFilePath(String(chunk?.filePath || "").trim(), fallbackId);
+	return extractChunkTitleFromFilePath(
+		String(chunk?.filePath || "").trim(),
+		fallbackId,
+	);
 }
 
 function getLegacyBlockDisplayName(block: IRBlock): string | undefined {
-	const displayName = Array.isArray(block.headingPath) && block.headingPath.length > 0
-		? String(block.headingPath[block.headingPath.length - 1] || "").trim()
-		: "";
+	const displayName =
+		Array.isArray(block.headingPath) && block.headingPath.length > 0
+			? String(block.headingPath[block.headingPath.length - 1] || "").trim()
+			: "";
 	return displayName || undefined;
 }
 
 function getLegacyBlockAssociatedNoteFields(
-	block: LegacyScheduleBlock
+	block: LegacyScheduleBlock,
 ): Pick<
 	ScheduleItem,
-	"primaryAssociatedNotePath" | "associatedNotePath" | "associatedNotePaths" | "associatedNoteScope"
+	| "primaryAssociatedNotePath"
+	| "associatedNotePath"
+	| "associatedNotePaths"
+	| "associatedNoteScope"
 > {
 	if (!supportsPointLinkedNotes("legacy-block")) {
 		return {};
@@ -93,7 +109,8 @@ function getLegacyBlockAssociatedNoteFields(
 			block.primaryAssociatedNotePath ||
 			block.associatedNotePath ||
 			block.meta?.associatedNotePath,
-		associatedNotePaths: block.associatedNotePaths || block.meta?.associatedNotePaths,
+		associatedNotePaths:
+			block.associatedNotePaths || block.meta?.associatedNotePaths,
 	});
 	const primaryAssociatedNotePath = associatedNotePaths[0] || undefined;
 	return {
@@ -104,7 +121,9 @@ function getLegacyBlockAssociatedNoteFields(
 	};
 }
 
-function normalizeScheduleItemSequenceOrder(value: unknown): number | undefined {
+function normalizeScheduleItemSequenceOrder(
+	value: unknown,
+): number | undefined {
 	if (typeof value === "number" && Number.isFinite(value)) {
 		return value;
 	}
@@ -115,30 +134,43 @@ function normalizeScheduleItemSequenceOrder(value: unknown): number | undefined 
 	return undefined;
 }
 
-function getScheduleItemSequenceMeta(meta: unknown): Pick<
+function getScheduleItemSequenceMeta(
+	meta: unknown,
+): Pick<
 	ScheduleItem,
-	"sourceSequenceGroup" | "sourceSequenceOrder" | "sourceSequenceLocked" | "sourceSequenceAnchorDateKey"
+	| "sourceSequenceGroup"
+	| "sourceSequenceOrder"
+	| "sourceSequenceLocked"
+	| "sourceSequenceAnchorDateKey"
 > {
-	const record = meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
-	const sourceSequenceGroup = readString(record?.sourceSequenceGroup) || undefined;
-	const sourceSequenceOrder = normalizeScheduleItemSequenceOrder(record?.sourceSequenceOrder);
-	const sourceSequenceAnchorDateKey = readString(record?.sourceSequenceAnchorDateKey) || undefined;
+	const record =
+		meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
+	const sourceSequenceGroup =
+		readString(record?.sourceSequenceGroup) || undefined;
+	const sourceSequenceOrder = normalizeScheduleItemSequenceOrder(
+		record?.sourceSequenceOrder,
+	);
+	const sourceSequenceAnchorDateKey =
+		readString(record?.sourceSequenceAnchorDateKey) || undefined;
 
 	return {
 		sourceSequenceGroup,
 		sourceSequenceOrder,
-		sourceSequenceLocked: record?.sourceSequenceLocked === true ? true : undefined,
+		sourceSequenceLocked:
+			record?.sourceSequenceLocked === true ? true : undefined,
 		sourceSequenceAnchorDateKey,
 	};
 }
 
-export function buildScheduleItemFromProjectedItem(item: IRProjectedScheduleItem): ScheduleItem {
+export function buildScheduleItemFromProjectedItem(
+	item: IRProjectedScheduleItem,
+): ScheduleItem {
 	const linkedNotesEnabled = supportsPointLinkedNotesForScheduleItem(item);
 	const associatedNotePaths = linkedNotesEnabled
 		? resolveAssociatedNotePaths({
 				associatedNotePath: item.associatedNotePath,
 				associatedNotePaths: item.associatedNotePaths,
-			})
+		  })
 		: [];
 	const primaryAssociatedNotePath = associatedNotePaths[0];
 	return {
@@ -151,7 +183,9 @@ export function buildScheduleItemFromProjectedItem(item: IRProjectedScheduleItem
 		primaryAssociatedNotePath,
 		associatedNotePath: primaryAssociatedNotePath,
 		associatedNotePaths,
-		associatedNoteScope: linkedNotesEnabled ? item.associatedNoteScope : undefined,
+		associatedNoteScope: linkedNotesEnabled
+			? item.associatedNoteScope
+			: undefined,
 		deckId: item.deckId,
 		priority: item.priority,
 		intervalDays: item.intervalDays,
@@ -176,7 +210,10 @@ export function buildScheduleItemFromLegacyBlock(block: IRBlock): ScheduleItem {
 	const title =
 		displayName ||
 		String(block.headingText || "").trim() ||
-		String(block.contentPreview || "").trim().replace(/\s+/g, " ").slice(0, 60) ||
+		String(block.contentPreview || "")
+			.trim()
+			.replace(/\s+/g, " ")
+			.slice(0, 60) ||
 		String(block.id || "").trim() ||
 		"Untitled";
 
@@ -191,7 +228,9 @@ export function buildScheduleItemFromLegacyBlock(block: IRBlock): ScheduleItem {
 		intervalDays: Number(block.interval ?? migrated.intervalDays ?? 1),
 		scheduleStatus: String(block.state || migrated.status || "new"),
 		nextRepDate: Number(migrated.nextRepDate || 0),
-		nextReviewDate: migrated.nextRepDate ? new Date(migrated.nextRepDate) : null,
+		nextReviewDate: migrated.nextRepDate
+			? new Date(migrated.nextRepDate)
+			: null,
 		resumeLink: resolveLegacyBlockResumeLink(block),
 		...getScheduleItemSequenceMeta(legacyBlock.meta),
 		sourceType: "legacy-block",
@@ -200,19 +239,24 @@ export function buildScheduleItemFromLegacyBlock(block: IRBlock): ScheduleItem {
 
 export function buildScheduleItemFromChunkData(
 	chunk: IRChunkFileData,
-	fallbackId?: string
+	fallbackId?: string,
 ): ScheduleItem {
 	const filePath = String(chunk?.filePath || "").trim();
-	const title = extractChunkTitle(chunk, fallbackId || String(chunk?.chunkId || "").trim());
+	const title = extractChunkTitle(
+		chunk,
+		fallbackId || String(chunk?.chunkId || "").trim(),
+	);
 	const associatedNotePaths = supportsPointLinkedNotes("chunk")
 		? resolveAssociatedNotePaths({
-				associatedNotePath: chunk?.meta?.primaryAssociatedNotePath || chunk?.meta?.associatedNotePath,
+				associatedNotePath:
+					chunk?.meta?.primaryAssociatedNotePath ||
+					chunk?.meta?.associatedNotePath,
 				associatedNotePaths: chunk?.meta?.associatedNotePaths,
-			})
+		  })
 		: [];
 	const primaryAssociatedNotePath = associatedNotePaths[0] || undefined;
 	const nextRepDate = Number(chunk?.nextRepDate || 0);
-	const chunkMeta = ((chunk?.meta || {}) as unknown) as Record<string, unknown>;
+	const chunkMeta = (chunk?.meta || {}) as unknown as Record<string, unknown>;
 
 	return {
 		id: String(chunk?.chunkId || fallbackId || "").trim(),
@@ -220,7 +264,9 @@ export function buildScheduleItemFromChunkData(
 		displayName: extractReadingPointDisplayName(title),
 		sourceFile: filePath,
 		autoSubscribedAt:
-			typeof chunkMeta.autoSubscribedAt === "string" ? chunkMeta.autoSubscribedAt : undefined,
+			typeof chunkMeta.autoSubscribedAt === "string"
+				? chunkMeta.autoSubscribedAt
+				: undefined,
 		autoSubscribedBadgeUntil:
 			typeof chunkMeta.autoSubscribedBadgeUntil === "string"
 				? chunkMeta.autoSubscribedBadgeUntil
@@ -235,27 +281,37 @@ export function buildScheduleItemFromChunkData(
 		scheduleStatus: String(chunk?.scheduleStatus || "new"),
 		nextRepDate,
 		nextReviewDate: nextRepDate > 0 ? new Date(nextRepDate) : null,
-		resumeLink: typeof chunkMeta.resumeLink === "string" ? chunkMeta.resumeLink : undefined,
+		resumeLink:
+			typeof chunkMeta.resumeLink === "string"
+				? chunkMeta.resumeLink
+				: undefined,
 		...getScheduleItemSequenceMeta(chunk?.meta),
 		sourceType: "chunk",
 	};
 }
 
-export function buildScheduleItemFromPdfTask(task: IRPdfBookmarkTask): ScheduleItem {
+export function buildScheduleItemFromPdfTask(
+	task: IRPdfBookmarkTask,
+): ScheduleItem {
 	const fullTitle = String(task?.title || "").trim() || "PDF";
 	return {
 		id: String(task?.id || "").trim(),
 		title: fullTitle,
 		displayName: extractReadingPointDisplayName(fullTitle),
 		sourceFile: String(task?.pdfPath || "").trim(),
-		primaryAssociatedNotePath: task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
-		associatedNotePath: task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath,
+		primaryAssociatedNotePath:
+			task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
+		associatedNotePath:
+			task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath,
 		associatedNotePaths: resolveAssociatedNotePaths({
-			associatedNotePath: task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
+			associatedNotePath:
+				task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
 			associatedNotePaths: task?.meta?.associatedNotePaths,
 		}),
 		associatedNoteScope:
-			task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath ? "point" : undefined,
+			task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath
+				? "point"
+				: undefined,
 		resumeLink: task?.link,
 		priority: Number(task?.priorityUi ?? task?.priorityEff ?? 5),
 		intervalDays: Number(task?.intervalDays ?? 1),
@@ -273,9 +329,9 @@ export async function buildScheduleItemFromEpubTask(
 	options?: {
 		resolvedFilePath?: string;
 		resolveFilePath?: (
-			input: Pick<IREpubBookmarkTask, "sourceId" | "epubFilePath">
+			input: Pick<IREpubBookmarkTask, "sourceId" | "epubFilePath">,
 		) => Promise<string>;
-	}
+	},
 ): Promise<ScheduleItem> {
 	const resolvedFilePath =
 		options?.resolvedFilePath ||
@@ -288,17 +344,27 @@ export async function buildScheduleItemFromEpubTask(
 	return {
 		id: String(task?.id || "").trim(),
 		title: String(task?.title || "").trim() || "EPUB",
-		displayName: extractReadingPointDisplayName(String(task?.title || "").trim() || "EPUB"),
+		displayName: extractReadingPointDisplayName(
+			String(task?.title || "").trim() || "EPUB",
+		),
 		sourceFile: resolvedFilePath,
-		primaryAssociatedNotePath: task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
-		associatedNotePath: task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath,
+		primaryAssociatedNotePath:
+			task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
+		associatedNotePath:
+			task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath,
 		associatedNotePaths: resolveAssociatedNotePaths({
-			associatedNotePath: task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
+			associatedNotePath:
+				task?.meta?.primaryAssociatedNotePath || task?.meta?.associatedNotePath,
 			associatedNotePaths: task?.meta?.associatedNotePaths,
 		}),
 		associatedNoteScope:
-			task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath ? "point" : undefined,
-		resumeLink: typeof task?.meta?.resumeLink === "string" ? task.meta.resumeLink : undefined,
+			task?.meta?.associatedNotePath || task?.meta?.primaryAssociatedNotePath
+				? "point"
+				: undefined,
+		resumeLink:
+			typeof task?.meta?.resumeLink === "string"
+				? task.meta.resumeLink
+				: undefined,
 		priority: Number(task?.priorityUi ?? task?.priorityEff ?? 5),
 		intervalDays: Number(task?.intervalDays ?? 1),
 		scheduleStatus: String(task?.status || "new"),

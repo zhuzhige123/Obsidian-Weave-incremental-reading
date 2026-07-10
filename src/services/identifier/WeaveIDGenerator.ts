@@ -93,7 +93,10 @@ export class WeaveIDGenerator {
 		const timeStr = this.encodeTimestamp(now);
 
 		// 2. 生成随机部分（5位base32）
-		const randomStr = this.generateRandomString(UUID_LENGTH.RANDOM, UUID_ALPHABET);
+		const randomStr = this.generateRandomString(
+			UUID_LENGTH.RANDOM,
+			UUID_ALPHABET,
+		);
 
 		// 3. 组合成完整UUID
 		return `${UUID_PREFIX}${timeStr}${randomStr}`;
@@ -129,7 +132,9 @@ export class WeaveIDGenerator {
 		}
 
 		// 去掉前缀，取前7位
-		const timeStr = uuid.replace(UUID_PREFIX, "").substring(0, UUID_LENGTH.TIMESTAMP);
+		const timeStr = uuid
+			.replace(UUID_PREFIX, "")
+			.substring(0, UUID_LENGTH.TIMESTAMP);
 
 		let timestamp = 0;
 		for (let i = 0; i < timeStr.length; i++) {
@@ -173,7 +178,9 @@ export class WeaveIDGenerator {
 
 		// 2. 检查字符集
 		const content = uuid.replace(UUID_PREFIX, "");
-		result.alphabetValid = [...content].every((char) => UUID_ALPHABET.includes(char));
+		result.alphabetValid = [...content].every((char) =>
+			UUID_ALPHABET.includes(char),
+		);
 		if (!result.alphabetValid) {
 			result.error = ERROR_MESSAGES.INVALID_ALPHABET;
 			return result;
@@ -202,7 +209,10 @@ export class WeaveIDGenerator {
 	 * @returns 新生成的BlockID字符串（含we-前缀，不含^前缀）
 	 */
 	generateBlockID(): string {
-		const randomPart = this.generateRandomString(BLOCK_ID_LENGTH, BLOCK_ID_ALPHABET);
+		const randomPart = this.generateRandomString(
+			BLOCK_ID_LENGTH,
+			BLOCK_ID_ALPHABET,
+		);
 		return `we-${randomPart}`;
 	}
 
@@ -235,7 +245,9 @@ export class WeaveIDGenerator {
 		}
 
 		// 2. 检查字符集
-		result.alphabetValid = [...blockId].every((char) => BLOCK_ID_ALPHABET.includes(char));
+		result.alphabetValid = [...blockId].every((char) =>
+			BLOCK_ID_ALPHABET.includes(char),
+		);
 		if (!result.alphabetValid) {
 			result.error = ERROR_MESSAGES.INVALID_ALPHABET;
 			return result;
@@ -343,12 +355,14 @@ export const isValidUUID = (uuid: string) => generator.isValidUUID(uuid);
 /**
  * 验证BlockID（便捷函数）
  */
-export const isValidBlockID = (blockId: string) => generator.isValidBlockID(blockId);
+export const isValidBlockID = (blockId: string) =>
+	generator.isValidBlockID(blockId);
 
 /**
  * 提取时间戳（便捷函数）
  */
-export const extractTimestamp = (uuid: string) => generator.extractTimestamp(uuid);
+export const extractTimestamp = (uuid: string) =>
+	generator.extractTimestamp(uuid);
 
 /**
  * 获取生成器实例（便捷函数）

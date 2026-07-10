@@ -5,7 +5,10 @@ export function getObsidianPlugin(app: App, pluginId: string): Plugin | null {
 	return app.plugins.getPlugin(pluginId) ?? null;
 }
 
-export function getObsidianPluginAs<T extends object>(app: App, pluginId: string): T | null {
+export function getObsidianPluginAs<T extends object>(
+	app: App,
+	pluginId: string,
+): T | null {
 	const plugin = getObsidianPlugin(app, pluginId);
 	return plugin ? (plugin as T) : null;
 }
@@ -13,7 +16,7 @@ export function getObsidianPluginAs<T extends object>(app: App, pluginId: string
 export function findCollaboratorEpubHost(
 	app: App,
 	collaboratorPluginIds: readonly string[],
-	excludePlugin?: Plugin | null
+	excludePlugin?: Plugin | null,
 ): EpubHostReaderCapabilities | null {
 	for (const pluginId of collaboratorPluginIds) {
 		const plugin = getObsidianPlugin(app, pluginId);

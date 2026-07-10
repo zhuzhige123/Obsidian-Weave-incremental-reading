@@ -19,7 +19,10 @@ vi.mock("../../../utils/obsidian-plugin-registry", () => ({
 vi.mock("../../../utils/i18n", () => ({
 	i18n: {
 		t: vi.fn((_key: string, params?: Record<string, string>) => {
-			if (params?.pluginId === "weave-epub-reader" && _key.includes("Outdated")) {
+			if (
+				params?.pluginId === "weave-epub-reader" &&
+				_key.includes("Outdated")
+			) {
 				return "请更新阅读器插件";
 			}
 			return _key;
@@ -48,7 +51,7 @@ describe("epub-reader-interop", () => {
 
 		expect(resolveEpubReaderInteropFailure({} as never)).toBe("api-missing");
 		expect(getEpubReaderInteropFailureMessage({} as never, "api-missing")).toBe(
-			"请更新阅读器插件"
+			"请更新阅读器插件",
 		);
 	});
 });

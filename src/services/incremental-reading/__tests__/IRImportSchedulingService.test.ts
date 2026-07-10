@@ -1,5 +1,5 @@
-import { IRImportSchedulingService } from "../IRImportSchedulingService";
 import type { SchedulingConfig } from "../../../types/ir-import-scheduling";
+import { IRImportSchedulingService } from "../IRImportSchedulingService";
 
 describe("IRImportSchedulingService", () => {
 	const createService = (dailyBudgetMinutes: number) =>
@@ -18,7 +18,11 @@ describe("IRImportSchedulingService", () => {
 			targetLoadRate: 0.8,
 		};
 
-		const impact = await service.calculateScheduling([{ id: "b1" } as any], config, new Date("2026-04-09"));
+		const impact = await service.calculateScheduling(
+			[{ id: "b1" } as any],
+			config,
+			new Date("2026-04-09"),
+		);
 
 		expect(impact.dailyLoads).toHaveLength(1);
 		expect(impact.dailyLoads[0].newCount).toBe(1);
@@ -38,11 +42,13 @@ describe("IRImportSchedulingService", () => {
 		const impact = await service.calculateScheduling(
 			[{ id: "b1" } as any, { id: "b2" } as any],
 			config,
-			new Date("2026-04-09")
+			new Date("2026-04-09"),
 		);
 
 		expect(impact.dailyLoads).toHaveLength(2);
-		expect(impact.dailyLoads.every((load) => Number.isFinite(load.loadRate))).toBe(true);
+		expect(
+			impact.dailyLoads.every((load) => Number.isFinite(load.loadRate)),
+		).toBe(true);
 		expect(Number.isFinite(impact.peakLoadRate)).toBe(true);
 		expect(Number.isFinite(impact.averageLoadRate)).toBe(true);
 	});

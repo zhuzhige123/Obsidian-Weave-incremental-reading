@@ -2,7 +2,7 @@ import { AbstractInputSuggest, App } from "obsidian";
 import type { Card } from "../data/types";
 import { getCardTagValues, removeHashPrefix } from "./tag-utils";
 
-export type TagSuggestionDataSource = "memory" | "questionBank" | "incremental-reading";
+export type TagSuggestionDataSource = "incremental-reading";
 export type TagSuggestionOption = string | { name: string; count?: number };
 
 export interface TagSuggestionItem {
@@ -37,7 +37,9 @@ export function formatTagSuggestionLabel(tag: string): string {
 	return normalized ? `#${normalized}` : "#";
 }
 
-export function normalizeTagSuggestionOptions(options: TagSuggestionOption[]): TagSuggestionItem[] {
+export function normalizeTagSuggestionOptions(
+	options: TagSuggestionOption[],
+): TagSuggestionItem[] {
 	const tagMap = new Map<string, TagSuggestionItem>();
 
 	for (const option of options || []) {
@@ -48,16 +50,23 @@ export function normalizeTagSuggestionOptions(options: TagSuggestionOption[]): T
 		}
 
 		const key = normalized.toLocaleLowerCase();
-		const count = typeof option === "string" ? 0 : Math.max(0, Number(option.count) || 0);
+		const count =
+			typeof option === "string" ? 0 : Math.max(0, Number(option.count) || 0);
 		const label = formatTagSuggestionLabel(normalized);
 		const keywords = Array.from(new Set([normalized, label]));
-		const searchText = keywords.map((value) => value.toLocaleLowerCase()).join(" ");
+		const searchText = keywords
+			.map((value) => value.toLocaleLowerCase())
+			.join(" ");
 		const existing = tagMap.get(key);
 
 		if (existing) {
 			existing.count = Math.max(existing.count, count);
-			existing.keywords = Array.from(new Set([...existing.keywords, ...keywords]));
-			existing.searchText = existing.keywords.map((value) => value.toLocaleLowerCase()).join(" ");
+			existing.keywords = Array.from(
+				new Set([...existing.keywords, ...keywords]),
+			);
+			existing.searchText = existing.keywords
+				.map((value) => value.toLocaleLowerCase())
+				.join(" ");
 			continue;
 		}
 
@@ -72,14 +81,14 @@ export function normalizeTagSuggestionOptions(options: TagSuggestionOption[]): T
 	}
 
 	return Array.from(tagMap.values()).sort(
-		(a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "zh-CN")
+		(a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "zh-CN"),
 	);
 }
 
 export function filterTagSuggestionItems(
 	items: TagSuggestionItem[],
 	query: string,
-	limit = 40
+	limit = 40,
 ): TagSuggestionItem[] {
 	const normalizedQuery = query.trim().toLocaleLowerCase();
 	const filtered = normalizedQuery
@@ -90,8 +99,10 @@ export function filterTagSuggestionItems(
 		.sort((a, b) => {
 			const aTag = a.tag.toLocaleLowerCase();
 			const bTag = b.tag.toLocaleLowerCase();
-			const aStarts = normalizedQuery && aTag.startsWith(normalizedQuery) ? 1 : 0;
-			const bStarts = normalizedQuery && bTag.startsWith(normalizedQuery) ? 1 : 0;
+			const aStarts =
+				normalizedQuery && aTag.startsWith(normalizedQuery) ? 1 : 0;
+			const bStarts =
+				normalizedQuery && bTag.startsWith(normalizedQuery) ? 1 : 0;
 			if (aStarts !== bStarts) {
 				return bStarts - aStarts;
 			}
@@ -114,10 +125,14 @@ function collectVaultTagCounts(app: App): Map<string, number> {
 			if (!normalizedTag) {
 				continue;
 			}
-			const safeUsageCount = typeof usageCount === "number" && Number.isFinite(usageCount)
-				? Math.max(0, Math.floor(usageCount))
-				: 0;
-			usageByTag.set(normalizedTag, Math.max(usageByTag.get(normalizedTag) ?? 0, safeUsageCount));
+			const safeUsageCount =
+				typeof usageCount === "number" && Number.isFinite(usageCount)
+					? Math.max(0, Math.floor(usageCount))
+					: 0;
+			usageByTag.set(
+				normalizedTag,
+				Math.max(usageByTag.get(normalizedTag) ?? 0, safeUsageCount),
+			);
 		}
 		return usageByTag;
 	}
@@ -125,7 +140,9 @@ function collectVaultTagCounts(app: App): Map<string, number> {
 	for (const markdownFile of app.vault.getMarkdownFiles()) {
 		const cache = metadataCache?.getFileCache?.(markdownFile) ?? null;
 		const tagsInFile = new Set<string>();
-		const frontmatterTags = (cache?.frontmatter as { tags?: unknown } | undefined)?.tags;
+		const frontmatterTags = (
+			cache?.frontmatter as { tags?: unknown } | undefined
+		)?.tags;
 		if (Array.isArray(frontmatterTags)) {
 			frontmatterTags
 				.map((tag) => normalizeTagSuggestionValue(String(tag || "")))
@@ -140,7 +157,9 @@ function collectVaultTagCounts(app: App): Map<string, number> {
 		}
 
 		for (const tagCache of cache?.tags ?? []) {
-			const normalizedTag = normalizeTagSuggestionValue(String(tagCache.tag || ""));
+			const normalizedTag = normalizeTagSuggestionValue(
+				String(tagCache.tag || ""),
+			);
 			if (normalizedTag) {
 				tagsInFile.add(normalizedTag);
 			}
@@ -157,7 +176,7 @@ function collectVaultTagCounts(app: App): Map<string, number> {
 export function buildTagSuggestionOptions(
 	app: App,
 	cards: Card[],
-	dataSource: TagSuggestionDataSource
+	dataSource: TagSuggestionDataSource,
 ): Array<{ name: string; count: number }> {
 	const usageByTag = collectVaultTagCounts(app);
 
@@ -208,7 +227,11 @@ export class TagInputSuggest extends AbstractInputSuggest<TagSuggestionItem> {
 		window.setTimeout(() => this.close(), 120);
 	};
 
-	constructor(app: App, inputEl: HTMLInputElement | HTMLDivElement, options: TagInputSuggestOptions) {
+	constructor(
+		app: App,
+		inputEl: HTMLInputElement | HTMLDivElement,
+		options: TagInputSuggestOptions,
+	) {
 		super(app, inputEl);
 		this.options = options;
 		this.targetEl = inputEl;
@@ -231,7 +254,11 @@ export class TagInputSuggest extends AbstractInputSuggest<TagSuggestionItem> {
 		}
 
 		const query = this.getQuery();
-		const suggestions = filterTagSuggestionItems(this.options.getItems(), query, this.limit);
+		const suggestions = filterTagSuggestionItems(
+			this.options.getItems(),
+			query,
+			this.limit,
+		);
 		const createSuggestion = this.options.createSuggestion?.(query) ?? null;
 
 		return createSuggestion ? [createSuggestion, ...suggestions] : suggestions;

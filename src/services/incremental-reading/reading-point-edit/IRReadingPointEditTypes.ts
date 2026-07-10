@@ -1,6 +1,9 @@
+import type {
+	IRParameterContext,
+	IRTraceState,
+} from "../../../types/ir-point-storage-types";
 import type { ScheduleItemSourceType } from "../IRCalendarScheduleItem";
 import type { ParsedReadingTarget } from "../reading-target/IRReadingTargetTypes";
-import type { IRParameterContext, IRTraceState } from "../../../types/ir-point-storage-types";
 
 export interface IRReadingPointDuplicateTitleMatch {
 	pointId: string;

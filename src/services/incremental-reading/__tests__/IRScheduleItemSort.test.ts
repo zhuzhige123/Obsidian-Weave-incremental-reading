@@ -61,7 +61,11 @@ describe("IRScheduleItemSort", () => {
 		});
 
 		expect(
-			compareScheduleItemsForDailyQueue(highPriorityLateImport, lowPriorityEarlyImport, dayKey)
+			compareScheduleItemsForDailyQueue(
+				highPriorityLateImport,
+				lowPriorityEarlyImport,
+				dayKey,
+			),
 		).toBeLessThan(0);
 	});
 
@@ -84,7 +88,9 @@ describe("IRScheduleItemSort", () => {
 			sourceSequenceAnchorDateKey: dayKey,
 		});
 
-		expect(compareScheduleItemsForDailyQueue(first, second, dayKey)).toBeLessThan(0);
+		expect(
+			compareScheduleItemsForDailyQueue(first, second, dayKey),
+		).toBeLessThan(0);
 	});
 
 	test("effectivePriority 优先于 priority 字段", () => {
@@ -110,7 +116,9 @@ describe("IRScheduleItemSort", () => {
 			effectivePriority: 8.5,
 		});
 
-		expect(compareScheduleItemsForDailyQueue(manualHigh, effHigh, dayKey)).toBeLessThan(0);
+		expect(
+			compareScheduleItemsForDailyQueue(manualHigh, effHigh, dayKey),
+		).toBeLessThan(0);
 	});
 
 	test("patchScheduleItemsInMapByDate 只重排优先级，不改变条目所属日期", () => {
@@ -138,10 +146,13 @@ describe("IRScheduleItemSort", () => {
 			"high",
 			8.5,
 			8.5,
-			[dayKey]
+			[dayKey],
 		);
 
-		expect(patched.get(dayKey)?.map((item) => item.id)).toEqual(["high", "low"]);
+		expect(patched.get(dayKey)?.map((item) => item.id)).toEqual([
+			"high",
+			"low",
+		]);
 		expect(patched.get(dayKey)?.[0]?.priority).toBe(8.5);
 	});
 

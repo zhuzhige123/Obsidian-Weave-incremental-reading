@@ -6,7 +6,7 @@ import type { ScheduleItem } from "./IRCalendarScheduleItem";
 export function buildVisibleDayCountsByDate(
 	materialsByDate: Map<string, ScheduleItem[]>,
 	pinnedByDate: Map<string, ScheduleItem[]>,
-	shouldIncludeItem: (item: ScheduleItem) => boolean
+	shouldIncludeItem: (item: ScheduleItem) => boolean,
 ): Map<string, number> {
 	const counts = new Map<string, number>();
 	const dateKeys = new Set<string>([
@@ -34,7 +34,7 @@ export function buildVisibleDayCountsByDate(
 
 export function mergeCalendarDayCountMaps(
 	base: Map<string, number>,
-	updates: Map<string, number>
+	updates: Map<string, number>,
 ): Map<string, number> {
 	const merged = new Map(base);
 	for (const [dateKey, count] of updates.entries()) {
@@ -45,7 +45,7 @@ export function mergeCalendarDayCountMaps(
 
 export function mergeCalendarDaySummariesFromCounts(
 	daySummaries: Map<string, { totalCount: number }>,
-	counts: Map<string, number>
+	counts: Map<string, number>,
 ): Map<string, { totalCount: number }> {
 	const merged = new Map(daySummaries);
 	for (const [dateKey, count] of counts.entries()) {

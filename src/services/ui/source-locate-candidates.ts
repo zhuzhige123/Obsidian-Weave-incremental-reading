@@ -5,7 +5,9 @@ export const EPUB_LOCATE_CFI_PREFIX = "__weave_epub_cfi__=";
 export const EPUB_LOCATE_EXCERPT_PREFIX = "__weave_epub_excerpt__=";
 export const EPUB_LOCATE_TIME_PREFIX = "__weave_epub_time__=";
 
-const EPUB_PROTOCOL_NAME_TOKENS = EPUB_RUNTIME.protocol.allNames.map((name) => name.toLowerCase());
+const EPUB_PROTOCOL_NAME_TOKENS = EPUB_RUNTIME.protocol.allNames.map((name) =>
+	name.toLowerCase(),
+);
 
 export interface TaggedSourceLocateCandidates {
 	rawSearchCandidates: string[];
@@ -38,7 +40,9 @@ export interface EpubMarkdownLocateCandidateOptions {
 	excerptId?: string;
 }
 
-export function parseTaggedSourceLocateCandidates(candidates: string[]): TaggedSourceLocateCandidates {
+export function parseTaggedSourceLocateCandidates(
+	candidates: string[],
+): TaggedSourceLocateCandidates {
 	const rawSearchCandidates: string[] = [];
 	const textCandidates: string[] = [];
 	const epubLinkCandidates: string[] = [];
@@ -70,7 +74,9 @@ export function parseTaggedSourceLocateCandidates(candidates: string[]): TaggedS
 		}
 
 		if (value.startsWith(EPUB_LOCATE_EXCERPT_PREFIX)) {
-			const excerptValue = value.slice(EPUB_LOCATE_EXCERPT_PREFIX.length).trim();
+			const excerptValue = value
+				.slice(EPUB_LOCATE_EXCERPT_PREFIX.length)
+				.trim();
 			if (excerptValue) {
 				excerptCandidates.push(excerptValue);
 				rawSearchCandidates.push(excerptValue);
@@ -79,7 +85,9 @@ export function parseTaggedSourceLocateCandidates(candidates: string[]): TaggedS
 		}
 
 		if (value.startsWith(EPUB_LOCATE_TIME_PREFIX)) {
-			const numericValue = Number(value.slice(EPUB_LOCATE_TIME_PREFIX.length).trim());
+			const numericValue = Number(
+				value.slice(EPUB_LOCATE_TIME_PREFIX.length).trim(),
+			);
 			if (Number.isFinite(numericValue) && numericValue > 0) {
 				createdTime = numericValue;
 			}
@@ -104,7 +112,9 @@ export function parseTaggedSourceLocateCandidates(candidates: string[]): TaggedS
 	};
 }
 
-export function buildSourceLocateCandidateVariants(candidate: string): string[] {
+export function buildSourceLocateCandidateVariants(
+	candidate: string,
+): string[] {
 	const value = String(candidate || "").trim();
 	if (!value) return [];
 
@@ -128,7 +138,9 @@ export function buildSourceLocateCandidateVariants(candidate: string): string[] 
 	return Array.from(variants).filter(Boolean);
 }
 
-export function buildSourceLocateSourceRefCandidates(sourceRef?: string): string[] {
+export function buildSourceLocateSourceRefCandidates(
+	sourceRef?: string,
+): string[] {
 	const trimmed = String(sourceRef || "").trim();
 	if (
 		!trimmed ||
@@ -158,7 +170,7 @@ export function buildSourceLocateSourceRefCandidates(sourceRef?: string): string
 }
 
 export function buildEpubMarkdownLocateCandidates(
-	options: EpubMarkdownLocateCandidateOptions
+	options: EpubMarkdownLocateCandidateOptions,
 ): string[] {
 	const candidates: string[] = [];
 	const encodedCfi = String(options.encodedCfi || "").trim();
@@ -168,7 +180,9 @@ export function buildEpubMarkdownLocateCandidates(
 	const excerptText = String(options.excerptText || "").trim();
 
 	if (epubFilePath && encodedCfi) {
-		candidates.push(`${EPUB_LOCATE_LINK_PREFIX}${epubFilePath}#weave-cfi=${encodedCfi}`);
+		candidates.push(
+			`${EPUB_LOCATE_LINK_PREFIX}${epubFilePath}#weave-cfi=${encodedCfi}`,
+		);
 	}
 	if (encodedCfi) {
 		candidates.push(`${EPUB_LOCATE_CFI_PREFIX}${encodedCfi}`);
@@ -184,7 +198,9 @@ export function buildEpubMarkdownLocateCandidates(
 		Number.isFinite(options.createdTime) &&
 		options.createdTime > 0
 	) {
-		candidates.push(`${EPUB_LOCATE_TIME_PREFIX}${Math.trunc(options.createdTime)}`);
+		candidates.push(
+			`${EPUB_LOCATE_TIME_PREFIX}${Math.trunc(options.createdTime)}`,
+		);
 	}
 	candidates.push(...buildSourceLocateSourceRefCandidates(options.sourceRef));
 	if (excerptText) {
@@ -201,7 +217,10 @@ export function buildEpubMarkdownLocateCandidates(
 	return candidates.filter(Boolean);
 }
 
-export function decodeSourceLocateURIComponent(value: string, maxPasses = 2): string {
+export function decodeSourceLocateURIComponent(
+	value: string,
+	maxPasses = 2,
+): string {
 	let decoded = String(value || "");
 	for (let i = 0; i < maxPasses; i += 1) {
 		try {
@@ -226,7 +245,7 @@ export function normalizeSourceLocateMatchValue(value: string): string {
 
 export function isDescriptiveSourceLocateTextCandidate(
 	candidate: string,
-	options: SourceLocateTextCandidateOptions = {}
+	options: SourceLocateTextCandidateOptions = {},
 ): boolean {
 	const normalized = normalizeSourceLocateMatchValue(candidate);
 	const minLength = options.minLength ?? 10;
@@ -260,7 +279,7 @@ export function isDescriptiveSourceLocateTextCandidate(
 
 export function buildSourceLocateTimestampCandidates(
 	createdTime: number,
-	options: SourceLocateTimestampOptions = {}
+	options: SourceLocateTimestampOptions = {},
 ): string[] {
 	const date = new Date(createdTime);
 	if (!Number.isFinite(date.getTime())) {

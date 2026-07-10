@@ -1,9 +1,9 @@
-import { LEGACY_WEAVE_PRODUCT_IDS } from "../config/plugin-runtime";
 import { LICENSE_CLOUD_MAX_DEVICES } from "../config/license-cloud-config";
+import { LEGACY_WEAVE_PRODUCT_IDS } from "../config/plugin-runtime";
 import type { LicenseInfo } from "../types/license";
 import {
-	getInheritedLicensesFromLegacyWeave,
 	type PluginLookupApp,
+	getInheritedLicensesFromLegacyWeave,
 } from "./plugin-access";
 
 export interface LicenseDeviceStats {
@@ -11,7 +11,9 @@ export interface LicenseDeviceStats {
 	max: number;
 }
 
-export function isWeavePrimaryLicense(license: LicenseInfo | null | undefined): boolean {
+export function isWeavePrimaryLicense(
+	license: LicenseInfo | null | undefined,
+): boolean {
 	if (!license) {
 		return false;
 	}
@@ -23,14 +25,16 @@ export function isWeavePrimaryLicense(license: LicenseInfo | null | undefined): 
 }
 
 export function getLicenseDeviceStats(
-	license: LicenseInfo | null | undefined
+	license: LicenseInfo | null | undefined,
 ): LicenseDeviceStats | null {
 	if (!license?.isActivated) {
 		return null;
 	}
 
 	const max =
-		license.cloudSync?.devicesMax ?? license.maxDevices ?? LICENSE_CLOUD_MAX_DEVICES;
+		license.cloudSync?.devicesMax ??
+		license.maxDevices ??
+		LICENSE_CLOUD_MAX_DEVICES;
 
 	if (typeof license.cloudSync?.devicesUsed === "number") {
 		return { used: license.cloudSync.devicesUsed, max };
@@ -48,7 +52,7 @@ export function getLicenseDeviceStats(
  */
 export function resolveLicenseDeviceStats(
 	license: LicenseInfo | null | undefined,
-	app?: PluginLookupApp
+	app?: PluginLookupApp,
 ): LicenseDeviceStats | null {
 	if (!license?.isActivated) {
 		return null;
@@ -60,9 +64,12 @@ export function resolveLicenseDeviceStats(
 			(candidate) =>
 				candidate.isActivated &&
 				candidate.activationCode &&
-				(!license.activationCode || candidate.activationCode === license.activationCode)
+				(!license.activationCode ||
+					candidate.activationCode === license.activationCode),
 		);
-		const weaveStats = getLicenseDeviceStats(matchingWeaveLicense ?? weaveLicenses[0]);
+		const weaveStats = getLicenseDeviceStats(
+			matchingWeaveLicense ?? weaveLicenses[0],
+		);
 		if (weaveStats) {
 			return weaveStats;
 		}

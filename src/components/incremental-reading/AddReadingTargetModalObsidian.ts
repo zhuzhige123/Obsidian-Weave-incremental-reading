@@ -1,8 +1,8 @@
 import { App, Modal } from "obsidian";
 import { mount, unmount } from "svelte";
 import type WeavePlugin from "../../main";
-import { configureWeaveObsidianModalLayout } from "../../utils/obsidian-modal-layout";
 import { i18n } from "../../utils/i18n";
+import { configureWeaveObsidianModalLayout } from "../../utils/obsidian-modal-layout";
 import AddReadingTargetModal from "./AddReadingTargetModal.svelte";
 
 import type { ReadingTargetScheduleMode } from "../../services/incremental-reading/reading-target/IRReadingTargetScheduleDate";

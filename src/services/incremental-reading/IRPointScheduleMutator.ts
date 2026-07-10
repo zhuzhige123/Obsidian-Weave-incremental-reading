@@ -1,15 +1,21 @@
 import type { App } from "obsidian";
 import type { IRBlockStatus, IRBlockV4 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
-import { IRChunkScheduleAdapter } from "./IRChunkScheduleAdapter";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
+import { IRChunkScheduleAdapter } from "./IRChunkScheduleAdapter";
 import { getSharedIRDueDateIndexService } from "./IRDueDateIndexService";
-import { isEpubBookmarkTaskId, IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
-import { isPdfBookmarkTaskId, IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
+import {
+	IREpubBookmarkTaskService,
+	isEpubBookmarkTaskId,
+} from "./IREpubBookmarkTaskService";
+import {
+	IRPdfBookmarkTaskService,
+	isPdfBookmarkTaskId,
+} from "./IRPdfBookmarkTaskService";
+import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
+import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { IRStorageAdapterV4 } from "./IRStorageAdapterV4";
 import { IRStorageService } from "./IRStorageService";
-import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
-import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
 
 export interface PointScheduleMutation {
 	nextRepDate?: number;
@@ -56,7 +62,7 @@ export class IRPointScheduleMutator {
 	async mutateFromBlock(
 		block: IRBlockV4,
 		changes: PointScheduleMutation,
-		options?: PointScheduleMutateOptions
+		options?: PointScheduleMutateOptions,
 	): Promise<PointScheduleMutateResult> {
 		await Promise.all([
 			this.storage.initialize(),
@@ -81,13 +87,15 @@ export class IRPointScheduleMutator {
 		}
 
 		const nextRepDate =
-			changes.nextRepDate !== undefined ? changes.nextRepDate : previousNextRepDate;
+			changes.nextRepDate !== undefined
+				? changes.nextRepDate
+				: previousNextRepDate;
 
 		if (changes.nextRepDate !== undefined) {
 			await getSharedIRDueDateIndexService(this.app).updatePointDueDate(
 				pointId,
 				previousNextRepDate,
-				nextRepDate
+				nextRepDate,
 			);
 			await getSharedIRDueDateIndexService(this.app).flushPendingWrites();
 		}
@@ -109,14 +117,16 @@ export class IRPointScheduleMutator {
 		getSharedIRScheduleIndexService(this.app).invalidate();
 		getSharedIRCalendarQueryService(this.app).invalidate();
 		getSharedIRProjectionRuntime(this.app).markStale();
-		const sources = await getSharedIRScheduleIndexService(this.app).getScheduleSources();
+		const sources = await getSharedIRScheduleIndexService(
+			this.app,
+		).getScheduleSources();
 		return sources.scheduleFingerprint;
 	}
 
 	private async mutateMarkdownPointSchedule(
 		pointId: string,
 		block: IRBlockV4,
-		changes: PointScheduleMutation
+		changes: PointScheduleMutation,
 	): Promise<void> {
 		const scheduleUpdates = {
 			nextRepDate: changes.nextRepDate,
@@ -146,14 +156,16 @@ export class IRPointScheduleMutator {
 		}
 
 		throw new Error(
-			`[IRPointScheduleMutator] 无法持久化调度：阅读点 ${pointId} 在 points/chunk/block 存储中不存在`
+			`[IRPointScheduleMutator] 无法持久化调度：阅读点 ${pointId} 在 points/chunk/block 存储中不存在`,
 		);
 	}
 }
 
 const mutatorByApp = new WeakMap<App, IRPointScheduleMutator>();
 
-export function getSharedIRPointScheduleMutator(app: App): IRPointScheduleMutator {
+export function getSharedIRPointScheduleMutator(
+	app: App,
+): IRPointScheduleMutator {
 	let service = mutatorByApp.get(app);
 	if (!service) {
 		service = new IRPointScheduleMutator(app);
@@ -166,12 +178,19 @@ export async function mutatePointScheduleFromBlock(
 	app: App,
 	block: IRBlockV4,
 	changes: PointScheduleMutation,
-	options?: PointScheduleMutateOptions
+	options?: PointScheduleMutateOptions,
 ): Promise<PointScheduleMutateResult> {
 	try {
-		return await getSharedIRPointScheduleMutator(app).mutateFromBlock(block, changes, options);
+		return await getSharedIRPointScheduleMutator(app).mutateFromBlock(
+			block,
+			changes,
+			options,
+		);
 	} catch (error) {
-		logger.warn("[IRPointScheduleMutator] mutate failed", { pointId: block.id, error });
+		logger.warn("[IRPointScheduleMutator] mutate failed", {
+			pointId: block.id,
+			error,
+		});
 		throw error;
 	}
 }
@@ -181,7 +200,7 @@ export async function persistBlockScheduleState(
 	app: App,
 	before: IRBlockV4,
 	after: IRBlockV4,
-	options?: Omit<PointScheduleMutateOptions, "previousNextRepDate">
+	options?: Omit<PointScheduleMutateOptions, "previousNextRepDate">,
 ): Promise<PointScheduleMutateResult> {
 	return mutatePointScheduleFromBlock(
 		app,
@@ -196,6 +215,6 @@ export async function persistBlockScheduleState(
 		{
 			...options,
 			previousNextRepDate: Number(before.nextRepDate || 0) || undefined,
-		}
+		},
 	);
 }

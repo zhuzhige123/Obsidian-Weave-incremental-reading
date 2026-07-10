@@ -21,8 +21,13 @@ export interface ResolvedWeaveMemoryHost {
 	openCreateCardModal: (input: WeaveCreateCardModalInput) => Promise<void>;
 }
 
-export function resolveWeaveMemoryHost(app: App): ResolvedWeaveMemoryHost | null {
-	const host = getObsidianPluginAs<WeaveMemoryHostCapabilities>(app, WEAVE_MAIN_PLUGIN_ID);
+export function resolveWeaveMemoryHost(
+	app: App,
+): ResolvedWeaveMemoryHost | null {
+	const host = getObsidianPluginAs<WeaveMemoryHostCapabilities>(
+		app,
+		WEAVE_MAIN_PLUGIN_ID,
+	);
 	const openCreateCardModal = host?.openCreateCardModal;
 	if (typeof openCreateCardModal !== "function") {
 		return null;

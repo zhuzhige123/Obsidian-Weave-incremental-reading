@@ -21,13 +21,17 @@ export interface IRContinueReadingSuggestionsModalObsidianOptions {
 }
 
 export class IRContinueReadingSuggestionsModalObsidian {
-	private static activeInstance: IRContinueReadingSuggestionsModalObsidian | null = null;
+	private static activeInstance: IRContinueReadingSuggestionsModalObsidian | null =
+		null;
 	private component: Parameters<typeof unmount>[0] | null = null;
 	private containerEl: HTMLDivElement | null = null;
 	private options: IRContinueReadingSuggestionsModalObsidianOptions;
 	private isOpen = false;
 
-	constructor(_app: App, options: IRContinueReadingSuggestionsModalObsidianOptions) {
+	constructor(
+		_app: App,
+		options: IRContinueReadingSuggestionsModalObsidianOptions,
+	) {
 		this.options = options;
 	}
 
@@ -72,8 +76,7 @@ export class IRContinueReadingSuggestionsModalObsidian {
 
 		try {
 			this.containerEl?.remove();
-		} catch {
-		}
+		} catch {}
 		this.containerEl = null;
 		this.options.onClose?.();
 	}

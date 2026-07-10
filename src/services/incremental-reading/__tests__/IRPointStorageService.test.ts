@@ -1,6 +1,6 @@
 import { getPluginPaths, getV2Paths } from "../../../config/paths";
-import { IRPointStorageService } from "../IRPointStorageService";
 import { IR_POINT_STORAGE_VERSION } from "../../../types/ir-point-storage-types";
+import { IRPointStorageService } from "../IRPointStorageService";
 
 function normalizeTestPath(path: string): string {
 	return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
@@ -12,9 +12,17 @@ function parentPath(path: string): string {
 	return idx > 0 ? normalized.slice(0, idx) : "";
 }
 
-function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs: string[] = []) {
+function createMemoryApp(
+	initialFiles: Record<string, string> = {},
+	initialDirs: string[] = [],
+) {
 	const files = new Map<string, string>();
-	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave"]);
+	const folders = new Set<string>([
+		"",
+		".obsidian",
+		".obsidian/plugins",
+		".obsidian/plugins/weave",
+	]);
 
 	const ensureDir = (dir: string) => {
 		const normalized = normalizeTestPath(dir);
@@ -56,7 +64,8 @@ function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs:
 			const childFiles: string[] = [];
 
 			for (const folder of folders) {
-				if (!folder || folder === normalized || !folder.startsWith(prefix)) continue;
+				if (!folder || folder === normalized || !folder.startsWith(prefix))
+					continue;
 				const rest = folder.slice(prefix.length);
 				if (!rest || rest.includes("/")) continue;
 				childFolders.add(folder);
@@ -77,7 +86,9 @@ function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs:
 		read: vi.fn(async (path: string) => {
 			const normalized = normalizeTestPath(path);
 			if (folders.has(normalized) && !files.has(normalized)) {
-				const error = new Error("EISDIR: illegal operation on a directory, read");
+				const error = new Error(
+					"EISDIR: illegal operation on a directory, read",
+				);
 				(error as NodeJS.ErrnoException).code = "EISDIR";
 				throw error;
 			}
@@ -137,8 +148,8 @@ function buildMaterialRecord(id: string, sourcePath: string, title = id) {
 			type: sourcePath.toLowerCase().endsWith(".epub")
 				? "epub"
 				: sourcePath.toLowerCase().endsWith(".pdf")
-					? "pdf"
-					: "file",
+				? "pdf"
+				: "file",
 			path: sourcePath,
 		},
 		bibliography: {
@@ -161,15 +172,24 @@ function buildMaterialRecord(id: string, sourcePath: string, title = id) {
 }
 
 function getPointFilesIndexPath(app: any): string {
-	return normalizeTestPath(getPluginPaths(app as any).cache.incrementalReading.pointFilesIndex);
+	return normalizeTestPath(
+		getPluginPaths(app as any).cache.incrementalReading.pointFilesIndex,
+	);
 }
 
-function getIndexedPointFilePath(v2Paths: ReturnType<typeof getV2Paths>, pointIndex: any): string {
+function getIndexedPointFilePath(
+	v2Paths: ReturnType<typeof getV2Paths>,
+	pointIndex: any,
+): string {
 	const indexedPath = String(pointIndex.files?.[0]?.file || "");
 	if (!indexedPath) {
 		return "";
 	}
-	if (normalizeTestPath(indexedPath).startsWith(normalizeTestPath(v2Paths.ir.root))) {
+	if (
+		normalizeTestPath(indexedPath).startsWith(
+			normalizeTestPath(v2Paths.ir.root),
+		)
+	) {
 		return normalizeTestPath(indexedPath);
 	}
 	return normalizeTestPath(`${v2Paths.ir.root}/${indexedPath}`);
@@ -209,8 +229,12 @@ describe("IRPointStorageService", () => {
 			locator: { tocHref: "chapter-1.xhtml", tocLevel: 0 },
 		});
 
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
-		expect(pointIndex.files[0]?.file).toBe("weave/incremental-reading/points/Readable Topic.irdeck");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		expect(pointIndex.files[0]?.file).toBe(
+			"weave/incremental-reading/points/Readable Topic.irdeck",
+		);
 
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
 		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
@@ -222,7 +246,9 @@ describe("IRPointStorageService", () => {
 		expect(pointFile.points[0].source.type).toBe("epub");
 		expect(pointFile.points[0].source.path).toBe("Books/Test.epub");
 		expect(pointFile.points[0].source.title).toBe("Chapter 1");
-		expect(pointFile.points[0].parameterContext.materialClass).toBe("academic-book");
+		expect(pointFile.points[0].parameterContext.materialClass).toBe(
+			"academic-book",
+		);
 		expect(files.has(normalizeTestPath(v2Paths.ir.materialsIndex))).toBe(false);
 	});
 
@@ -246,7 +272,7 @@ describe("IRPointStorageService", () => {
 					],
 				}),
 			},
-			[`${v2Paths.ir.root}/points`]
+			[`${v2Paths.ir.root}/points`],
 		);
 		files.set(
 			getPointFilesIndexPath(app),
@@ -262,12 +288,14 @@ describe("IRPointStorageService", () => {
 						updatedAt: "2026-04-16T10:00:00.000Z",
 					},
 				],
-			})
+			}),
 		);
 		const service = new IRPointStorageService(app);
 
 		const result = await service.refreshPointFilesIndexFromVault();
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
 
 		expect(result.scanned).toBe(1);
 		expect(pointIndex.files).toHaveLength(1);
@@ -308,7 +336,7 @@ describe("IRPointStorageService", () => {
 					points: [],
 				}),
 			},
-			[`${v2Paths.ir.root}/points`]
+			[`${v2Paths.ir.root}/points`],
 		);
 		files.set(
 			getPointFilesIndexPath(app),
@@ -331,26 +359,32 @@ describe("IRPointStorageService", () => {
 						updatedAt: "2026-04-16T11:00:00.000Z",
 					},
 				],
-			})
+			}),
 		);
 		const service = new IRPointStorageService(app);
 
 		const result = await service.refreshPointFilesIndexForVaultPaths(
 			["weave/incremental-reading/points/Existing Topic.irdeck"],
-			{ removedPaths: ["weave/incremental-reading/points/Stale Topic.irdeck"] }
+			{ removedPaths: ["weave/incremental-reading/points/Stale Topic.irdeck"] },
 		);
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
 
 		expect(result.scanned).toBe(1);
 		expect(pointIndex.files).toHaveLength(2);
-		expect(pointIndex.files.some((entry: { topicId: string }) => entry.topicId === "stale-topic")).toBe(
-			false
-		);
-		expect(pointIndex.files.map((entry: { file: string }) => entry.file)).toEqual(
+		expect(
+			pointIndex.files.some(
+				(entry: { topicId: string }) => entry.topicId === "stale-topic",
+			),
+		).toBe(false);
+		expect(
+			pointIndex.files.map((entry: { file: string }) => entry.file),
+		).toEqual(
 			expect.arrayContaining([
 				"weave/incremental-reading/points/Existing Topic.irdeck",
 				"weave/incremental-reading/points/Other Topic.irdeck",
-			])
+			]),
 		);
 	});
 
@@ -375,7 +409,11 @@ describe("IRPointStorageService", () => {
 			sourceType: "pdf-bookmark",
 			sourcePath: "Docs/Keep.pdf",
 			locatorType: "pdf-selection",
-			locator: { link: "obsidian://pdf", annotationId: "ann-1", pdfPath: "Docs/Keep.pdf" },
+			locator: {
+				link: "obsidian://pdf",
+				annotationId: "ann-1",
+				pdfPath: "Docs/Keep.pdf",
+			},
 			linkedNotePaths: ["Notes/A.md", "Notes/B.md"],
 			explicitTagGroupId: "group-a",
 			isStarred: true,
@@ -412,11 +450,16 @@ describe("IRPointStorageService", () => {
 		expect(snapshots[0].topicName).toBe("Readable Topic");
 
 		const pointFile = JSON.parse(
-			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Readable Topic.irdeck`)) || "{}"
+			files.get(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Readable Topic.irdeck`),
+			) || "{}",
 		);
 		const point = pointFile.points[0];
 		expect(point.userData.title).toBe("Selection A Updated");
-		expect(point.relations.linkedNotePaths).toEqual(["Notes/A.md", "Notes/B.md"]);
+		expect(point.relations.linkedNotePaths).toEqual([
+			"Notes/A.md",
+			"Notes/B.md",
+		]);
 		expect(point.metadata.tagGroupId).toBe("group-a");
 		expect(point.stats.impressionCount).toBe(4);
 		expect(point.stats.extractCount).toBe(2);
@@ -498,7 +541,9 @@ describe("IRPointStorageService", () => {
 		const service = new IRPointStorageService(app);
 
 		const snapshots = await service.listPointSnapshots();
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
 
 		expect(snapshots).toHaveLength(1);
 		expect(snapshots[0]?.topicId).toBe("topic-history");
@@ -511,7 +556,7 @@ describe("IRPointStorageService", () => {
 					topicName: "历史专题",
 					pointCount: 1,
 				}),
-			])
+			]),
 		);
 	});
 
@@ -533,10 +578,17 @@ describe("IRPointStorageService", () => {
 			linkedNotePaths: ["Notes/Topic", "Notes/Appendix.md"],
 		});
 
-		expect(await service.remapAssociatedNoteFileReferences("Notes/Topic.md", "Notes/Renamed Topic.md")).toBe(1);
+		expect(
+			await service.remapAssociatedNoteFileReferences(
+				"Notes/Topic.md",
+				"Notes/Renamed Topic.md",
+			),
+		).toBe(1);
 
 		const pointFile = JSON.parse(
-			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Readable Topic.irdeck`)) || "{}"
+			files.get(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Readable Topic.irdeck`),
+			) || "{}",
 		);
 		expect(pointFile.points[0].relations.linkedNotePaths).toEqual([
 			"Notes/Renamed Topic.md",
@@ -610,28 +662,43 @@ chunk body`,
 					["topic-1", "Topic One"],
 					["topic-2", "Topic Two"],
 				]),
-			}
+			},
 		);
 
 		const pointIndex = JSON.parse(
-			files.get(getPointFilesIndexPath(app)) || "{}"
+			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
 		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
 		expect(pointFile.points).toHaveLength(1);
 		expect(pointFile.points[0].id).toBe("chunk-1");
 		expect(pointFile.points[0].pointType).toBe("chunk-entry");
-		expect(pointFile.points[0].relations.topicIds).toEqual(["topic-1", "topic-2"]);
+		expect(pointFile.points[0].relations.topicIds).toEqual([
+			"topic-1",
+			"topic-2",
+		]);
 		expect(pointFile.points[0].relations.linkedNotePaths).toEqual([]);
-		expect(pointFile.points[0].metadata.chunkFilePath).toBe("IR/Chunks/01_Chunk.md");
+		expect(pointFile.points[0].metadata.chunkFilePath).toBe(
+			"IR/Chunks/01_Chunk.md",
+		);
 		expect(pointFile.points[0].metadata.tagGroupId).toBe("group-chunk");
-		expect(pointFile.points[0].metadata.sourceSequenceGroup).toBe("md:Docs/Source.md");
+		expect(pointFile.points[0].metadata.sourceSequenceGroup).toBe(
+			"md:Docs/Source.md",
+		);
 		expect(pointFile.points[0].metadata.sourceSequenceOrder).toBe(1);
 		expect(pointFile.points[0].metadata.sourceSequenceLocked).toBe(true);
-		expect(pointFile.points[0].metadata.sourceSequenceAnchorDateKey).toBe("2026-05-03");
-		expect(pointFile.points[0].metadata.autoSubscribedAt).toBe("2026-05-03T01:02:03.000Z");
-		expect(pointFile.points[0].metadata.autoSubscribedFolderPath).toBe("Inbox/Subscribed");
-		expect(pointFile.points[0].metadata.autoSubscribedBadgeUntil).toBe("2026-05-10T01:02:03.000Z");
+		expect(pointFile.points[0].metadata.sourceSequenceAnchorDateKey).toBe(
+			"2026-05-03",
+		);
+		expect(pointFile.points[0].metadata.autoSubscribedAt).toBe(
+			"2026-05-03T01:02:03.000Z",
+		);
+		expect(pointFile.points[0].metadata.autoSubscribedFolderPath).toBe(
+			"Inbox/Subscribed",
+		);
+		expect(pointFile.points[0].metadata.autoSubscribedBadgeUntil).toBe(
+			"2026-05-10T01:02:03.000Z",
+		);
 		expect(pointFile.points[0].metadata.externalDocument).toBe(true);
 		expect(pointFile.points[0].userData.tags).toEqual(["alpha", "Beta"]);
 		expect(pointFile.points[0].source.id).toBe("source-1");
@@ -658,7 +725,11 @@ chunk body`,
 		};
 
 		await service.syncLegacyPoint(input);
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.root}/points/Old Topic.irdeck`))).toBe(true);
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Old Topic.irdeck`),
+			),
+		).toBe(true);
 
 		await service.upsertPointDeck({
 			id: "topic-1",
@@ -670,11 +741,23 @@ chunk body`,
 			updatedAt: "2026-04-16T10:00:00.000Z",
 		} as any);
 
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.root}/points/Old Topic.irdeck`))).toBe(false);
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.root}/points/New Topic.irdeck`))).toBe(true);
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Old Topic.irdeck`),
+			),
+		).toBe(false);
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.root}/points/New Topic.irdeck`),
+			),
+		).toBe(true);
 
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
-		expect(pointIndex.files[0]?.file).toBe("weave/incremental-reading/points/New Topic.irdeck");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		expect(pointIndex.files[0]?.file).toBe(
+			"weave/incremental-reading/points/New Topic.irdeck",
+		);
 	});
 
 	it("moves a point to a new topic shard and removes stale copies from the previous topic", async () => {
@@ -703,10 +786,14 @@ chunk body`,
 		});
 
 		const topicAFile = JSON.parse(
-			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Topic A.irdeck`)) || "{}"
+			files.get(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Topic A.irdeck`),
+			) || "{}",
 		);
 		const topicBFile = JSON.parse(
-			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Topic B.irdeck`)) || "{}"
+			files.get(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Topic B.irdeck`),
+			) || "{}",
 		);
 
 		expect(topicAFile.points || []).toHaveLength(0);
@@ -747,10 +834,14 @@ chunk body`,
 			locator: { page: 2 },
 		});
 
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.root}/points/topic-1.irdeck`))).toBe(false);
+		expect(
+			files.has(normalizeTestPath(`${v2Paths.ir.root}/points/topic-1.irdeck`)),
+		).toBe(false);
 
 		const pointFile = JSON.parse(
-			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Readable Topic.irdeck`)) || "{}"
+			files.get(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Readable Topic.irdeck`),
+			) || "{}",
 		);
 		expect(pointFile.topicName).toBe("Readable Topic");
 		expect(pointFile.points).toHaveLength(2);
@@ -826,13 +917,25 @@ chunk body`,
 		const snapshots = await service.listPointSnapshots();
 
 		expect(snapshots).toHaveLength(1);
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.root}/points/Topic One.points-001.json`))).toBe(
-			false
-		);
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.root}/points/Topic One.irdeck`))).toBe(true);
+		expect(
+			files.has(
+				normalizeTestPath(
+					`${v2Paths.ir.root}/points/Topic One.points-001.json`,
+				),
+			),
+		).toBe(false);
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Topic One.irdeck`),
+			),
+		).toBe(true);
 
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
-		expect(pointIndex.files[0]?.file).toBe("weave/incremental-reading/points/Topic One.irdeck");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		expect(pointIndex.files[0]?.file).toBe(
+			"weave/incremental-reading/points/Topic One.irdeck",
+		);
 	});
 
 	it("resolves point topic metadata from a .irdeck file path", async () => {
@@ -861,7 +964,9 @@ chunk body`,
 		});
 		const service = new IRPointStorageService(app);
 
-		const entry = await service.getPointFileEntryByPath(`${v2Paths.ir.root}/points/Topic One.irdeck`);
+		const entry = await service.getPointFileEntryByPath(
+			`${v2Paths.ir.root}/points/Topic One.irdeck`,
+		);
 
 		expect(entry).toEqual({
 			topicId: "topic-1",
@@ -873,7 +978,9 @@ chunk body`,
 
 	it("executes repeatable migration without duplicating points and relocates legacy reader state", async () => {
 		const v2Paths = getV2Paths("");
-		const pluginPaths = getPluginPaths({ vault: { configDir: ".obsidian" } } as any);
+		const pluginPaths = getPluginPaths({
+			vault: { configDir: ".obsidian" },
+		} as any);
 		const { app, files } = createMemoryApp({
 			[v2Paths.ir.legacyTopics]: JSON.stringify({
 				topics: {
@@ -925,7 +1032,14 @@ chunk body`,
 				savedAt: 1713261600000,
 			}),
 			[`${v2Paths.ir.epub}/book-1/concealed-texts.json`]: JSON.stringify([
-				{ id: "conceal-1", text: "legacy", mode: "mask", chapterIndex: 1, cfiRange: "/6/8", createdTime: 1 },
+				{
+					id: "conceal-1",
+					text: "legacy",
+					mode: "mask",
+					chapterIndex: 1,
+					cfiRange: "/6/8",
+					createdTime: 1,
+				},
 			]),
 			[`${v2Paths.ir.epub}/reader-settings.desktop.json`]: JSON.stringify({
 				lineHeight: 1.8,
@@ -938,9 +1052,11 @@ chunk body`,
 		const service = new IRPointStorageService(app);
 
 		const firstReport = await service.executeMigration();
-		const inspectionAfterFirstMigration = await service.inspectMigrationStatus();
+		const inspectionAfterFirstMigration =
+			await service.inspectMigrationStatus();
 		const secondReport = await service.executeMigration();
-		const inspectionAfterSecondMigration = await service.inspectMigrationStatus();
+		const inspectionAfterSecondMigration =
+			await service.inspectMigrationStatus();
 
 		expect(firstReport.summary.migratedPoints).toBe(1);
 		expect(firstReport.summary.migratedReaderStateFiles).toBe(4);
@@ -957,7 +1073,7 @@ chunk body`,
 		expect(inspectionAfterSecondMigration.pendingReaderStateFileCount).toBe(0);
 
 		const pointIndex = JSON.parse(
-			files.get(getPointFilesIndexPath(app)) || "{}"
+			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
 		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
@@ -974,42 +1090,64 @@ chunk body`,
 		expect(
 			files.has(
 				normalizeTestPath(
-					`${pluginPaths.state.incrementalReading.readerState}/epub/book-1/state.json`
-				)
-			)
+					`${pluginPaths.state.incrementalReading.readerState}/epub/book-1/state.json`,
+				),
+			),
 		).toBe(true);
 		expect(
 			files.has(
 				normalizeTestPath(
-					`${pluginPaths.state.incrementalReading.readerState}/epub/book-1/last-open-bookmark.json`
-				)
-			)
+					`${pluginPaths.state.incrementalReading.readerState}/epub/book-1/last-open-bookmark.json`,
+				),
+			),
 		).toBe(true);
 		expect(
 			files.has(
 				normalizeTestPath(
-					`${pluginPaths.cache.incrementalReading.readerArtifacts}/epub/book-1/concealed-texts.json`
-				)
-			)
+					`${pluginPaths.cache.incrementalReading.readerArtifacts}/epub/book-1/concealed-texts.json`,
+				),
+			),
 		).toBe(true);
 		expect(
 			files.has(
 				normalizeTestPath(
-					`${pluginPaths.state.incrementalReading.readerState}/epub/reader-settings.desktop.json`
-				)
-			)
+					`${pluginPaths.state.incrementalReading.readerState}/epub/reader-settings.desktop.json`,
+				),
+			),
 		).toBe(true);
 
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.epub}/book-1/state.json`))).toBe(true);
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.epub}/book-1/last-open-bookmark.json`))).toBe(true);
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.epub}/book-1/concealed-texts.json`))).toBe(true);
+		expect(
+			files.has(normalizeTestPath(`${v2Paths.ir.epub}/book-1/state.json`)),
+		).toBe(true);
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.epub}/book-1/last-open-bookmark.json`),
+			),
+		).toBe(true);
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.epub}/book-1/concealed-texts.json`),
+			),
+		).toBe(true);
 	});
 
 	it("backfills point source data and removes legacy material files during migration cleanup", async () => {
 		const v2Paths = getV2Paths("");
-		const activeMaterial = buildMaterialRecord("src-active", "Docs/Source.md", "Source");
-		const duplicateLegacyMaterial = buildMaterialRecord("tk-ir-legacy", "Docs/Source.md", "Source");
-		const uniqueLegacyMaterial = buildMaterialRecord("legacy-keep", "Docs/Standalone.md", "Standalone");
+		const activeMaterial = buildMaterialRecord(
+			"src-active",
+			"Docs/Source.md",
+			"Source",
+		);
+		const duplicateLegacyMaterial = buildMaterialRecord(
+			"tk-ir-legacy",
+			"Docs/Source.md",
+			"Source",
+		);
+		const uniqueLegacyMaterial = buildMaterialRecord(
+			"legacy-keep",
+			"Docs/Standalone.md",
+			"Standalone",
+		);
 		const { app, files, folders } = createMemoryApp(
 			{
 				[v2Paths.ir.pointFilesIndex]: JSON.stringify({
@@ -1025,18 +1163,20 @@ chunk body`,
 						},
 					],
 				}),
-				[`${v2Paths.ir.root}/points/Topic One.points-001.json`]: JSON.stringify({
-					schemaVersion: 1,
-					topicId: "topic-1",
-					topicName: "Topic One",
-					updatedAt: "2026-04-16T10:00:00.000Z",
-					points: [
-						{
-							id: "point-1",
-							materialId: "src-active",
-						},
-					],
-				}),
+				[`${v2Paths.ir.root}/points/Topic One.points-001.json`]: JSON.stringify(
+					{
+						schemaVersion: 1,
+						topicId: "topic-1",
+						topicName: "Topic One",
+						updatedAt: "2026-04-16T10:00:00.000Z",
+						points: [
+							{
+								id: "point-1",
+								materialId: "src-active",
+							},
+						],
+					},
+				),
 				[v2Paths.ir.materialsIndex]: JSON.stringify({
 					schemaVersion: 1,
 					updatedAt: "2026-04-16T10:00:00.000Z",
@@ -1061,11 +1201,12 @@ chunk body`,
 						},
 					],
 				}),
-				[`${v2Paths.ir.root}/materials/src-active.material.json`]: JSON.stringify(activeMaterial),
-				[`${v2Paths.ir.root}/materials/tk-ir-legacy.material.json`]: JSON.stringify(
-					duplicateLegacyMaterial
-				),
-				[`${v2Paths.ir.root}/materials/legacy-keep.material.json`]: JSON.stringify(uniqueLegacyMaterial),
+				[`${v2Paths.ir.root}/materials/src-active.material.json`]:
+					JSON.stringify(activeMaterial),
+				[`${v2Paths.ir.root}/materials/tk-ir-legacy.material.json`]:
+					JSON.stringify(duplicateLegacyMaterial),
+				[`${v2Paths.ir.root}/materials/legacy-keep.material.json`]:
+					JSON.stringify(uniqueLegacyMaterial),
 				[v2Paths.ir.materials.index]: JSON.stringify({
 					version: "1.0.0",
 					lastUpdated: "2026-04-16T10:00:00.000Z",
@@ -1085,7 +1226,7 @@ chunk body`,
 				"Docs/Source.md": "# Source",
 				"Docs/Standalone.md": "# Standalone",
 			},
-			[v2Paths.ir.materials.sessions]
+			[v2Paths.ir.materials.sessions],
 		);
 		const service = new IRPointStorageService(app);
 
@@ -1108,20 +1249,36 @@ chunk body`,
 		expect(report.summary.removedEmptyLegacyMaterialDirs).toBe(1);
 
 		expect(
-			files.has(normalizeTestPath(`${v2Paths.ir.root}/materials/tk-ir-legacy.material.json`))
+			files.has(
+				normalizeTestPath(
+					`${v2Paths.ir.root}/materials/tk-ir-legacy.material.json`,
+				),
+			),
 		).toBe(false);
 		expect(
-			files.has(normalizeTestPath(`${v2Paths.ir.root}/materials/src-active.material.json`))
+			files.has(
+				normalizeTestPath(
+					`${v2Paths.ir.root}/materials/src-active.material.json`,
+				),
+			),
 		).toBe(false);
 		expect(
-			files.has(normalizeTestPath(`${v2Paths.ir.root}/materials/legacy-keep.material.json`))
+			files.has(
+				normalizeTestPath(
+					`${v2Paths.ir.root}/materials/legacy-keep.material.json`,
+				),
+			),
 		).toBe(false);
 		expect(files.has(normalizeTestPath(v2Paths.ir.materialsIndex))).toBe(false);
-		expect(files.has(normalizeTestPath(v2Paths.ir.materials.index))).toBe(false);
-		expect(folders.has(normalizeTestPath(v2Paths.ir.materials.sessions))).toBe(false);
+		expect(files.has(normalizeTestPath(v2Paths.ir.materials.index))).toBe(
+			false,
+		);
+		expect(folders.has(normalizeTestPath(v2Paths.ir.materials.sessions))).toBe(
+			false,
+		);
 
 		const pointIndex = JSON.parse(
-			files.get(getPointFilesIndexPath(app)) || "{}"
+			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
 		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
@@ -1264,7 +1421,7 @@ chunk body`,
 		expect(files.has(normalizeTestPath(v2Paths.ir.blocks))).toBe(false);
 
 		const pointIndex = JSON.parse(
-			files.get(getPointFilesIndexPath(app)) || "{}"
+			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
 		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
@@ -1282,7 +1439,10 @@ chunk body`,
 	it("migrates non-canonical topic index paths to standard points/*.irdeck files", async () => {
 		const v2Paths = getV2Paths("");
 		const topicDirPath = `${v2Paths.ir.root}/points/Mixed Topic`;
-		const { app, files } = createMemoryApp({}, [topicDirPath, `${v2Paths.ir.root}/points`]);
+		const { app, files } = createMemoryApp({}, [
+			topicDirPath,
+			`${v2Paths.ir.root}/points`,
+		]);
 		files.set(
 			getPointFilesIndexPath(app),
 			JSON.stringify({
@@ -1297,7 +1457,7 @@ chunk body`,
 						updatedAt: "2026-04-16T10:00:00.000Z",
 					},
 				],
-			})
+			}),
 		);
 		const service = new IRPointStorageService(app);
 
@@ -1314,14 +1474,22 @@ chunk body`,
 			metadata: { canvasNodeId: "node-1", externalDocument: true },
 		});
 
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
-		expect(pointIndex.files[0]?.file).toBe("weave/incremental-reading/points/Mixed Topic.irdeck");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		expect(pointIndex.files[0]?.file).toBe(
+			"weave/incremental-reading/points/Mixed Topic.irdeck",
+		);
 		const pointFile = JSON.parse(
-			files.get(normalizeTestPath(`${v2Paths.ir.root}/points/Mixed Topic.irdeck`)) || "{}"
+			files.get(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Mixed Topic.irdeck`),
+			) || "{}",
 		);
-		expect(pointFile.points.some((point: { id: string }) => point.id === "canvas-node-1")).toBe(
-			true
-		);
+		expect(
+			pointFile.points.some(
+				(point: { id: string }) => point.id === "canvas-node-1",
+			),
+		).toBe(true);
 	});
 
 	it("keeps one index row per visible .irdeck path and loads snapshots from duplicate topic files", async () => {
@@ -1345,7 +1513,7 @@ chunk body`,
 					points: [{ id: "point-b", relations: { topicIds: ["topic-dup"] } }],
 				}),
 			},
-			[`${v2Paths.ir.root}/points`, "Topics"]
+			[`${v2Paths.ir.root}/points`, "Topics"],
 		);
 		const service = new IRPointStorageService(app);
 
@@ -1355,11 +1523,16 @@ chunk body`,
 		expect(refreshResult.duplicateTopicGroups).toBe(1);
 		expect(refreshResult.conflicts[0]?.paths).toHaveLength(2);
 
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
 		expect(pointIndex.files).toHaveLength(2);
 
 		const snapshots = await service.listPointSnapshots();
-		expect(snapshots.map((item) => item.point.id).sort()).toEqual(["point-a", "point-b"]);
+		expect(snapshots.map((item) => item.point.id).sort()).toEqual([
+			"point-a",
+			"point-b",
+		]);
 
 		const decks = await service.listPointDecks();
 		expect(Object.keys(decks)).toEqual(["topic-dup"]);
@@ -1383,7 +1556,7 @@ chunk body`,
 					],
 				}),
 			},
-			[`${v2Paths.ir.root}/points`, "Topics"]
+			[`${v2Paths.ir.root}/points`, "Topics"],
 		);
 		const service = new IRPointStorageService(app);
 
@@ -1391,13 +1564,17 @@ chunk body`,
 		expect(refreshResult.scanned).toBeGreaterThan(0);
 		expect(refreshResult.added).toBe(1);
 
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
 		expect(pointIndex.files).toHaveLength(1);
 		expect(pointIndex.files[0]?.file).toBe(normalizeTestPath(vaultDeckPath));
 		expect(files.has(normalizeTestPath(vaultDeckPath))).toBe(true);
-		expect(files.has(normalizeTestPath(`${v2Paths.ir.root}/points/Vault Topic.irdeck`))).toBe(
-			false
-		);
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Vault Topic.irdeck`),
+			),
+		).toBe(false);
 	});
 
 	it("migrates legacy blocks when only decks.json alias remains", async () => {
@@ -1442,7 +1619,9 @@ chunk body`,
 		const service = new IRPointStorageService(app);
 
 		const report = await service.executeMigration();
-		const pointIndex = JSON.parse(files.get(getPointFilesIndexPath(app)) || "{}");
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
 		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
 
@@ -1486,10 +1665,13 @@ chunk body`,
 					],
 				}),
 			},
-			[`${v2Paths.ir.root}/points`, "Topics"]
+			[`${v2Paths.ir.root}/points`, "Topics"],
 		);
 		const service = new IRPointStorageService(app);
-		const conflicts = await service.detectMergePointIdConflictsBetweenFiles(keeper, [other]);
+		const conflicts = await service.detectMergePointIdConflictsBetweenFiles(
+			keeper,
+			[other],
+		);
 		expect(conflicts).toHaveLength(1);
 		expect(conflicts[0]?.pointId).toBe("same-point");
 		expect(conflicts[0]?.variants).toHaveLength(2);
@@ -1529,7 +1711,7 @@ chunk body`,
 					],
 				}),
 			},
-			[`${v2Paths.ir.root}/points`, "Topics"]
+			[`${v2Paths.ir.root}/points`, "Topics"],
 		);
 		const service = new IRPointStorageService(app);
 		const before = files.get(normalizeTestPath(keeper));
@@ -1572,7 +1754,7 @@ chunk body`,
 					],
 				}),
 			},
-			[`${v2Paths.ir.root}/points`, "Topics"]
+			[`${v2Paths.ir.root}/points`, "Topics"],
 		);
 		const service = new IRPointStorageService(app);
 		const result = await service.mergePointFilesIntoKeeper(keeper, [other], {
@@ -1629,13 +1811,16 @@ chunk body`,
 				traceConfidence: 1,
 				lastVerifiedAt: "2026-06-14T12:00:00.000Z",
 			},
-			{ preserveExisting: true }
+			{ preserveExisting: true },
 		);
 
 		const snapshot = await service.getPointSnapshotById("chunk-trace-1");
-		expect(snapshot?.point.metadata?.resumeLink).toBe("[[Notes/Target.md#^new-block]]");
-		expect(snapshot?.point.trace?.locator?.resumeLink).toBe("[[Notes/Target.md#^new-block]]");
+		expect(snapshot?.point.metadata?.resumeLink).toBe(
+			"[[Notes/Target.md#^new-block]]",
+		);
+		expect(snapshot?.point.trace?.locator?.resumeLink).toBe(
+			"[[Notes/Target.md#^new-block]]",
+		);
 		expect(snapshot?.point.trace?.traceState).toBe("verified");
 	});
-
 });

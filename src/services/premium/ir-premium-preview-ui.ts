@@ -11,7 +11,7 @@ let popoverComponent: MountedPopover | null = null;
 export function openIRPremiumFeaturePreview(
 	app: App,
 	featureId: string,
-	openSettings?: () => void
+	openSettings?: () => void,
 ): void {
 	const normalizedFeatureId = String(featureId || "").trim();
 	if (!normalizedFeatureId) {
@@ -24,7 +24,9 @@ export function openIRPremiumFeaturePreview(
 
 	closeIRPremiumFeaturePreview();
 
-	hostEl = activeDocument.body.createDiv("weave-ir-premium-feature-preview-host");
+	hostEl = activeDocument.body.createDiv(
+		"weave-ir-premium-feature-preview-host",
+	);
 	popoverComponent = mount(IRPremiumFeaturePopover, {
 		target: hostEl,
 		props: {

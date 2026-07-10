@@ -37,7 +37,9 @@ describe("IRSchedulePriorityPatch", () => {
 			epubTasks: [],
 		} as unknown as IRWorkspaceDataSnapshot;
 
-		expect(readStoredPriorityFromWorkspaceSnapshot(snapshot, "chunk-1")).toEqual({
+		expect(
+			readStoredPriorityFromWorkspaceSnapshot(snapshot, "chunk-1"),
+		).toEqual({
 			priorityUi: 6.5,
 			priorityEff: 7.2,
 		});

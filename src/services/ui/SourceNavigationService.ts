@@ -1,17 +1,26 @@
-import { type App, type Editor, MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
-import { i18n } from "../../utils/i18n";
+import {
+	type App,
+	type Editor,
+	MarkdownView,
+	Notice,
+	type WorkspaceLeaf,
+} from "obsidian";
 import { readCanvasNodeData } from "../../types/canvas-menu-node";
 import {
 	type CanvasRuntimeNode,
 	type CanvasViewLike,
 	readCanvasNodeElement,
 } from "../../types/canvas-runtime";
+import { i18n } from "../../utils/i18n";
 import {
 	openFileWithExistingLeaf,
 	openLinkWithExistingLeaf,
 } from "../../utils/workspace-navigation";
-import { normalizeCanvasNodeId, resolveCanvasMenuNodeId } from "./canvas-source-locate";
 import { getSourceLocateOverlayService } from "./SourceLocateOverlayService";
+import {
+	normalizeCanvasNodeId,
+	resolveCanvasMenuNodeId,
+} from "./canvas-source-locate";
 import {
 	buildSourceLocateTimestampCandidates,
 	isDescriptiveSourceLocateTextCandidate,
@@ -58,11 +67,14 @@ export class SourceNavigationService {
 	async locateInMarkdownView(
 		view: MarkdownView,
 		candidates: string[],
-		options: LocateOptions = {}
+		options: LocateOptions = {},
 	): Promise<boolean> {
 		if (!view?.containerEl) return false;
 
-		const target = this.overlay.findMarkdownLocateTarget(view.containerEl, candidates);
+		const target = this.overlay.findMarkdownLocateTarget(
+			view.containerEl,
+			candidates,
+		);
 		if (!target) {
 			const editor = view?.editor as Editor | undefined;
 			if (!editor || !this.locateInMarkdownEditor(editor, candidates)) {
@@ -73,7 +85,11 @@ export class SourceNavigationService {
 		}
 
 		try {
-			target.scrollTarget.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+			target.scrollTarget.scrollIntoView({
+				behavior: "auto",
+				block: "center",
+				inline: "nearest",
+			});
 		} catch (_e) {
 			/* ignore */
 		}
@@ -87,13 +103,15 @@ export class SourceNavigationService {
 		view: MarkdownView,
 		candidates: string[],
 		options: LocateOptions,
-		attempt: number
+		attempt: number,
 	): void {
 		const delay = attempt === 0 ? 60 : this.markdownOverlayRetryDelayMs;
 		window.setTimeout(() => {
 			try {
 				const containerEl = view?.containerEl as HTMLElement | undefined;
-				const target = containerEl ? this.overlay.findMarkdownLocateTarget(containerEl, candidates) : null;
+				const target = containerEl
+					? this.overlay.findMarkdownLocateTarget(containerEl, candidates)
+					: null;
 				if (target) {
 					const shown = this.overlay.showAtRect(target.overlayRect, {
 						label: options.label || DEFAULT_LABEL,
@@ -107,7 +125,12 @@ export class SourceNavigationService {
 				/* ignore */
 			}
 			if (attempt + 1 < this.markdownOverlayMaxAttempts) {
-				this.showMarkdownOverlayFromViewWithRetry(view, candidates, options, attempt + 1);
+				this.showMarkdownOverlayFromViewWithRetry(
+					view,
+					candidates,
+					options,
+					attempt + 1,
+				);
 			}
 		}, delay);
 	}
@@ -117,7 +140,7 @@ export class SourceNavigationService {
 		candidates: string[],
 		options: LocateOptions,
 		fallbackTarget: { overlayRect: DOMRect; scrollTarget: HTMLElement },
-		attempt: number
+		attempt: number,
 	): void {
 		const delay = attempt === 0 ? 40 : this.markdownOverlayRetryDelayMs;
 		window.setTimeout(() => {
@@ -129,7 +152,13 @@ export class SourceNavigationService {
 						: null) || fallbackTarget;
 				if (!latestTarget) {
 					if (attempt + 1 < this.markdownOverlayMaxAttempts) {
-						this.showMarkdownOverlayWithRetry(view, candidates, options, fallbackTarget, attempt + 1);
+						this.showMarkdownOverlayWithRetry(
+							view,
+							candidates,
+							options,
+							fallbackTarget,
+							attempt + 1,
+						);
 					}
 					return;
 				}
@@ -143,11 +172,23 @@ export class SourceNavigationService {
 				}
 
 				if (attempt + 1 < this.markdownOverlayMaxAttempts) {
-					this.showMarkdownOverlayWithRetry(view, candidates, options, latestTarget, attempt + 1);
+					this.showMarkdownOverlayWithRetry(
+						view,
+						candidates,
+						options,
+						latestTarget,
+						attempt + 1,
+					);
 				}
 			} catch (_e) {
 				if (attempt + 1 < this.markdownOverlayMaxAttempts) {
-					this.showMarkdownOverlayWithRetry(view, candidates, options, fallbackTarget, attempt + 1);
+					this.showMarkdownOverlayWithRetry(
+						view,
+						candidates,
+						options,
+						fallbackTarget,
+						attempt + 1,
+					);
 				}
 			}
 		}, delay);
@@ -156,7 +197,7 @@ export class SourceNavigationService {
 	locateOpenedMarkdownLeaf(
 		openedLeaf: WorkspaceLeaf | null,
 		candidates: string[],
-		options: LocateOptions = {}
+		options: LocateOptions = {},
 	): void {
 		this.locateOpenedMarkdownLeafWithRetry(openedLeaf, candidates, options, 0);
 	}
@@ -165,38 +206,47 @@ export class SourceNavigationService {
 		openedLeaf: WorkspaceLeaf | null,
 		candidates: string[],
 		options: LocateOptions,
-		attempt: number
+		attempt: number,
 	): void {
-		const delay = attempt === 0 ? options.delayMs ?? 220 : this.markdownLocateRetryDelayMs;
+		const delay =
+			attempt === 0 ? options.delayMs ?? 220 : this.markdownLocateRetryDelayMs;
 		window.setTimeout(() => {
 			void (async () => {
-			try {
-				const activeView =
-					openedLeaf?.view?.getViewType?.() === "markdown"
-						? (openedLeaf.view as MarkdownView)
-						: this.app.workspace.getActiveViewOfType(MarkdownView);
-				const located = activeView
-					? await this.locateInMarkdownView(activeView, candidates, options)
-					: false;
-				if (located) return;
+				try {
+					const activeView =
+						openedLeaf?.view?.getViewType?.() === "markdown"
+							? (openedLeaf.view as MarkdownView)
+							: this.app.workspace.getActiveViewOfType(MarkdownView);
+					const located = activeView
+						? await this.locateInMarkdownView(activeView, candidates, options)
+						: false;
+					if (located) return;
 
-				if (attempt + 1 < this.markdownLocateMaxAttempts) {
-					this.locateOpenedMarkdownLeafWithRetry(openedLeaf, candidates, options, attempt + 1);
-					return;
+					if (attempt + 1 < this.markdownLocateMaxAttempts) {
+						this.locateOpenedMarkdownLeafWithRetry(
+							openedLeaf,
+							candidates,
+							options,
+							attempt + 1,
+						);
+						return;
+					}
+
+					if (!activeView?.containerEl && options.fallbackEl) {
+						this.overlay.showAtRect(
+							options.fallbackEl.getBoundingClientRect(),
+							{
+								label: options.label || DEFAULT_LABEL,
+								icon: options.icon || DEFAULT_ICON,
+							},
+						);
+						return;
+					}
+
+					new Notice(i18n.t("irServiceNotices.sourceNav.openedButNotLocated"));
+				} catch (_e) {
+					/* ignore */
 				}
-
-				if (!activeView?.containerEl && options.fallbackEl) {
-					this.overlay.showAtRect(options.fallbackEl.getBoundingClientRect(), {
-						label: options.label || DEFAULT_LABEL,
-						icon: options.icon || DEFAULT_ICON,
-					});
-					return;
-				}
-
-				new Notice(i18n.t("irServiceNotices.sourceNav.openedButNotLocated"));
-			} catch (_e) {
-				/* ignore */
-			}
 			})();
 		}, delay);
 	}
@@ -205,12 +255,17 @@ export class SourceNavigationService {
 		linkText: string,
 		contextPath: string,
 		candidates: string[],
-		options: LocateOptions = {}
+		options: LocateOptions = {},
 	): Promise<WorkspaceLeaf | null> {
-		const openedLeaf = await openLinkWithExistingLeaf(this.app, linkText, contextPath, {
-			openInNewTab: options.openInNewTab ?? true,
-			focus: options.focus ?? true,
-		});
+		const openedLeaf = await openLinkWithExistingLeaf(
+			this.app,
+			linkText,
+			contextPath,
+			{
+				openInNewTab: options.openInNewTab ?? true,
+				focus: options.focus ?? true,
+			},
+		);
 		this.locateOpenedMarkdownLeaf(openedLeaf, candidates, options);
 		return openedLeaf;
 	}
@@ -219,7 +274,7 @@ export class SourceNavigationService {
 		canvasPath: string,
 		candidates: string[],
 		nodeId?: string,
-		options: LocateOptions = {}
+		options: LocateOptions = {},
 	): Promise<WorkspaceLeaf | null> {
 		let canvasLeaf =
 			this.app.workspace.getLeavesOfType("canvas").find((leaf) => {
@@ -234,14 +289,19 @@ export class SourceNavigationService {
 		}
 		if (!canvasLeaf) return null;
 
-		this.app.workspace.setActiveLeaf(canvasLeaf, { focus: options.focus ?? true });
+		this.app.workspace.setActiveLeaf(canvasLeaf, {
+			focus: options.focus ?? true,
+		});
 
 		this.locateCanvasNodeWithRetry(canvasLeaf, candidates, nodeId, options, 0);
 
 		return canvasLeaf;
 	}
 
-	private locateInMarkdownEditor(editor: Editor, candidates: string[]): boolean {
+	private locateInMarkdownEditor(
+		editor: Editor,
+		candidates: string[],
+	): boolean {
 		const content = this.safeGetEditorValue(editor);
 		if (!content) {
 			return false;
@@ -254,7 +314,10 @@ export class SourceNavigationService {
 		}
 
 		const lineText = editor.getLine(target.line) || "";
-		const startPos = { line: target.line, ch: Math.max(0, Math.min(target.startCh, lineText.length)) };
+		const startPos = {
+			line: target.line,
+			ch: Math.max(0, Math.min(target.startCh, lineText.length)),
+		};
 		const endPos = {
 			line: target.line,
 			ch: Math.max(startPos.ch, Math.min(target.endCh, lineText.length)),
@@ -267,7 +330,12 @@ export class SourceNavigationService {
 		}
 
 		try {
-			editor.setSelection(startPos, endPos.ch > startPos.ch ? endPos : { line: target.line, ch: lineText.length });
+			editor.setSelection(
+				startPos,
+				endPos.ch > startPos.ch
+					? endPos
+					: { line: target.line, ch: lineText.length },
+			);
 			window.setTimeout(() => {
 				try {
 					editor.setCursor(startPos);
@@ -285,7 +353,7 @@ export class SourceNavigationService {
 					from: { line: Math.max(0, target.line - 2), ch: 0 },
 					to: { line: target.line + 2, ch: 0 },
 				},
-				true
+				true,
 			);
 		} catch (_e) {
 			try {
@@ -306,7 +374,9 @@ export class SourceNavigationService {
 		}
 	}
 
-	private parseEditorLocateCandidates(candidates: string[]): EditorLocateCandidates {
+	private parseEditorLocateCandidates(
+		candidates: string[],
+	): EditorLocateCandidates {
 		const parsed = parseTaggedSourceLocateCandidates(candidates);
 		const timestampCandidates =
 			typeof parsed.createdTime === "number"
@@ -314,7 +384,9 @@ export class SourceNavigationService {
 				: [];
 
 		return {
-			textCandidates: parsed.textCandidates.filter((value) => this.isDescriptiveTextCandidate(value)),
+			textCandidates: parsed.textCandidates.filter((value) =>
+				this.isDescriptiveTextCandidate(value),
+			),
 			epubLinkCandidates: parsed.epubLinkCandidates,
 			epubCfiCandidates: parsed.epubCfiCandidates,
 			excerptCandidates: parsed.excerptCandidates,
@@ -325,7 +397,7 @@ export class SourceNavigationService {
 
 	private findBestEditorLocateTarget(
 		content: string,
-		candidates: EditorLocateCandidates
+		candidates: EditorLocateCandidates,
 	): { line: number; startCh: number; endCh: number } | null {
 		const normalized = String(content || "").replace(/\r\n/g, "\n");
 		const lines = normalized.split("\n");
@@ -342,16 +414,14 @@ export class SourceNavigationService {
 
 	private findBestEpubCalloutLine(
 		lines: string[],
-		candidates: EditorLocateCandidates
+		candidates: EditorLocateCandidates,
 	): { line: number; startCh: number; endCh: number } | null {
-		let best:
-			| {
-				line: number;
-				startCh: number;
-				endCh: number;
-				score: number;
-			  }
-			| null = null;
+		let best: {
+			line: number;
+			startCh: number;
+			endCh: number;
+			score: number;
+		} | null = null;
 
 		for (let index = 0; index < lines.length; index += 1) {
 			const headerLine = lines[index];
@@ -361,7 +431,10 @@ export class SourceNavigationService {
 
 			const blockLines = [headerLine];
 			let nextIndex = index + 1;
-			while (nextIndex < lines.length && lines[nextIndex].trimStart().startsWith(">")) {
+			while (
+				nextIndex < lines.length &&
+				lines[nextIndex].trimStart().startsWith(">")
+			) {
 				blockLines.push(lines[nextIndex]);
 				nextIndex += 1;
 			}
@@ -369,9 +442,17 @@ export class SourceNavigationService {
 			const blockText = blockLines.join("\n");
 			const score = this.scoreEditorCalloutBlock(blockText, candidates);
 			if (score > 0) {
-				const targetLine = this.findBestLineWithinBlock(lines, index, nextIndex - 1, candidates);
+				const targetLine = this.findBestLineWithinBlock(
+					lines,
+					index,
+					nextIndex - 1,
+					candidates,
+				);
 				const lineText = lines[targetLine] || "";
-				const selection = this.findBestSelectionInLine(lineText, candidates.textCandidates);
+				const selection = this.findBestSelectionInLine(
+					lineText,
+					candidates.textCandidates,
+				);
 				const result = {
 					line: targetLine,
 					startCh: selection?.start ?? 0,
@@ -391,18 +472,41 @@ export class SourceNavigationService {
 			: null;
 	}
 
-	private scoreEditorCalloutBlock(blockText: string, candidates: EditorLocateCandidates): number {
+	private scoreEditorCalloutBlock(
+		blockText: string,
+		candidates: EditorLocateCandidates,
+	): number {
 		const normalizedBlock = this.normalizeForMatch(blockText);
 		if (!normalizedBlock) {
 			return 0;
 		}
 
 		let score = 0;
-		score += this.scoreBestNormalizedMatch(normalizedBlock, candidates.excerptCandidates) * 200;
-		score += this.scoreBestNormalizedMatch(normalizedBlock, candidates.epubLinkCandidates) * 100;
-		score += this.scoreBestNormalizedMatch(normalizedBlock, candidates.epubCfiCandidates) * 80;
-		score += this.scoreBestNormalizedMatch(normalizedBlock, candidates.timestampCandidates) * 20;
-		score += this.scoreBestNormalizedMatch(normalizedBlock, candidates.textCandidates) * 5;
+		score +=
+			this.scoreBestNormalizedMatch(
+				normalizedBlock,
+				candidates.excerptCandidates,
+			) * 200;
+		score +=
+			this.scoreBestNormalizedMatch(
+				normalizedBlock,
+				candidates.epubLinkCandidates,
+			) * 100;
+		score +=
+			this.scoreBestNormalizedMatch(
+				normalizedBlock,
+				candidates.epubCfiCandidates,
+			) * 80;
+		score +=
+			this.scoreBestNormalizedMatch(
+				normalizedBlock,
+				candidates.timestampCandidates,
+			) * 20;
+		score +=
+			this.scoreBestNormalizedMatch(
+				normalizedBlock,
+				candidates.textCandidates,
+			) * 5;
 		return score;
 	}
 
@@ -410,13 +514,16 @@ export class SourceNavigationService {
 		lines: string[],
 		startLine: number,
 		endLine: number,
-		candidates: EditorLocateCandidates
+		candidates: EditorLocateCandidates,
 	): number {
 		let bestLine = startLine;
 		let bestScore = 0;
 		for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
 			const lineText = lines[lineNumber] || "";
-			const score = this.scoreBestNormalizedMatch(this.normalizeForMatch(lineText), candidates.textCandidates);
+			const score = this.scoreBestNormalizedMatch(
+				this.normalizeForMatch(lineText),
+				candidates.textCandidates,
+			);
 			if (score > bestScore) {
 				bestScore = score;
 				bestLine = lineNumber;
@@ -430,21 +537,22 @@ export class SourceNavigationService {
 
 	private findBestPlainTextLine(
 		lines: string[],
-		textCandidates: string[]
+		textCandidates: string[],
 	): { line: number; startCh: number; endCh: number } | null {
-		let best:
-			| {
-				line: number;
-				startCh: number;
-				endCh: number;
-				score: number;
-			  }
-			| null = null;
+		let best: {
+			line: number;
+			startCh: number;
+			endCh: number;
+			score: number;
+		} | null = null;
 
 		for (let lineNumber = 0; lineNumber < lines.length; lineNumber += 1) {
 			const lineText = lines[lineNumber] || "";
 			const normalizedLine = this.normalizeForMatch(lineText);
-			const score = this.scoreBestNormalizedMatch(normalizedLine, textCandidates);
+			const score = this.scoreBestNormalizedMatch(
+				normalizedLine,
+				textCandidates,
+			);
 			if (score <= 0) {
 				continue;
 			}
@@ -467,7 +575,7 @@ export class SourceNavigationService {
 
 	private findBestSelectionInLine(
 		lineText: string,
-		candidates: string[]
+		candidates: string[],
 	): { start: number; end: number } | null {
 		const lowerLine = lineText.toLowerCase();
 		let best: { start: number; end: number; length: number } | null = null;
@@ -477,7 +585,11 @@ export class SourceNavigationService {
 			const lowerCandidate = trimmed.toLowerCase();
 			const index = lowerLine.indexOf(lowerCandidate);
 			if (index < 0) continue;
-			const current = { start: index, end: index + trimmed.length, length: trimmed.length };
+			const current = {
+				start: index,
+				end: index + trimmed.length,
+				length: trimmed.length,
+			};
 			if (!best || current.length > best.length) {
 				best = current;
 			}
@@ -485,11 +597,18 @@ export class SourceNavigationService {
 		return best ? { start: best.start, end: best.end } : null;
 	}
 
-	private scoreBestNormalizedMatch(haystack: string, candidates: string[]): number {
+	private scoreBestNormalizedMatch(
+		haystack: string,
+		candidates: string[],
+	): number {
 		let bestScore = 0;
 		for (const candidate of candidates) {
 			const normalizedCandidate = this.normalizeForMatch(candidate);
-			if (!haystack || !normalizedCandidate || !haystack.includes(normalizedCandidate)) {
+			if (
+				!haystack ||
+				!normalizedCandidate ||
+				!haystack.includes(normalizedCandidate)
+			) {
 				continue;
 			}
 			bestScore = Math.max(bestScore, normalizedCandidate.length);
@@ -516,7 +635,7 @@ export class SourceNavigationService {
 		candidates: string[],
 		nodeId: string | undefined,
 		options: LocateOptions,
-		attempt: number
+		attempt: number,
 	): void {
 		window.setTimeout(() => {
 			try {
@@ -525,7 +644,13 @@ export class SourceNavigationService {
 				const nodesMap = canvas?.nodes;
 				if (!canvas || !nodesMap) {
 					if (attempt < 5) {
-						this.locateCanvasNodeWithRetry(canvasLeaf, candidates, nodeId, options, attempt + 1);
+						this.locateCanvasNodeWithRetry(
+							canvasLeaf,
+							candidates,
+							nodeId,
+							options,
+							attempt + 1,
+						);
 					}
 					return;
 				}
@@ -538,12 +663,21 @@ export class SourceNavigationService {
 
 				if (!matchedNode) {
 					if (attempt < 5) {
-						this.locateCanvasNodeWithRetry(canvasLeaf, candidates, nodeId, options, attempt + 1);
+						this.locateCanvasNodeWithRetry(
+							canvasLeaf,
+							candidates,
+							nodeId,
+							options,
+							attempt + 1,
+						);
 					} else if (options.fallbackEl) {
-						this.overlay.showAtRect(options.fallbackEl.getBoundingClientRect(), {
-							label: options.label || DEFAULT_LABEL,
-							icon: options.icon || DEFAULT_ICON,
-						});
+						this.overlay.showAtRect(
+							options.fallbackEl.getBoundingClientRect(),
+							{
+								label: options.label || DEFAULT_LABEL,
+								icon: options.icon || DEFAULT_ICON,
+							},
+						);
 					}
 					return;
 				}
@@ -562,13 +696,22 @@ export class SourceNavigationService {
 				}
 			} catch (_e) {
 				if (attempt < 5) {
-					this.locateCanvasNodeWithRetry(canvasLeaf, candidates, nodeId, options, attempt + 1);
+					this.locateCanvasNodeWithRetry(
+						canvasLeaf,
+						candidates,
+						nodeId,
+						options,
+						attempt + 1,
+					);
 				}
 			}
 		}, (options.delayMs ?? 350) + attempt * 180);
 	}
 
-	private findCanvasNodeById(nodes: CanvasRuntimeNode[], nodeId?: string): CanvasRuntimeNode | null {
+	private findCanvasNodeById(
+		nodes: CanvasRuntimeNode[],
+		nodeId?: string,
+	): CanvasRuntimeNode | null {
 		const normalizedNodeId = normalizeCanvasNodeId(nodeId);
 		if (!normalizedNodeId) return null;
 		for (const node of nodes) {
@@ -581,11 +724,12 @@ export class SourceNavigationService {
 
 	private findCanvasNodeByLocateCandidates(
 		nodes: CanvasRuntimeNode[],
-		candidates: string[]
+		candidates: string[],
 	): CanvasRuntimeNode | null {
 		const parsed = this.parseEditorLocateCandidates(candidates);
 		const rawCandidates = candidates.filter(
-			(candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0
+			(candidate): candidate is string =>
+				typeof candidate === "string" && candidate.trim().length > 0,
 		);
 		if (
 			parsed.textCandidates.length === 0 &&
@@ -606,7 +750,11 @@ export class SourceNavigationService {
 			if (!searchableText) {
 				continue;
 			}
-			const score = this.scoreCanvasNodeMatch(searchableText, parsed, rawCandidates);
+			const score = this.scoreCanvasNodeMatch(
+				searchableText,
+				parsed,
+				rawCandidates,
+			);
 			if (score > bestScore) {
 				bestScore = score;
 				bestNode = node;
@@ -639,7 +787,7 @@ export class SourceNavigationService {
 	private scoreCanvasNodeMatch(
 		searchableText: string,
 		parsed: EditorLocateCandidates,
-		rawCandidates: string[]
+		rawCandidates: string[],
 	): number {
 		const normalized = this.normalizeForMatch(searchableText);
 		if (!normalized) {
@@ -647,20 +795,31 @@ export class SourceNavigationService {
 		}
 
 		let score = 0;
-		score += this.scoreBestNormalizedMatch(normalized, parsed.excerptCandidates) * 200;
-		score += this.scoreBestNormalizedMatch(normalized, parsed.epubLinkCandidates) * 100;
-		score += this.scoreBestNormalizedMatch(normalized, parsed.epubCfiCandidates) * 80;
-		score += this.scoreBestNormalizedMatch(normalized, parsed.timestampCandidates) * 20;
-		score += this.scoreBestNormalizedMatch(normalized, parsed.textCandidates) * 5;
+		score +=
+			this.scoreBestNormalizedMatch(normalized, parsed.excerptCandidates) * 200;
+		score +=
+			this.scoreBestNormalizedMatch(normalized, parsed.epubLinkCandidates) *
+			100;
+		score +=
+			this.scoreBestNormalizedMatch(normalized, parsed.epubCfiCandidates) * 80;
+		score +=
+			this.scoreBestNormalizedMatch(normalized, parsed.timestampCandidates) *
+			20;
+		score +=
+			this.scoreBestNormalizedMatch(normalized, parsed.textCandidates) * 5;
 		score += this.scoreBestNormalizedMatch(normalized, rawCandidates);
 		return score;
 	}
 
 	private findCanvasNodeByRect(
 		nodes: CanvasRuntimeNode[],
-		nodeRect?: LocateOptions["nodeRect"]
+		nodeRect?: LocateOptions["nodeRect"],
 	): CanvasRuntimeNode | null {
-		if (!nodeRect || !Number.isFinite(nodeRect.x) || !Number.isFinite(nodeRect.y)) {
+		if (
+			!nodeRect ||
+			!Number.isFinite(nodeRect.x) ||
+			!Number.isFinite(nodeRect.y)
+		) {
 			return null;
 		}
 

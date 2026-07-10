@@ -11,10 +11,9 @@ describe("IRCalendarProjectionUtils", () => {
 	});
 
 	it("merges priority date keys uniquely", () => {
-		expect(mergePriorityDateKeys(["2026-05-29", "2026-05-29"], ["2026-05-30"])).toEqual([
-			"2026-05-29",
-			"2026-05-30",
-		]);
+		expect(
+			mergePriorityDateKeys(["2026-05-29", "2026-05-29"], ["2026-05-30"]),
+		).toEqual(["2026-05-29", "2026-05-30"]);
 	});
 
 	it("derives affected date keys from rep timestamps and previous keys", () => {
@@ -28,7 +27,7 @@ describe("IRCalendarProjectionUtils", () => {
 			{
 				previousDateKeys: ["2026-05-29"],
 				anchorDateKey: "2026-05-28",
-			}
+			},
 		);
 		expect(keys).toContain("2026-05-29");
 		expect(keys).toContain("2026-06-02");

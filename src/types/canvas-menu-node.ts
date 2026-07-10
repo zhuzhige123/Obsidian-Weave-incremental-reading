@@ -19,7 +19,9 @@ export type CanvasMenuNode = {
 	};
 };
 
-export function readCanvasNodeData(node: CanvasMenuNode | null | undefined): CanvasNodeData | null {
+export function readCanvasNodeData(
+	node: CanvasMenuNode | null | undefined,
+): CanvasNodeData | null {
 	if (!node) {
 		return null;
 	}
@@ -28,7 +30,9 @@ export function readCanvasNodeData(node: CanvasMenuNode | null | undefined): Can
 	return data && typeof data === "object" ? data : null;
 }
 
-export function readCanvasNodeText(node: CanvasMenuNode | null | undefined): string {
+export function readCanvasNodeText(
+	node: CanvasMenuNode | null | undefined,
+): string {
 	const nodeData = readCanvasNodeData(node);
 	if (!nodeData) {
 		return "";

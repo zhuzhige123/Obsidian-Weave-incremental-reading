@@ -1,6 +1,6 @@
 import type { ScheduleItem } from "./IRCalendarScheduleItem";
-import type { IRPlannedScheduleItem } from "./IRScheduleKernel";
 import { IRCognitiveProfileService } from "./IRCognitiveProfileService";
+import type { IRPlannedScheduleItem } from "./IRScheduleKernel";
 
 const profileService = new IRCognitiveProfileService();
 
@@ -17,7 +17,9 @@ export type IRScheduleSortableItem = Pick<
 	| "manualSchedulePinnedDateKey"
 >;
 
-export function getScheduleItemManualPriority(item: IRScheduleSortableItem): number {
+export function getScheduleItemManualPriority(
+	item: IRScheduleSortableItem,
+): number {
 	const manualPriority = item.explanation?.manualPriority;
 	if (typeof manualPriority === "number" && Number.isFinite(manualPriority)) {
 		return manualPriority;
@@ -25,17 +27,27 @@ export function getScheduleItemManualPriority(item: IRScheduleSortableItem): num
 	return Number(item.priority || 0);
 }
 
-export function getScheduleItemEffectivePriority(item: IRScheduleSortableItem): number {
+export function getScheduleItemEffectivePriority(
+	item: IRScheduleSortableItem,
+): number {
 	const explanationPriority = item.explanation?.effectivePriority;
-	if (typeof explanationPriority === "number" && Number.isFinite(explanationPriority)) {
+	if (
+		typeof explanationPriority === "number" &&
+		Number.isFinite(explanationPriority)
+	) {
 		return explanationPriority;
 	}
 	return getScheduleItemManualPriority(item);
 }
 
-export function getScheduleItemOverdueDays(item: IRScheduleSortableItem): number {
+export function getScheduleItemOverdueDays(
+	item: IRScheduleSortableItem,
+): number {
 	const explanationOverdue = item.explanation?.overdueDays;
-	if (typeof explanationOverdue === "number" && Number.isFinite(explanationOverdue)) {
+	if (
+		typeof explanationOverdue === "number" &&
+		Number.isFinite(explanationOverdue)
+	) {
 		return Math.max(0, explanationOverdue);
 	}
 	return 0;
@@ -43,21 +55,21 @@ export function getScheduleItemOverdueDays(item: IRScheduleSortableItem): number
 
 export function isScheduleItemInitialSequenceLockedForDay(
 	item: IRScheduleSortableItem,
-	dayKey: string
+	dayKey: string,
 ): boolean {
 	return Boolean(
 		item.sourceSequenceLocked &&
 			item.sourceSequenceGroup &&
 			typeof item.sourceSequenceOrder === "number" &&
 			item.sourceSequenceAnchorDateKey &&
-			item.sourceSequenceAnchorDateKey === dayKey
+			item.sourceSequenceAnchorDateKey === dayKey,
 	);
 }
 
 export function compareScheduleItemsSourceSequenceWithinDay(
 	left: IRScheduleSortableItem,
 	right: IRScheduleSortableItem,
-	dayKey: string
+	dayKey: string,
 ): number {
 	if (
 		!isScheduleItemInitialSequenceLockedForDay(left, dayKey) ||
@@ -68,7 +80,10 @@ export function compareScheduleItemsSourceSequenceWithinDay(
 	if (left.sourceSequenceGroup !== right.sourceSequenceGroup) {
 		return 0;
 	}
-	return Number(left.sourceSequenceOrder || 0) - Number(right.sourceSequenceOrder || 0);
+	return (
+		Number(left.sourceSequenceOrder || 0) -
+		Number(right.sourceSequenceOrder || 0)
+	);
 }
 
 /**
@@ -80,7 +95,7 @@ export function compareScheduleItemsSourceSequenceWithinDay(
 export function compareScheduleItemsForDailyQueue(
 	left: IRScheduleSortableItem,
 	right: IRScheduleSortableItem,
-	dayKey?: string
+	dayKey?: string,
 ): number {
 	const manualPriorityDiff =
 		getScheduleItemManualPriority(right) - getScheduleItemManualPriority(left);
@@ -89,25 +104,32 @@ export function compareScheduleItemsForDailyQueue(
 	}
 
 	const effectivePriorityDiff =
-		getScheduleItemEffectivePriority(right) - getScheduleItemEffectivePriority(left);
+		getScheduleItemEffectivePriority(right) -
+		getScheduleItemEffectivePriority(left);
 	if (effectivePriorityDiff !== 0) {
 		return effectivePriorityDiff;
 	}
 
-	const overdueDiff = getScheduleItemOverdueDays(right) - getScheduleItemOverdueDays(left);
+	const overdueDiff =
+		getScheduleItemOverdueDays(right) - getScheduleItemOverdueDays(left);
 	if (overdueDiff !== 0) {
 		return overdueDiff;
 	}
 
 	if (dayKey) {
-		const sequenceCompare = compareScheduleItemsSourceSequenceWithinDay(left, right, dayKey);
+		const sequenceCompare = compareScheduleItemsSourceSequenceWithinDay(
+			left,
+			right,
+			dayKey,
+		);
 		if (sequenceCompare !== 0) {
 			return sequenceCompare;
 		}
 	}
 
 	const scoreDiff =
-		(right.explanation?.compositeScore ?? 0) - (left.explanation?.compositeScore ?? 0);
+		(right.explanation?.compositeScore ?? 0) -
+		(left.explanation?.compositeScore ?? 0);
 	if (scoreDiff !== 0) {
 		return scoreDiff;
 	}
@@ -124,7 +146,7 @@ export function patchScheduleItemPriorityFields(
 	item: IRScheduleSortableItem,
 	itemId: string,
 	priorityUi: number,
-	priorityEff: number
+	priorityEff: number,
 ): IRScheduleSortableItem {
 	if (item.id !== itemId) {
 		return item;
@@ -159,29 +181,32 @@ export function patchScheduleItemPriorityFields(
 	};
 }
 
-export function sortScheduleItemsForDailyQueue<T extends IRScheduleSortableItem>(
-	items: T[],
-	dayKey: string
-): T[] {
-	return [...items].sort((left, right) => compareScheduleItemsForDailyQueue(left, right, dayKey));
+export function sortScheduleItemsForDailyQueue<
+	T extends IRScheduleSortableItem,
+>(items: T[], dayKey: string): T[] {
+	return [...items].sort((left, right) =>
+		compareScheduleItemsForDailyQueue(left, right, dayKey),
+	);
 }
 
 /**
  * 组装当日阅读队列：未完成项按调度优先级排在前面，已完成项按完成顺序排在末尾。
  */
-export function assembleScheduleItemsForDailyQueue<T extends IRScheduleSortableItem & { id: string }>(
+export function assembleScheduleItemsForDailyQueue<
+	T extends IRScheduleSortableItem & { id: string },
+>(
 	items: T[],
 	dayKey: string,
 	options: {
 		completedIds?: Iterable<string>;
 		/** 已完成项在列表末尾的显示顺序（通常为 calendar-progress 中的完成顺序）。 */
 		completedIdOrder?: string[];
-	} = {}
+	} = {},
 ): T[] {
 	const completedSet = new Set(
 		Array.from(options.completedIds ?? [])
 			.map((id) => String(id || "").trim())
-			.filter(Boolean)
+			.filter(Boolean),
 	);
 	if (completedSet.size === 0) {
 		return sortScheduleItemsForDailyQueue(items, dayKey);
@@ -198,7 +223,7 @@ export function assembleScheduleItemsForDailyQueue<T extends IRScheduleSortableI
 
 	const pending = sortScheduleItemsForDailyQueue(
 		Array.from(byId.values()).filter((item) => !completedSet.has(item.id)),
-		dayKey
+		dayKey,
 	);
 
 	const completedOrderSource =
@@ -210,7 +235,11 @@ export function assembleScheduleItemsForDailyQueue<T extends IRScheduleSortableI
 	const seenCompleted = new Set<string>();
 	for (const id of completedOrderSource) {
 		const normalizedId = String(id || "").trim();
-		if (!normalizedId || seenCompleted.has(normalizedId) || !completedSet.has(normalizedId)) {
+		if (
+			!normalizedId ||
+			seenCompleted.has(normalizedId) ||
+			!completedSet.has(normalizedId)
+		) {
 			continue;
 		}
 		const item = byId.get(normalizedId);
@@ -235,11 +264,15 @@ export function patchScheduleItemsInMapByDate<T extends IRScheduleSortableItem>(
 	itemId: string,
 	priorityUi: number,
 	priorityEff: number,
-	limitToDateKeys?: string[]
+	limitToDateKeys?: string[],
 ): Map<string, T[]> {
 	const allowedDateKeys =
 		limitToDateKeys && limitToDateKeys.length > 0
-			? new Set(limitToDateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+			? new Set(
+					limitToDateKeys
+						.map((key) => String(key || "").trim())
+						.filter(Boolean),
+			  )
 			: null;
 
 	return new Map(
@@ -249,17 +282,17 @@ export function patchScheduleItemsInMapByDate<T extends IRScheduleSortableItem>(
 			}
 
 			const patched = items.map((item) =>
-				patchScheduleItemPriorityFields(item, itemId, priorityUi, priorityEff)
+				patchScheduleItemPriorityFields(item, itemId, priorityUi, priorityEff),
 			) as T[];
 			return [dateKey, sortScheduleItemsForDailyQueue(patched, dateKey)];
-		})
+		}),
 	);
 }
 
 export function collectScheduleItemDateKeys(
 	itemId: string,
 	materialsByDate: Map<string, IRScheduleSortableItem[]>,
-	pinnedByDate: Map<string, IRScheduleSortableItem[]> = new Map()
+	pinnedByDate: Map<string, IRScheduleSortableItem[]> = new Map(),
 ): string[] {
 	const dateKeys = new Set<string>();
 	for (const [dateKey, items] of materialsByDate.entries()) {

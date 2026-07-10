@@ -7,57 +7,37 @@
 
 /* ==================== 移动端设计令牌 (.is-mobile) ==================== */
 
-body.is-mobile .weave-main-editor-mode,
-body.is-mobile .weave-create-card-modal-container,
-body.is-mobile .resizable-modal.weave-create-card-modal,
-body.is-mobile .weave-edit-card-modal-container,
-body.is-mobile .weave-view-card-modal-container,
-body.is-mobile .weave-modal-container,
-body.is-mobile .weave-modal-backdrop,
-body.is-mobile .weave-modal-overlay,
-body.is-mobile .weave-modal-content {
+body.is-mobile .weave-app .weave-modal-container,
+body.is-mobile .weave-app .weave-modal-backdrop,
+body.is-mobile .weave-app .weave-modal-overlay,
+body.is-mobile .weave-app .weave-modal-content {
   /* 编辑器内容区：移动端减少左右留白，提高有效行宽 */
   --weave-editor-padding-y: 14px;
   --weave-editor-padding-x: 12px;
 }
 
-body.is-phone .weave-main-editor-mode,
-body.is-phone .weave-create-card-modal-container,
-body.is-phone .resizable-modal.weave-create-card-modal,
-body.is-phone .weave-edit-card-modal-container,
-body.is-phone .weave-view-card-modal-container,
-body.is-phone .weave-modal-container,
-body.is-phone .weave-modal-backdrop,
-body.is-phone .weave-modal-overlay,
-body.is-phone .weave-modal-content {
+body.is-phone .weave-app .weave-modal-container,
+body.is-phone .weave-app .weave-modal-backdrop,
+body.is-phone .weave-app .weave-modal-overlay,
+body.is-phone .weave-app .weave-modal-content {
   /* 手机上进一步减少左右留白 */
   --weave-editor-padding-y: 12px;
   --weave-editor-padding-x: 10px;
 }
 
-body.is-mobile.weave-line-numbers-on .weave-main-editor-mode,
-body.is-mobile.weave-line-numbers-on .weave-create-card-modal-container,
-body.is-mobile.weave-line-numbers-on .resizable-modal.weave-create-card-modal,
-body.is-mobile.weave-line-numbers-on .weave-edit-card-modal-container,
-body.is-mobile.weave-line-numbers-on .weave-view-card-modal-container,
-body.is-mobile.weave-line-numbers-on .weave-modal-container,
-body.is-mobile.weave-line-numbers-on .weave-modal-backdrop,
-body.is-mobile.weave-line-numbers-on .weave-modal-overlay,
-body.is-mobile.weave-line-numbers-on .weave-modal-content {
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-container,
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-backdrop,
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-overlay,
+body.is-mobile.weave-line-numbers-on .weave-app .weave-modal-content {
   --weave-editor-padding-x: 10px;
   --weave-editor-padding-left: 6px;
   --weave-editor-padding-right: 10px;
 }
 
-body.is-phone.weave-line-numbers-on .weave-main-editor-mode,
-body.is-phone.weave-line-numbers-on .weave-create-card-modal-container,
-body.is-phone.weave-line-numbers-on .resizable-modal.weave-create-card-modal,
-body.is-phone.weave-line-numbers-on .weave-edit-card-modal-container,
-body.is-phone.weave-line-numbers-on .weave-view-card-modal-container,
-body.is-phone.weave-line-numbers-on .weave-modal-container,
-body.is-phone.weave-line-numbers-on .weave-modal-backdrop,
-body.is-phone.weave-line-numbers-on .weave-modal-overlay,
-body.is-phone.weave-line-numbers-on .weave-modal-content {
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-container,
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-backdrop,
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-overlay,
+body.is-phone.weave-line-numbers-on .weave-app .weave-modal-content {
   --weave-editor-padding-x: 8px;
   --weave-editor-padding-left: 4px;
   --weave-editor-padding-right: 8px;

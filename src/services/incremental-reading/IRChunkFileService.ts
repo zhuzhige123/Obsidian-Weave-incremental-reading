@@ -145,7 +145,10 @@ export class IRChunkFileService {
 
 			return result as unknown as IRChunkFileYAML;
 		} catch (error) {
-			logger.error(`[IRChunkFileService] 读取块文件 YAML 失败: ${filePath}`, error);
+			logger.error(
+				`[IRChunkFileService] 读取块文件 YAML 失败: ${filePath}`,
+				error,
+			);
 			return null;
 		}
 	}
@@ -153,7 +156,10 @@ export class IRChunkFileService {
 	/**
 	 * 更新旧 chunk Markdown 的 YAML frontmatter。
 	 */
-	async updateChunkFileYAML(filePath: string, updates: Partial<IRChunkFileYAML>): Promise<boolean> {
+	async updateChunkFileYAML(
+		filePath: string,
+		updates: Partial<IRChunkFileYAML>,
+	): Promise<boolean> {
 		try {
 			const file = this.getChunkFile(filePath);
 			if (!file) return false;
@@ -167,12 +173,17 @@ export class IRChunkFileService {
 
 			const updatedYAML = { ...existingYAML, ...updates };
 			const restContent = content.substring(yamlMatch[0].length);
-			const nextContent = `---\n${yamlStringify(updatedYAML as Record<string, unknown>)}\n---${restContent}`;
+			const nextContent = `---\n${yamlStringify(
+				updatedYAML as Record<string, unknown>,
+			)}\n---${restContent}`;
 
 			await this.app.vault.modify(file, nextContent);
 			return true;
 		} catch (error) {
-			logger.error(`[IRChunkFileService] 更新块文件 YAML 失败: ${filePath}`, error);
+			logger.error(
+				`[IRChunkFileService] 更新块文件 YAML 失败: ${filePath}`,
+				error,
+			);
 			return false;
 		}
 	}

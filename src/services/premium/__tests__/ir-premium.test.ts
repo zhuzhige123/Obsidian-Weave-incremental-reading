@@ -10,7 +10,7 @@ describe("getIRPremiumFeaturePreviewContent", () => {
 	it("returns full free and premium feature lists", () => {
 		initI18n();
 		const preview = getIRPremiumFeaturePreviewContent(
-			IR_PREMIUM_FEATURES.IMPORT_EXTERNAL_READING_POINTS
+			IR_PREMIUM_FEATURES.IMPORT_EXTERNAL_READING_POINTS,
 		);
 
 		expect(preview.title.length).toBeGreaterThan(0);
@@ -18,14 +18,15 @@ describe("getIRPremiumFeaturePreviewContent", () => {
 		expect(preview.premiumFeatures.length).toBeGreaterThan(1);
 		expect(
 			preview.premiumFeatures.some(
-				(item) => item.featureId === IR_PREMIUM_FEATURES.IMPORT_EXTERNAL_READING_POINTS
-			)
+				(item) =>
+					item.featureId === IR_PREMIUM_FEATURES.IMPORT_EXTERNAL_READING_POINTS,
+			),
 		).toBe(true);
 	});
 
 	it("uses the first premium feature as the default preview anchor", () => {
 		expect(getDefaultIRPremiumFeaturePreviewId()).toBe(
-			IR_PREMIUM_FEATURES.IMPORT_EXTERNAL_READING_POINTS
+			IR_PREMIUM_FEATURES.IMPORT_EXTERNAL_READING_POINTS,
 		);
 	});
 });

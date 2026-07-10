@@ -32,7 +32,10 @@ describe("resolveScheduleItemTypeBadge", () => {
 		} as any;
 
 		expect(
-			resolveScheduleItemTypeBadge(app, makeMaterial({ sourceFile: "IR/Web Point.md" }))
+			resolveScheduleItemTypeBadge(
+				app,
+				makeMaterial({ sourceFile: "IR/Web Point.md" }),
+			),
 		).toBe("link");
 	});
 
@@ -42,19 +45,35 @@ describe("resolveScheduleItemTypeBadge", () => {
 		expect(
 			resolveScheduleItemTypeBadge(
 				app,
-				makeMaterial({ id: "pdf-task:1", sourceType: "pdf", sourceFile: "Books/A.pdf" })
-			)
+				makeMaterial({
+					id: "pdf-task:1",
+					sourceType: "pdf",
+					sourceFile: "Books/A.pdf",
+				}),
+			),
 		).toBe("pdf");
 		expect(
 			resolveScheduleItemTypeBadge(
 				app,
-				makeMaterial({ id: "epubbm-1", sourceType: "epub", sourceFile: "Books/A.epub" })
-			)
+				makeMaterial({
+					id: "epubbm-1",
+					sourceType: "epub",
+					sourceFile: "Books/A.epub",
+				}),
+			),
 		).toBe("epub");
-		expect(resolveScheduleItemTypeBadge(app, makeMaterial({ sourceFile: "Maps/Topic.canvas" }))).toBe(
-			"canvas"
-		);
-		expect(resolveScheduleItemTypeBadge(app, makeMaterial({ sourceFile: "Notes/Topic.md" }))).toBe("md");
+		expect(
+			resolveScheduleItemTypeBadge(
+				app,
+				makeMaterial({ sourceFile: "Maps/Topic.canvas" }),
+			),
+		).toBe("canvas");
+		expect(
+			resolveScheduleItemTypeBadge(
+				app,
+				makeMaterial({ sourceFile: "Notes/Topic.md" }),
+			),
+		).toBe("md");
 	});
 
 	it("maps type badges to Obsidian icons", () => {
@@ -81,10 +100,20 @@ describe("resolveScheduleItemTypeBadge", () => {
 			sourceFile: "Books/A.pdf",
 		});
 
-		expect(matchesScheduleItemTypeSearch(app, mdMaterial, ["md"], [])).toBe(true);
-		expect(matchesScheduleItemTypeSearch(app, mdMaterial, ["pdf"], [])).toBe(false);
-		expect(matchesScheduleItemTypeSearch(app, pdfMaterial, ["pdf"], [])).toBe(true);
-		expect(matchesScheduleItemTypeSearch(app, pdfMaterial, [], ["pdf"])).toBe(false);
-		expect(matchesScheduleItemTypeSearch(app, mdMaterial, ["markdown", "pdf"], [])).toBe(true);
+		expect(matchesScheduleItemTypeSearch(app, mdMaterial, ["md"], [])).toBe(
+			true,
+		);
+		expect(matchesScheduleItemTypeSearch(app, mdMaterial, ["pdf"], [])).toBe(
+			false,
+		);
+		expect(matchesScheduleItemTypeSearch(app, pdfMaterial, ["pdf"], [])).toBe(
+			true,
+		);
+		expect(matchesScheduleItemTypeSearch(app, pdfMaterial, [], ["pdf"])).toBe(
+			false,
+		);
+		expect(
+			matchesScheduleItemTypeSearch(app, mdMaterial, ["markdown", "pdf"], []),
+		).toBe(true);
 	});
 });

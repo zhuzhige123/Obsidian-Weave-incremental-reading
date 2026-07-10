@@ -7,35 +7,40 @@ import { logger } from "../utils/logger";
 
 import { type App, Platform } from "obsidian";
 import {
+	LICENSE_CLOUD_MAX_DEVICES,
+	LICENSE_CLOUD_REVALIDATION_DAYS,
+	isCloudLicenseConfigured,
+} from "../config/license-cloud-config";
+import {
 	CURRENT_PLUGIN_VERSION,
 	LICENSE_PUBLIC_KEY,
 	SUPPORTED_ACTIVATION_PRODUCT_IDS,
 } from "../config/plugin-runtime";
-import type { ActivationCodeData, CloudSyncInfo, LicenseInfo, LicensedProduct } from "../types/license";
+import type {
+	ActivationCodeData,
+	CloudSyncInfo,
+	LicenseInfo,
+	LicensedProduct,
+} from "../types/license";
+import { sanitizeCloudLicenseUserMessage } from "./activation-privacy";
+import { CloudLicenseValidator } from "./cloudLicenseValidator";
+import {
+	DEVICE_FINGERPRINT_VERSION,
+	generateStableDeviceFingerprint,
+} from "./device-fingerprint";
+import {
+	isActivationAttempt,
+	parseActivationCodeDataJson,
+	readActivationCodeData,
+} from "./license-code-parse";
+import { assertSubmittedEmailMatchesActivationOwner } from "./license-owner-email";
 import {
 	LICENSED_PRODUCTS,
 	licenseAppliesToProduct,
 	mapActivationDataToEntitlements,
 	normalizeLicenseInfo,
 } from "./license-state";
-import {
-	isCloudLicenseConfigured,
-	LICENSE_CLOUD_MAX_DEVICES,
-	LICENSE_CLOUD_REVALIDATION_DAYS,
-} from "../config/license-cloud-config";
-import { sanitizeCloudLicenseUserMessage } from "./activation-privacy";
-import { CloudLicenseValidator } from "./cloudLicenseValidator";
-import { assertSubmittedEmailMatchesActivationOwner } from "./license-owner-email";
-import {
-	DEVICE_FINGERPRINT_VERSION,
-	generateStableDeviceFingerprint,
-} from "./device-fingerprint";
 import { vaultStorage } from "./vault-local-storage";
-import {
-	isActivationAttempt,
-	parseActivationCodeDataJson,
-	readActivationCodeData,
-} from "./license-code-parse";
 
 // 重新导出类型供其他模块使用（向后兼容）
 export type { LicenseInfo, CloudSyncInfo, ActivationCodeData };
@@ -103,7 +108,9 @@ export class LicenseManager {
 
 		// 时区和地区信息
 		components.push(new Date().getTimezoneOffset().toString());
-		components.push(Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown");
+		components.push(
+			Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown",
+		);
 
 		// 硬件信息
 		components.push(navigator.hardwareConcurrency?.toString() || "0");
@@ -162,7 +169,9 @@ export class LicenseManager {
 			if (gl) {
 				const renderer = gl.getParameter(gl.RENDERER) as unknown;
 				const vendor = gl.getParameter(gl.VENDOR) as unknown;
-				components.push(typeof renderer === "string" ? renderer : "unknown-renderer");
+				components.push(
+					typeof renderer === "string" ? renderer : "unknown-renderer",
+				);
 				components.push(typeof vendor === "string" ? vendor : "unknown-vendor");
 			}
 		} catch {
@@ -220,20 +229,28 @@ export class LicenseManager {
 	/**
 	 * 验证 RSA 签名
 	 */
-	private async verifySignature(data: string, signature: string): Promise<boolean> {
+	private async verifySignature(
+		data: string,
+		signature: string,
+	): Promise<boolean> {
 		try {
 			// 导入公钥
 			const publicKey = await crypto.subtle.importKey(
 				"spki",
 				new Uint8Array(
-					this.base64Decode(LICENSE_PUBLIC_KEY.replace(/-----[^-]+-----/g, "").replace(/\s/g, ""))
+					this.base64Decode(
+						LICENSE_PUBLIC_KEY.replace(/-----[^-]+-----/g, "").replace(
+							/\s/g,
+							"",
+						),
+					),
 				),
 				{
 					name: "RSASSA-PKCS1-v1_5",
 					hash: "SHA-256",
 				},
 				false,
-				["verify"]
+				["verify"],
 			);
 
 			// 验证签名
@@ -244,7 +261,7 @@ export class LicenseManager {
 				"RSASSA-PKCS1-v1_5",
 				publicKey,
 				new Uint8Array(signatureBuffer),
-				dataBuffer
+				dataBuffer,
 			);
 		} catch (error) {
 			logger.error("签名验证失败:", error);
@@ -255,7 +272,9 @@ export class LicenseManager {
 	/**
 	 * 解析激活码
 	 */
-	private parseActivationCode(activationCode: string): { data: string; signature: string } | null {
+	private parseActivationCode(
+		activationCode: string,
+	): { data: string; signature: string } | null {
 		try {
 			// 激活码格式: BASE64_DATA.BASE64_SIGNATURE
 			const parts = activationCode.split(".");
@@ -276,7 +295,9 @@ export class LicenseManager {
 		}
 	}
 
-	private getInvalidTargetProductMessage(targetProduct: LicensedProduct): string {
+	private getInvalidTargetProductMessage(
+		targetProduct: LicensedProduct,
+	): string {
 		if (targetProduct === LICENSED_PRODUCTS.EPUB) {
 			return "激活码不适用于当前 EPUB 插件";
 		}
@@ -294,7 +315,7 @@ export class LicenseManager {
 		_deviceFingerprint?: string,
 		options?: {
 			targetProduct?: LicensedProduct;
-		}
+		},
 	): Promise<{
 		isValid: boolean;
 		data?: ActivationCodeData;
@@ -308,7 +329,10 @@ export class LicenseManager {
 			}
 
 			// 验证签名
-			const isSignatureValid = await this.verifySignature(parsed.data, parsed.signature);
+			const isSignatureValid = await this.verifySignature(
+				parsed.data,
+				parsed.signature,
+			);
 			if (!isSignatureValid) {
 				return { isValid: false, error: "激活码签名验证失败" };
 			}
@@ -338,7 +362,7 @@ export class LicenseManager {
 						entitlements,
 						features: data.features,
 					}),
-					options.targetProduct
+					options.targetProduct,
 				);
 				if (!applicable) {
 					return {
@@ -373,7 +397,7 @@ export class LicenseManager {
 		email: string,
 		options?: {
 			targetProduct?: LicensedProduct;
-		}
+		},
 	): Promise<{
 		success: boolean;
 		licenseInfo?: LicenseInfo;
@@ -396,14 +420,21 @@ export class LicenseManager {
 			const deviceFingerprint = await this.generateDeviceFingerprint();
 
 			// 本地RSA签名验证（必须通过）
-			const validation = await this.validateActivationCode(activationCode, deviceFingerprint, options);
+			const validation = await this.validateActivationCode(
+				activationCode,
+				deviceFingerprint,
+				options,
+			);
 			if (!validation.isValid || !validation.data) {
 				return { success: false, error: validation.error };
 			}
 
 			const data = validation.data;
 
-			const ownerEmailCheck = assertSubmittedEmailMatchesActivationOwner(sanitizedEmail, data);
+			const ownerEmailCheck = assertSubmittedEmailMatchesActivationOwner(
+				sanitizedEmail,
+				data,
+			);
 			if (!ownerEmailCheck.ok) {
 				return { success: false, error: ownerEmailCheck.error };
 			}
@@ -419,7 +450,7 @@ export class LicenseManager {
 				activationCode,
 				deviceFingerprint,
 				sanitizedEmail,
-				getRuntimePlatformLabel()
+				getRuntimePlatformLabel(),
 			);
 
 			if (!cloudResult.success) {
@@ -431,7 +462,7 @@ export class LicenseManager {
 
 			const maxDevices = Math.min(
 				cloudResult.max_devices ?? data.maxDevices ?? LICENSE_CLOUD_MAX_DEVICES,
-				LICENSE_CLOUD_MAX_DEVICES
+				LICENSE_CLOUD_MAX_DEVICES,
 			);
 			const nowIso = new Date().toISOString();
 
@@ -517,7 +548,7 @@ export class LicenseManager {
 		licenseInfo: LicenseInfo,
 		options?: {
 			targetProduct?: LicensedProduct;
-		}
+		},
 	): Promise<{
 		isValid: boolean;
 		error?: string;
@@ -540,7 +571,10 @@ export class LicenseManager {
 				return { isValid: false, error: "激活码信息缺失" };
 			}
 
-			if (options?.targetProduct && !licenseAppliesToProduct(normalizedLicense, options.targetProduct)) {
+			if (
+				options?.targetProduct &&
+				!licenseAppliesToProduct(normalizedLicense, options.targetProduct)
+			) {
 				return {
 					isValid: false,
 					error: this.getInvalidTargetProductMessage(options.targetProduct),
@@ -557,7 +591,10 @@ export class LicenseManager {
 			];
 			for (const field of requiredFields) {
 				if (!normalizedLicense[field as keyof LicenseInfo]) {
-					return { isValid: false, error: `许可证数据不完整，缺少${field}字段` };
+					return {
+						isValid: false,
+						error: `许可证数据不完整，缺少${field}字段`,
+					};
 				}
 			}
 
@@ -578,9 +615,12 @@ export class LicenseManager {
 
 			// 检查即将过期的情况
 			const daysUntilExpiry = Math.ceil(
-				(expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+				(expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
 			);
-			if (normalizedLicense.licenseType !== "lifetime" && daysUntilExpiry <= 30) {
+			if (
+				normalizedLicense.licenseType !== "lifetime" &&
+				daysUntilExpiry <= 30
+			) {
 				warnings.push(`许可证将在${daysUntilExpiry}天后过期`);
 			}
 
@@ -602,7 +642,7 @@ export class LicenseManager {
 				}
 				this.cloudValidator.clearCache();
 				warnings.push(
-					"设备指纹已更新；主插件与增量阅读将共用同一设备位。若设备数仍异常，请重新激活一次"
+					"设备指纹已更新；主插件与增量阅读将共用同一设备位。若设备数仍异常，请重新激活一次",
 				);
 			}
 
@@ -610,7 +650,7 @@ export class LicenseManager {
 				const cloudCheck = await this.performCloudValidation(
 					normalizedLicense,
 					currentFingerprint,
-					warnings
+					warnings,
 				);
 				if (!cloudCheck.ok) {
 					return { isValid: false, error: cloudCheck.error };
@@ -618,21 +658,28 @@ export class LicenseManager {
 			}
 
 			// 重新验证激活码
-			const validation = await this.validateActivationCode(normalizedLicense.activationCode, undefined, options);
+			const validation = await this.validateActivationCode(
+				normalizedLicense.activationCode,
+				undefined,
+				options,
+			);
 			if (!validation.isValid) {
 				return { isValid: false, error: validation.error };
 			}
 
 			// 验证产品版本兼容性
-			if (normalizedLicense.productVersion && normalizedLicense.productVersion !== CURRENT_PLUGIN_VERSION) {
+			if (
+				normalizedLicense.productVersion &&
+				normalizedLicense.productVersion !== CURRENT_PLUGIN_VERSION
+			) {
 				warnings.push(
-					`许可证版本(${normalizedLicense.productVersion})与当前版本(${CURRENT_PLUGIN_VERSION})不匹配`
+					`许可证版本(${normalizedLicense.productVersion})与当前版本(${CURRENT_PLUGIN_VERSION})不匹配`,
 				);
 			}
 
 			// 检查激活时间是否过于久远（可能的时钟问题）
 			const daysSinceActivation = Math.ceil(
-				(now.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)
+				(now.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24),
 			);
 			if (daysSinceActivation > 3650) {
 				// 超过10年
@@ -715,7 +762,7 @@ export class LicenseManager {
 	private async performCloudValidation(
 		licenseInfo: LicenseInfo,
 		currentFingerprint: string,
-		warnings: string[]
+		warnings: string[],
 	): Promise<{ ok: boolean; error?: string }> {
 		try {
 			if (!licenseInfo.boundEmail) {
@@ -731,7 +778,7 @@ export class LicenseManager {
 				licenseInfo.activationCode,
 				currentFingerprint,
 				licenseInfo.boundEmail,
-				{ bypassCache: true }
+				{ bypassCache: true },
 			);
 
 			if (cloudResult.valid) {
@@ -740,8 +787,12 @@ export class LicenseManager {
 					status: "synced",
 					syncedAt: licenseInfo.cloudSync?.syncedAt || nowIso,
 					lastValidatedAt: nowIso,
-					devicesUsed: cloudResult.devices_count ?? licenseInfo.cloudSync?.devicesUsed,
-					devicesMax: cloudResult.max_devices ?? licenseInfo.cloudSync?.devicesMax ?? licenseInfo.maxDevices,
+					devicesUsed:
+						cloudResult.devices_count ?? licenseInfo.cloudSync?.devicesUsed,
+					devicesMax:
+						cloudResult.max_devices ??
+						licenseInfo.cloudSync?.devicesMax ??
+						licenseInfo.maxDevices,
 				};
 				return { ok: true };
 			}
@@ -755,7 +806,8 @@ export class LicenseManager {
 			return {
 				ok: false,
 				error: sanitizeCloudLicenseUserMessage(
-					cloudResult.error || "云端验证失败，此设备可能已被其他设备挤占，请重新激活"
+					cloudResult.error ||
+						"云端验证失败，此设备可能已被其他设备挤占，请重新激活",
 				),
 			};
 		} catch (error) {
@@ -776,7 +828,9 @@ export class LicenseManager {
 			return true;
 		}
 
-		const lastValidated = new Date(licenseInfo.cloudSync.lastValidatedAt).getTime();
+		const lastValidated = new Date(
+			licenseInfo.cloudSync.lastValidatedAt,
+		).getTime();
 		const daysSince = (Date.now() - lastValidated) / (1000 * 60 * 60 * 24);
 		return daysSince >= LICENSE_CLOUD_REVALIDATION_DAYS;
 	}
@@ -828,12 +882,12 @@ export class ActivationAttemptLimiter {
 
 		// 清理过期的尝试记录
 		const validAttempts = attempts.filter(
-			(attempt) => now - attempt.timestamp < this.ATTEMPT_WINDOW
+			(attempt) => now - attempt.timestamp < this.ATTEMPT_WINDOW,
 		);
 
 		// 获取当前设备的尝试记录
 		const deviceAttempts = validAttempts.filter(
-			(attempt) => attempt.deviceFingerprint === deviceFingerprint
+			(attempt) => attempt.deviceFingerprint === deviceFingerprint,
 		);
 
 		// 检查是否被锁定
@@ -844,7 +898,8 @@ export class ActivationAttemptLimiter {
 		if (lastFailedAttempt) {
 			const timeSinceLastAttempt = now - lastFailedAttempt.timestamp;
 			const failedAttempts = deviceAttempts.filter(
-				(attempt) => !attempt.success && now - attempt.timestamp < this.LOCKOUT_DURATION
+				(attempt) =>
+					!attempt.success && now - attempt.timestamp < this.LOCKOUT_DURATION,
 			);
 
 			if (failedAttempts.length >= this.MAX_ATTEMPTS) {
@@ -852,7 +907,9 @@ export class ActivationAttemptLimiter {
 				if (remainingTime > 0) {
 					return {
 						canAttempt: false,
-						error: `激活尝试次数过多，请等待 ${Math.ceil(remainingTime / 60000)} 分钟后重试`,
+						error: `激活尝试次数过多，请等待 ${Math.ceil(
+							remainingTime / 60000,
+						)} 分钟后重试`,
 						remainingTime,
 					};
 				}
@@ -949,7 +1006,9 @@ export class ActivationCodeValidator {
 	/**
 	 * 验证激活码格式
 	 */
-	static validateFormat(activationCode: string): ActivationCodeValidationResult {
+	static validateFormat(
+		activationCode: string,
+	): ActivationCodeValidationResult {
 		// 基础检查
 		if (!activationCode || typeof activationCode !== "string") {
 			return {

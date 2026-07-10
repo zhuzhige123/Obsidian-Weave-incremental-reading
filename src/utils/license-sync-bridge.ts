@@ -8,7 +8,8 @@ import { WEAVE_MAIN_PLUGIN_ID } from "./weave-reader-access";
  */
 export const WEAVE_LICENSE_CHANGED_WORKSPACE_EVENT = "Weave:license-changed";
 
-export const WEAVE_LICENSE_CHANGED_WINDOW_EVENT = WEAVE_LICENSE_CHANGED_WORKSPACE_EVENT;
+export const WEAVE_LICENSE_CHANGED_WINDOW_EVENT =
+	WEAVE_LICENSE_CHANGED_WORKSPACE_EVENT;
 
 type LicenseChangeEmitterApp = {
 	workspace?: {
@@ -53,8 +54,11 @@ function buildLicenseSyncFingerprint(plugin: LicenseSyncCapablePlugin): string {
 		inherited: codes(state.inheritedLicenses),
 		premium: state.isPremiumActive,
 		weaveInstalled: Boolean(
-			(plugin.app as { plugins?: { getPlugin?: (id: string) => unknown } } | undefined)?.plugins
-				?.getPlugin?.(WEAVE_MAIN_PLUGIN_ID)
+			(
+				plugin.app as
+					| { plugins?: { getPlugin?: (id: string) => unknown } }
+					| undefined
+			)?.plugins?.getPlugin?.(WEAVE_MAIN_PLUGIN_ID),
 		),
 	});
 }
@@ -62,7 +66,7 @@ function buildLicenseSyncFingerprint(plugin: LicenseSyncCapablePlugin): string {
 export function registerLicenseSyncBridge(
 	plugin: Plugin,
 	target: LicenseSyncCapablePlugin,
-	options?: LicenseSyncBridgeOptions
+	options?: LicenseSyncBridgeOptions,
 ): () => void {
 	const debounceMs = options?.debounceMs ?? LICENSE_SYNC_DEBOUNCE_MS;
 	let lastFingerprint = buildLicenseSyncFingerprint(target);
@@ -116,16 +120,25 @@ export function registerLicenseSyncBridge(
 	};
 
 	plugin.registerEvent(
-		plugin.app.workspace.on(WEAVE_LICENSE_CHANGED_WORKSPACE_EVENT, handleLicenseChanged)
+		plugin.app.workspace.on(
+			WEAVE_LICENSE_CHANGED_WORKSPACE_EVENT,
+			handleLicenseChanged,
+		),
 	);
-	plugin.registerDomEvent(window, WEAVE_LICENSE_CHANGED_WINDOW_EVENT, handleLicenseChanged);
+	plugin.registerDomEvent(
+		window,
+		WEAVE_LICENSE_CHANGED_WINDOW_EVENT,
+		handleLicenseChanged,
+	);
 	plugin.registerDomEvent(window, "focus", handlePassiveSync);
 	plugin.registerDomEvent(activeDocument, "visibilitychange", () => {
 		if (!activeDocument.hidden) {
 			handlePassiveSync();
 		}
 	});
-	plugin.registerEvent(plugin.app.workspace.on("layout-change", handlePassiveSync));
+	plugin.registerEvent(
+		plugin.app.workspace.on("layout-change", handlePassiveSync),
+	);
 
 	if (typeof plugin.app.workspace.onLayoutReady === "function") {
 		plugin.app.workspace.onLayoutReady(() => {

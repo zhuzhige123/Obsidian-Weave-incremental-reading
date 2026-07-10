@@ -2,17 +2,23 @@ import type { App } from "obsidian";
 import type { IRBlockV4 } from "../../types/ir-types";
 import { readAdvancedScheduleSettingsSnapshot } from "../../utils/ir-plugin-host-access";
 import { IRChunkScheduleAdapter } from "./IRChunkScheduleAdapter";
-import { isEpubBookmarkTaskId, IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
-import { isPdfBookmarkTaskId, IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
 import {
-	persistBlockScheduleState,
+	IREpubBookmarkTaskService,
+	isEpubBookmarkTaskId,
+} from "./IREpubBookmarkTaskService";
+import {
+	IRPdfBookmarkTaskService,
+	isPdfBookmarkTaskId,
+} from "./IRPdfBookmarkTaskService";
+import {
 	type PointScheduleMutateResult,
+	persistBlockScheduleState,
 } from "./IRPointScheduleMutator";
 import {
-	computePostponeAdjustedBlock,
-	computeScheduleModeAdjustedBlock,
 	type IRScheduleMenuAction,
 	type IRScheduleModePreviewInput,
+	computePostponeAdjustedBlock,
+	computeScheduleModeAdjustedBlock,
 } from "./IRScheduleModePreviewService";
 import { IRStorageService } from "./IRStorageService";
 
@@ -22,7 +28,7 @@ export type { IRScheduleMenuAction, IRScheduleModePreviewInput };
 export function buildScheduleModePreviewInput(
 	app: App,
 	block: IRBlockV4,
-	tagGroupIntervalFactor = 1
+	tagGroupIntervalFactor = 1,
 ): IRScheduleModePreviewInput {
 	return {
 		block,
@@ -35,7 +41,7 @@ export function buildScheduleModePreviewInput(
 export function computeScheduleMenuActionBlock(
 	beforeBlock: IRBlockV4,
 	action: IRScheduleMenuAction,
-	input: IRScheduleModePreviewInput
+	input: IRScheduleModePreviewInput,
 ): IRBlockV4 {
 	if (action === "postpone") {
 		return computePostponeAdjustedBlock(beforeBlock, 2);
@@ -49,7 +55,7 @@ export function computeScheduleMenuActionBlock(
 export async function persistScheduleMenuActionL0(
 	app: App,
 	beforeBlock: IRBlockV4,
-	afterBlock: IRBlockV4
+	afterBlock: IRBlockV4,
 ): Promise<PointScheduleMutateResult> {
 	return persistBlockScheduleState(app, beforeBlock, afterBlock, {
 		skipInvalidate: true,
@@ -59,7 +65,7 @@ export async function persistScheduleMenuActionL0(
 /** 安排/改期后记录零时长交互（与 V4 Scheduler 行为一致）。 */
 export async function recordScheduleMenuActionInteraction(
 	app: App,
-	pointId: string
+	pointId: string,
 ): Promise<void> {
 	const normalizedId = String(pointId || "").trim();
 	if (!normalizedId) {

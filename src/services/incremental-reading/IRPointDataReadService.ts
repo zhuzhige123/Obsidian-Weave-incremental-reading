@@ -6,8 +6,8 @@ import type {
 } from "../../types/ir-point-storage-types";
 import type { IRDeck } from "../../types/ir-types";
 import {
-	getSharedIRPointStorageService,
 	type IRPointStorageService,
+	getSharedIRPointStorageService,
 } from "./IRPointStorageService";
 
 /**
@@ -32,7 +32,9 @@ export class IRPointDataReadService {
 
 	async listPointFileCatalogEntries(): Promise<IRPointFileCatalogEntry[]> {
 		await this.initialize();
-		return await getSharedIRPointStorageService(this.app).listPointFileCatalogEntries();
+		return await getSharedIRPointStorageService(
+			this.app,
+		).listPointFileCatalogEntries();
 	}
 
 	async getPointFileEntryByPath(path: string): Promise<{
@@ -42,7 +44,9 @@ export class IRPointDataReadService {
 		absolutePath: string;
 	} | null> {
 		await this.initialize();
-		return await getSharedIRPointStorageService(this.app).getPointFileEntryByPath(path);
+		return await getSharedIRPointStorageService(
+			this.app,
+		).getPointFileEntryByPath(path);
 	}
 
 	async listPointDecks(): Promise<Record<string, IRDeck>> {
@@ -57,17 +61,23 @@ export class IRPointDataReadService {
 
 	async getPointSnapshotById(pointId: string): Promise<IRPointSnapshot | null> {
 		await this.initialize();
-		return await getSharedIRPointStorageService(this.app).getPointSnapshotById(pointId);
+		return await getSharedIRPointStorageService(this.app).getPointSnapshotById(
+			pointId,
+		);
 	}
 
 	async getPointTopicIds(pointId: string): Promise<string[]> {
 		await this.initialize();
-		return await getSharedIRPointStorageService(this.app).getPointTopicIds(pointId);
+		return await getSharedIRPointStorageService(this.app).getPointTopicIds(
+			pointId,
+		);
 	}
 
 	async getLatestMigrationReport(): Promise<IRPointStorageMigrationReport | null> {
 		await this.initialize();
-		return await getSharedIRPointStorageService(this.app).getLatestMigrationReport();
+		return await getSharedIRPointStorageService(
+			this.app,
+		).getLatestMigrationReport();
 	}
 
 	getPointStorage(): IRPointStorageService {

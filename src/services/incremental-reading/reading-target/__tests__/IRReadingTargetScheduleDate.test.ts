@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getProjectedScheduleSummary } from "../../IRProjectedScheduleSummary";
 import {
 	addScheduleDays,
 	assessReadingTargetDayLoad,
@@ -13,10 +14,10 @@ import {
 	resolveReadingTargetSchedulePin,
 	toDateInputValue,
 } from "../IRReadingTargetScheduleDate";
-import { getProjectedScheduleSummary } from "../../IRProjectedScheduleSummary";
 
 vi.mock("../../IRProjectedScheduleSummary", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("../../IRProjectedScheduleSummary")>();
+	const actual =
+		await importOriginal<typeof import("../../IRProjectedScheduleSummary")>();
 	return {
 		...actual,
 		getProjectedScheduleSummary: vi.fn(),
@@ -54,9 +55,11 @@ describe("IRReadingTargetScheduleDate", () => {
 	});
 
 	it("builds schedule pin with date key and timestamp", () => {
-		const pin = resolveReadingTargetSchedulePin(parseLocalDateKey("2026-06-13")!);
+		const pin = resolveReadingTargetSchedulePin(
+			parseLocalDateKey("2026-06-13")!,
+		);
 		expect(pin.dateKey).toBe("2026-06-13");
-		expect(pin.nextRepDate).toBe(parseLocalDateKey("2026-06-13")!.getTime());
+		expect(pin.nextRepDate).toBe(parseLocalDateKey("2026-06-13")?.getTime());
 	});
 
 	it("assesses overload levels against budget", () => {
@@ -68,15 +71,21 @@ describe("IRReadingTargetScheduleDate", () => {
 	it("formats date input values", () => {
 		const today = getScheduleToday();
 		expect(toDateInputValue(today)).toBe(formatLocalDateKey(today));
-		expect(getScheduleTomorrow(today).getTime()).toBeGreaterThan(today.getTime());
+		expect(getScheduleTomorrow(today).getTime()).toBeGreaterThan(
+			today.getTime(),
+		);
 	});
 
 	it("assesses projected day load snapshot", () => {
-		const assessment = assessReadingTargetDayLoad("2026-06-13", {
-			dateKey: "2026-06-13",
-			items: [],
-			totalEstimatedMinutes: 65,
-		}, 45);
+		const assessment = assessReadingTargetDayLoad(
+			"2026-06-13",
+			{
+				dateKey: "2026-06-13",
+				items: [],
+				totalEstimatedMinutes: 65,
+			},
+			45,
+		);
 		expect(assessment.level).toBe("overloaded");
 		expect(assessment.itemCount).toBe(0);
 	});
@@ -112,11 +121,16 @@ describe("IRReadingTargetScheduleDate", () => {
 			dayLoadsByDeckId: new Map([["deck-1", dayLoads]]),
 		});
 
-		const recommendation = await recommendReadingTargetScheduleDate({} as never, "deck-1", 45, {
-			startDate: start!,
-			horizonDays: 3,
-			estimatedMinutesForNewItem: 5,
-		});
+		const recommendation = await recommendReadingTargetScheduleDate(
+			{} as never,
+			"deck-1",
+			45,
+			{
+				startDate: start!,
+				horizonDays: 3,
+				estimatedMinutesForNewItem: 5,
+			},
+		);
 
 		expect(recommendation.dateKey).not.toBe("2026-06-12");
 		expect(recommendation.loadRatioPercent).toBeLessThan(50);

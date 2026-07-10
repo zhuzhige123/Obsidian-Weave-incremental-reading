@@ -64,7 +64,10 @@ describe("resolveReadingPointStoredSchedule", () => {
 		});
 		storageSpies.getBlock.mockResolvedValue(null);
 
-		const schedule = await resolveReadingPointStoredSchedule({} as any, "chunk-1");
+		const schedule = await resolveReadingPointStoredSchedule(
+			{} as any,
+			"chunk-1",
+		);
 
 		expect(schedule).toEqual({
 			priority: 5,

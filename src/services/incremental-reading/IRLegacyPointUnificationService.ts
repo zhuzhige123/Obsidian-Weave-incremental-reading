@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
-import { logger } from "../../utils/logger";
 import type { IRPointSnapshot } from "../../types/ir-point-storage-types";
+import { logger } from "../../utils/logger";
 import {
 	buildLegacyChunkFromPointSnapshot,
 	getStoredPointKind,
@@ -99,17 +99,22 @@ export class IRLegacyPointUnificationService {
 				result.failed += 1;
 				const message = error instanceof Error ? error.message : String(error);
 				result.errors.push(`${pointId}: ${message}`);
-				logger.warn("[IRLegacyPointUnificationService] 升级 legacy 阅读点失败", {
-					pointId,
-					error,
-				});
+				logger.warn(
+					"[IRLegacyPointUnificationService] 升级 legacy 阅读点失败",
+					{
+						pointId,
+						error,
+					},
+				);
 			}
 		}
 
 		return result;
 	}
 
-	private async upgradeLegacyBlockSnapshotToChunk(snapshot: IRPointSnapshot): Promise<boolean> {
+	private async upgradeLegacyBlockSnapshotToChunk(
+		snapshot: IRPointSnapshot,
+	): Promise<boolean> {
 		const point = snapshot.point;
 		const pointId = String(point.id || "").trim();
 		if (!pointId) {
@@ -119,7 +124,9 @@ export class IRLegacyPointUnificationService {
 		const { chunk } = buildLegacyChunkFromPointSnapshot(snapshot);
 		const chunkMeta = (chunk.meta || {}) as unknown as Record<string, unknown>;
 		const topicIds = Array.isArray(point.relations?.topicIds)
-			? point.relations.topicIds.map((id) => String(id || "").trim()).filter(Boolean)
+			? point.relations.topicIds
+					.map((id) => String(id || "").trim())
+					.filter(Boolean)
 			: [String(snapshot.topicId || "").trim()].filter(Boolean);
 		const primaryTopicId = topicIds[0] || snapshot.topicId;
 		const locator = point.trace?.locator || {};
@@ -128,7 +135,7 @@ export class IRLegacyPointUnificationService {
 				(locator as { filePath?: string }).filePath ||
 				(locator as { sourcePath?: string }).sourcePath ||
 				point.source?.path ||
-				""
+				"",
 		).trim();
 
 		if (!sourcePath) {
@@ -141,8 +148,10 @@ export class IRLegacyPointUnificationService {
 			topicId: primaryTopicId,
 			topicIds,
 			topicName: snapshot.topicName,
-			title: String(point.userData?.title || point.source?.title || pointId).trim(),
-			tags: Array.isArray(point.userData?.tags) ? [...(point.userData.tags)] : [],
+			title: String(
+				point.userData?.title || point.source?.title || pointId,
+			).trim(),
+			tags: Array.isArray(point.userData?.tags) ? [...point.userData.tags] : [],
 			status: String(point.schedule?.status || "new"),
 			priorityUi:
 				typeof point.schedule?.manualPriority === "number"
@@ -157,7 +166,8 @@ export class IRLegacyPointUnificationService {
 					? point.schedule.intervalDays
 					: undefined,
 			nextRepDate:
-				typeof point.schedule?.nextReviewAt === "string" && point.schedule.nextReviewAt.trim()
+				typeof point.schedule?.nextReviewAt === "string" &&
+				point.schedule.nextReviewAt.trim()
 					? Date.parse(point.schedule.nextReviewAt)
 					: undefined,
 			sourceType: "ir-chunk",
@@ -173,7 +183,9 @@ export class IRLegacyPointUnificationService {
 					? (chunkMeta.headingPath as string[])
 					: undefined,
 				resumeLink:
-					typeof chunkMeta.resumeLink === "string" ? chunkMeta.resumeLink : undefined,
+					typeof chunkMeta.resumeLink === "string"
+						? chunkMeta.resumeLink
+						: undefined,
 			},
 			linkedNotePaths: Array.isArray(point.relations?.linkedNotePaths)
 				? [...point.relations.linkedNotePaths]
@@ -192,6 +204,8 @@ export class IRLegacyPointUnificationService {
 	}
 }
 
-export function getSharedIRLegacyPointUnificationService(app: App): IRLegacyPointUnificationService {
+export function getSharedIRLegacyPointUnificationService(
+	app: App,
+): IRLegacyPointUnificationService {
 	return new IRLegacyPointUnificationService(app);
 }

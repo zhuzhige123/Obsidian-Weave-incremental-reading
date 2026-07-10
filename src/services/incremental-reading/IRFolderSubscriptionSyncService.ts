@@ -1,27 +1,31 @@
 import type { App, TFile } from "obsidian";
 import { normalizePath } from "obsidian";
-import { readString } from "../../utils/unknown-record";
-import { extractAllTags } from "../../utils/yaml-utils";
-import { IR_RUNTIME } from "./ir-runtime";
-import {
-	getActiveIncrementalReadingFolderSubscriptionRules,
-	resolveIncrementalReadingFolderSubscriptionRuleForFile,
-} from "./folder-subscription-settings";
 import type {
 	IncrementalReadingFolderSubscriptionRule,
 	IncrementalReadingFolderSubscriptionSettings,
 } from "../../types/plugin-settings.d";
+import { readString } from "../../utils/unknown-record";
+import { extractAllTags } from "../../utils/yaml-utils";
+import { spreadBunchedDueDates } from "./IRHorizonLoadPlanner";
 import {
-	evaluateFolderSubscriptionSyncState,
-	isFolderSubscriptionPendingNewEntry,
+	getActiveIncrementalReadingFolderSubscriptionRules,
+	resolveIncrementalReadingFolderSubscriptionRuleForFile,
+} from "./folder-subscription-settings";
+import {
 	type ExistingChunkLike,
 	type ExistingMaterialLike,
 	type FolderSubscriptionSyncGap,
+	evaluateFolderSubscriptionSyncState,
+	isFolderSubscriptionPendingNewEntry,
 } from "./folder-subscription-sync-state";
 import { collectMarkdownFilesForFolderSubscriptionRules } from "./folder-subscription-vault-scan";
-import { spreadBunchedDueDates } from "./IRHorizonLoadPlanner";
+import { IR_RUNTIME } from "./ir-runtime";
 
-export type { ExistingChunkLike, ExistingMaterialLike, FolderSubscriptionSyncGap };
+export type {
+	ExistingChunkLike,
+	ExistingMaterialLike,
+	FolderSubscriptionSyncGap,
+};
 
 export interface IRFolderSubscriptionPendingRuleSummary {
 	ruleId: string;
@@ -105,7 +109,10 @@ async function readWeaveType(app: App, file: TFile): Promise<string> {
 }
 
 /** 跳过插件内部 IR 系统文件；普通剪藏 md 即使带有 weave-reading-id 仍应参与订阅补齐。 */
-async function shouldSkipFolderSubscriptionFile(app: App, file: TFile): Promise<boolean> {
+async function shouldSkipFolderSubscriptionFile(
+	app: App,
+	file: TFile,
+): Promise<boolean> {
 	if (file.extension === "irdeck") {
 		return true;
 	}
@@ -119,7 +126,7 @@ async function shouldSkipFolderSubscriptionFile(app: App, file: TFile): Promise<
 	}
 
 	const pluginConfigPath = normalizePath(
-		`${app.vault.configDir}/plugins/${IR_RUNTIME.pluginId}/`
+		`${app.vault.configDir}/plugins/${IR_RUNTIME.pluginId}/`,
 	);
 	if (normalizePath(file.path).startsWith(pluginConfigPath)) {
 		return true;
@@ -140,13 +147,18 @@ function isFolderSubscriptionDeletedTag(tag: string): boolean {
 	);
 }
 
-async function hasFolderSubscriptionExcludedTag(app: App, file: TFile): Promise<boolean> {
+async function hasFolderSubscriptionExcludedTag(
+	app: App,
+	file: TFile,
+): Promise<boolean> {
 	if (file.extension !== "md") {
 		return false;
 	}
 	try {
 		const content = await app.vault.read(file);
-		return extractAllTags(content).some((tag) => isFolderSubscriptionDeletedTag(tag));
+		return extractAllTags(content).some((tag) =>
+			isFolderSubscriptionDeletedTag(tag),
+		);
 	} catch {
 		return false;
 	}
@@ -174,7 +186,7 @@ function buildMaterialIndexes(materials: ExistingMaterialLike[]): {
 function resolveExistingMaterialForFile(
 	file: TFile,
 	app: App,
-	materialIndexes: ReturnType<typeof buildMaterialIndexes>
+	materialIndexes: ReturnType<typeof buildMaterialIndexes>,
 ): ExistingMaterialLike | null {
 	const normalizedFilePath = normalizeComparablePath(file.path);
 	const byPath = materialIndexes.byPath.get(normalizedFilePath);
@@ -197,9 +209,19 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 	existingMaterials?: ExistingMaterialLike[];
 	deckNameById?: Record<string, string>;
 }): Promise<IRFolderSubscriptionScanResult> {
-	const { app, settings, existingChunks = [], existingMaterials = [], deckNameById = {} } = options;
-	const activeRules = getActiveIncrementalReadingFolderSubscriptionRules(settings);
-	const markdownFiles = collectMarkdownFilesForFolderSubscriptionRules(app, activeRules);
+	const {
+		app,
+		settings,
+		existingChunks = [],
+		existingMaterials = [],
+		deckNameById = {},
+	} = options;
+	const activeRules =
+		getActiveIncrementalReadingFolderSubscriptionRules(settings);
+	const markdownFiles = collectMarkdownFilesForFolderSubscriptionRules(
+		app,
+		activeRules,
+	);
 
 	if (activeRules.length === 0 || markdownFiles.length === 0) {
 		return {
@@ -224,7 +246,10 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 	const pendingCountByRuleId = new Map<string, number>();
 
 	for (const file of markdownFiles) {
-		const rule = resolveIncrementalReadingFolderSubscriptionRuleForFile(file.path, activeRules);
+		const rule = resolveIncrementalReadingFolderSubscriptionRuleForFile(
+			file.path,
+			activeRules,
+		);
 		if (!rule) {
 			continue;
 		}
@@ -237,11 +262,18 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 
 		const ruleId = String(rule.id || "").trim();
 		const targetDeckId = String(rule.deckId || "").trim();
-		matchedCountByRuleId.set(ruleId, (matchedCountByRuleId.get(ruleId) || 0) + 1);
+		matchedCountByRuleId.set(
+			ruleId,
+			(matchedCountByRuleId.get(ruleId) || 0) + 1,
+		);
 
 		const normalizedFilePath = normalizeComparablePath(file.path);
 		const existingChunk = chunkByFilePath.get(normalizedFilePath) || null;
-		const existingMaterial = resolveExistingMaterialForFile(file, app, materialIndexes);
+		const existingMaterial = resolveExistingMaterialForFile(
+			file,
+			app,
+			materialIndexes,
+		);
 		const syncState = evaluateFolderSubscriptionSyncState({
 			targetDeckId,
 			existingMaterial,
@@ -253,7 +285,10 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 		}
 
 		if (isFolderSubscriptionPendingNewEntry(syncState.syncGaps)) {
-			pendingCountByRuleId.set(ruleId, (pendingCountByRuleId.get(ruleId) || 0) + 1);
+			pendingCountByRuleId.set(
+				ruleId,
+				(pendingCountByRuleId.get(ruleId) || 0) + 1,
+			);
 		}
 
 		candidateEntries.push({
@@ -287,7 +322,7 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 		activeRuleCount: activeRules.length,
 		candidates: candidateEntries,
 		pendingCount: candidateEntries.filter((entry) =>
-			isFolderSubscriptionPendingNewEntry(entry.syncGaps)
+			isFolderSubscriptionPendingNewEntry(entry.syncGaps),
 		).length,
 		ruleSummaries,
 	};
@@ -309,7 +344,7 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 			priority: number;
 			tags: string[];
 			copyToImportFolder: false;
-		}
+		},
 	) => Promise<{ uuid: string }>;
 	setReadingDeck: (materialId: string, deckId: string) => Promise<boolean>;
 	ensureChunkScheduled: (
@@ -323,11 +358,16 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 			scheduleDate?: Date;
 			existingChunk?: ExistingChunkLike | null;
 			readingMaterialId: string;
-		}
+		},
 	) => Promise<boolean>;
 }): Promise<IRFolderSubscriptionApplyResult> {
-	const { candidates, pinToToday, getOrCreateMaterial, setReadingDeck, ensureChunkScheduled } =
-		options;
+	const {
+		candidates,
+		pinToToday,
+		getOrCreateMaterial,
+		setReadingDeck,
+		ensureChunkScheduled,
+	} = options;
 	let added = 0;
 	let updated = 0;
 	let unchanged = 0;
@@ -337,7 +377,8 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 
 	const pendingNewCandidates = candidates.filter(
 		(candidate) =>
-			candidate.needsSync && isFolderSubscriptionPendingNewEntry(candidate.syncGaps)
+			candidate.needsSync &&
+			isFolderSubscriptionPendingNewEntry(candidate.syncGaps),
 	);
 	const spreadDateByPath = new Map<string, number>();
 	if (
@@ -350,7 +391,7 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 				nextRepDate: options.initialScheduleSpread?.anchorMs ?? Date.now(),
 			})),
 			Math.max(1, options.initialScheduleSpread?.horizonDays ?? 7),
-			options.initialScheduleSpread?.anchorMs ?? Date.now()
+			options.initialScheduleSpread?.anchorMs ?? Date.now(),
 		);
 		pendingNewCandidates.forEach((candidate, index) => {
 			const spreadMs = spread[index]?.nextRepDate;
@@ -385,21 +426,28 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 			candidate.existingChunk.meta.autoSubscribedAt.trim()
 				? candidate.existingChunk.meta.autoSubscribedAt.trim()
 				: candidate.hasChunkRecord
-					? ""
-					: new Date().toISOString();
+				? ""
+				: new Date().toISOString();
 		const spreadMs = spreadDateByPath.get(candidate.file.path);
 		const scheduleDate =
 			typeof spreadMs === "number" && Number.isFinite(spreadMs)
 				? new Date(spreadMs)
 				: undefined;
-		const changed = await ensureChunkScheduled(candidate.file, deckId, deckName, {
-			autoSubscribedAt,
-			autoSubscribedFolderPath: String(candidate.rule.folderPath || "").trim(),
-			pinToToday: pinToToday && !scheduleDate,
-			scheduleDate,
-			existingChunk: candidate.existingChunk,
-			readingMaterialId: material.uuid,
-		});
+		const changed = await ensureChunkScheduled(
+			candidate.file,
+			deckId,
+			deckName,
+			{
+				autoSubscribedAt,
+				autoSubscribedFolderPath: String(
+					candidate.rule.folderPath || "",
+				).trim(),
+				pinToToday: pinToToday && !scheduleDate,
+				scheduleDate,
+				existingChunk: candidate.existingChunk,
+				readingMaterialId: material.uuid,
+			},
+		);
 
 		if (!changed) {
 			unchanged += 1;
@@ -416,5 +464,12 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 		}
 	}
 
-	return { added, updated, unchanged, addedFiles, updatedFiles, unchangedFiles };
+	return {
+		added,
+		updated,
+		unchanged,
+		addedFiles,
+		updatedFiles,
+		unchangedFiles,
+	};
 }

@@ -7,7 +7,7 @@ import {
 export function formatCloudLicenseApiError(
 	response: RequestUrlResponse,
 	data: Record<string, unknown> | null,
-	fallbackVerb: "激活" | "验证" = "激活"
+	fallbackVerb: "激活" | "验证" = "激活",
 ): string {
 	if (data) {
 		if (data.error_code === "EMAIL_ALREADY_BOUND") {
@@ -16,7 +16,10 @@ export function formatCloudLicenseApiError(
 
 		if (typeof data.error === "string" && data.error.trim()) {
 			const sanitized = sanitizeCloudLicenseUserMessage(data.error);
-			if (sanitized.includes("Signature mismatch") || sanitized.includes("OTSAuthFailed")) {
+			if (
+				sanitized.includes("Signature mismatch") ||
+				sanitized.includes("OTSAuthFailed")
+			) {
 				return "表格存储鉴权失败：请在函数计算环境变量中检查 ALICLOUD_ACCESS_KEY_ID / ALICLOUD_ACCESS_KEY_SECRET 是否与 RAM 子账号匹配，并确认该账号有 weave-activation 的 OTS 读写权限。";
 			}
 			return sanitized;
@@ -26,16 +29,24 @@ export function formatCloudLicenseApiError(
 		const code = typeof data.Code === "string" ? data.Code : "";
 
 		if (code === "CAExited" || response.status === 412) {
-			if (message.includes("Cannot find module") && message.includes("index.mjs")) {
-				return "云端授权服务未正确部署：服务器找不到入口文件。请用 node scripts\\pack-fc-zip.mjs lite 重新打包并上传，启动命令改为 node index.mjs；部署后访问 /health 应返回 {\"ok\":true}。";
+			if (
+				message.includes("Cannot find module") &&
+				message.includes("index.mjs")
+			) {
+				return '云端授权服务未正确部署：服务器找不到入口文件。请用 node scripts\\pack-fc-zip.mjs lite 重新打包并上传，启动命令改为 node index.mjs；部署后访问 /health 应返回 {"ok":true}。';
 			}
 			const firstLine = message.split(/\r?\n/)[0]?.trim();
 			if (firstLine) {
-				return `云端授权服务异常（${code || `HTTP ${response.status}`}）：${firstLine}`;
+				return `云端授权服务异常（${
+					code || `HTTP ${response.status}`
+				}）：${firstLine}`;
 			}
 		}
 
-		if (message.includes("Signature mismatch") || message.includes("OTSAuthFailed")) {
+		if (
+			message.includes("Signature mismatch") ||
+			message.includes("OTSAuthFailed")
+		) {
 			return "表格存储鉴权失败：请在函数计算环境变量中检查 ALICLOUD_ACCESS_KEY_ID / ALICLOUD_ACCESS_KEY_SECRET 是否与 RAM 子账号匹配，并确认该账号有 weave-activation 的 OTS 读写权限。";
 		}
 

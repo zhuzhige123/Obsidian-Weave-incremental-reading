@@ -4,7 +4,7 @@ import { logger } from "../utils/logger";
  * 提供统一的目录操作接口，支持隐藏文件夹
  */
 
-import { normalizePath, type DataAdapter } from "obsidian";
+import { type DataAdapter, normalizePath } from "obsidian";
 
 export class DirectoryUtils {
 	/**
@@ -58,7 +58,10 @@ export class DirectoryUtils {
 	 * await DirectoryUtils.ensureDirRecursive(vault.adapter, '.weave/indices/cards');
 	 * ```
 	 */
-	static async ensureDirRecursive(adapter: DataAdapter, path: string): Promise<void> {
+	static async ensureDirRecursive(
+		adapter: DataAdapter,
+		path: string,
+	): Promise<void> {
 		// 🔥 输入验证
 		if (!path || typeof path !== "string" || path.trim() === "") {
 			throw new Error("目录路径不能为空");
@@ -107,7 +110,10 @@ export class DirectoryUtils {
 	 * // 会创建 .weave 和 .weave/data
 	 * ```
 	 */
-	static async ensureDirForFile(adapter: DataAdapter, filePath: string): Promise<void> {
+	static async ensureDirForFile(
+		adapter: DataAdapter,
+		filePath: string,
+	): Promise<void> {
 		// 🔥 输入验证
 		if (!filePath || typeof filePath !== "string" || filePath.trim() === "") {
 			throw new Error("文件路径不能为空");
@@ -132,7 +138,7 @@ export class DirectoryUtils {
 	static async pruneEmptyDirsUnder(
 		adapter: DataAdapter,
 		rootPath: string,
-		options: { preserveRoot?: boolean } = {}
+		options: { preserveRoot?: boolean } = {},
 	): Promise<number> {
 		const normalizedRoot = normalizePath(String(rootPath || "").trim());
 		if (!normalizedRoot) {
@@ -140,7 +146,9 @@ export class DirectoryUtils {
 		}
 
 		const adapterWithDirOps = adapter as DataAdapter & {
-			list?: (path: string) => Promise<{ files?: string[]; folders?: string[] }>;
+			list?: (
+				path: string,
+			) => Promise<{ files?: string[]; folders?: string[] }>;
 			rmdir?: (path: string, recursive?: boolean) => Promise<void>;
 			remove?: (path: string) => Promise<void>;
 		};
@@ -187,7 +195,9 @@ export class DirectoryUtils {
 				return;
 			}
 
-			for (const childDir of Array.isArray(listing.folders) ? listing.folders : []) {
+			for (const childDir of Array.isArray(listing.folders)
+				? listing.folders
+				: []) {
 				await visit(normalizePath(childDir));
 			}
 

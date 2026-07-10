@@ -1,10 +1,10 @@
 import type { App } from "obsidian";
-import type { IRReadingTargetSchedulePin } from "./IRReadingTargetTypes";
 import {
+	type IRProjectedDayLoad,
 	getProjectedDayLoad,
 	getProjectedScheduleSummary,
-	type IRProjectedDayLoad,
 } from "../IRProjectedScheduleSummary";
+import type { IRReadingTargetSchedulePin } from "./IRReadingTargetTypes";
 
 export type ReadingTargetDayLoadLevel = "normal" | "warning" | "overloaded";
 
@@ -39,17 +39,23 @@ export function normalizeScheduleDate(date: Date): Date {
 
 export function formatLocalDateKey(date: Date): string {
 	const normalized = normalizeScheduleDate(date);
-	return `${normalized.getFullYear()}-${String(normalized.getMonth() + 1).padStart(2, "0")}-${String(
-		normalized.getDate()
-	).padStart(2, "0")}`;
+	return `${normalized.getFullYear()}-${String(
+		normalized.getMonth() + 1,
+	).padStart(2, "0")}-${String(normalized.getDate()).padStart(2, "0")}`;
 }
 
 export function parseLocalDateKey(dateKey: string): Date | null {
-	const match = String(dateKey || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+	const match = String(dateKey || "")
+		.trim()
+		.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 	if (!match) {
 		return null;
 	}
-	const parsed = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+	const parsed = new Date(
+		Number(match[1]),
+		Number(match[2]) - 1,
+		Number(match[3]),
+	);
 	if (Number.isNaN(parsed.getTime())) {
 		return null;
 	}
@@ -75,7 +81,8 @@ export function getScheduleTomorrow(from = new Date()): Date {
 export function getNextMonday(from = new Date()): Date {
 	const normalized = normalizeScheduleDate(from);
 	const weekday = normalized.getDay();
-	const daysUntilNextMonday = weekday === 0 ? 1 : weekday === 1 ? 7 : 8 - weekday;
+	const daysUntilNextMonday =
+		weekday === 0 ? 1 : weekday === 1 ? 7 : 8 - weekday;
 	return addScheduleDays(normalized, daysUntilNextMonday);
 }
 
@@ -83,7 +90,9 @@ export function toDateInputValue(date: Date): string {
 	return formatLocalDateKey(date);
 }
 
-export function resolveReadingTargetSchedulePin(scheduleDate: Date): IRReadingTargetSchedulePin {
+export function resolveReadingTargetSchedulePin(
+	scheduleDate: Date,
+): IRReadingTargetSchedulePin {
 	const pinned = normalizeScheduleDate(scheduleDate);
 	return {
 		nextRepDate: pinned.getTime(),
@@ -93,7 +102,7 @@ export function resolveReadingTargetSchedulePin(scheduleDate: Date): IRReadingTa
 
 export function computeReadingTargetDayLoadLevel(
 	totalEstimatedMinutes: number,
-	dailyBudgetMinutes: number
+	dailyBudgetMinutes: number,
 ): ReadingTargetDayLoadLevel {
 	const budget = Math.max(1, Number(dailyBudgetMinutes) || 40);
 	const minutes = Math.max(0, Number(totalEstimatedMinutes) || 0);
@@ -109,11 +118,17 @@ export function computeReadingTargetDayLoadLevel(
 export function assessReadingTargetDayLoad(
 	dateKey: string,
 	load: IRProjectedDayLoad | undefined,
-	dailyBudgetMinutes: number
+	dailyBudgetMinutes: number,
 ): ReadingTargetDayLoadAssessment {
-	const totalEstimatedMinutes = Math.max(0, Number(load?.totalEstimatedMinutes || 0));
+	const totalEstimatedMinutes = Math.max(
+		0,
+		Number(load?.totalEstimatedMinutes || 0),
+	);
 	const itemCount = load?.items?.length ?? 0;
-	const level = computeReadingTargetDayLoadLevel(totalEstimatedMinutes, dailyBudgetMinutes);
+	const level = computeReadingTargetDayLoadLevel(
+		totalEstimatedMinutes,
+		dailyBudgetMinutes,
+	);
 	return {
 		dateKey,
 		itemCount,
@@ -127,7 +142,7 @@ export async function loadReadingTargetDayLoadAssessment(
 	app: App,
 	date: Date,
 	deckId: string,
-	dailyBudgetMinutes: number
+	dailyBudgetMinutes: number,
 ): Promise<ReadingTargetDayLoadAssessment> {
 	const dateKey = formatLocalDateKey(date);
 	const summary = await getProjectedScheduleSummary(app, {
@@ -143,10 +158,11 @@ function scoreScheduleCandidate(
 	offset: number,
 	projectedMinutes: number,
 	level: ReadingTargetDayLoadLevel,
-	dailyBudgetMinutes: number
+	dailyBudgetMinutes: number,
 ): number {
 	const budget = Math.max(1, dailyBudgetMinutes);
-	const levelPenalty = level === "overloaded" ? 1000 : level === "warning" ? 100 : 0;
+	const levelPenalty =
+		level === "overloaded" ? 1000 : level === "warning" ? 100 : 0;
 	return levelPenalty + (projectedMinutes / budget) * 10 + offset * 0.05;
 }
 
@@ -155,7 +171,7 @@ function buildScheduleRecommendationSummary(
 	level: ReadingTargetDayLoadLevel,
 	loadRatioPercent: number,
 	projectedMinutes: number,
-	dailyBudgetMinutes: number
+	dailyBudgetMinutes: number,
 ): string {
 	if (offset === 0 && level === "normal") {
 		return `今天负载适中，加入后约 ${loadRatioPercent}% 日预算（${projectedMinutes}/${dailyBudgetMinutes} 分钟），适合排入今天。`;
@@ -180,12 +196,15 @@ export async function recommendReadingTargetScheduleDate(
 		startDate?: Date;
 		horizonDays?: number;
 		estimatedMinutesForNewItem?: number;
-	}
+	},
 ): Promise<ReadingTargetScheduleRecommendation> {
 	const budget = Math.max(1, Number(dailyBudgetMinutes) || 40);
 	const start = normalizeScheduleDate(options?.startDate ?? getScheduleToday());
 	const horizonDays = Math.max(1, options?.horizonDays ?? 21);
-	const newItemMinutes = Math.max(1, Number(options?.estimatedMinutesForNewItem) || 5);
+	const newItemMinutes = Math.max(
+		1,
+		Number(options?.estimatedMinutesForNewItem) || 5,
+	);
 
 	const summary = await getProjectedScheduleSummary(app, {
 		deckIds: [deckId],
@@ -209,10 +228,18 @@ export async function recommendReadingTargetScheduleDate(
 		const candidate = addScheduleDays(start, offset);
 		const dateKey = formatLocalDateKey(candidate);
 		const load = getProjectedDayLoad(summary, dateKey, [deckId]);
-		const existingMinutes = Math.max(0, Number(load.totalEstimatedMinutes || 0));
+		const existingMinutes = Math.max(
+			0,
+			Number(load.totalEstimatedMinutes || 0),
+		);
 		const projectedMinutes = existingMinutes + newItemMinutes;
 		const level = computeReadingTargetDayLoadLevel(projectedMinutes, budget);
-		const score = scoreScheduleCandidate(offset, projectedMinutes, level, budget);
+		const score = scoreScheduleCandidate(
+			offset,
+			projectedMinutes,
+			level,
+			budget,
+		);
 
 		if (!best || score < best.score) {
 			best = {
@@ -239,7 +266,7 @@ export async function recommendReadingTargetScheduleDate(
 
 	const loadRatioPercent = Math.min(
 		999,
-		Math.round((pick.projectedMinutes / budget) * 100)
+		Math.round((pick.projectedMinutes / budget) * 100),
 	);
 
 	return {
@@ -257,7 +284,7 @@ export async function recommendReadingTargetScheduleDate(
 			pick.level,
 			loadRatioPercent,
 			pick.projectedMinutes,
-			budget
+			budget,
 		),
 	};
 }

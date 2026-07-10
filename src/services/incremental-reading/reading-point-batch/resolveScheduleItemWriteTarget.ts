@@ -1,8 +1,10 @@
+import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import { resolveExternalBookmarkTaskKind } from "../IRLinkedNotePolicy";
 import type { IRPointWriteTarget } from "../IRPointWriteService";
-import type { ScheduleItem } from "../IRCalendarScheduleItem";
 
-export function resolveScheduleItemWriteTarget(material: ScheduleItem): IRPointWriteTarget {
+export function resolveScheduleItemWriteTarget(
+	material: ScheduleItem,
+): IRPointWriteTarget {
 	const externalKind = resolveExternalBookmarkTaskKind(material);
 	return {
 		id: material.id,
@@ -10,8 +12,8 @@ export function resolveScheduleItemWriteTarget(material: ScheduleItem): IRPointW
 			material.sourceType === "legacy-block"
 				? "block"
 				: material.sourceType === "chunk"
-					? "chunk"
-					: externalKind ?? undefined,
+				? "chunk"
+				: externalKind ?? undefined,
 		sourceDocumentPath: material.sourceFile || undefined,
 	};
 }

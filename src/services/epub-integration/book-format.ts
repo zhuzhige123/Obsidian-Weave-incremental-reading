@@ -10,7 +10,7 @@ export const SUPPORTED_BOOK_EXTENSIONS = [
 	"txt",
 ] as const;
 
-export type SupportedBookExtension = (typeof SUPPORTED_BOOK_EXTENSIONS)[number];
+export type SupportedBookExtension = typeof SUPPORTED_BOOK_EXTENSIONS[number];
 
 const SUPPORTED_BOOK_EXTENSION_SET = new Set<string>(SUPPORTED_BOOK_EXTENSIONS);
 
@@ -25,11 +25,16 @@ export function getBookExtensionFromPath(filePath: string): string {
 	const normalizedPath = normalizePath(String(filePath || ""));
 	const fileName = normalizedPath.split("/").pop() || normalizedPath;
 	const normalizedFileName = fileName.toLowerCase();
-	if (normalizedFileName.endsWith(".fb2.zip") || normalizedFileName.endsWith(".fbz")) {
+	if (
+		normalizedFileName.endsWith(".fb2.zip") ||
+		normalizedFileName.endsWith(".fbz")
+	) {
 		return "fbz";
 	}
 	const dotIndex = fileName.lastIndexOf(".");
-	return dotIndex >= 0 ? normalizeBookExtension(fileName.slice(dotIndex + 1)) : "";
+	return dotIndex >= 0
+		? normalizeBookExtension(fileName.slice(dotIndex + 1))
+		: "";
 }
 
 export function getBookFormatDisplayLabel(extensionOrPath: string): string {
@@ -57,7 +62,9 @@ export function getBookFormatDisplayLabel(extensionOrPath: string): string {
 	}
 }
 
-export function isSupportedBookExtension(value: string): value is SupportedBookExtension {
+export function isSupportedBookExtension(
+	value: string,
+): value is SupportedBookExtension {
 	return SUPPORTED_BOOK_EXTENSION_SET.has(normalizeBookExtension(value));
 }
 
@@ -65,7 +72,9 @@ export function isSupportedBookPath(filePath: string): boolean {
 	return isSupportedBookExtension(getBookExtensionFromPath(filePath));
 }
 
-export function isSupportedBookFile(file: TAbstractFile | null | undefined): file is TFile {
+export function isSupportedBookFile(
+	file: TAbstractFile | null | undefined,
+): file is TFile {
 	return file instanceof TFile && isSupportedBookPath(file.path);
 }
 

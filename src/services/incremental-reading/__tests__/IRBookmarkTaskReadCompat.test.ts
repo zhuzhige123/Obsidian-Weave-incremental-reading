@@ -1,21 +1,28 @@
 import { getV2Paths } from "../../../config/paths";
 import { IREpubBookmarkTaskService } from "../IREpubBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "../IRPdfBookmarkTaskService";
-import { getSharedIRPointStorageService, IRPointStorageService } from "../IRPointStorageService";
+import {
+	IRPointStorageService,
+	getSharedIRPointStorageService,
+} from "../IRPointStorageService";
 
 vi.mock("obsidian", async () => {
-	const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
-		"../../../tests/mocks/obsidian"
-	);
+	const actual = await vi.importActual<
+		typeof import("../../../tests/mocks/obsidian")
+	>("../../../tests/mocks/obsidian");
 	return {
 		...actual,
-		normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, ""),
+		normalizePath: (path: string) =>
+			path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, ""),
 	};
 });
 
 vi.mock("../../epub-integration/ir-epub-storage-access", () => ({
 	getIrEpubStorageService: () => ({
-		async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+		async ensureSourceIdentity(
+			filePath: string,
+			options?: { preferredSourceId?: string },
+		) {
 			return {
 				sourceId: options?.preferredSourceId || `src-${filePath}`,
 				filePath,
@@ -37,9 +44,17 @@ function parentPath(path: string): string {
 	return idx > 0 ? normalized.slice(0, idx) : "";
 }
 
-function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs: string[] = []) {
+function createMemoryApp(
+	initialFiles: Record<string, string> = {},
+	initialDirs: string[] = [],
+) {
 	const files = new Map<string, string>();
-	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave-incremental-reading"]);
+	const folders = new Set<string>([
+		"",
+		".obsidian",
+		".obsidian/plugins",
+		".obsidian/plugins/weave-incremental-reading",
+	]);
 
 	const ensureDir = (dir: string) => {
 		const normalized = normalizeTestPath(dir);
@@ -81,7 +96,8 @@ function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs:
 			const childFiles: string[] = [];
 
 			for (const folder of folders) {
-				if (!folder || folder === normalized || !folder.startsWith(prefix)) continue;
+				if (!folder || folder === normalized || !folder.startsWith(prefix))
+					continue;
 				const rest = folder.slice(prefix.length);
 				if (!rest || rest.includes("/")) continue;
 				childFolders.add(folder);
@@ -250,7 +266,9 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 				lastInteractionAt: 1713348000000,
 			},
 		});
-		vi.spyOn(pointStorage, "ensureRuntimeBaseline").mockResolvedValue(undefined);
+		vi.spyOn(pointStorage, "ensureRuntimeBaseline").mockResolvedValue(
+			undefined,
+		);
 
 		const service = new IRPdfBookmarkTaskService(app);
 		const task = await service.getTask("pdfbm-1");
@@ -322,7 +340,9 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 
 		expect(deleted).toBe(true);
 		expect(await service.getTask("pdfbm-point-only")).toBeNull();
-		expect(await pointStorage.getPointSnapshotById("pdfbm-point-only")).toBeNull();
+		expect(
+			await pointStorage.getPointSnapshotById("pdfbm-point-only"),
+		).toBeNull();
 	});
 
 	it("PDF task service can update point-only migrated tasks and sync changes back to point storage", async () => {
@@ -377,11 +397,14 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 			}),
 		});
 		expect((await service.getTask("pdfbm-point-update"))?.title).toBe("新标题");
-		expect((await pointStorage.getPointSnapshotById("pdfbm-point-update"))?.point.userData.title).toBe("新标题");
-		expect((await pointStorage.getPointSnapshotById("pdfbm-point-update"))?.point.relations.linkedNotePaths).toEqual([
-			"Notes/After.md",
-			"Notes/Before.md",
-		]);
+		expect(
+			(await pointStorage.getPointSnapshotById("pdfbm-point-update"))?.point
+				.userData.title,
+		).toBe("新标题");
+		expect(
+			(await pointStorage.getPointSnapshotById("pdfbm-point-update"))?.point
+				.relations.linkedNotePaths,
+		).toEqual(["Notes/After.md", "Notes/Before.md"]);
 	});
 
 	it("EPUB task service returns migrated point data and keeps EPUB lookup working", async () => {
@@ -463,7 +486,9 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 				lastInteractionAt: 1713348000000,
 			},
 		});
-		vi.spyOn(pointStorage, "ensureRuntimeBaseline").mockResolvedValue(undefined);
+		vi.spyOn(pointStorage, "ensureRuntimeBaseline").mockResolvedValue(
+			undefined,
+		);
 
 		const service = new IREpubBookmarkTaskService(app);
 		const task = await service.getTask("epubbm-1");
@@ -531,11 +556,15 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 		const service = new IREpubBookmarkTaskService(app);
 		expect(await service.getTask("epubbm-point-only")).not.toBeNull();
 
-		const deletedCount = await service.deleteTasksByDeckIdentifiers(["topic-2"]);
+		const deletedCount = await service.deleteTasksByDeckIdentifiers([
+			"topic-2",
+		]);
 
 		expect(deletedCount).toBe(1);
 		expect(await service.getTask("epubbm-point-only")).toBeNull();
-		expect(await pointStorage.getPointSnapshotById("epubbm-point-only")).toBeNull();
+		expect(
+			await pointStorage.getPointSnapshotById("epubbm-point-only"),
+		).toBeNull();
 	});
 
 	it("EPUB task service can update resume point for point-only migrated tasks", async () => {
@@ -576,9 +605,12 @@ describe("Bookmark task services prefer IRPoint storage reads", () => {
 		const service = new IREpubBookmarkTaskService(app);
 		await service.setResumePoint("epubbm-point-resume", "epubcfi(/6/8)");
 
-		expect((await service.getTask("epubbm-point-resume"))?.resumeCfi).toBe("epubcfi(/6/8)");
+		expect((await service.getTask("epubbm-point-resume"))?.resumeCfi).toBe(
+			"epubcfi(/6/8)",
+		);
 		expect(
-			(await pointStorage.getPointSnapshotById("epubbm-point-resume"))?.point.trace.locator.resumeCfi
+			(await pointStorage.getPointSnapshotById("epubbm-point-resume"))?.point
+				.trace.locator.resumeCfi,
 		).toBe("epubcfi(/6/8)");
 	});
 });

@@ -19,7 +19,9 @@ interface SelectionToIRModalOptions {
 	initialFolder: string;
 	titleDetected: boolean;
 	onSubmit: (payload: SelectionToIRSubmitPayload) => Promise<void>;
-	onPreferenceChange?: (update: SelectionToIRPreferenceUpdate) => Promise<void> | void;
+	onPreferenceChange?: (
+		update: SelectionToIRPreferenceUpdate,
+	) => Promise<void> | void;
 }
 
 function normalizeFolderPath(folderPath: string): string {
@@ -58,11 +60,17 @@ export class SelectionToIRModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("weave-selection-to-ir-modal-content");
 
-		const headerPanelEl = contentEl.createDiv({ cls: "weave-selection-to-ir-panel" });
+		const headerPanelEl = contentEl.createDiv({
+			cls: "weave-selection-to-ir-panel",
+		});
 
-		const deckToolbarEl = headerPanelEl.createDiv({ cls: "weave-selection-to-ir-toolbar" });
+		const deckToolbarEl = headerPanelEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar",
+		});
 
-		const deckInfoEl = deckToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
+		const deckInfoEl = deckToolbarEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar-info",
+		});
 		deckInfoEl.createDiv({
 			text: i18n.t("irModals.selectionToIr.deckName"),
 			cls: "setting-item-name",
@@ -80,9 +88,13 @@ export class SelectionToIRModal extends Modal {
 			this.showDeckMenu(evt as MouseEvent);
 		});
 
-		const folderToolbarEl = headerPanelEl.createDiv({ cls: "weave-selection-to-ir-toolbar" });
+		const folderToolbarEl = headerPanelEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar",
+		});
 
-		const folderInfoEl = folderToolbarEl.createDiv({ cls: "weave-selection-to-ir-toolbar-info" });
+		const folderInfoEl = folderToolbarEl.createDiv({
+			cls: "weave-selection-to-ir-toolbar-info",
+		});
 		folderInfoEl.createDiv({
 			text: i18n.t("irModals.selectionToIr.savePath"),
 			cls: "setting-item-name",
@@ -118,12 +130,18 @@ export class SelectionToIRModal extends Modal {
 				});
 			});
 
-		const footerEl = contentEl.createDiv({ cls: "weave-selection-to-ir-footer" });
+		const footerEl = contentEl.createDiv({
+			cls: "weave-selection-to-ir-footer",
+		});
 
-		const cancelButton = footerEl.createEl("button", { text: i18n.t("irModals.common.cancel") });
+		const cancelButton = footerEl.createEl("button", {
+			text: i18n.t("irModals.common.cancel"),
+		});
 		cancelButton.addEventListener("click", () => this.close());
 
-		this.createButtonEl = footerEl.createEl("button", { text: i18n.t("irModals.selectionToIr.createReadingPoint") });
+		this.createButtonEl = footerEl.createEl("button", {
+			text: i18n.t("irModals.selectionToIr.createReadingPoint"),
+		});
 		this.createButtonEl.classList.add("mod-cta");
 		this.createButtonEl.addEventListener("click", () => {
 			void this.handleCreate();
@@ -148,11 +166,15 @@ export class SelectionToIRModal extends Modal {
 	}
 
 	private getFolderButtonText(): string {
-		return i18n.t("irModals.common.saveTo", { path: this.getFolderDisplayName(this.selectedFolder) });
+		return i18n.t("irModals.common.saveTo", {
+			path: this.getFolderDisplayName(this.selectedFolder),
+		});
 	}
 
 	private getDeckButtonText(): string {
-		const selectedDeck = this.options.deckOptions.find((deck) => deck.id === this.selectedDeckId);
+		const selectedDeck = this.options.deckOptions.find(
+			(deck) => deck.id === this.selectedDeckId,
+		);
 		return selectedDeck
 			? i18n.t("irModals.common.topicLabel", { name: selectedDeck.name })
 			: i18n.t("irModals.common.selectTopic");
@@ -165,7 +187,9 @@ export class SelectionToIRModal extends Modal {
 		}
 
 		const exists = this.app.vault.getAbstractFileByPath(normalized);
-		return exists ? normalized : i18n.t("irModals.common.createSuffix", { path: normalized });
+		return exists
+			? normalized
+			: i18n.t("irModals.common.createSuffix", { path: normalized });
 	}
 
 	private applyPickerButtonStyle(buttonEl: HTMLButtonElement): void {
@@ -207,7 +231,7 @@ export class SelectionToIRModal extends Modal {
 			this.folderButtonEl.textContent = this.getFolderButtonText();
 		}
 		void Promise.resolve(
-			this.options.onPreferenceChange?.({ folderPath: this.selectedFolder })
+			this.options.onPreferenceChange?.({ folderPath: this.selectedFolder }),
 		).catch(() => undefined);
 	}
 
@@ -244,7 +268,9 @@ export class SelectionToIRModal extends Modal {
 		} finally {
 			this.creating = false;
 			if (this.createButtonEl) {
-				this.createButtonEl.textContent = i18n.t("irModals.selectionToIr.createReadingPoint");
+				this.createButtonEl.textContent = i18n.t(
+					"irModals.selectionToIr.createReadingPoint",
+				);
 			}
 			this.syncCreateButtonState();
 		}
@@ -256,6 +282,7 @@ export class SelectionToIRModal extends Modal {
 		}
 
 		const title = (this.titleInputEl?.value ?? this.draftTitle).trim();
-		this.createButtonEl.disabled = this.creating || !this.selectedDeckId || !title;
+		this.createButtonEl.disabled =
+			this.creating || !this.selectedDeckId || !title;
 	}
 }

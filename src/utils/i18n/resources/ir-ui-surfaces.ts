@@ -37,7 +37,8 @@ const zhIrDataMgmt: TranslationKey = {
 		legacyMigrationFailed: "旧存储迁移失败",
 		mergeSuccessWithResolutions:
 			"已合并 {added} 个阅读点，跳过相同内容 {skipped} 个，按选择覆盖 {replaced} 个，删除 {removed} 个文件",
-		mergeSuccess: "已合并 {added} 个阅读点，跳过重复 {skipped} 个，删除 {removed} 个文件",
+		mergeSuccess:
+			"已合并 {added} 个阅读点，跳过重复 {skipped} 个，删除 {removed} 个文件",
 		noLegacyPointsToUnify: "没有需要统一的旧版 Markdown 阅读点",
 		pointFormatScanFailed: "阅读点格式统计失败",
 		pointFormatUnifyDone:
@@ -78,7 +79,8 @@ const zhIrDataMgmt: TranslationKey = {
 		migrateBatchBody: "将迁移 {count} 个专题文件为当前规范结构。建议先备份库。",
 		deleteEmptyTitle: "删除空专题文件",
 		deleteEmptyConfirm: "删除",
-		deleteEmptyBody: "该专题文件没有任何阅读点：\n{path}\n\n是否删除此 .irdeck 文件？",
+		deleteEmptyBody:
+			"该专题文件没有任何阅读点：\n{path}\n\n是否删除此 .irdeck 文件？",
 		legacyMigrationTitle: "执行旧存储迁移",
 		legacyMigrationConfirm: "开始迁移",
 		legacyMigrationBody:
@@ -209,7 +211,8 @@ const enIrDataMgmt: TranslationKey = {
 		deleteFailed: "Delete failed",
 		selectKeeperFirst: "Select the file to keep first",
 		noOtherFilesToDelete: "No other files need to be deleted",
-		pickConflictVersion: "Choose a file version for each conflicting reading point",
+		pickConflictVersion:
+			"Choose a file version for each conflicting reading point",
 		conflictsDetected:
 			"Detected {count} reading points with the same ID but different content across files. Choose a version for each point below, then click merge again.",
 		conflictScanFailed: "Failed to scan merge conflicts",
@@ -222,7 +225,8 @@ const enIrDataMgmt: TranslationKey = {
 		migratedBatch: "Migrated {count} topic files",
 		batchMigrateFailed: "Batch migration failed",
 		emptyFileDeleted: "Empty topic file deleted",
-		legacyMigrationDone: "Legacy storage migration finished: {success} succeeded, {failed} failed",
+		legacyMigrationDone:
+			"Legacy storage migration finished: {success} succeeded, {failed} failed",
 		legacyMigrationFailed: "Legacy storage migration failed",
 		mergeSuccessWithResolutions:
 			"Merged {added} reading points, skipped {skipped} identical entries, overwrote {replaced} by selection, removed {removed} files",
@@ -242,7 +246,8 @@ const enIrDataMgmt: TranslationKey = {
 	confirm: {
 		normalizeMoveTitle: "Confirm normalization move",
 		normalizeMoveConfirm: "Start move",
-		normalizeMoveBody: "Move {count} topic files to:\n{targetDir}\n\n{preview}{more}",
+		normalizeMoveBody:
+			"Move {count} topic files to:\n{targetDir}\n\n{preview}{more}",
 		normalizeMoveMore: "\n… plus {more} more files",
 		mergeTitle: "Confirm merge and delete other copies",
 		mergeConfirm: "Merge and delete",
@@ -254,7 +259,8 @@ const enIrDataMgmt: TranslationKey = {
 			"{keeperLabel}:\n{keeper}{conflictNote}\n\nReading points from the other {removeCount} file(s) will be merged into the kept file (deduplicated by ID), then these copies will be deleted:\n{toRemove}\n\nThis cannot be undone.",
 		recoverTitle: "Confirm topic file recovery",
 		recoverConfirm: "Recover",
-		recoverBody: "Recover into vault directory:\n{targetDir}\n\nSource:\n{sourcePath}",
+		recoverBody:
+			"Recover into vault directory:\n{targetDir}\n\nSource:\n{sourcePath}",
 		deleteBackupTitle: "Confirm backup file deletion",
 		deleteBackupConfirm: "Delete",
 		deleteBackupBody:
@@ -308,7 +314,8 @@ const enIrDataMgmt: TranslationKey = {
 			"Found {count} legacy incremental-reading storage item(s) pending migration (no longer handled by the Weave main plugin).",
 		action: "Run legacy storage migration",
 	},
-	loading: "Scanning incremental-reading topic files in the vault and plugin backups…",
+	loading:
+		"Scanning incremental-reading topic files in the vault and plugin backups…",
 	scanFailedInline: "Scan failed. Please try again.",
 	columns: {
 		topic: "Topic",
@@ -324,7 +331,8 @@ const enIrDataMgmt: TranslationKey = {
 		pointKindLoading: "Scanning reading-point formats…",
 		pointKindStats:
 			"{total} total: chunk {chunk} · legacy Markdown {legacy} · PDF {pdf} · EPUB {epub} · other {other}",
-		pointKindAllUnified: "All Markdown reading points already use chunk format.",
+		pointKindAllUnified:
+			"All Markdown reading points already use chunk format.",
 		pointKindLegacyHint:
 			"Legacy Markdown points still use the legacy-block scheduling path. Unifying to chunk format is recommended.",
 		unifyLegacyPoints: "Unify reading-point formats ({count})",
@@ -361,11 +369,13 @@ const enIrDataMgmt: TranslationKey = {
 		compareA: "Compare A",
 		compareB: "Compare B",
 		analyzeDiff: "Analyze differences",
-		diffSummary: "A: {countA} points · B: {countB} points · Shared IDs: {shared}",
+		diffSummary:
+			"A: {countA} points · B: {countB} points · Shared IDs: {shared}",
 		onlyInA: "Only in A ({count})",
 		onlyInB: "Only in B ({count})",
 		moreIds: "… plus {count} more",
-		conflictTitle: "Same reading-point ID, different content (choose a version for each)",
+		conflictTitle:
+			"Same reading-point ID, different content (choose a version for each)",
 		conflictHint:
 			"These reading points share an ID across files but differ in fields. Nothing is written or deleted until every conflict has a selection.",
 		cancelConflict: "Cancel conflict resolution",
@@ -608,7 +618,8 @@ const zhIrSettingsStandalone: TranslationKey = {
 	},
 	language: {
 		title: "界面语言",
-		description: "选择插件界面显示语言。设为「跟随 Obsidian」时将随 Obsidian 语言设置自动切换。",
+		description:
+			"选择插件界面显示语言。设为「跟随 Obsidian」时将随 Obsidian 语言设置自动切换。",
 		auto: "跟随 Obsidian",
 		zhCN: "简体中文",
 		enUS: "English",
@@ -719,7 +730,8 @@ const enIrSettingsStandalone: TranslationKey = {
 	},
 	about: {
 		pluginInfoTitle: "Plugin information",
-		pluginInfoDesc: "Version, positioning, and core capabilities of the standalone incremental-reading plugin.",
+		pluginInfoDesc:
+			"Version, positioning, and core capabilities of the standalone incremental-reading plugin.",
 		basicInfoSection: "Basics",
 		name: "Plugin name",
 		version: "Current version",
@@ -797,7 +809,8 @@ const zhIrAnalytics: TranslationKey = {
 		pickTopicFirst: "请选择一个专题后查看图表",
 		pickTagFirst: "请选择一个标签后查看图表",
 		selectionInvalid: "当前选择已失效，请重新选择",
-		selectionSummary: "{subtitle} · 共 {items} 项，活跃 {active} 项，到期 {due} 项",
+		selectionSummary:
+			"{subtitle} · 共 {items} 项，活跃 {active} 项，到期 {due} 项",
 	},
 	loading: "正在生成分析图表…",
 	loadFailed: "分析数据加载失败",
@@ -852,7 +865,8 @@ const zhIrAnalytics: TranslationKey = {
 		noTagDataDesc: "等手工标签被用于增量阅读后，这里就会显示对应图表。",
 		pickTopicDesc: "先在上方选择一个专题，下方内容区会显示对应的分析图表。",
 		pickTagDesc: "先在上方选择一个标签，下方内容区会显示对应的分析图表。",
-		tryOtherFilters: "可以试试切换时间范围或分析条件，看看是否有可展示的图表数据。",
+		tryOtherFilters:
+			"可以试试切换时间范围或分析条件，看看是否有可展示的图表数据。",
 	},
 };
 
@@ -908,7 +922,8 @@ const enIrAnalytics: TranslationKey = {
 		pickTopicFirst: "Choose a topic to view charts",
 		pickTagFirst: "Choose a tag to view charts",
 		selectionInvalid: "The current selection is no longer valid. Choose again.",
-		selectionSummary: "{subtitle} · {items} items total, {active} active, {due} due",
+		selectionSummary:
+			"{subtitle} · {items} items total, {active} active, {due} due",
 	},
 	loading: "Generating analytics charts…",
 	loadFailed: "Failed to load analytics data",
@@ -948,9 +963,11 @@ const enIrAnalytics: TranslationKey = {
 	monitoring:
 		"Last 7 days avg scheduled {scheduled}/day · completed {completed}/day · reading {minutes} min/day · linked outcome rate {rate}%",
 	outcomes: {
-		extractsTooltip: "Stored extracts: {total}\nAction extracts this period: {action}",
+		extractsTooltip:
+			"Stored extracts: {total}\nAction extracts this period: {action}",
 		cardsTooltip: "Stored cards: {total}\nAction cards this period: {action}",
-		notesTooltip: "Linked Markdown notes: {total}\nAction notes this period: {action}",
+		notesTooltip:
+			"Linked Markdown notes: {total}\nAction notes this period: {action}",
 		actionPeriod: "Action this period {count}",
 	},
 	empty: {
@@ -959,11 +976,14 @@ const enIrAnalytics: TranslationKey = {
 		pickTopic: "Choose a topic first to view the current chart",
 		pickTag: "Choose a tag first to view the current chart",
 		noData: "No data to display in the current scope",
-		noTopicDataDesc: "Charts will appear here after reading points are linked to topics.",
-		noTagDataDesc: "Charts will appear here after manual tags are used in incremental reading.",
+		noTopicDataDesc:
+			"Charts will appear here after reading points are linked to topics.",
+		noTagDataDesc:
+			"Charts will appear here after manual tags are used in incremental reading.",
 		pickTopicDesc: "Choose a topic above and the chart area below will update.",
 		pickTagDesc: "Choose a tag above and the chart area below will update.",
-		tryOtherFilters: "Try switching the time range or filters to see whether chart data is available.",
+		tryOtherFilters:
+			"Try switching the time range or filters to see whether chart data is available.",
 	},
 };
 
@@ -978,11 +998,31 @@ const zhIrPriority: TranslationKey = {
 	setTitle: "设置优先级",
 	setAria: "设置优先级",
 	presets: {
-		lowest: { label: "最低", shortHint: "尽量少打扰", description: "仅在整体负载较低时再推进，适合暂不着急的阅读点。" },
-		low: { label: "低", shortHint: "低频出现", description: "保留在计划里，但不会主动占用太多今天的阅读注意力。" },
-		medium: { label: "中", shortHint: "常规节奏", description: "按当前默认节奏安排，是最平衡的推进频率。" },
-		high: { label: "高", shortHint: "更积极推进", description: "会更频繁回到你的阅读流里，适合当前值得优先推进的内容。" },
-		urgent: { label: "紧急", shortHint: "优先处理", description: "尽可能优先出现，适合你现在明确不想继续拖延的阅读点。" },
+		lowest: {
+			label: "最低",
+			shortHint: "尽量少打扰",
+			description: "仅在整体负载较低时再推进，适合暂不着急的阅读点。",
+		},
+		low: {
+			label: "低",
+			shortHint: "低频出现",
+			description: "保留在计划里，但不会主动占用太多今天的阅读注意力。",
+		},
+		medium: {
+			label: "中",
+			shortHint: "常规节奏",
+			description: "按当前默认节奏安排，是最平衡的推进频率。",
+		},
+		high: {
+			label: "高",
+			shortHint: "更积极推进",
+			description: "会更频繁回到你的阅读流里，适合当前值得优先推进的内容。",
+		},
+		urgent: {
+			label: "紧急",
+			shortHint: "优先处理",
+			description: "尽可能优先出现，适合你现在明确不想继续拖延的阅读点。",
+		},
 	},
 };
 
@@ -997,11 +1037,35 @@ const enIrPriority: TranslationKey = {
 	setTitle: "Set priority",
 	setAria: "Set priority",
 	presets: {
-		lowest: { label: "Lowest", shortHint: "Minimal interruption", description: "Advance only when overall load is low. Good for non-urgent reading points." },
-		low: { label: "Low", shortHint: "Infrequent", description: "Stays in the plan without taking much of today's attention." },
-		medium: { label: "Medium", shortHint: "Regular pace", description: "Follows the default rhythm—a balanced push frequency." },
-		high: { label: "High", shortHint: "Push harder", description: "Returns to your reading flow more often for content worth prioritizing now." },
-		urgent: { label: "Urgent", shortHint: "Handle first", description: "Surfaces as early as possible for reading points you do not want to delay." },
+		lowest: {
+			label: "Lowest",
+			shortHint: "Minimal interruption",
+			description:
+				"Advance only when overall load is low. Good for non-urgent reading points.",
+		},
+		low: {
+			label: "Low",
+			shortHint: "Infrequent",
+			description:
+				"Stays in the plan without taking much of today's attention.",
+		},
+		medium: {
+			label: "Medium",
+			shortHint: "Regular pace",
+			description: "Follows the default rhythm—a balanced push frequency.",
+		},
+		high: {
+			label: "High",
+			shortHint: "Push harder",
+			description:
+				"Returns to your reading flow more often for content worth prioritizing now.",
+		},
+		urgent: {
+			label: "Urgent",
+			shortHint: "Handle first",
+			description:
+				"Surfaces as early as possible for reading points you do not want to delay.",
+		},
 	},
 };
 
@@ -1058,7 +1122,8 @@ const enIrCommands: TranslationKey = {
 	canvasNodeNoContent: "This node has no usable content",
 	noDecksAvailable: "No incremental reading topics available",
 	loadDecksFailed: "Failed to load incremental reading topics",
-	premiumBlockedMessage: "Incremental reading is a premium feature. Activate your license to use it.",
+	premiumBlockedMessage:
+		"Incremental reading is a premium feature. Activate your license to use it.",
 };
 
 const zhIrViews: TranslationKey = {
@@ -1072,7 +1137,8 @@ const zhIrViews: TranslationKey = {
 		legacyEntrySuffix: "旧入口兼容",
 		defaultTitleLegacy: "增量阅读（旧入口兼容）",
 		removedTitle: "旧增量阅读主阅读界面已移除",
-		redirectWithDeck: "正在切换到左侧月历阅读侧边栏，请在那里继续处理「{deckName}」。",
+		redirectWithDeck:
+			"正在切换到左侧月历阅读侧边栏，请在那里继续处理「{deckName}」。",
 		redirectGeneric:
 			"正在切换到左侧月历阅读侧边栏，请在那里继续调度和打开阅读材料。",
 	},
@@ -1123,13 +1189,15 @@ const zhIrNotices: TranslationKey = {
 	noWebUrl: "未获取到当前网页链接",
 	selectWebTextFirst: "请先选中网页文本后再添加",
 	openAddModalFailed: "打开添加窗口失败，请重试",
-	selectMarkdownTextOrLine: "请先在 Markdown 文档中选中文本，或将光标放在有内容的行",
+	selectMarkdownTextOrLine:
+		"请先在 Markdown 文档中选中文本，或将光标放在有内容的行",
 	openCreateModalFailed: "打开阅读点创建窗口失败，请重试",
 	enterReadingPointName: "请输入阅读点名称",
 	selectIrDeck: "请选择增量阅读专题",
 	deckNotFoundOrArchived: "所选专题不存在或已归档",
 	addedToDeck: "已添加到增量阅读专题「{deckName}」",
-	fileCreatedButJoinFailed: "阅读点文件已创建，但加入增量阅读失败，请检查控制台日志",
+	fileCreatedButJoinFailed:
+		"阅读点文件已创建，但加入增量阅读失败，请检查控制台日志",
 	addFailed: "添加失败，请重试",
 	enterReadingPointTitle: "请输入阅读点标题",
 	pointCreatedWithReplace: "阅读点已创建，并已替换源文档选区",
@@ -1148,15 +1216,18 @@ const enIrNotices: TranslationKey = {
 	sourceFileNotFound: "Source file not found; cannot create reading point",
 	selectTextFirst: "Select text before creating a reading point",
 	canvasAddedToDeck: 'Added to Weave incremental reading topic "{deckName}"',
-	canvasUpdatedInDeck: 'Updated in Weave incremental reading topic "{deckName}"',
-	canvasAlreadyInDeck: 'This node already exists in Weave incremental reading topic "{deckName}"',
+	canvasUpdatedInDeck:
+		'Updated in Weave incremental reading topic "{deckName}"',
+	canvasAlreadyInDeck:
+		'This node already exists in Weave incremental reading topic "{deckName}"',
 	canvasAddFailed: "Failed to add to Weave incremental reading",
 	noWebUrl: "Could not get the current web page URL",
 	selectWebTextFirst: "Select text on the web page before adding",
 	openAddModalFailed: "Failed to open the add dialog. Please try again.",
 	selectMarkdownTextOrLine:
 		"Select text in the Markdown document first, or place the cursor on a line with content",
-	openCreateModalFailed: "Failed to open the reading point creation dialog. Please try again.",
+	openCreateModalFailed:
+		"Failed to open the reading point creation dialog. Please try again.",
 	enterReadingPointName: "Enter a reading point name",
 	selectIrDeck: "Select an incremental reading topic",
 	deckNotFoundOrArchived: "The selected topic does not exist or is archived",
@@ -1165,7 +1236,8 @@ const enIrNotices: TranslationKey = {
 		"The reading point file was created, but adding it to incremental reading failed. Check the console log.",
 	addFailed: "Add failed. Please try again.",
 	enterReadingPointTitle: "Enter a reading point title",
-	pointCreatedWithReplace: "Reading point created and source selection replaced",
+	pointCreatedWithReplace:
+		"Reading point created and source selection replaced",
 	pointCreatedWithoutReplace:
 		"Reading point created, but the source selection could not be replaced automatically",
 	pointCreated: "Reading point created",
@@ -1318,7 +1390,8 @@ const zhIrModals: TranslationKey = {
 		deckDesc: "选择该网页阅读点要加入的增量阅读专题。",
 		readingPointName: "阅读点名称",
 		titleFromSelectionDetected: "已从选区自动提取标题，你可以继续修改。",
-		titleFromSelectionFallback: "未检测到明确标题，已根据选区内容生成默认名称。",
+		titleFromSelectionFallback:
+			"未检测到明确标题，已根据选区内容生成默认名称。",
 		titleFromPageDetected: "已使用当前网页标题，你可以继续修改。",
 		titleFromPageFallback: "未能读取网页标题，已根据链接生成默认名称。",
 		readingPointNamePlaceholder: "输入阅读点名称",
@@ -1329,7 +1402,8 @@ const zhIrModals: TranslationKey = {
 		deckName: "所属专题",
 		deckDesc: "点击下拉菜单选择增量阅读专题。",
 		savePath: "保存路径",
-		savePathDesc: "默认遵循上次选择或 Obsidian 的新建笔记位置，也可以切换到其他文件夹。",
+		savePathDesc:
+			"默认遵循上次选择或 Obsidian 的新建笔记位置，也可以切换到其他文件夹。",
 		titleDetected: "已从选中文本中自动提取标题，你可以继续修改。",
 		titleFallback: "未检测到明确标题，已先用选中文本前缀生成标题。",
 		titlePlaceholder: "输入阅读点标题",
@@ -1373,12 +1447,14 @@ const enIrModals: TranslationKey = {
 	},
 	readingPointTags: {
 		title: "Edit tags",
-		intro: "Type # tags and press Enter to add; click × to remove. Pick from suggestions.",
+		intro:
+			"Type # tags and press Enter to add; click × to remove. Pick from suggestions.",
 		tagsUpdated: "Tags updated",
 	},
 	readingPointRename: {
 		title: "Rename",
-		duplicateTitle: "A reading point with this title already exists in this topic: {title}",
+		duplicateTitle:
+			"A reading point with this title already exists in this topic: {title}",
 		emptyTitle: "Title cannot be empty",
 		renamed: "Renamed",
 	},
@@ -1407,7 +1483,8 @@ const enIrModals: TranslationKey = {
 	paragraphAddToTopic: {
 		title: "Add to incremental reading topic",
 		deckName: "Topic",
-		deckDesc: "Select an existing topic or create a new one before adding this paragraph.",
+		deckDesc:
+			"Select an existing topic or create a new one before adding this paragraph.",
 		newTopic: "New topic",
 		titleDetected: "Title auto-extracted from the paragraph. You can edit it.",
 		titleFallback: "No clear title detected. Using paragraph prefix as title.",
@@ -1420,12 +1497,16 @@ const enIrModals: TranslationKey = {
 		webLink: "Web link",
 		selectionExcerpt: "Selection excerpt",
 		deckName: "Topic",
-		deckDesc: "Select the incremental reading topic for this web reading point.",
+		deckDesc:
+			"Select the incremental reading topic for this web reading point.",
 		readingPointName: "Reading point name",
-		titleFromSelectionDetected: "Title auto-extracted from selection. You can edit it.",
-		titleFromSelectionFallback: "No clear title. Generated default from selection.",
+		titleFromSelectionDetected:
+			"Title auto-extracted from selection. You can edit it.",
+		titleFromSelectionFallback:
+			"No clear title. Generated default from selection.",
 		titleFromPageDetected: "Using current page title. You can edit it.",
-		titleFromPageFallback: "Could not read page title. Generated default from URL.",
+		titleFromPageFallback:
+			"Could not read page title. Generated default from URL.",
 		readingPointNamePlaceholder: "Enter reading point name",
 		confirmAdd: "Confirm add",
 	},
@@ -1446,7 +1527,8 @@ const enIrModals: TranslationKey = {
 		title: "Subscription folder sync results",
 		scanSummary:
 			"Scanned {scanned} Markdown files, {rules} active subscription rules, matched {matched} candidate files.",
-		applySummary: "Added {added}, updated {updated}, skipped {unchanged} existing.",
+		applySummary:
+			"Added {added}, updated {updated}, skipped {unchanged} existing.",
 		sectionAdded: "Newly added to incremental reading",
 		sectionUpdated: "Updated existing materials",
 		sectionUnchanged: "Unchanged existing",
@@ -1594,12 +1676,14 @@ const zhIrImport: TranslationKey = {
 		default: "默认",
 	},
 	notices: {
-		mixedImportNotSupported: "暂不支持混合导入（请分别导入 Markdown、PDF 或 EPUB）",
+		mixedImportNotSupported:
+			"暂不支持混合导入（请分别导入 Markdown、PDF 或 EPUB）",
 		parsePdfOutlineFailed: "解析 PDF 目录失败: {message}",
 		importFailed: "导入失败: {message}",
 		importFailedWithFile: "导入失败: {file} - {message}",
 		selectAtLeastOne: "请至少选择一个{unit}",
-		epubImportComplete: "EPUB 导入完成: {success} 个任务创建, {skipped} 个已跳过",
+		epubImportComplete:
+			"EPUB 导入完成: {success} 个任务创建, {skipped} 个已跳过",
 		importCompleteMd: "导入完成: {count} 个 Markdown 文档已接入增量阅读",
 		legacyBlockImportDisabled:
 			"旧文件化块导入已停用：PDF/EPUB 等文件不再拆成 raw/index/chunk，请改用正文阅读点或等待新模型重做。",
@@ -1760,8 +1844,10 @@ const enIrImport: TranslationKey = {
 		importFailed: "Import failed: {message}",
 		importFailedWithFile: "Import failed: {file} - {message}",
 		selectAtLeastOne: "Select at least one {unit}",
-		epubImportComplete: "EPUB import done: {success} task(s) created, {skipped} skipped",
-		importCompleteMd: "Import complete: {count} Markdown document(s) added to incremental reading",
+		epubImportComplete:
+			"EPUB import done: {success} task(s) created, {skipped} skipped",
+		importCompleteMd:
+			"Import complete: {count} Markdown document(s) added to incremental reading",
 		legacyBlockImportDisabled:
 			"Legacy file-based block import is disabled. PDF/EPUB files are no longer split into raw/index/chunk. Use body reading points or wait for the new model.",
 		batchImportFailedCount: "{count} file(s) failed to import",
@@ -1770,11 +1856,15 @@ const enIrImport: TranslationKey = {
 	},
 	errors: {
 		noDeckSelected: "No topic selected",
-		materialServiceNotInit: "Incremental reading material service is not initialized",
-		storageServiceNotInit: "Incremental reading storage service is not initialized",
+		materialServiceNotInit:
+			"Incremental reading material service is not initialized",
+		storageServiceNotInit:
+			"Incremental reading storage service is not initialized",
 		noSplitContent: "No split content to import",
-		tagGroupInitFailed: "[MaterialImportModal] IRTagGroupService failed to initialize",
-		noDeckForLoadInfo: "[MaterialImportModal] No topic selected; cannot build import load info",
+		tagGroupInitFailed:
+			"[MaterialImportModal] IRTagGroupService failed to initialize",
+		noDeckForLoadInfo:
+			"[MaterialImportModal] No topic selected; cannot build import load info",
 	},
 };
 
@@ -1830,7 +1920,8 @@ const zhIrAddTarget: TranslationKey = {
 	notices: {
 		needMarkdownCursor: "请先在 Markdown 笔记中将光标放在目标段落",
 		added: "已添加 {count} 项到专题「{deckName}」",
-		epubUnresolved: "无法解析 EPUB 来源，请确认 weave-epub-reader 已启用且书籍仍在库中",
+		epubUnresolved:
+			"无法解析 EPUB 来源，请确认 weave-epub-reader 已启用且书籍仍在库中",
 		epubMissingCfi: "EPUB 链接缺少 cfi 定位信息",
 		addFailed: "添加失败，请检查链接与专题设置",
 	},
@@ -1876,11 +1967,13 @@ const enIrAddTarget: TranslationKey = {
 		adding: "Adding…",
 	},
 	placeholders: {
-		linkInput: "Paste https://…, [[note#^blockId]], or ![[note#^blockId|title]]",
+		linkInput:
+			"Paste https://…, [[note#^blockId]], or ![[note#^blockId|title]]",
 		titleInput: "Shown in calendar and queue",
 	},
 	hints: {
-		supportedFormats: "Supports web URLs, Obsidian wikilinks, and block references.",
+		supportedFormats:
+			"Supports web URLs, Obsidian wikilinks, and block references.",
 		titleDetected: "Title inferred from link or context. You can edit it.",
 		titleConfirm: "Confirm the reading point name.",
 		topicIntro: "Choose the incremental reading topic for this reading point.",
@@ -1888,7 +1981,8 @@ const enIrAddTarget: TranslationKey = {
 			"Schedules only the first read; the algorithm plans later reviews after you finish.",
 		customDayLoad: "{itemCount} item(s) scheduled · ~{minutes} min",
 		scheduleLoading: "Calculating recommended date…",
-		scheduleFallback: "Could not compute a recommendation. Switch to “Pick date”.",
+		scheduleFallback:
+			"Could not compute a recommendation. Switch to “Pick date”.",
 	},
 	meta: {
 		pdfBatchCount: "{count} PDF reading point(s)",
@@ -1909,7 +2003,8 @@ const enIrAddTarget: TranslationKey = {
 		selectTopic: "Select incremental reading topic",
 	},
 	notices: {
-		needMarkdownCursor: "Place the cursor on the target paragraph in a Markdown note first",
+		needMarkdownCursor:
+			"Place the cursor on the target paragraph in a Markdown note first",
 		added: "Added {count} item(s) to topic “{deckName}”",
 		epubUnresolved:
 			"Could not resolve EPUB source. Ensure weave-epub-reader is enabled and the book is in the vault.",
@@ -1920,9 +2015,11 @@ const enIrAddTarget: TranslationKey = {
 		emptyInput: "Enter or paste a link",
 		epubFileNotFound: "EPUB file not found: {filePath}",
 		epubMissingFileOrSid: "EPUB link is missing a valid file or sid parameter",
-		blockRefNotFound: "Block reference ^{blockId} was not found in “{filePath}”",
+		blockRefNotFound:
+			"Block reference ^{blockId} was not found in “{filePath}”",
 		pdfParseFailed: "Could not parse PDF++ link",
-		unknownFormat: "Unrecognized link format. Paste a web URL or Obsidian wikilink/block reference.",
+		unknownFormat:
+			"Unrecognized link format. Paste a web URL or Obsidian wikilink/block reference.",
 		fileNotFound: "File not found: {filePath}",
 		epubCfiRequired:
 			"Paste the full EPUB reader location link (with cfi), e.g. [Chapter](obsidian://weave-epub-reader?file=...&cfi=...)",
@@ -2009,7 +2106,8 @@ const zhIrReadingPointEdit: TranslationKey = {
 		linkTitle: "定位链接",
 		linkPlaceholder: "粘贴 https://…、[[笔记#^块ID]] 或 EPUB/PDF 定位链接",
 		locationPreview: "定位预览",
-		supportedFormatsHint: "支持网页 URL、Obsidian 双链、块引用与 EPUB/PDF 定位格式。",
+		supportedFormatsHint:
+			"支持网页 URL、Obsidian 双链、块引用与 EPUB/PDF 定位格式。",
 		preserveSchedule: "保留复习计划",
 		preserveScheduleHint: "修改链接后仍保留当前下次复习时间与间隔。",
 		notSet: "（未设置定位）",
@@ -2027,7 +2125,8 @@ const enIrReadingPointEdit: TranslationKey = {
 	},
 	traceLink: {
 		linkTitle: "Location link",
-		linkPlaceholder: "Paste https://…, [[note#^blockId]], or EPUB/PDF location link",
+		linkPlaceholder:
+			"Paste https://…, [[note#^blockId]], or EPUB/PDF location link",
 		locationPreview: "Location preview",
 		supportedFormatsHint:
 			"Supports web URLs, Obsidian wikilinks, block references, and EPUB/PDF location formats.",
@@ -2116,8 +2215,10 @@ const enIrServiceNotices: TranslationKey = {
 	quickEdit: {
 		pointNotFoundDeleted: "Reading point not found. It may have been deleted.",
 		openRenameFailed: "Failed to open rename. Please try again later.",
-		traceLinkUnsupported: "This reading point does not support editing the trace link.",
-		openTraceLinkFailed: "Failed to open trace link editor. Please try again later.",
+		traceLinkUnsupported:
+			"This reading point does not support editing the trace link.",
+		openTraceLinkFailed:
+			"Failed to open trace link editor. Please try again later.",
 		tagsUnsupported: "This reading point does not support editing tags.",
 		openTagsFailed: "Failed to open tag editor. Please try again later.",
 	},
@@ -2140,39 +2241,48 @@ const enIrServiceNotices: TranslationKey = {
 		openDeckListFailed: "Failed to open incremental reading topic list",
 		epubFileNotFound: "Matching EPUB file not found",
 		epubChapterLocationFailed: "Could not read chapter location data",
-		chapterAlreadyInDeck: 'Chapter "{title}" already exists in topic "{deckName}"',
+		chapterAlreadyInDeck:
+			'Chapter "{title}" already exists in topic "{deckName}"',
 		chapterAddedToDeck: 'Added "{title}" to topic "{deckName}"',
 		noReadingPosition: "No usable reading position",
 		epubTaskNotFound: "No IR task found for this EPUB",
 		resumeSaved: "Resume point saved: {title}",
 	},
 	sourceNav: {
-		openedButNotLocated: "Source document opened, but trace content could not be located precisely",
+		openedButNotLocated:
+			"Source document opened, but trace content could not be located precisely",
 	},
 	anchor: {
 		createdMaterialAndAnchor: "Reading material created and anchor marked",
 		markedAnchor: "Reading anchor marked",
 	},
 	readingTarget: {
-		epubLocationExists: "This EPUB location already exists in topic “{deckName}”",
+		epubLocationExists:
+			"This EPUB location already exists in topic “{deckName}”",
 		blockRefExists: "This block reference already exists in topic “{deckName}”",
 	},
 	workbench: {
 		openContentFirst: "Open paragraph reading content first",
 		noParagraph: "No paragraph available to add",
 		openDeckSelectFailed: "Failed to open topic picker. Please try again.",
-		paragraphAlreadyInDeck: "This paragraph already exists in topic “{deckName}”",
+		paragraphAlreadyInDeck:
+			"This paragraph already exists in topic “{deckName}”",
 		addedToDeck: "Added to topic “{deckName}”",
 		selectExcerptFirst: "Select text to excerpt first",
-		weaveMainPluginRequired: "Install and enable the Weave main plugin to create memory cards",
-		sourcePathUnknown: "Could not resolve source path. Card creation cancelled.",
-		paragraphUnavailable: "Current paragraph is unavailable. Card creation cancelled.",
+		weaveMainPluginRequired:
+			"Install and enable the Weave main plugin to create memory cards",
+		sourcePathUnknown:
+			"Could not resolve source path. Card creation cancelled.",
+		paragraphUnavailable:
+			"Current paragraph is unavailable. Card creation cancelled.",
 		memoryCardCreated: "Memory card created",
 		createMemoryCardFailed: "Failed to create memory card. Please try again.",
 		addParagraphToDeckFirst: "Add the current paragraph to a topic first",
-		canvasNodeAlreadyInDeck: "This Canvas node already exists in topic “{deckName}”",
+		canvasNodeAlreadyInDeck:
+			"This Canvas node already exists in topic “{deckName}”",
 		epubParagraphLocationFailed: "Could not resolve EPUB paragraph location",
-		epubParagraphAlreadyInDeck: "This EPUB paragraph already exists in topic “{deckName}”",
+		epubParagraphAlreadyInDeck:
+			"This EPUB paragraph already exists in topic “{deckName}”",
 	},
 	editor: {
 		initFailed: "Editor initialization failed",
@@ -2186,7 +2296,10 @@ const enIrServiceNotices: TranslationKey = {
 	},
 };
 
-export const irUiSurfaceTranslations: Record<SupportedLanguage, TranslationKey> = {
+export const irUiSurfaceTranslations: Record<
+	SupportedLanguage,
+	TranslationKey
+> = {
 	"zh-CN": {
 		irDataMgmt: zhIrDataMgmt,
 		irBlockInfo: zhIrBlockInfo,

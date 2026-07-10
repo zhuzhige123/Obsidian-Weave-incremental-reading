@@ -1,18 +1,21 @@
 import type { App } from "obsidian";
 import {
-	migrateToIRBlockV4,
 	type IRBlock,
 	type IRBlockMeta,
 	type IRDeck,
 	type IRPriority,
+	migrateToIRBlockV4,
 } from "../../types/ir-types";
 import {
-	getSharedIRScheduleKernel,
+	resolveAssociatedNotePath,
+	resolveAssociatedNotePaths,
+} from "./IRAssociatedNoteSignals";
+import {
 	type IRPlannedSchedule,
 	type IRPlannedScheduleItem,
 	type ScheduleRecomputeReason,
+	getSharedIRScheduleKernel,
 } from "./IRScheduleKernel";
-import { resolveAssociatedNotePath, resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import { IRStorageService } from "./IRStorageService";
 import { resolveLegacyBlockResumeLink } from "./paragraph-workbench/paragraph-block-reference";
 
@@ -56,18 +59,26 @@ export interface IRProjectedScheduleSummary {
 }
 
 function formatDateKey(date: Date): string {
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-		date.getDate()
-	).padStart(2, "0")}`;
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function normalizeDeckIds(deckIds?: string[]): string[] {
 	return Array.from(
-		new Set((deckIds || []).map((deckId) => String(deckId || "").trim()).filter(Boolean))
+		new Set(
+			(deckIds || [])
+				.map((deckId) => String(deckId || "").trim())
+				.filter(Boolean),
+		),
 	);
 }
 
-function cloneDayLoad(dateKey: string, load?: IRProjectedDayLoad): IRProjectedDayLoad {
+function cloneDayLoad(
+	dateKey: string,
+	load?: IRProjectedDayLoad,
+): IRProjectedDayLoad {
 	if (!load) {
 		return {
 			dateKey,
@@ -85,7 +96,7 @@ function cloneDayLoad(dateKey: string, load?: IRProjectedDayLoad): IRProjectedDa
 
 function getOrCreateDayLoad(
 	map: Map<string, IRProjectedDayLoad>,
-	dateKey: string
+	dateKey: string,
 ): IRProjectedDayLoad {
 	let load = map.get(dateKey);
 	if (!load) {
@@ -103,7 +114,7 @@ function pushProjectedItem(
 	summary: IRProjectedScheduleSummary,
 	dateKey: string,
 	item: IRProjectedScheduleItem,
-	deckIds: string[]
+	deckIds: string[],
 ): void {
 	const globalDayLoad = getOrCreateDayLoad(summary.dayLoadsByDate, dateKey);
 	globalDayLoad.items.push(item);
@@ -122,13 +133,18 @@ function pushProjectedItem(
 	}
 }
 
-function normalizeIdentifiers(values: Array<string | null | undefined>): string[] {
+function normalizeIdentifiers(
+	values: Array<string | null | undefined>,
+): string[] {
 	return Array.from(
-		new Set(values.map((value) => String(value || "").trim()).filter(Boolean))
+		new Set(values.map((value) => String(value || "").trim()).filter(Boolean)),
 	);
 }
 
-function buildDeckIdentifierContext(decks: IRDeck[], requestedDeckIds: string[]): {
+function buildDeckIdentifierContext(
+	decks: IRDeck[],
+	requestedDeckIds: string[],
+): {
 	targetIdentifiers: Set<string>;
 	canonicalByIdentifier: Map<string, string>;
 } {
@@ -175,7 +191,9 @@ function shouldIncludeLegacyBlock(block: IRBlock): boolean {
 	const tags = Array.isArray(block.tags) ? block.tags : [];
 	if (
 		tags.some((tag) => {
-			const normalized = String(tag || "").trim().toLowerCase();
+			const normalized = String(tag || "")
+				.trim()
+				.toLowerCase();
 			return normalized === "ignore" || normalized === "#ignore";
 		})
 	) {
@@ -187,7 +205,7 @@ function shouldIncludeLegacyBlock(block: IRBlock): boolean {
 function buildLegacyBlockDeckIdsByBlockId(
 	decks: IRDeck[],
 	targetIdentifiers: Set<string>,
-	canonicalByIdentifier: Map<string, string>
+	canonicalByIdentifier: Map<string, string>,
 ): Map<string, string[]> {
 	const result = new Map<string, string[]>();
 	for (const deck of decks) {
@@ -214,7 +232,7 @@ function buildLegacyBlockDeckIdsByBlockId(
 }
 
 function buildSessionTotalsByBlockId(
-	sessions: SessionLike[] | undefined | null
+	sessions: SessionLike[] | undefined | null,
 ): Map<string, number> {
 	const totals = new Map<string, number>();
 	for (const session of sessions || []) {
@@ -232,7 +250,6 @@ function mapLegacyPriority(priority?: IRPriority): number {
 			return 8;
 		case 3:
 			return 3;
-		case 2:
 		default:
 			return 5;
 	}
@@ -240,9 +257,10 @@ function mapLegacyPriority(priority?: IRPriority): number {
 
 function estimateLegacyBlockMinutes(
 	block: IRBlock,
-	readingSecondsById: Map<string, number>
+	readingSecondsById: Map<string, number>,
 ): number {
-	const historicalSeconds = readingSecondsById.get(String(block.id || "").trim()) || 0;
+	const historicalSeconds =
+		readingSecondsById.get(String(block.id || "").trim()) || 0;
 	if (historicalSeconds > 0 && block.reviewCount > 0) {
 		return Math.max(0.5, historicalSeconds / block.reviewCount / 60);
 	}
@@ -276,7 +294,7 @@ function mapLegacyBlockToProjectedItem(
 	block: IRBlock,
 	deckId: string,
 	readingSecondsById: Map<string, number>,
-	todayEndMs: number
+	todayEndMs: number,
 ): IRProjectedScheduleItem {
 	const migrated = migrateToIRBlockV4(block);
 	const nextRepDate = Number(migrated.nextRepDate || 0);
@@ -289,7 +307,11 @@ function mapLegacyBlockToProjectedItem(
 			legacyBlock.associatedNotePaths || legacyBlock.meta?.associatedNotePaths,
 	})[0];
 	let scheduleStatus: string = migrated.status;
-	if (scheduleStatus !== "new" && nextRepDate > 0 && nextRepDate <= todayEndMs) {
+	if (
+		scheduleStatus !== "new" &&
+		nextRepDate > 0 &&
+		nextRepDate <= todayEndMs
+	) {
 		scheduleStatus = "scheduled";
 	}
 
@@ -298,13 +320,19 @@ function mapLegacyBlockToProjectedItem(
 		title,
 		displayName:
 			Array.isArray(block.headingPath) && block.headingPath.length > 0
-				? String(block.headingPath[block.headingPath.length - 1] || "").trim() || undefined
+				? String(
+						block.headingPath[block.headingPath.length - 1] || "",
+				  ).trim() || undefined
 				: undefined,
 		sourceFile: String(block.filePath || "").trim(),
 		topicKey: `source:${String(block.filePath || "").trim()}`,
 		associatedNotePath,
 		associatedNoteScope: associatedNotePath ? "point" : undefined,
-		priority: Number(block.priorityUi ?? block.priorityEff ?? mapLegacyPriority(block.priority)),
+		priority: Number(
+			block.priorityUi ??
+				block.priorityEff ??
+				mapLegacyPriority(block.priority),
+		),
 		intervalDays: Number(migrated.intervalDays || block.interval || 1),
 		scheduleStatus,
 		nextRepDate,
@@ -319,7 +347,7 @@ function mapLegacyBlockToProjectedItem(
 async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 	app: App,
 	summary: IRProjectedScheduleSummary,
-	options: ProjectedScheduleOptions
+	options: ProjectedScheduleOptions,
 ): Promise<IRProjectedScheduleSummary> {
 	let storage: IRStorageService | null = null;
 	const getStorage = async (): Promise<IRStorageService> => {
@@ -331,8 +359,7 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 	};
 
 	const decksRecord =
-		options.seedData?.decksRecord ||
-		(await (await getStorage()).getAllDecks());
+		options.seedData?.decksRecord || (await (await getStorage()).getAllDecks());
 	let blocksRecord = options.seedData?.blocksRecord;
 	if (blocksRecord === undefined) {
 		const scanned = await (await getStorage()).getAllBlocks();
@@ -343,7 +370,8 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 	} else if (Object.keys(blocksRecord).length === 0) {
 		return summary;
 	}
-	const history = options.seedData?.history || (await (await getStorage()).getHistory());
+	const history =
+		options.seedData?.history || (await (await getStorage()).getHistory());
 
 	const decks = Object.values(decksRecord || {});
 	const blocks = Object.values(blocksRecord || {});
@@ -351,16 +379,15 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 		return summary;
 	}
 
-	const requestedDeckIds =
-		options.deckIds?.length ? options.deckIds : decks.map((deck) => String(deck.id || "").trim());
-	const { targetIdentifiers, canonicalByIdentifier } = buildDeckIdentifierContext(
-		decks,
-		requestedDeckIds
-	);
+	const requestedDeckIds = options.deckIds?.length
+		? options.deckIds
+		: decks.map((deck) => String(deck.id || "").trim());
+	const { targetIdentifiers, canonicalByIdentifier } =
+		buildDeckIdentifierContext(decks, requestedDeckIds);
 	const blockDeckIdsById = buildLegacyBlockDeckIdsByBlockId(
 		decks,
 		targetIdentifiers,
-		canonicalByIdentifier
+		canonicalByIdentifier,
 	);
 	const readingSecondsById = buildSessionTotalsByBlockId(history?.sessions);
 	const today = new Date();
@@ -373,10 +400,14 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 			continue;
 		}
 
-		const matchedDeckIds = new Set(blockDeckIdsById.get(String(block.id || "").trim()) || []);
+		const matchedDeckIds = new Set(
+			blockDeckIdsById.get(String(block.id || "").trim()) || [],
+		);
 		const legacyDeckPath = String(block.deckPath || "").trim();
 		if (legacyDeckPath && targetIdentifiers.has(legacyDeckPath)) {
-			matchedDeckIds.add(canonicalByIdentifier.get(legacyDeckPath) || legacyDeckPath);
+			matchedDeckIds.add(
+				canonicalByIdentifier.get(legacyDeckPath) || legacyDeckPath,
+			);
 		}
 
 		if (matchedDeckIds.size === 0) {
@@ -388,10 +419,13 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 			block,
 			primaryDeckId,
 			readingSecondsById,
-			todayEndMs
+			todayEndMs,
 		);
 		const nextRepDate = Number(item.nextRepDate || 0);
-		const dateKey = nextRepDate > todayEndMs ? formatDateKey(new Date(nextRepDate)) : todayKey;
+		const dateKey =
+			nextRepDate > todayEndMs
+				? formatDateKey(new Date(nextRepDate))
+				: todayKey;
 		pushProjectedItem(summary, dateKey, item, [...matchedDeckIds]);
 	}
 
@@ -400,20 +434,27 @@ async function mergeLegacyBlocksIntoProjectedScheduleSummary(
 
 export async function getProjectedScheduleSummary(
 	app: App,
-	options: ProjectedScheduleOptions = {}
+	options: ProjectedScheduleOptions = {},
 ): Promise<IRProjectedScheduleSummary> {
 	const schedule =
 		options.schedule ||
-		(await getSharedIRScheduleKernel(app).recomputeScheduleForDeck(options.reason ?? "ui_refresh", {
-			deckIds: options.deckIds,
-			horizonDays: options.horizonDays,
-		}));
+		(await getSharedIRScheduleKernel(app).recomputeScheduleForDeck(
+			options.reason ?? "ui_refresh",
+			{
+				deckIds: options.deckIds,
+				horizonDays: options.horizonDays,
+			},
+		));
 	const summary = buildProjectedScheduleSummary(schedule);
-	return await mergeLegacyBlocksIntoProjectedScheduleSummary(app, summary, options);
+	return await mergeLegacyBlocksIntoProjectedScheduleSummary(
+		app,
+		summary,
+		options,
+	);
 }
 
 export function buildProjectedScheduleSummary(
-	schedule: IRPlannedSchedule
+	schedule: IRPlannedSchedule,
 ): IRProjectedScheduleSummary {
 	const summary: IRProjectedScheduleSummary = {
 		schedule,
@@ -428,7 +469,12 @@ export function buildProjectedScheduleSummary(
 				sourceType: originalItem.sourceType,
 				explanation: originalItem.explanation,
 			};
-			pushProjectedItem(summary, day.dateKey, item, item.deckId ? [item.deckId] : []);
+			pushProjectedItem(
+				summary,
+				day.dateKey,
+				item,
+				item.deckId ? [item.deckId] : [],
+			);
 		}
 	}
 
@@ -438,7 +484,7 @@ export function buildProjectedScheduleSummary(
 export function getProjectedDayLoad(
 	summary: IRProjectedScheduleSummary,
 	date: Date | string,
-	deckIds?: string[]
+	deckIds?: string[],
 ): IRProjectedDayLoad {
 	const dateKey = typeof date === "string" ? date : formatDateKey(date);
 	const normalizedDeckIds = normalizeDeckIds(deckIds);
@@ -459,7 +505,7 @@ export function getProjectedDayLoad(
 
 export function buildProjectedDayLoadMap(
 	summary: IRProjectedScheduleSummary,
-	deckIds?: string[]
+	deckIds?: string[],
 ): Map<string, IRProjectedDayLoad> {
 	const normalizedDeckIds = normalizeDeckIds(deckIds);
 	if (normalizedDeckIds.length === 0) {
@@ -467,12 +513,14 @@ export function buildProjectedDayLoadMap(
 			Array.from(summary.dayLoadsByDate.entries()).map(([dateKey, load]) => [
 				dateKey,
 				cloneDayLoad(dateKey, load),
-			])
+			]),
 		);
 	}
 
 	const result = new Map<string, IRProjectedDayLoad>();
-	for (const dateKey of Array.from(summary.dayLoadsByDate.keys()).sort((a, b) => a.localeCompare(b))) {
+	for (const dateKey of Array.from(summary.dayLoadsByDate.keys()).sort(
+		(a, b) => a.localeCompare(b),
+	)) {
 		const combined = getProjectedDayLoad(summary, dateKey, normalizedDeckIds);
 		if (combined.items.length > 0) {
 			result.set(dateKey, combined);

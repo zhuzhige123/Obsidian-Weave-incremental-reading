@@ -1,7 +1,13 @@
+/**
+ * EPUB 阅读器互操作 API — 书签读写服务。
+ *
+ * 由 `src/services/epub-integration/index.ts` 对外导出，供 Weave EPUB Reader
+ * 等宿主插件通过插件注册表调用；独立 IR 本体不直接挂载此服务。
+ */
 import { App, TFile, normalizePath, parseYaml } from "obsidian";
 import { DirectoryUtils } from "../../utils/directory-utils";
-import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
 import { logger } from "../../utils/logger";
+import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
 import { sanitizeForSync } from "../../utils/sync-safe-filename";
 import { readString } from "../../utils/unknown-record";
 import { EpubLinkService } from "./EpubLinkService";
@@ -80,15 +86,19 @@ export class EpubBookmarkService {
 
 	getBookmarkFolder(): string {
 		const runtime = getEpubRuntime();
-		const pluginIds = [runtime.pluginId, ...runtime.collaboratorHostPluginIds].filter(
-			(value): value is string => typeof value === "string" && value.length > 0
+		const pluginIds = [
+			runtime.pluginId,
+			...runtime.collaboratorHostPluginIds,
+		].filter(
+			(value): value is string => typeof value === "string" && value.length > 0,
 		);
 		for (const pluginId of pluginIds) {
-			const plugin = getObsidianPluginAs<{ settings?: { bookmarkFolder?: string } }>(
-				this.app,
-				pluginId
+			const plugin = getObsidianPluginAs<{
+				settings?: { bookmarkFolder?: string };
+			}>(this.app, pluginId);
+			const configured = normalizeEpubBookmarkFolderPath(
+				plugin?.settings?.bookmarkFolder,
 			);
-			const configured = normalizeEpubBookmarkFolderPath(plugin?.settings?.bookmarkFolder);
 			if (configured) {
 				return configured;
 			}
@@ -101,22 +111,33 @@ export class EpubBookmarkService {
 		if (!fileData) {
 			return [];
 		}
-		return [...fileData.bookmarks].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+		return [...fileData.bookmarks].sort(
+			(a, b) => (b.createdAt || 0) - (a.createdAt || 0),
+		);
 	}
 
 	async getBookmarkCountForBook(book: EpubBook): Promise<number> {
 		return (await this.loadBookmarksForBook(book)).length;
 	}
 
-	async addBookmark(book: EpubBook, input: EpubBookmarkCreateInput): Promise<EpubBookmarkWriteResult> {
+	async addBookmark(
+		book: EpubBook,
+		input: EpubBookmarkCreateInput,
+	): Promise<EpubBookmarkWriteResult> {
 		const filePath = await this.resolveBookmarkFilePath(book);
-		const existing = (await this.readBookmarkFileByPath(filePath)) ?? this.createEmptyFileFrontmatter(book);
+		const existing =
+			(await this.readBookmarkFileByPath(filePath)) ??
+			this.createEmptyFileFrontmatter(book);
 		const normalizedBookmark = this.normalizeBookmarkRecord(
 			{
 				...input,
-				id: this.createBookmarkId(existing.stableKey, input.cfi, input.createdAt ?? Date.now()),
+				id: this.createBookmarkId(
+					existing.stableKey,
+					input.cfi,
+					input.createdAt ?? Date.now(),
+				),
 			},
-			existing.stableKey
+			existing.stableKey,
 		);
 		if (!normalizedBookmark) {
 			throw new Error("Invalid EPUB bookmark payload");
@@ -124,7 +145,8 @@ export class EpubBookmarkService {
 
 		const normalizedCfi = EpubLinkService.normalizeCfi(normalizedBookmark.cfi);
 		const existingIndex = existing.bookmarks.findIndex(
-			(bookmark) => EpubLinkService.normalizeCfi(bookmark.cfi) === normalizedCfi
+			(bookmark) =>
+				EpubLinkService.normalizeCfi(bookmark.cfi) === normalizedCfi,
 		);
 		let created = false;
 		let bookmark = normalizedBookmark;
@@ -143,9 +165,12 @@ export class EpubBookmarkService {
 		}
 
 		existing.bookId = String(book.id || "").trim();
-		existing.sourceId = typeof book.sourceId === "string" ? book.sourceId : undefined;
+		existing.sourceId =
+			typeof book.sourceId === "string" ? book.sourceId : undefined;
 		existing.sourceFingerprint =
-			typeof book.sourceFingerprint === "string" ? book.sourceFingerprint : undefined;
+			typeof book.sourceFingerprint === "string"
+				? book.sourceFingerprint
+				: undefined;
 		existing.bookPath = normalizePath(String(book.filePath || "").trim());
 		existing.bookTitle = this.resolveBookTitle(book);
 		existing.bookAuthor = this.resolveBookAuthor(book);
@@ -162,10 +187,17 @@ export class EpubBookmarkService {
 		};
 	}
 
-	async updateBookFileReferences(oldPath: string, newPath: string): Promise<number> {
+	async updateBookFileReferences(
+		oldPath: string,
+		newPath: string,
+	): Promise<number> {
 		const normalizedOldPath = normalizePath(String(oldPath || "").trim());
 		const normalizedNewPath = normalizePath(String(newPath || "").trim());
-		if (!normalizedOldPath || !normalizedNewPath || normalizedOldPath === normalizedNewPath) {
+		if (
+			!normalizedOldPath ||
+			!normalizedNewPath ||
+			normalizedOldPath === normalizedNewPath
+		) {
 			return 0;
 		}
 
@@ -174,7 +206,8 @@ export class EpubBookmarkService {
 			.getFiles()
 			.filter(
 				(file) =>
-					file.extension === "md" && this.isBookmarkFileInsideFolder(file.path, folderPath)
+					file.extension === "md" &&
+					this.isBookmarkFileInsideFolder(file.path, folderPath),
 			);
 		let updated = 0;
 
@@ -192,7 +225,9 @@ export class EpubBookmarkService {
 		return updated;
 	}
 
-	private async readBookmarkFileForBook(book: EpubBook): Promise<EpubBookmarkFileFrontmatter | null> {
+	private async readBookmarkFileForBook(
+		book: EpubBook,
+	): Promise<EpubBookmarkFileFrontmatter | null> {
 		const filePath = await this.findExistingBookmarkFilePath(book);
 		if (!filePath) {
 			return null;
@@ -201,7 +236,10 @@ export class EpubBookmarkService {
 	}
 
 	private async resolveBookmarkFilePath(book: EpubBook): Promise<string> {
-		return (await this.findExistingBookmarkFilePath(book)) ?? this.getPreferredBookmarkFilePath(book);
+		return (
+			(await this.findExistingBookmarkFilePath(book)) ??
+			this.getPreferredBookmarkFilePath(book)
+		);
 	}
 
 	private getPreferredBookmarkFilePath(book: EpubBook): string {
@@ -212,7 +250,9 @@ export class EpubBookmarkService {
 		return folderPath ? normalizePath(`${folderPath}/${fileName}`) : fileName;
 	}
 
-	private async findExistingBookmarkFilePath(book: EpubBook): Promise<string | null> {
+	private async findExistingBookmarkFilePath(
+		book: EpubBook,
+	): Promise<string | null> {
 		const preferredPath = this.getPreferredBookmarkFilePath(book);
 		if (await this.app.vault.adapter.exists(preferredPath)) {
 			return preferredPath;
@@ -226,12 +266,15 @@ export class EpubBookmarkService {
 				(file) =>
 					file.extension === "md" &&
 					this.isBookmarkFileInsideFolder(file.path, folderPath) &&
-					file.name.endsWith(suffix)
+					file.name.endsWith(suffix),
 			);
 		return match?.path ?? null;
 	}
 
-	private isBookmarkFileInsideFolder(filePath: string, folderPath: string): boolean {
+	private isBookmarkFileInsideFolder(
+		filePath: string,
+		folderPath: string,
+	): boolean {
 		const normalizedFilePath = normalizePath(String(filePath || "").trim());
 		const normalizedFolderPath = normalizeEpubBookmarkFolderPath(folderPath);
 		if (!normalizedFolderPath) {
@@ -253,7 +296,9 @@ export class EpubBookmarkService {
 	private resolveBookTitle(book: EpubBook): string {
 		return (
 			String(book.metadata?.title || "").trim() ||
-			EpubLinkService.extractShortBookName(String(book.filePath || "").trim()) ||
+			EpubLinkService.extractShortBookName(
+				String(book.filePath || "").trim(),
+			) ||
 			"EPUB"
 		);
 	}
@@ -263,7 +308,9 @@ export class EpubBookmarkService {
 		return author || undefined;
 	}
 
-	private createEmptyFileFrontmatter(book: EpubBook): EpubBookmarkFileFrontmatter {
+	private createEmptyFileFrontmatter(
+		book: EpubBook,
+	): EpubBookmarkFileFrontmatter {
 		return {
 			format: EPUB_BOOKMARK_FILE_FORMAT,
 			weave_epub_bookmark_file: true,
@@ -271,7 +318,9 @@ export class EpubBookmarkService {
 			bookId: String(book.id || "").trim(),
 			sourceId: typeof book.sourceId === "string" ? book.sourceId : undefined,
 			sourceFingerprint:
-				typeof book.sourceFingerprint === "string" ? book.sourceFingerprint : undefined,
+				typeof book.sourceFingerprint === "string"
+					? book.sourceFingerprint
+					: undefined,
 			bookPath: normalizePath(String(book.filePath || "").trim()),
 			bookTitle: this.resolveBookTitle(book),
 			bookAuthor: this.resolveBookAuthor(book),
@@ -280,7 +329,11 @@ export class EpubBookmarkService {
 		};
 	}
 
-	private createBookmarkId(stableKey: string, cfi: string, createdAt: number): string {
+	private createBookmarkId(
+		stableKey: string,
+		cfi: string,
+		createdAt: number,
+	): string {
 		const seed = `${stableKey}::${createdAt}::${cfi}`;
 		return `epub-bm-${this.hashString(seed).toString(36)}`;
 	}
@@ -293,7 +346,9 @@ export class EpubBookmarkService {
 		return hash;
 	}
 
-	private async readBookmarkFileByPath(filePath: string): Promise<EpubBookmarkFileFrontmatter | null> {
+	private async readBookmarkFileByPath(
+		filePath: string,
+	): Promise<EpubBookmarkFileFrontmatter | null> {
 		const existing = this.app.vault.getAbstractFileByPath(filePath);
 		if (!(existing instanceof TFile)) {
 			return null;
@@ -307,7 +362,9 @@ export class EpubBookmarkService {
 		}
 	}
 
-	private parseBookmarkFileContent(content: string): EpubBookmarkFileFrontmatter | null {
+	private parseBookmarkFileContent(
+		content: string,
+	): EpubBookmarkFileFrontmatter | null {
 		const match = String(content || "").match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
 		if (!match) {
 			return null;
@@ -317,20 +374,31 @@ export class EpubBookmarkService {
 			if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
 				return null;
 			}
-			return this.normalizeBookmarkFileFrontmatter(parsed as Record<string, unknown>);
+			return this.normalizeBookmarkFileFrontmatter(
+				parsed as Record<string, unknown>,
+			);
 		} catch (error) {
-			logger.warn("[EpubBookmarkService] Failed to parse bookmark frontmatter:", error);
+			logger.warn(
+				"[EpubBookmarkService] Failed to parse bookmark frontmatter:",
+				error,
+			);
 			return null;
 		}
 	}
 
-	private normalizeBookmarkFileFrontmatter(value: Record<string, unknown>): EpubBookmarkFileFrontmatter | null {
+	private normalizeBookmarkFileFrontmatter(
+		value: Record<string, unknown>,
+	): EpubBookmarkFileFrontmatter | null {
 		const format = readString(value.format);
 		const stableKey = readString(value.stableKey);
 		const bookId = readString(value.bookId);
 		const bookPath = normalizePath(readString(value.bookPath));
 		const bookTitle = readString(value.bookTitle);
-		if ((format && format !== EPUB_BOOKMARK_FILE_FORMAT) || !stableKey || !bookPath) {
+		if (
+			(format && format !== EPUB_BOOKMARK_FILE_FORMAT) ||
+			!stableKey ||
+			!bookPath
+		) {
 			return null;
 		}
 		return {
@@ -340,16 +408,22 @@ export class EpubBookmarkService {
 			bookId,
 			sourceId: typeof value.sourceId === "string" ? value.sourceId : undefined,
 			sourceFingerprint:
-				typeof value.sourceFingerprint === "string" ? value.sourceFingerprint : undefined,
+				typeof value.sourceFingerprint === "string"
+					? value.sourceFingerprint
+					: undefined,
 			bookPath,
 			bookTitle,
-			bookAuthor: typeof value.bookAuthor === "string" ? value.bookAuthor : undefined,
+			bookAuthor:
+				typeof value.bookAuthor === "string" ? value.bookAuthor : undefined,
 			updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : 0,
 			bookmarks: this.normalizeBookmarkRecords(value.bookmarks, stableKey),
 		};
 	}
 
-	private normalizeBookmarkRecords(value: unknown, stableKey: string): EpubBookmarkRecord[] {
+	private normalizeBookmarkRecords(
+		value: unknown,
+		stableKey: string,
+	): EpubBookmarkRecord[] {
 		if (!Array.isArray(value)) {
 			return [];
 		}
@@ -359,7 +433,10 @@ export class EpubBookmarkService {
 			.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 	}
 
-	private normalizeBookmarkRecord(value: unknown, stableKey: string): EpubBookmarkRecord | null {
+	private normalizeBookmarkRecord(
+		value: unknown,
+		stableKey: string,
+	): EpubBookmarkRecord | null {
 		if (!value || typeof value !== "object") {
 			return null;
 		}
@@ -368,7 +445,8 @@ export class EpubBookmarkService {
 		if (!cfi) {
 			return null;
 		}
-		const createdAt = typeof record.createdAt === "number" ? record.createdAt : Date.now();
+		const createdAt =
+			typeof record.createdAt === "number" ? record.createdAt : Date.now();
 		const chapterTitle = readString(record.chapterTitle);
 		return {
 			id:
@@ -376,17 +454,23 @@ export class EpubBookmarkService {
 					? record.id.trim()
 					: this.createBookmarkId(stableKey, cfi, createdAt),
 			cfi,
-			chapterIndex: typeof record.chapterIndex === "number" ? record.chapterIndex : 0,
+			chapterIndex:
+				typeof record.chapterIndex === "number" ? record.chapterIndex : 0,
 			percent: typeof record.percent === "number" ? record.percent : 0,
 			chapterTitle,
-			pageNumber: typeof record.pageNumber === "number" ? record.pageNumber : undefined,
-			totalPages: typeof record.totalPages === "number" ? record.totalPages : undefined,
+			pageNumber:
+				typeof record.pageNumber === "number" ? record.pageNumber : undefined,
+			totalPages:
+				typeof record.totalPages === "number" ? record.totalPages : undefined,
 			createdAt,
 			preview: typeof record.preview === "string" ? record.preview : undefined,
 		};
 	}
 
-	private async writeBookmarkFile(filePath: string, frontmatter: EpubBookmarkFileFrontmatter): Promise<void> {
+	private async writeBookmarkFile(
+		filePath: string,
+		frontmatter: EpubBookmarkFileFrontmatter,
+	): Promise<void> {
 		const content = this.renderBookmarkFileContent(frontmatter);
 		await DirectoryUtils.ensureDirForFile(this.app.vault.adapter, filePath);
 		const existing = this.app.vault.getAbstractFileByPath(filePath);
@@ -397,7 +481,9 @@ export class EpubBookmarkService {
 		await this.app.vault.create(filePath, content);
 	}
 
-	private renderBookmarkFileContent(frontmatter: EpubBookmarkFileFrontmatter): string {
+	private renderBookmarkFileContent(
+		frontmatter: EpubBookmarkFileFrontmatter,
+	): string {
 		const yamlText = this.stringifyYamlObject({
 			format: EPUB_BOOKMARK_FILE_FORMAT,
 			weave_epub_bookmark_file: true,
@@ -415,16 +501,14 @@ export class EpubBookmarkService {
 	}
 
 	private renderBookmarkBody(frontmatter: EpubBookmarkFileFrontmatter): string {
-		const lines: string[] = [
-			`# ${frontmatter.bookTitle || "EPUB 书签"}`,
-			"",
-		];
+		const lines: string[] = [`# ${frontmatter.bookTitle || "EPUB 书签"}`, ""];
 		if (frontmatter.bookmarks.length === 0) {
 			lines.push("暂无书签");
 			return lines.join("\n");
 		}
 		for (const bookmark of frontmatter.bookmarks) {
-			const chapterTitle = bookmark.chapterTitle || `第 ${bookmark.chapterIndex + 1} 章`;
+			const chapterTitle =
+				bookmark.chapterTitle || `第 ${bookmark.chapterIndex + 1} 章`;
 			const pageLabel = this.buildPageLabel(bookmark);
 			const createdLabel = this.formatTimestamp(bookmark.createdAt);
 			const link = this.linkService.buildEpubLink(
@@ -434,7 +518,7 @@ export class EpubBookmarkService {
 				bookmark.chapterIndex,
 				bookmark.chapterTitle,
 				undefined,
-				frontmatter.sourceId
+				frontmatter.sourceId,
 			);
 			lines.push(`## ${chapterTitle}`);
 			lines.push("");
@@ -451,7 +535,10 @@ export class EpubBookmarkService {
 
 	private buildPageLabel(bookmark: EpubBookmarkRecord): string {
 		if (typeof bookmark.pageNumber === "number" && bookmark.pageNumber > 0) {
-			if (typeof bookmark.totalPages === "number" && bookmark.totalPages >= bookmark.pageNumber) {
+			if (
+				typeof bookmark.totalPages === "number" &&
+				bookmark.totalPages >= bookmark.pageNumber
+			) {
 				return `第 ${bookmark.pageNumber} / ${bookmark.totalPages} 页`;
 			}
 			return `第 ${bookmark.pageNumber} 页`;
@@ -460,7 +547,9 @@ export class EpubBookmarkService {
 	}
 
 	private formatPercent(percent: number): string {
-		const safe = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
+		const safe = Number.isFinite(percent)
+			? Math.max(0, Math.min(100, percent))
+			: 0;
 		return `${Math.round(safe)}%`;
 	}
 
@@ -478,10 +567,15 @@ export class EpubBookmarkService {
 	}
 
 	private normalizeInlineText(value: string): string {
-		return String(value || "").replace(/\s+/g, " ").trim();
+		return String(value || "")
+			.replace(/\s+/g, " ")
+			.trim();
 	}
 
-	private stringifyYamlObject(value: Record<string, unknown>, indent = ""): string {
+	private stringifyYamlObject(
+		value: Record<string, unknown>,
+		indent = "",
+	): string {
 		const lines: string[] = [];
 		for (const [key, entry] of Object.entries(value)) {
 			if (entry === undefined) {
@@ -492,7 +586,12 @@ export class EpubBookmarkService {
 		return lines.join("\n");
 	}
 
-	private appendYamlProperty(lines: string[], key: string, value: unknown, indent: string): void {
+	private appendYamlProperty(
+		lines: string[],
+		key: string,
+		value: unknown,
+		indent: string,
+	): void {
 		if (Array.isArray(value)) {
 			if (value.length === 0) {
 				lines.push(`${indent}${key}: []`);
@@ -506,7 +605,7 @@ export class EpubBookmarkService {
 		}
 		if (value && typeof value === "object") {
 			const entries = Object.entries(value as Record<string, unknown>).filter(
-				([, entry]) => entry !== undefined
+				([, entry]) => entry !== undefined,
 			);
 			if (entries.length === 0) {
 				lines.push(`${indent}${key}: {}`);
@@ -521,7 +620,11 @@ export class EpubBookmarkService {
 		lines.push(`${indent}${key}: ${this.formatYamlScalar(value)}`);
 	}
 
-	private appendYamlArrayItem(lines: string[], value: unknown, indent: string): void {
+	private appendYamlArrayItem(
+		lines: string[],
+		value: unknown,
+		indent: string,
+	): void {
 		if (Array.isArray(value)) {
 			if (value.length === 0) {
 				lines.push(`${indent}- []`);
@@ -535,18 +638,23 @@ export class EpubBookmarkService {
 		}
 		if (value && typeof value === "object") {
 			const entries = Object.entries(value as Record<string, unknown>).filter(
-				([, entry]) => entry !== undefined
+				([, entry]) => entry !== undefined,
 			);
 			if (entries.length === 0) {
 				lines.push(`${indent}- {}`);
 				return;
 			}
 			const [firstKey, firstValue] = entries[0];
-			if (Array.isArray(firstValue) || (firstValue && typeof firstValue === "object")) {
+			if (
+				Array.isArray(firstValue) ||
+				(firstValue && typeof firstValue === "object")
+			) {
 				lines.push(`${indent}- ${firstKey}:`);
 				this.appendComplexYamlValue(lines, firstValue, `${indent}    `);
 			} else {
-				lines.push(`${indent}- ${firstKey}: ${this.formatYamlScalar(firstValue)}`);
+				lines.push(
+					`${indent}- ${firstKey}: ${this.formatYamlScalar(firstValue)}`,
+				);
 			}
 			for (const [key, entry] of entries.slice(1)) {
 				this.appendYamlProperty(lines, key, entry, `${indent}  `);
@@ -556,7 +664,11 @@ export class EpubBookmarkService {
 		lines.push(`${indent}- ${this.formatYamlScalar(value)}`);
 	}
 
-	private appendComplexYamlValue(lines: string[], value: unknown, indent: string): void {
+	private appendComplexYamlValue(
+		lines: string[],
+		value: unknown,
+		indent: string,
+	): void {
 		if (Array.isArray(value)) {
 			for (const item of value) {
 				this.appendYamlArrayItem(lines, item, indent);
@@ -564,7 +676,9 @@ export class EpubBookmarkService {
 			return;
 		}
 		if (value && typeof value === "object") {
-			for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+			for (const [key, entry] of Object.entries(
+				value as Record<string, unknown>,
+			)) {
 				if (entry === undefined) {
 					continue;
 				}

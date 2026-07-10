@@ -58,7 +58,7 @@ describe("IRDailyLoadAllocator", () => {
 				createSortableItem({ id: "c", priority: 4, estimatedMinutes: 15 }),
 			],
 			"2026-06-18",
-			policy
+			policy,
 		);
 
 		expect(result.assigned.map((item) => item.id)).toEqual(["a", "b", "c"]);
@@ -79,7 +79,7 @@ describe("IRDailyLoadAllocator", () => {
 				createSortableItem({ id: "low", priority: 3, estimatedMinutes: 20 }),
 			],
 			"2026-06-18",
-			policy
+			policy,
 		);
 
 		expect(result.assigned.map((item) => item.id)).toEqual(["high", "mid"]);
@@ -107,7 +107,7 @@ describe("IRDailyLoadAllocator", () => {
 				pinned,
 			],
 			"2026-06-18",
-			policy
+			policy,
 		);
 
 		expect(result.assigned.map((item) => item.id)).toEqual(["high", "pinned"]);
@@ -125,7 +125,7 @@ describe("IRDailyLoadAllocator", () => {
 				baselineCount: 15,
 				stretchCountCeiling: 17,
 				deferredCount: 0,
-			})
+			}),
 		).toBe("warning");
 		expect(
 			computeDayOverloadLevel({
@@ -136,7 +136,7 @@ describe("IRDailyLoadAllocator", () => {
 				baselineCount: 15,
 				stretchCountCeiling: 17,
 				deferredCount: 0,
-			})
+			}),
 		).toBe("normal");
 	});
 
@@ -158,7 +158,7 @@ describe("IRDailyLoadAllocator", () => {
 				createSortableItem({ id: "7", priority: 1, estimatedMinutes: 2 }),
 			],
 			"2026-06-18",
-			policy
+			policy,
 		);
 
 		expect(result.assigned).toHaveLength(6);

@@ -1,6 +1,6 @@
 import type { App, View, WorkspaceLeaf } from "obsidian";
-import { deriveWebPageTitleFromUrl } from "../incremental-reading/ir-web-reading-point";
 import { readString } from "../../utils/unknown-record";
+import { deriveWebPageTitleFromUrl } from "../incremental-reading/ir-web-reading-point";
 import { OBSIDIAN_WEB_VIEWER_VIEW_TYPE } from "./obsidian-open-web-url";
 
 export interface WebViewerPageContext {
@@ -14,7 +14,9 @@ type WebViewerViewLike = View & {
 	getDisplayText?: () => string;
 };
 
-export function readWebViewerUrlFromView(view: View | null | undefined): string {
+export function readWebViewerUrlFromView(
+	view: View | null | undefined,
+): string {
 	if (!view || view.getViewType?.() !== OBSIDIAN_WEB_VIEWER_VIEW_TYPE) {
 		return "";
 	}
@@ -34,7 +36,10 @@ export function readWebViewerUrlFromView(view: View | null | undefined): string 
 	return url;
 }
 
-export function readWebViewerTitleFromView(view: View | null | undefined, url: string): string {
+export function readWebViewerTitleFromView(
+	view: View | null | undefined,
+	url: string,
+): string {
 	if (!view || view.getViewType?.() !== OBSIDIAN_WEB_VIEWER_VIEW_TYPE) {
 		return deriveWebPageTitleFromUrl(url);
 	}
@@ -49,7 +54,7 @@ export function readWebViewerTitleFromView(view: View | null | undefined, url: s
 }
 
 export function getWebViewerPageContextFromView(
-	view: View | null | undefined
+	view: View | null | undefined,
 ): WebViewerPageContext | null {
 	const url = readWebViewerUrlFromView(view);
 	if (!url) {
@@ -68,17 +73,23 @@ export function getWebViewerPageContextFromView(
 	};
 }
 
-export function getActiveWebViewerPageContext(app: App): WebViewerPageContext | null {
+export function getActiveWebViewerPageContext(
+	app: App,
+): WebViewerPageContext | null {
 	const workspace = app.workspace as App["workspace"] & {
 		getActiveLeaf?: () => import("obsidian").WorkspaceLeaf | null;
 	};
 	const activeLeaf =
-		typeof workspace.getActiveLeaf === "function" ? workspace.getActiveLeaf() : null;
+		typeof workspace.getActiveLeaf === "function"
+			? workspace.getActiveLeaf()
+			: null;
 	if (activeLeaf?.view?.getViewType?.() === OBSIDIAN_WEB_VIEWER_VIEW_TYPE) {
 		return getWebViewerPageContextFromView(activeLeaf.view);
 	}
 
-	for (const leaf of app.workspace.getLeavesOfType(OBSIDIAN_WEB_VIEWER_VIEW_TYPE)) {
+	for (const leaf of app.workspace.getLeavesOfType(
+		OBSIDIAN_WEB_VIEWER_VIEW_TYPE,
+	)) {
 		const context = getWebViewerPageContextFromView(leaf.view);
 		if (context) {
 			return context;

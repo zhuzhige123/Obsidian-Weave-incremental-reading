@@ -55,7 +55,10 @@ const VALID_TRANSITIONS: Record<IRBlockStatus, IRBlockStatus[]> = {
 /**
  * 检查状态迁移是否有效
  */
-export function isValidTransition(from: IRBlockStatus, to: IRBlockStatus): boolean {
+export function isValidTransition(
+	from: IRBlockStatus,
+	to: IRBlockStatus,
+): boolean {
 	return VALID_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
@@ -79,7 +82,9 @@ export class IRStateMachineV4 {
 		const now = Date.now();
 		const nextRepDate = calculateNextRepDate(initialIntervalDays);
 
-		logger.debug(`[IRStateMachineV4] ${block.id}: new → queued, interval=${initialIntervalDays}d`);
+		logger.debug(
+			`[IRStateMachineV4] ${block.id}: new → queued, interval=${initialIntervalDays}d`,
+		);
 
 		return {
 			...block,
@@ -155,7 +160,7 @@ export class IRStateMachineV4 {
 		block: IRBlockV4,
 		mBase = 1.5,
 		mGroup = 1.0,
-		maxInterval?: number
+		maxInterval?: number,
 	): IRBlockV4 {
 		if (block.status !== "active") {
 			throw new InvalidStateTransitionError(block.status, "queued");
@@ -169,7 +174,7 @@ export class IRStateMachineV4 {
 			mBase,
 			mGroup,
 			block.priorityEff,
-			maxInterval
+			maxInterval,
 		);
 
 		// nextRepDate 单调更新（不得回退到过去）
@@ -177,7 +182,9 @@ export class IRStateMachineV4 {
 
 		logger.debug(
 			`[IRStateMachineV4] ${block.id}: active → queued, ` +
-				`interval=${newInterval.toFixed(2)}d, pEff=${block.priorityEff.toFixed(2)}`
+				`interval=${newInterval.toFixed(2)}d, pEff=${block.priorityEff.toFixed(
+					2,
+				)}`,
 		);
 
 		return {
@@ -196,7 +203,10 @@ export class IRStateMachineV4 {
 	 * @param reason 完成原因
 	 * @returns 更新后的内容块
 	 */
-	transitionToDone(block: IRBlockV4, reason: "archived" | "completed" = "archived"): IRBlockV4 {
+	transitionToDone(
+		block: IRBlockV4,
+		reason: "archived" | "completed" = "archived",
+	): IRBlockV4 {
 		if (block.status !== "active") {
 			throw new InvalidStateTransitionError(block.status, "done");
 		}
@@ -296,13 +306,15 @@ export class IRStateMachineV4 {
 			throw new InvalidStateTransitionError(
 				block.status,
 				"queued",
-				"强制恢复仅适用于 done/removed 状态"
+				"强制恢复仅适用于 done/removed 状态",
 			);
 		}
 
 		const now = Date.now();
 
-		logger.debug(`[IRStateMachineV4] ${block.id}: ${block.status} → queued (强制恢复)`);
+		logger.debug(
+			`[IRStateMachineV4] ${block.id}: ${block.status} → queued (强制恢复)`,
+		);
 
 		return {
 			...block,
@@ -327,7 +339,7 @@ export class IRStateMachineV4 {
 		block: IRBlockV4,
 		newPriorityUi: number,
 		reason: string,
-		useTimeAwareEWMA = false
+		useTimeAwareEWMA = false,
 	): IRBlockV4 {
 		// 强制理由检查
 		if (!reason || reason.trim().length === 0) {
@@ -344,7 +356,7 @@ export class IRStateMachineV4 {
 			newPriorityEff = calculatePriorityEWMATimeAware(
 				newPriorityUi,
 				block.priorityEff,
-				block.stats.lastInteraction
+				block.stats.lastInteraction,
 			);
 		} else {
 			// 标准 EWMA
@@ -356,10 +368,10 @@ export class IRStateMachineV4 {
 
 		logger.debug(
 			`[IRStateMachineV4] ${block.id}: 优先级变更 ` +
-				`UI=${oldP}→${newPriorityUi}, Eff=${block.priorityEff.toFixed(2)}→${newPriorityEff.toFixed(
-					2
-				)}, ` +
-				`理由="${reason}"`
+				`UI=${oldP}→${newPriorityUi}, Eff=${block.priorityEff.toFixed(
+					2,
+				)}→${newPriorityEff.toFixed(2)}, ` +
+				`理由="${reason}"`,
 		);
 
 		return {
@@ -395,7 +407,7 @@ export class IRStateMachineV4 {
 		effectiveTimeSec: number,
 		extracts = 0,
 		cardsCreated = 0,
-		notesWritten = 0
+		notesWritten = 0,
 	): IRBlockV4 {
 		const now = Date.now();
 
@@ -404,7 +416,8 @@ export class IRStateMachineV4 {
 			stats: {
 				...block.stats,
 				totalReadingTimeSec: block.stats.totalReadingTimeSec + readingTimeSec,
-				effectiveReadingTimeSec: block.stats.effectiveReadingTimeSec + effectiveTimeSec,
+				effectiveReadingTimeSec:
+					block.stats.effectiveReadingTimeSec + effectiveTimeSec,
 				extracts: block.stats.extracts + extracts,
 				cardsCreated: block.stats.cardsCreated + cardsCreated,
 				notesWritten: block.stats.notesWritten + notesWritten,

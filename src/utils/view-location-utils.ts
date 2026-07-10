@@ -95,8 +95,12 @@ export function getViewSurfaceTokens(leaf: WorkspaceLeaf): ViewSurfaceTokens {
 
 	return {
 		context: inSidebar ? "sidebar" : "main",
-		surfaceBackground: inSidebar ? SIDEBAR_SURFACE_BACKGROUND : MAIN_SURFACE_BACKGROUND,
-		elevatedBackground: inSidebar ? SIDEBAR_ELEVATED_BACKGROUND : MAIN_ELEVATED_BACKGROUND,
+		surfaceBackground: inSidebar
+			? SIDEBAR_SURFACE_BACKGROUND
+			: MAIN_SURFACE_BACKGROUND,
+		elevatedBackground: inSidebar
+			? SIDEBAR_ELEVATED_BACKGROUND
+			: MAIN_ELEVATED_BACKGROUND,
 	};
 }
 
@@ -111,7 +115,7 @@ export function getViewSurfaceTokens(leaf: WorkspaceLeaf): ViewSurfaceTokens {
 export async function moveViewToLocation(
 	view: ItemView,
 	targetLocation: ViewLocation,
-	_preferredSide: "left" | "right" = "right"
+	_preferredSide: "left" | "right" = "right",
 ): Promise<boolean> {
 	try {
 		const workspace = view.app.workspace;
@@ -174,7 +178,7 @@ export async function moveViewToLocation(
  */
 export async function toggleViewLocation(
 	view: ItemView,
-	preferredSide: "left" | "right" = "right"
+	preferredSide: "left" | "right" = "right",
 ): Promise<boolean> {
 	const currentLocation = getLeafLocation(view.leaf);
 
@@ -228,7 +232,7 @@ export function getLocationToggleTooltip(leaf: WorkspaceLeaf): string {
  */
 export function addLocationToggleAction(
 	view: ItemView,
-	preferredSide: "left" | "right" = "right"
+	preferredSide: "left" | "right" = "right",
 ): HTMLElement | null {
 	// 获取初始图标和提示
 	const icon = getLocationToggleIcon(view.leaf);

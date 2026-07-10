@@ -26,7 +26,7 @@ describe("runIdleBatchedTasks", () => {
 					cancelAfter();
 					return calls >= 2;
 				},
-			}
+			},
 		);
 		expect(calls).toBeLessThan(5);
 	});

@@ -30,17 +30,26 @@ function getMaterialDeckId(material: ExistingMaterialLike): string {
 	return String(material.readingDeckId || material.topicId || "").trim();
 }
 
-function chunkAssignedToDeck(chunk: ExistingChunkLike, deckId: string): boolean {
+function chunkAssignedToDeck(
+	chunk: ExistingChunkLike,
+	deckId: string,
+): boolean {
 	if (!deckId) {
 		return false;
 	}
-	const deckIds = Array.isArray(chunk.deckIds) ? chunk.deckIds.map((id) => String(id || "").trim()) : [];
-	const topicIds = Array.isArray(chunk.topicIds) ? chunk.topicIds.map((id) => String(id || "").trim()) : [];
+	const deckIds = Array.isArray(chunk.deckIds)
+		? chunk.deckIds.map((id) => String(id || "").trim())
+		: [];
+	const topicIds = Array.isArray(chunk.topicIds)
+		? chunk.topicIds.map((id) => String(id || "").trim())
+		: [];
 	return deckIds.includes(deckId) || topicIds.includes(deckId);
 }
 
 function isChunkScheduleInactive(chunk: ExistingChunkLike): boolean {
-	const status = String(chunk.scheduleStatus || "").trim().toLowerCase();
+	const status = String(chunk.scheduleStatus || "")
+		.trim()
+		.toLowerCase();
 	if (status === "removed" || status === "done" || status === "suspended") {
 		return true;
 	}
@@ -85,7 +94,9 @@ export function evaluateFolderSubscriptionSyncState(options: {
 			syncGaps.push("chunk_schedule_inactive");
 		}
 		const materialUuid = String(existingMaterial?.uuid || "").trim();
-		const linkedMaterialId = String(existingChunk.meta?.readingMaterialId || "").trim();
+		const linkedMaterialId = String(
+			existingChunk.meta?.readingMaterialId || "",
+		).trim();
 		if (materialUuid && linkedMaterialId !== materialUuid) {
 			syncGaps.push("chunk_material_unlinked");
 		}
@@ -102,6 +113,10 @@ export function evaluateFolderSubscriptionSyncState(options: {
 	};
 }
 
-export function isFolderSubscriptionPendingNewEntry(syncGaps: FolderSubscriptionSyncGap[]): boolean {
-	return syncGaps.includes("missing_material") || syncGaps.includes("missing_chunk");
+export function isFolderSubscriptionPendingNewEntry(
+	syncGaps: FolderSubscriptionSyncGap[],
+): boolean {
+	return (
+		syncGaps.includes("missing_material") || syncGaps.includes("missing_chunk")
+	);
 }

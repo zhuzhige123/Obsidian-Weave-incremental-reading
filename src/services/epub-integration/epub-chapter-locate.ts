@@ -12,7 +12,7 @@ export function buildEpubChapterResumeLink(
 	tocHref: string,
 	chapterTitle?: string,
 	sourceId?: string,
-	chapterIndex?: number
+	chapterIndex?: number,
 ): string {
 	const reader = getEpubReaderInteropHost(app);
 	if (typeof reader?.buildPublicationChapterMarkdownLink === "function") {
@@ -21,7 +21,7 @@ export function buildEpubChapterResumeLink(
 			tocHref,
 			chapterTitle,
 			sourceId,
-			chapterIndex
+			chapterIndex,
 		);
 	}
 
@@ -31,6 +31,6 @@ export function buildEpubChapterResumeLink(
 		tocHref,
 		chapterTitle,
 		sourceId,
-		chapterIndex
+		chapterIndex,
 	);
 }

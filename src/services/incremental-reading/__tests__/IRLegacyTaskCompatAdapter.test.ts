@@ -1,5 +1,5 @@
-vi.mock('obsidian', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('obsidian')>();
+vi.mock("obsidian", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("obsidian")>();
 	return {
 		...actual,
 		App: actual.App ?? class MockApp {},
@@ -7,7 +7,7 @@ vi.mock('obsidian', async (importOriginal) => {
 		ItemView: actual.ItemView ?? class MockItemView {},
 		WorkspaceLeaf: actual.WorkspaceLeaf ?? class MockWorkspaceLeaf {},
 		MarkdownView: actual.MarkdownView ?? class MockMarkdownView {},
-		Notice: actual.Notice ?? class MockNotice { constructor(_message?: string) {} },
+		Notice: actual.Notice ?? class MockNotice {},
 		Menu: actual.Menu ?? class MockMenu {},
 		Modal: actual.Modal ?? class MockModal {},
 		Plugin: actual.Plugin ?? class MockPlugin {},
@@ -15,7 +15,11 @@ vi.mock('obsidian', async (importOriginal) => {
 		Platform: actual.Platform ?? { isMobile: false },
 		normalizePath:
 			actual.normalizePath ??
-			((value: string) => String(value || '').replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '')),
+			((value: string) =>
+				String(value || "")
+					.replace(/\\/g, "/")
+					.replace(/\/+/g, "/")
+					.replace(/\/$/, "")),
 	};
 });
 
@@ -188,12 +192,15 @@ describe("IRLegacyTaskCompatAdapter", () => {
 						title: "Demo PDF",
 					},
 				} as any,
-			} as any)
+			} as any),
 		);
 
 		expect(task.meta?.primaryAssociatedNotePath).toBe("Notes/Topic.md");
 		expect(task.meta?.associatedNotePath).toBe("Notes/Topic.md");
-		expect(task.meta?.associatedNotePaths).toEqual(["Notes/Topic.md", "Notes/Appendix.md"]);
+		expect(task.meta?.associatedNotePaths).toEqual([
+			"Notes/Topic.md",
+			"Notes/Appendix.md",
+		]);
 	});
 
 	it("recognizes canvas-node points as chunk schedule entries", () => {
@@ -216,8 +223,8 @@ describe("IRLegacyTaskCompatAdapter", () => {
 							pointTitle: "Canvas 节点阅读点",
 						},
 					},
-				} as any)
-			)
+				} as any),
+			),
 		).toBe("chunk");
 	});
 
@@ -255,9 +262,9 @@ describe("IRLegacyTaskCompatAdapter", () => {
 						nextReviewAt: "2026-05-03T00:00:00.000Z",
 					},
 				},
-			} as any)
+			} as any),
 		);
-		const chunkMeta = ((chunk.meta || {}) as unknown) as Record<string, unknown>;
+		const chunkMeta = (chunk.meta || {}) as unknown as Record<string, unknown>;
 
 		expect(chunk.filePath).toBe("Inbox/Subscribed/demo.md");
 		expect(chunk.nextRepDate).toBe(Date.parse("2026-05-03T00:00:00.000Z"));

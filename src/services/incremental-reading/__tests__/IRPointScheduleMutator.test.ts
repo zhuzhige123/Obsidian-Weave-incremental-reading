@@ -90,7 +90,7 @@ describe("IRPointScheduleMutator", () => {
 				id: "chunk-1",
 				nextRepDate: 1000,
 			} as any,
-			{ nextRepDate: 2000, scheduleStatus: "scheduled" }
+			{ nextRepDate: 2000, scheduleStatus: "scheduled" },
 		);
 
 		expect(updateChunkScheduleMock).toHaveBeenCalledWith(
@@ -99,7 +99,7 @@ describe("IRPointScheduleMutator", () => {
 				nextRepDate: 2000,
 				scheduleStatus: "scheduled",
 			}),
-			expect.objectContaining({ skipScheduleCacheInvalidate: true })
+			expect.objectContaining({ skipScheduleCacheInvalidate: true }),
 		);
 	});
 });

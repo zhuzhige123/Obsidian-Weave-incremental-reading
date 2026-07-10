@@ -39,15 +39,17 @@ describe("paragraph-block-reference", () => {
 
 	it("builds obsidian block wiki links", () => {
 		expect(buildObsidianBlockWikiLink("Notes/demo.md", "abc123", "别名")).toBe(
-			"[[Notes/demo.md#^abc123|别名]]"
+			"[[Notes/demo.md#^abc123|别名]]",
 		);
 		expect(buildObsidianEmbedBlockWikiLink("Notes/demo.md", "abc123")).toBe(
-			"![[Notes/demo.md#^abc123]]"
+			"![[Notes/demo.md#^abc123]]",
 		);
 	});
 
 	it("extracts obsidian block id from text", () => {
-		expect(extractObsidianBlockIdFromText("段落末尾 ^ir_abc12345")).toBe("ir_abc12345");
+		expect(extractObsidianBlockIdFromText("段落末尾 ^ir_abc12345")).toBe(
+			"ir_abc12345",
+		);
 		expect(formatObsidianBlockId("ir_abc12345")).toBe("^ir_abc12345");
 	});
 
@@ -62,12 +64,14 @@ describe("paragraph-block-reference", () => {
 			resolveLegacyBlockResumeLink({
 				filePath: "Notes/demo.md",
 				notes: "![[Notes/demo.md#^ir_d420d8|标题]]",
-			})
+			}),
 		).toBe("Notes/demo.md#^ir_d420d8");
-		expect(extractWikiLinkTarget("![[Notes/demo.md#^ir_d420d8]]")).toBe("Notes/demo.md#^ir_d420d8");
-		expect(buildObsidianBlockResumeLink("Notes/demo.md", "ir_d420d8", "标题")).toBe(
-			"[[Notes/demo.md#^ir_d420d8|标题]]"
+		expect(extractWikiLinkTarget("![[Notes/demo.md#^ir_d420d8]]")).toBe(
+			"Notes/demo.md#^ir_d420d8",
 		);
+		expect(
+			buildObsidianBlockResumeLink("Notes/demo.md", "ir_d420d8", "标题"),
+		).toBe("[[Notes/demo.md#^ir_d420d8|标题]]");
 	});
 
 	it("cleans markdown heading prefixes from titles", () => {
@@ -75,9 +79,9 @@ describe("paragraph-block-reference", () => {
 	});
 
 	it("builds canvas node embed links", () => {
-		expect(buildCanvasNodeEmbedWikiLink("Boards/demo.canvas", "node-1", "节点")).toBe(
-			"![[Boards/demo.canvas?node=node-1|节点]]"
-		);
+		expect(
+			buildCanvasNodeEmbedWikiLink("Boards/demo.canvas", "node-1", "节点"),
+		).toBe("![[Boards/demo.canvas?node=node-1|节点]]");
 	});
 
 	it("detects duplicate blocks by obsidian block id in notes", () => {
@@ -97,7 +101,7 @@ describe("paragraph-block-reference", () => {
 				text: "段落 ^ir-block-1",
 				metadata: { startLine: 20, endLine: 22 },
 			},
-			"ir-block-1"
+			"ir-block-1",
 		);
 		expect(duplicate?.id).toBe("ir-abc");
 		expect(blockReferencesObsidianId(blocks[0], "ir-block-1")).toBe(true);

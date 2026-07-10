@@ -21,16 +21,23 @@ type CompatiblePlugin = {
 	getEffectiveLicenseState?: () => { activeLicenses?: LicenseInfo[] };
 };
 
-function getPluginById(app: PluginLookupApp | undefined, pluginId: string): CompatiblePlugin | null {
+function getPluginById(
+	app: PluginLookupApp | undefined,
+	pluginId: string,
+): CompatiblePlugin | null {
 	if (!app) {
 		return null;
 	}
 
 	const plugin = app.plugins.getPlugin(pluginId);
-	return plugin && typeof plugin === "object" ? (plugin as CompatiblePlugin) : null;
+	return plugin && typeof plugin === "object"
+		? (plugin as CompatiblePlugin)
+		: null;
 }
 
-function getLegacyWeavePlugin(app: PluginLookupApp | undefined): CompatiblePlugin | null {
+function getLegacyWeavePlugin(
+	app: PluginLookupApp | undefined,
+): CompatiblePlugin | null {
 	return getPluginById(app, WEAVE_MAIN_PLUGIN_ID);
 }
 
@@ -39,7 +46,10 @@ function getPluginLocalLicenses(plugin: CompatiblePlugin): LicenseInfo[] {
 		return plugin.getLocalLicenses();
 	}
 
-	return normalizeLicenseStore(plugin.settings?.license, plugin.settings?.licenseState).localLicenses;
+	return normalizeLicenseStore(
+		plugin.settings?.license,
+		plugin.settings?.licenseState,
+	).localLicenses;
 }
 
 function getPluginActiveLicenses(plugin: CompatiblePlugin): LicenseInfo[] {
@@ -51,7 +61,7 @@ function getPluginActiveLicenses(plugin: CompatiblePlugin): LicenseInfo[] {
 }
 
 export function getInheritedLicensesFromLegacyWeave(
-	app: PluginLookupApp | undefined
+	app: PluginLookupApp | undefined,
 ): LicenseInfo[] {
 	const legacyPlugin = getLegacyWeavePlugin(app);
 	if (!legacyPlugin) {
@@ -59,11 +69,12 @@ export function getInheritedLicensesFromLegacyWeave(
 	}
 
 	const sourcePluginId =
-		String(legacyPlugin.manifest?.id || WEAVE_MAIN_PLUGIN_ID).trim() || WEAVE_MAIN_PLUGIN_ID;
+		String(legacyPlugin.manifest?.id || WEAVE_MAIN_PLUGIN_ID).trim() ||
+		WEAVE_MAIN_PLUGIN_ID;
 
 	return dedupeLicenses(
 		getPluginActiveLicenses(legacyPlugin).map((license) =>
-			cloneLicenseAsInherited(license, sourcePluginId)
-		)
+			cloneLicenseAsInherited(license, sourcePluginId),
+		),
 	);
 }

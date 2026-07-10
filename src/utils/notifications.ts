@@ -2,7 +2,7 @@ import { Notice } from "obsidian";
 
 export function showNotification(
 	message: string,
-	type: "success" | "error" | "info" | "warning" = "info"
+	type: "success" | "error" | "info" | "warning" = "info",
 ) {
 	const prefixMap = {
 		success: "✓ ",

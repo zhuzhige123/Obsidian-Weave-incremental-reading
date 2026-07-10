@@ -9,7 +9,7 @@ describe("yaml created field normalization", () => {
 	it("writes created instead of legacy we_created when creating content", () => {
 		const content = createContentWithMetadata(
 			{ we_created: "2026-04-09T12:00:00.000Z" },
-			"Body"
+			"Body",
 		);
 		const yaml = parseYAMLFromContent(content);
 

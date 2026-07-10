@@ -46,7 +46,11 @@ const FALLBACK_SERIES_PALETTE = [
 const DEFAULT_GRADIENT_COLOR = { r: 124, g: 58, b: 237 };
 const parsedColorCache = new Map<string, { r: number; g: number; b: number }>();
 
-function resolveCssVar(style: CSSStyleDeclaration, name: string, fallback: string): string {
+function resolveCssVar(
+	style: CSSStyleDeclaration,
+	name: string,
+	fallback: string,
+): string {
 	return style.getPropertyValue(name).trim() || fallback;
 }
 
@@ -60,23 +64,31 @@ function detectDarkTheme(): boolean {
 export function getThemeColors(): ThemeColors {
 	const style = getComputedStyle(activeDocument.body);
 	const isDark = detectDarkTheme();
-	const text = resolveCssVar(style, "--text-normal", isDark ? "#e5e7eb" : "#1f2937");
-	const textMuted = resolveCssVar(style, "--text-muted", isDark ? "#9ca3af" : "#6b7280");
+	const text = resolveCssVar(
+		style,
+		"--text-normal",
+		isDark ? "#e5e7eb" : "#1f2937",
+	);
+	const textMuted = resolveCssVar(
+		style,
+		"--text-muted",
+		isDark ? "#9ca3af" : "#6b7280",
+	);
 	const accent = resolveCssVar(style, "--interactive-accent", FALLBACK_ACCENT);
 	const background = resolveCssVar(
 		style,
 		"--background-primary",
-		isDark ? "#111827" : "#ffffff"
+		isDark ? "#111827" : "#ffffff",
 	);
 	const backgroundSecondary = resolveCssVar(
 		style,
 		"--background-secondary",
-		isDark ? "#1f2937" : "#f8fafc"
+		isDark ? "#1f2937" : "#f8fafc",
 	);
 	const border = resolveCssVar(
 		style,
 		"--background-modifier-border",
-		isDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.12)"
+		isDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.12)",
 	);
 	const success = resolveCssVar(style, "--text-success", "#22c55e");
 	const warning = resolveCssVar(style, "--text-warning", "#f59e0b");
@@ -84,9 +96,11 @@ export function getThemeColors(): ThemeColors {
 	const axisLineColor = resolveCssVar(
 		style,
 		"--background-modifier-border",
-		isDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.12)"
+		isDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.12)",
 	);
-	const splitLineColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)";
+	const splitLineColor = isDark
+		? "rgba(255,255,255,0.08)"
+		: "rgba(15,23,42,0.08)";
 
 	return {
 		text,
@@ -139,7 +153,8 @@ export function getBaseChartOption(colors: ThemeColors): unknown {
 				color: colors.text,
 			},
 			padding: [8, 12],
-			extraCssText: "box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 6px;",
+			extraCssText:
+				"box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 6px;",
 		},
 		grid: {
 			left: "3%",
@@ -186,7 +201,11 @@ export function getBaseChartOption(colors: ThemeColors): unknown {
 /**
  * 生成渐变色配置（支持多种颜色格式）
  */
-export function createGradient(color: string, opacity1 = 0.25, opacity2 = 0.05): unknown {
+export function createGradient(
+	color: string,
+	opacity1 = 0.25,
+	opacity2 = 0.05,
+): unknown {
 	const safeOpacity1 = Math.max(0, Math.min(1, opacity1));
 	const safeOpacity2 = Math.max(0, Math.min(1, opacity2));
 
@@ -209,7 +228,9 @@ export function createGradient(color: string, opacity1 = 0.25, opacity2 = 0.05):
 	};
 }
 
-function parseHexColor(colorStr: string): { r: number; g: number; b: number } | null {
+function parseHexColor(
+	colorStr: string,
+): { r: number; g: number; b: number } | null {
 	const normalized = colorStr.trim().replace(/^#/, "");
 	if (!/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(normalized)) {
 		return null;
@@ -233,7 +254,9 @@ function parseHexColor(colorStr: string): { r: number; g: number; b: number } | 
 	return { r, g, b };
 }
 
-function parseRgbColor(colorStr: string): { r: number; g: number; b: number } | null {
+function parseRgbColor(
+	colorStr: string,
+): { r: number; g: number; b: number } | null {
 	const normalized = colorStr.trim();
 	if (!/^rgba?\(/i.test(normalized)) {
 		return null;
@@ -244,7 +267,9 @@ function parseRgbColor(colorStr: string): { r: number; g: number; b: number } | 
 		return null;
 	}
 
-	const [r, g, b] = channelValues.slice(0, 3).map((value) => Math.round(Number(value)));
+	const [r, g, b] = channelValues
+		.slice(0, 3)
+		.map((value) => Math.round(Number(value)));
 	if ([r, g, b].some((value) => Number.isNaN(value))) {
 		return null;
 	}
@@ -252,7 +277,9 @@ function parseRgbColor(colorStr: string): { r: number; g: number; b: number } | 
 	return { r, g, b };
 }
 
-function resolveColorWithDom(colorStr: string): { r: number; g: number; b: number } | null {
+function resolveColorWithDom(
+	colorStr: string,
+): { r: number; g: number; b: number } | null {
 	if (typeof document === "undefined" || !activeDocument.body) {
 		return null;
 	}
@@ -274,7 +301,11 @@ function resolveColorWithDom(colorStr: string): { r: number; g: number; b: numbe
 	}
 }
 
-function resolveGradientColor(colorStr: string): { r: number; g: number; b: number } {
+function resolveGradientColor(colorStr: string): {
+	r: number;
+	g: number;
+	b: number;
+} {
 	const normalized = String(colorStr || "").trim();
 	if (!normalized) {
 		return DEFAULT_GRADIENT_COLOR;
@@ -314,7 +345,7 @@ export function applyAlphaToColor(color: string, opacity = 1): string {
  */
 export function validateChartData<T extends Record<string, unknown>>(
 	data: T[],
-	requiredFields: string[]
+	requiredFields: string[],
 ): T[] {
 	// 数据验证开始
 
@@ -353,7 +384,7 @@ export function validateChartData<T extends Record<string, unknown>>(
  */
 export function formatValue(
 	value: number,
-	type: "number" | "percentage" | "time" = "number"
+	type: "number" | "percentage" | "time" = "number",
 ): string {
 	if (typeof value !== "number" || Number.isNaN(value)) return "0";
 

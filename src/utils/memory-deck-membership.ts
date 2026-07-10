@@ -35,7 +35,7 @@ function buildLookupMaps(decks?: DeckIdentifierLookup[]) {
 
 export function getNormalizedDeckEntries(
 	values: string[] | undefined,
-	decks?: DeckIdentifierLookup[]
+	decks?: DeckIdentifierLookup[],
 ): NormalizedDeckEntry[] {
 	if (!values || values.length === 0) {
 		return [];
@@ -75,21 +75,23 @@ export function getNormalizedDeckEntries(
 
 export function getMemoryFormalDeckEntries(
 	values: string[] | undefined,
-	decks?: DeckIdentifierLookup[]
+	decks?: DeckIdentifierLookup[],
 ): NormalizedDeckEntry[] {
-	return getNormalizedDeckEntries(values, decks).filter((entry) => entry.purpose !== "test");
+	return getNormalizedDeckEntries(values, decks).filter(
+		(entry) => entry.purpose !== "test",
+	);
 }
 
 export function hasMultipleMemoryFormalDecks(
 	values: string[] | undefined,
-	decks?: DeckIdentifierLookup[]
+	decks?: DeckIdentifierLookup[],
 ): boolean {
 	return getMemoryFormalDeckEntries(values, decks).length > 1;
 }
 
 export function keepSingleMemoryFormalDeck(
 	values: string[] | undefined,
-	decks?: DeckIdentifierLookup[]
+	decks?: DeckIdentifierLookup[],
 ): NormalizedDeckEntry[] {
 	const entries = getNormalizedDeckEntries(values, decks);
 	let primaryMemoryDeck: NormalizedDeckEntry | undefined;
@@ -106,27 +108,30 @@ export function keepSingleMemoryFormalDeck(
 		}
 	}
 
-	return primaryMemoryDeck ? [primaryMemoryDeck, ...nonMemoryDecks] : nonMemoryDecks;
+	return primaryMemoryDeck
+		? [primaryMemoryDeck, ...nonMemoryDecks]
+		: nonMemoryDecks;
 }
 
 export function getSingleMemoryFormalDeckIds(
 	values: string[] | undefined,
-	decks?: DeckIdentifierLookup[]
+	decks?: DeckIdentifierLookup[],
 ): string[] {
 	return keepSingleMemoryFormalDeck(values, decks).map((entry) => entry.deckId);
 }
 
 export function getSingleMemoryFormalDeckNames(
 	values: string[] | undefined,
-	decks?: DeckIdentifierLookup[]
+	decks?: DeckIdentifierLookup[],
 ): string[] {
-	return keepSingleMemoryFormalDeck(values, decks).map((entry) => entry.deckName);
+	return keepSingleMemoryFormalDeck(values, decks).map(
+		(entry) => entry.deckName,
+	);
 }
 
 export function getPrimarySingleMemoryFormalDeckId(
 	values: string[] | undefined,
-	decks?: DeckIdentifierLookup[]
+	decks?: DeckIdentifierLookup[],
 ): string | undefined {
 	return getSingleMemoryFormalDeckIds(values, decks)[0];
 }
-

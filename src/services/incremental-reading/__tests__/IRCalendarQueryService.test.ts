@@ -1,6 +1,5 @@
-
-import { buildScheduleFingerprint } from "../IRScheduleFingerprint";
 import { IRCalendarQueryService } from "../IRCalendarQueryService";
+import { buildScheduleFingerprint } from "../IRScheduleFingerprint";
 
 describe("IRCalendarQueryService cache title normalization", () => {
 	it("normalizes stale cached pdf and epub items when attaching runtime context", () => {
@@ -46,16 +45,26 @@ describe("IRCalendarQueryService cache title normalization", () => {
 				materialsByDate: new Map([["2026-05-01", [stalePdfItem, legacyItem]]]),
 				continueReadingSuspendedItemsPool: [staleEpubItem],
 				schedule: { generatedAt: 2, version: 1, deckIds: [], days: [] },
-				scope: { deckIds: [], cacheKey: "__all__::__default__", stateKey: "old" },
+				scope: {
+					deckIds: [],
+					cacheKey: "__all__::__default__",
+					stateKey: "old",
+				},
 			},
 			{ generatedAt: 1 } as any,
 			[],
-			{ deckIds: [], cacheKey: "__all__::__default__" }
+			{ deckIds: [], cacheKey: "__all__::__default__" },
 		);
 
-		expect(result.materialsByDate.get("2026-05-01")?.[0]?.displayName).toBe("PDF 阅读点");
-		expect(result.continueReadingSuspendedItemsPool[0]?.displayName).toBe("EPUB 阅读点");
-		expect(result.materialsByDate.get("2026-05-01")?.[1]?.displayName).toBeUndefined();
+		expect(result.materialsByDate.get("2026-05-01")?.[0]?.displayName).toBe(
+			"PDF 阅读点",
+		);
+		expect(result.continueReadingSuspendedItemsPool[0]?.displayName).toBe(
+			"EPUB 阅读点",
+		);
+		expect(
+			result.materialsByDate.get("2026-05-01")?.[1]?.displayName,
+		).toBeUndefined();
 	});
 
 	it("excludes schedule items backed by .irdeck internal data files", () => {
@@ -91,11 +100,15 @@ describe("IRCalendarQueryService cache title normalization", () => {
 				materialsByDate: new Map([["2026-05-01", [irdeckItem, validItem]]]),
 				continueReadingSuspendedItemsPool: [irdeckItem],
 				schedule: { generatedAt: 2, version: 1, deckIds: [], days: [] },
-				scope: { deckIds: [], cacheKey: "__all__::__default__", stateKey: "old" },
+				scope: {
+					deckIds: [],
+					cacheKey: "__all__::__default__",
+					stateKey: "old",
+				},
 			},
 			{ generatedAt: 1 } as any,
 			[],
-			{ deckIds: [], cacheKey: "__all__::__default__" }
+			{ deckIds: [], cacheKey: "__all__::__default__" },
 		);
 
 		expect(result.materialsByDate.get("2026-05-01")).toEqual([validItem]);

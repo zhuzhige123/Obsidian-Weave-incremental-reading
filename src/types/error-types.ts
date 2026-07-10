@@ -267,7 +267,7 @@ export class WeaveErrorFactory {
 		message: string,
 		path: string,
 		operation: FileSystemError["operation"],
-		originalError?: Error
+		originalError?: Error,
 	): FileSystemError {
 		return {
 			code,
@@ -289,7 +289,7 @@ export class WeaveErrorFactory {
 		message: string,
 		operation: StorageError["operation"],
 		dataType?: StorageError["dataType"],
-		originalError?: Error
+		originalError?: Error,
 	): StorageError {
 		return {
 			code,
@@ -311,7 +311,7 @@ export class WeaveErrorFactory {
 		message: string,
 		cardId?: string,
 		deckId?: string,
-		originalError?: Error
+		originalError?: Error,
 	): CardError {
 		return {
 			code,
@@ -334,7 +334,7 @@ export class WeaveErrorFactory {
 		action?: string,
 		params?: unknown,
 		response?: unknown,
-		originalError?: Error
+		originalError?: Error,
 	): AnkiConnectError {
 		return {
 			code,

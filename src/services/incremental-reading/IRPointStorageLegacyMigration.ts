@@ -1,7 +1,18 @@
 import { normalizePath } from "obsidian";
-import { normalizeChunkForRuntime, normalizeTopicStoreRecords } from "../../utils/ir-topic-compat";
-import type { ReadingMaterial, ReadingMaterialsIndex } from "../../types/incremental-reading-types";
-import type { IRBlock, IRChunkFileData, IRDeck, IRSourceFileMeta } from "../../types/ir-types";
+import type {
+	ReadingMaterial,
+	ReadingMaterialsIndex,
+} from "../../types/incremental-reading-types";
+import type {
+	IRBlock,
+	IRChunkFileData,
+	IRDeck,
+	IRSourceFileMeta,
+} from "../../types/ir-types";
+import {
+	normalizeChunkForRuntime,
+	normalizeTopicStoreRecords,
+} from "../../utils/ir-topic-compat";
 
 export type LegacyTopicRecord = {
 	id: string;
@@ -29,11 +40,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function readLegacyTopicStoreRecords(
-	api: IRLegacyReadApi
+	api: IRLegacyReadApi,
 ): Promise<Record<string, IRDeck>> {
 	const [topicsFile, decksFile] = await Promise.all([
-		api.readJson<Record<string, unknown>>(api.paths.legacyTopics, {} as Record<string, unknown>),
-		api.readJson<Record<string, unknown>>(api.paths.legacyDecks, {} as Record<string, unknown>),
+		api.readJson<Record<string, unknown>>(
+			api.paths.legacyTopics,
+			{} as Record<string, unknown>,
+		),
+		api.readJson<Record<string, unknown>>(
+			api.paths.legacyDecks,
+			{} as Record<string, unknown>,
+		),
 	]);
 	return {
 		...normalizeTopicStoreRecords(decksFile),
@@ -43,7 +60,7 @@ export async function readLegacyTopicStoreRecords(
 
 export async function getLegacyTopicsMap(
 	api: IRLegacyReadApi,
-	defaultTopicName: string
+	defaultTopicName: string,
 ): Promise<Map<string, LegacyTopicRecord>> {
 	const topicsRoot = await readLegacyTopicStoreRecords(api);
 	const map = new Map<string, LegacyTopicRecord>();
@@ -54,31 +71,46 @@ export async function getLegacyTopicsMap(
 		}
 		map.set(topicId, {
 			id: topicId,
-			name: (typeof value.name === "string" && value.name.trim()) || topicId || defaultTopicName,
+			name:
+				(typeof value.name === "string" && value.name.trim()) ||
+				topicId ||
+				defaultTopicName,
 		});
 	}
 
 	return map;
 }
 
-export async function getLegacyDecks(api: IRLegacyReadApi): Promise<Record<string, IRDeck>> {
+export async function getLegacyDecks(
+	api: IRLegacyReadApi,
+): Promise<Record<string, IRDeck>> {
 	return await readLegacyTopicStoreRecords(api);
 }
 
-export async function getLegacyMaterials(api: IRLegacyReadApi): Promise<Map<string, ReadingMaterial>> {
-	const legacyIndex = await api.readJson<ReadingMaterialsIndex>(api.paths.materialsIndex, {
-		version: "1.0.0",
-		lastUpdated: "",
-		materials: {},
-	});
+export async function getLegacyMaterials(
+	api: IRLegacyReadApi,
+): Promise<Map<string, ReadingMaterial>> {
+	const legacyIndex = await api.readJson<ReadingMaterialsIndex>(
+		api.paths.materialsIndex,
+		{
+			version: "1.0.0",
+			lastUpdated: "",
+			materials: {},
+		},
+	);
 	return new Map(Object.entries(legacyIndex.materials || {}));
 }
 
-export async function getLegacyChunkData(api: IRLegacyReadApi): Promise<Map<string, IRChunkFileData>> {
-	const rawStore = await api.readJson<Record<string, unknown>>(api.paths.chunks, {
-		version: "1.0.0",
-		chunks: {},
-	});
+export async function getLegacyChunkData(
+	api: IRLegacyReadApi,
+): Promise<Map<string, IRChunkFileData>> {
+	const rawStore = await api.readJson<Record<string, unknown>>(
+		api.paths.chunks,
+		{
+			version: "1.0.0",
+			chunks: {},
+		},
+	);
 	const rawChunks = isRecord(rawStore.chunks) ? rawStore.chunks : rawStore;
 	const chunks = new Map<string, IRChunkFileData>();
 
@@ -102,11 +134,16 @@ export async function getLegacyChunkData(api: IRLegacyReadApi): Promise<Map<stri
 	return chunks;
 }
 
-export async function getLegacyBlocksData(api: IRLegacyReadApi): Promise<Map<string, IRBlock>> {
-	const rawStore = await api.readJson<Record<string, unknown>>(api.paths.blocks, {
-		version: "1.0.0",
-		blocks: {},
-	});
+export async function getLegacyBlocksData(
+	api: IRLegacyReadApi,
+): Promise<Map<string, IRBlock>> {
+	const rawStore = await api.readJson<Record<string, unknown>>(
+		api.paths.blocks,
+		{
+			version: "1.0.0",
+			blocks: {},
+		},
+	);
 	const rawBlocks = isRecord(rawStore.blocks) ? rawStore.blocks : rawStore;
 	const blocks = new Map<string, IRBlock>();
 
@@ -115,7 +152,8 @@ export async function getLegacyBlocksData(api: IRLegacyReadApi): Promise<Map<str
 			continue;
 		}
 
-		const normalizedId = (typeof rawBlock.id === "string" && rawBlock.id.trim()) || blockId;
+		const normalizedId =
+			(typeof rawBlock.id === "string" && rawBlock.id.trim()) || blockId;
 		if (!normalizedId) {
 			continue;
 		}
@@ -129,10 +167,11 @@ export async function getLegacyBlocksData(api: IRLegacyReadApi): Promise<Map<str
 			typeof rawBlock.startLine === "number"
 				? rawBlock.startLine
 				: typeof rawBlock.blockIndex === "number"
-					? rawBlock.blockIndex
-					: 0;
+				? rawBlock.blockIndex
+				: 0;
 		const headingText =
-			(typeof rawBlock.headingText === "string" && rawBlock.headingText.trim()) ||
+			(typeof rawBlock.headingText === "string" &&
+				rawBlock.headingText.trim()) ||
 			headingPath[headingPath.length - 1] ||
 			normalizedId;
 
@@ -140,11 +179,14 @@ export async function getLegacyBlocksData(api: IRLegacyReadApi): Promise<Map<str
 			id: normalizedId,
 			filePath: typeof rawBlock.filePath === "string" ? rawBlock.filePath : "",
 			headingPath,
-			headingLevel: typeof rawBlock.headingLevel === "number" ? rawBlock.headingLevel : 1,
+			headingLevel:
+				typeof rawBlock.headingLevel === "number" ? rawBlock.headingLevel : 1,
 			startLine,
-			endLine: typeof rawBlock.endLine === "number" ? rawBlock.endLine : startLine,
+			endLine:
+				typeof rawBlock.endLine === "number" ? rawBlock.endLine : startLine,
 			priority:
-				typeof rawBlock.priority === "number" && [1, 2, 3].includes(rawBlock.priority)
+				typeof rawBlock.priority === "number" &&
+				[1, 2, 3].includes(rawBlock.priority)
 					? (rawBlock.priority as 1 | 2 | 3)
 					: 2,
 			state:
@@ -152,30 +194,51 @@ export async function getLegacyBlocksData(api: IRLegacyReadApi): Promise<Map<str
 					? (rawBlock.state as IRBlock["state"])
 					: "new",
 			interval: typeof rawBlock.interval === "number" ? rawBlock.interval : 0,
-			intervalFactor: typeof rawBlock.intervalFactor === "number" ? rawBlock.intervalFactor : 1.5,
-			nextReview: typeof rawBlock.nextReview === "string" ? rawBlock.nextReview : null,
-			reviewCount: typeof rawBlock.reviewCount === "number" ? rawBlock.reviewCount : 0,
-			lastReview: typeof rawBlock.lastReview === "string" ? rawBlock.lastReview : null,
+			intervalFactor:
+				typeof rawBlock.intervalFactor === "number"
+					? rawBlock.intervalFactor
+					: 1.5,
+			nextReview:
+				typeof rawBlock.nextReview === "string" ? rawBlock.nextReview : null,
+			reviewCount:
+				typeof rawBlock.reviewCount === "number" ? rawBlock.reviewCount : 0,
+			lastReview:
+				typeof rawBlock.lastReview === "string" ? rawBlock.lastReview : null,
 			favorite: Boolean(rawBlock.favorite),
 			tags: Array.isArray(rawBlock.tags)
-				? rawBlock.tags.filter((item): item is string => typeof item === "string")
+				? rawBlock.tags.filter(
+						(item): item is string => typeof item === "string",
+				  )
 				: [],
 			notes: typeof rawBlock.notes === "string" ? rawBlock.notes : "",
 			extractedCards: Array.isArray(rawBlock.extractedCards)
-				? rawBlock.extractedCards.filter((item): item is string => typeof item === "string")
+				? rawBlock.extractedCards.filter(
+						(item): item is string => typeof item === "string",
+				  )
 				: [],
 			totalReadingTime:
-				typeof rawBlock.totalReadingTime === "number" ? rawBlock.totalReadingTime : 0,
-			firstReadAt: typeof rawBlock.firstReadAt === "string" ? rawBlock.firstReadAt : null,
-			priorityUi: typeof rawBlock.priorityUi === "number" ? rawBlock.priorityUi : undefined,
-			priorityEff: typeof rawBlock.priorityEff === "number" ? rawBlock.priorityEff : undefined,
+				typeof rawBlock.totalReadingTime === "number"
+					? rawBlock.totalReadingTime
+					: 0,
+			firstReadAt:
+				typeof rawBlock.firstReadAt === "string" ? rawBlock.firstReadAt : null,
+			priorityUi:
+				typeof rawBlock.priorityUi === "number"
+					? rawBlock.priorityUi
+					: undefined,
+			priorityEff:
+				typeof rawBlock.priorityEff === "number"
+					? rawBlock.priorityEff
+					: undefined,
 			priorityUpdatedAt:
-				typeof rawBlock.priorityUpdatedAt === "string" ? rawBlock.priorityUpdatedAt : undefined,
+				typeof rawBlock.priorityUpdatedAt === "string"
+					? rawBlock.priorityUpdatedAt
+					: undefined,
 			dailyAppearances: isRecord(rawBlock.dailyAppearances)
 				? (Object.fromEntries(
 						Object.entries(rawBlock.dailyAppearances)
 							.filter(([, value]) => typeof value === "number")
-							.map(([date, value]) => [date, Number(value)])
+							.map(([date, value]) => [date, Number(value)]),
 				  ) as Record<string, number>)
 				: undefined,
 			tagGroupId:
@@ -183,28 +246,42 @@ export async function getLegacyBlocksData(api: IRLegacyReadApi): Promise<Map<str
 					? rawBlock.tagGroupId
 					: undefined,
 			createdAt:
-				typeof rawBlock.createdAt === "string" ? rawBlock.createdAt : new Date(0).toISOString(),
+				typeof rawBlock.createdAt === "string"
+					? rawBlock.createdAt
+					: new Date(0).toISOString(),
 			updatedAt:
-				typeof rawBlock.updatedAt === "string" ? rawBlock.updatedAt : new Date().toISOString(),
+				typeof rawBlock.updatedAt === "string"
+					? rawBlock.updatedAt
+					: new Date().toISOString(),
 			headingText,
 			deckPath:
 				typeof rawBlock.deckPath === "string" && rawBlock.deckPath.trim()
 					? rawBlock.deckPath
 					: undefined,
-			blockIndex: typeof rawBlock.blockIndex === "number" ? rawBlock.blockIndex : startLine,
+			blockIndex:
+				typeof rawBlock.blockIndex === "number"
+					? rawBlock.blockIndex
+					: startLine,
 			contentPreview:
-				typeof rawBlock.contentPreview === "string" ? rawBlock.contentPreview : headingText,
+				typeof rawBlock.contentPreview === "string"
+					? rawBlock.contentPreview
+					: headingText,
 		} as IRBlock);
 	}
 
 	return blocks;
 }
 
-export async function getLegacySources(api: IRLegacyReadApi): Promise<Map<string, IRSourceFileMeta>> {
-	const rawStore = await api.readJson<Record<string, unknown>>(api.paths.sources, {
-		version: "1.0.0",
-		sources: {},
-	});
+export async function getLegacySources(
+	api: IRLegacyReadApi,
+): Promise<Map<string, IRSourceFileMeta>> {
+	const rawStore = await api.readJson<Record<string, unknown>>(
+		api.paths.sources,
+		{
+			version: "1.0.0",
+			sources: {},
+		},
+	);
 	const rawSources = isRecord(rawStore.sources) ? rawStore.sources : rawStore;
 	const sources = new Map<string, IRSourceFileMeta>();
 
@@ -213,33 +290,55 @@ export async function getLegacySources(api: IRLegacyReadApi): Promise<Map<string
 			continue;
 		}
 		const normalizedSourceId =
-			(typeof rawSource.sourceId === "string" && rawSource.sourceId.trim()) || sourceId;
+			(typeof rawSource.sourceId === "string" && rawSource.sourceId.trim()) ||
+			sourceId;
 		if (!normalizedSourceId) {
 			continue;
 		}
 		sources.set(normalizedSourceId, {
 			sourceId: normalizedSourceId,
-			originalPath: typeof rawSource.originalPath === "string" ? rawSource.originalPath : "",
-			rawFilePath: typeof rawSource.rawFilePath === "string" ? rawSource.rawFilePath : "",
-			indexFilePath: typeof rawSource.indexFilePath === "string" ? rawSource.indexFilePath : "",
+			originalPath:
+				typeof rawSource.originalPath === "string"
+					? rawSource.originalPath
+					: "",
+			rawFilePath:
+				typeof rawSource.rawFilePath === "string" ? rawSource.rawFilePath : "",
+			indexFilePath:
+				typeof rawSource.indexFilePath === "string"
+					? rawSource.indexFilePath
+					: "",
 			chunkIds: Array.isArray(rawSource.chunkIds)
-				? rawSource.chunkIds.filter((item): item is string => typeof item === "string")
+				? rawSource.chunkIds.filter(
+						(item): item is string => typeof item === "string",
+				  )
 				: [],
-			title: typeof rawSource.title === "string" ? rawSource.title : normalizedSourceId,
-			author: typeof rawSource.author === "string" ? rawSource.author : undefined,
+			title:
+				typeof rawSource.title === "string"
+					? rawSource.title
+					: normalizedSourceId,
+			author:
+				typeof rawSource.author === "string" ? rawSource.author : undefined,
 			tagGroup:
 				typeof rawSource.tagGroup === "string" && rawSource.tagGroup.trim()
 					? rawSource.tagGroup
 					: "default",
-			createdAt: typeof rawSource.createdAt === "number" ? rawSource.createdAt : Date.now(),
-			updatedAt: typeof rawSource.updatedAt === "number" ? rawSource.updatedAt : Date.now(),
+			createdAt:
+				typeof rawSource.createdAt === "number"
+					? rawSource.createdAt
+					: Date.now(),
+			updatedAt:
+				typeof rawSource.updatedAt === "number"
+					? rawSource.updatedAt
+					: Date.now(),
 		});
 	}
 
 	return sources;
 }
 
-export async function readLegacyBookmarkTaskStores(api: IRLegacyReadApi): Promise<{
+export async function readLegacyBookmarkTaskStores(
+	api: IRLegacyReadApi,
+): Promise<{
 	pdfStore: Record<string, unknown>;
 	epubStore: Record<string, unknown>;
 }> {
@@ -263,17 +362,26 @@ export function deriveLegacyBlockTitle(block: IRBlock): string {
 	if (preview) {
 		return preview.replace(/\s+/g, " ").slice(0, 80);
 	}
-	const fileName = normalizePath(String(block.filePath || "").trim()).split("/").pop() || "";
-	return fileName.replace(/\.md$/i, "") || String(block.id || "").trim() || "未命名阅读点";
+	const fileName =
+		normalizePath(String(block.filePath || "").trim())
+			.split("/")
+			.pop() || "";
+	return (
+		fileName.replace(/\.md$/i, "") ||
+		String(block.id || "").trim() ||
+		"未命名阅读点"
+	);
 }
 
 export function resolveLegacyBlockTopicIds(
 	block: IRBlock,
 	legacyDecks: Record<string, IRDeck>,
-	defaultTopicId: string
+	defaultTopicId: string,
 ): string[] {
 	const topicIds = new Set<string>();
-	const directDeckPath = String((block as { deckPath?: string }).deckPath || "").trim();
+	const directDeckPath = String(
+		(block as { deckPath?: string }).deckPath || "",
+	).trim();
 	if (directDeckPath) {
 		topicIds.add(directDeckPath);
 	}
@@ -298,7 +406,7 @@ export function resolveLegacyBlockTopicIds(
 export function resolveLegacyTopicName(
 	topicId: string | undefined,
 	topicsMap: Map<string, LegacyTopicRecord>,
-	defaultTopicName: string
+	defaultTopicName: string,
 ): string {
 	if (topicId && topicsMap.has(topicId)) {
 		return topicsMap.get(topicId)?.name || defaultTopicName;

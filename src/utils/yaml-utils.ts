@@ -10,9 +10,12 @@
 
 import { EpubLinkService } from "../services/epub-integration/EpubLinkService";
 import { logger } from "./logger";
-import { readString } from "./unknown-record";
-import { getNormalizedDeckEntries, getSingleMemoryFormalDeckIds } from "./memory-deck-membership";
+import {
+	getNormalizedDeckEntries,
+	getSingleMemoryFormalDeckIds,
+} from "./memory-deck-membership";
 import { TagExtractor } from "./tag-extractor";
+import { readString } from "./unknown-record";
 
 // ===== 类型定义 =====
 
@@ -88,7 +91,9 @@ export function parseEpubSourceInfo(content: string): {
 			return {};
 		}
 
-		const sourceValues = Array.isArray(yaml.we_source) ? yaml.we_source : [yaml.we_source];
+		const sourceValues = Array.isArray(yaml.we_source)
+			? yaml.we_source
+			: [yaml.we_source];
 		for (const sourceValue of sourceValues) {
 			if (typeof sourceValue !== "string" || !sourceValue.trim()) {
 				continue;
@@ -242,8 +247,13 @@ function parseYAMLValue(value: string): unknown {
 	if (normalizedValue === "false") return false;
 
 	// 数字（排除 UUID 类似的字符串）
-	const looksLikeUUID = normalizedValue.includes("-") || normalizedValue.length > 15;
-	if (!looksLikeUUID && !Number.isNaN(Number(normalizedValue)) && normalizedValue !== "") {
+	const looksLikeUUID =
+		normalizedValue.includes("-") || normalizedValue.length > 15;
+	if (
+		!looksLikeUUID &&
+		!Number.isNaN(Number(normalizedValue)) &&
+		normalizedValue !== ""
+	) {
 		return Number(normalizedValue);
 	}
 
@@ -277,19 +287,26 @@ function unquoteString(value: string): string {
  * @param key 属性名
  * @returns 属性值，不存在则返回 undefined
  */
-export function getCardProperty<T = unknown>(content: string, key: string): T | undefined {
+export function getCardProperty<T = unknown>(
+	content: string,
+	key: string,
+): T | undefined {
 	const yaml = parseYAMLFromContent(content);
 	return yaml[key] as T | undefined;
 }
 
-function readYamlStringOrStringArray(value: unknown): string | string[] | undefined {
+function readYamlStringOrStringArray(
+	value: unknown,
+): string | string[] | undefined {
 	if (typeof value === "string") {
 		return value;
 	}
 	if (!Array.isArray(value)) {
 		return undefined;
 	}
-	const items = value.filter((entry): entry is string => typeof entry === "string");
+	const items = value.filter(
+		(entry): entry is string => typeof entry === "string",
+	);
 	return items.length > 0 ? items : undefined;
 }
 
@@ -307,9 +324,12 @@ function readCardYamlType(value: unknown): CardYAMLType | undefined {
 		: undefined;
 }
 
-function readCardYamlDifficulty(value: unknown): CardYAMLDifficulty | undefined {
+function readCardYamlDifficulty(
+	value: unknown,
+): CardYAMLDifficulty | undefined {
 	const allowed: CardYAMLDifficulty[] = ["easy", "medium", "hard"];
-	return typeof value === "string" && allowed.includes(value as CardYAMLDifficulty)
+	return typeof value === "string" &&
+		allowed.includes(value as CardYAMLDifficulty)
 		? (value as CardYAMLDifficulty)
 		: undefined;
 }
@@ -325,15 +345,16 @@ export function getCardMetadata(content: string): CardYAMLMetadata {
 		typeof yaml.created === "string"
 			? yaml.created
 			: typeof yaml.we_created === "string"
-				? yaml.we_created
-				: undefined;
+			? yaml.we_created
+			: undefined;
 
 	return {
 		we_source: readYamlStringOrStringArray(yaml.we_source),
 		we_block: typeof yaml.we_block === "string" ? yaml.we_block : undefined,
 		we_refs: normalizeToArray(yaml.we_refs),
 		we_decks: normalizeToArray(yaml.we_decks),
-		we_priority: typeof yaml.we_priority === "number" ? yaml.we_priority : undefined,
+		we_priority:
+			typeof yaml.we_priority === "number" ? yaml.we_priority : undefined,
 		we_type: readCardYamlType(yaml.we_type),
 		we_difficulty: readCardYamlDifficulty(yaml.we_difficulty),
 		created,
@@ -350,14 +371,15 @@ function normalizeLegacyCreatedField(yaml: YAMLFrontmatter): YAMLFrontmatter {
 	const canonicalCreated =
 		typeof normalized.created === "string" && normalized.created.trim()
 			? normalized.created
-			: typeof normalized.we_created === "string" && normalized.we_created.trim()
-				? normalized.we_created
-				: undefined;
+			: typeof normalized.we_created === "string" &&
+			  normalized.we_created.trim()
+			? normalized.we_created
+			: undefined;
 
 	if (canonicalCreated) {
 		normalized.created = canonicalCreated;
 	}
-	delete normalized.we_created;
+	normalized.we_created = undefined;
 
 	return normalized;
 }
@@ -387,7 +409,11 @@ function normalizeToArray(value: unknown): string[] | undefined {
  * @param value 属性值（undefined 表示删除该属性）
  * @returns 更新后的内容
  */
-export function setCardProperty(content: string, key: string, value: unknown): string {
+export function setCardProperty(
+	content: string,
+	key: string,
+	value: unknown,
+): string {
 	const yaml = parseYAMLFromContent(content);
 
 	if (value === undefined) {
@@ -405,7 +431,10 @@ export function setCardProperty(content: string, key: string, value: unknown): s
  * @param updates 要更新的属性映射
  * @returns 更新后的内容
  */
-export function setCardProperties(content: string, updates: Partial<CardYAMLMetadata>): string {
+export function setCardProperties(
+	content: string,
+	updates: Partial<CardYAMLMetadata>,
+): string {
 	const yaml = parseYAMLFromContent(content);
 
 	for (const [key, value] of Object.entries(updates)) {
@@ -510,7 +539,9 @@ function formatYAMLLine(key: string, value: unknown): string {
 			return `${key}: []`;
 		}
 		// 多行数组格式
-		const items = value.map((item) => `  - ${quoteIfNeeded(String(item))}`).join("\n");
+		const items = value
+			.map((item) => `  - ${quoteIfNeeded(String(item))}`)
+			.join("\n");
 		return `${key}:\n${items}`;
 	}
 
@@ -611,13 +642,18 @@ export function hasYAMLFrontmatter(content: string): boolean {
  * @param body 正文内容
  * @returns 完整内容
  */
-export function createContentWithMetadata(metadata: CardYAMLMetadata, body: string): string {
+export function createContentWithMetadata(
+	metadata: CardYAMLMetadata,
+	body: string,
+): string {
 	const yaml: YAMLFrontmatter = {};
 
 	if (metadata.we_source) yaml.we_source = metadata.we_source;
 	if (metadata.we_block) yaml.we_block = metadata.we_block;
-	if (metadata.we_decks && metadata.we_decks.length > 0) yaml.we_decks = metadata.we_decks;
-	if (metadata.we_priority !== undefined) yaml.we_priority = metadata.we_priority;
+	if (metadata.we_decks && metadata.we_decks.length > 0)
+		yaml.we_decks = metadata.we_decks;
+	if (metadata.we_priority !== undefined)
+		yaml.we_priority = metadata.we_priority;
 	if (metadata.we_type) yaml.we_type = metadata.we_type;
 	if (metadata.we_difficulty) yaml.we_difficulty = metadata.we_difficulty;
 	const legacyCreated =
@@ -644,7 +680,10 @@ export function createContentWithMetadata(metadata: CardYAMLMetadata, body: stri
  * @param body 正文内容
  * @returns 完整内容（含YAML frontmatter）
  */
-export function buildContentWithYAML(yamlData: Record<string, unknown>, body: string): string {
+export function buildContentWithYAML(
+	yamlData: Record<string, unknown>,
+	body: string,
+): string {
 	const filtered: YAMLFrontmatter = {};
 	for (const [key, value] of Object.entries(yamlData)) {
 		if (value !== undefined && value !== null && value !== "") {
@@ -670,7 +709,7 @@ export function buildContentWithYAML(yamlData: Record<string, unknown>, body: st
  */
 export function validateDeckNames(
 	deckNames: string[],
-	validDeckNames: Set<string>
+	validDeckNames: Set<string>,
 ): { valid: boolean; invalidNames: string[] } {
 	const invalidNames: string[] = [];
 
@@ -745,7 +784,9 @@ export function parseSourceInfo(content: string): SourceInfo {
 
 		// 1. 优先从 we_source 解析（支持合并格式 ![[文档#^blockId]]）
 		if (yaml.we_source) {
-			const sourceValues = Array.isArray(yaml.we_source) ? yaml.we_source : [yaml.we_source];
+			const sourceValues = Array.isArray(yaml.we_source)
+				? yaml.we_source
+				: [yaml.we_source];
 			for (const sourceValue of sourceValues) {
 				if (typeof sourceValue !== "string" || !sourceValue.trim()) {
 					continue;
@@ -763,7 +804,9 @@ export function parseSourceInfo(content: string): SourceInfo {
 
 		// 2. 兼容旧版：从 we_block 补充块ID（如果 we_source 中没有）
 		if (!sourceBlock && yaml.we_block) {
-			const rawBlockValue: unknown = Array.isArray(yaml.we_block) ? yaml.we_block[0] : yaml.we_block;
+			const rawBlockValue: unknown = Array.isArray(yaml.we_block)
+				? yaml.we_block[0]
+				: yaml.we_block;
 			if (typeof rawBlockValue === "string" && rawBlockValue.trim()) {
 				const blockValue = rawBlockValue;
 				sourceBlock = parseBlockId(blockValue);
@@ -778,7 +821,9 @@ export function parseSourceInfo(content: string): SourceInfo {
 		// 3. 解析关联文档列表
 		let refs: string[] | undefined;
 		if (yaml.we_refs) {
-			const refsArray = Array.isArray(yaml.we_refs) ? yaml.we_refs : [yaml.we_refs];
+			const refsArray = Array.isArray(yaml.we_refs)
+				? yaml.we_refs
+				: [yaml.we_refs];
 			refs = refsArray
 				.map((ref: string) => parseObsidianLink(ref))
 				.filter((ref: string | undefined): ref is string => !!ref);
@@ -827,7 +872,8 @@ export function parseObsidianLink(link: string): string | undefined {
 		const hashIndex = inner.indexOf("#");
 		const caretIndex = inner.indexOf("^");
 		let cutIndex = -1;
-		if (hashIndex !== -1 && caretIndex !== -1) cutIndex = Math.min(hashIndex, caretIndex);
+		if (hashIndex !== -1 && caretIndex !== -1)
+			cutIndex = Math.min(hashIndex, caretIndex);
 		else if (hashIndex !== -1) cutIndex = hashIndex;
 		else if (caretIndex !== -1) cutIndex = caretIndex;
 		if (cutIndex !== -1) {
@@ -851,7 +897,7 @@ export function parseObsidianLink(link: string): string | undefined {
 
 		const hasKnownNonMarkdownExtension =
 			/\.(canvas|excalidraw(?:\.md)?|pdf|epub|png|jpe?g|gif|webp|svg|bmp|tiff|mp3|wav|ogg|flac|m4a|mp4|mov|avi|webm|txt|docx?)$/i.test(
-				docName
+				docName,
 			);
 		if (hasKnownNonMarkdownExtension) {
 			return docName;
@@ -896,7 +942,10 @@ export function parseBlockId(value: string): string | undefined {
  * @param content 卡片内容
  * @returns 迁移后的内容，如果无需迁移则返回原内容
  */
-export function migrateSourceFields(content: string): { content: string; migrated: boolean } {
+export function migrateSourceFields(content: string): {
+	content: string;
+	migrated: boolean;
+} {
 	if (!content) return { content, migrated: false };
 
 	try {
@@ -916,21 +965,27 @@ export function migrateSourceFields(content: string): { content: string; migrate
 			? [yaml.we_source]
 			: [];
 		const firstSourceIndex = sourceValues.findIndex(
-			(value): value is string => typeof value === "string" && value.trim().length > 0
+			(value): value is string =>
+				typeof value === "string" && value.trim().length > 0,
 		);
 		const sourceValue =
-			firstSourceIndex >= 0 && typeof sourceValues[firstSourceIndex] === "string"
+			firstSourceIndex >= 0 &&
+			typeof sourceValues[firstSourceIndex] === "string"
 				? sourceValues[firstSourceIndex]
 				: undefined;
-		const blockValues: unknown[] = Array.isArray(yaml.we_block) ? yaml.we_block : [yaml.we_block];
+		const blockValues: unknown[] = Array.isArray(yaml.we_block)
+			? yaml.we_block
+			: [yaml.we_block];
 		const blockValue = blockValues.find(
-			(value): value is string => typeof value === "string" && value.trim().length > 0
+			(value): value is string =>
+				typeof value === "string" && value.trim().length > 0,
 		);
 
 		// 如果任一 we_source 已包含块ID，只需删除 we_block
 		if (
 			sourceValues.some(
-				(value): value is string => typeof value === "string" && !!parseBlockId(value)
+				(value): value is string =>
+					typeof value === "string" && !!parseBlockId(value),
 			)
 		) {
 			const { we_block: _removedWeBlock, ...newYaml } = yaml;
@@ -968,7 +1023,8 @@ export function migrateSourceFields(content: string): { content: string; migrate
 		const { we_block: _removedWeBlock, ...newYaml } = yaml;
 		if (Array.isArray(yaml.we_source)) {
 			const nextSourceValues = sourceValues.filter(
-				(value): value is string => typeof value === "string" && value.trim().length > 0
+				(value): value is string =>
+					typeof value === "string" && value.trim().length > 0,
 			);
 			if (firstSourceIndex >= 0) {
 				nextSourceValues[firstSourceIndex] = mergedSource;
@@ -1051,7 +1107,7 @@ export interface GetCardDeckIdsOptions {
 function normalizeDeckIdentifiers(
 	values: string[] | undefined,
 	decks?: Array<{ id: string; name: string; purpose?: "memory" | "test" }>,
-	preserveAllDeckIds = false
+	preserveAllDeckIds = false,
 ): string[] {
 	if (preserveAllDeckIds) {
 		return getNormalizedDeckEntries(values, decks).map((entry) => entry.deckId);
@@ -1075,9 +1131,14 @@ function normalizeDeckIdentifiers(
  * @returns CardDeckInfo 对象
  */
 export function getCardDeckIds(
-	card: { content?: string; deckId?: string; referencedByDecks?: string[]; cardPurpose?: string },
+	card: {
+		content?: string;
+		deckId?: string;
+		referencedByDecks?: string[];
+		cardPurpose?: string;
+	},
 	decks?: Array<{ id: string; name: string; purpose?: "memory" | "test" }>,
-	options: GetCardDeckIdsOptions = {}
+	options: GetCardDeckIdsOptions = {},
 ): CardDeckInfo {
 	const result: CardDeckInfo = { deckIds: [] };
 	const fallbackToReferences = options.fallbackToReferences ?? true;
@@ -1090,11 +1151,15 @@ export function getCardDeckIds(
 
 	if (!isTestCard && runtimeDeckIds.length > 0) {
 		let nextDeckIds = [...runtimeDeckIds];
-		if (fallbackToReferences && Array.isArray(card.referencedByDecks) && decks) {
+		if (
+			fallbackToReferences &&
+			Array.isArray(card.referencedByDecks) &&
+			decks
+		) {
 			const referencedDeckIds = normalizeDeckIdentifiers(
 				card.referencedByDecks,
 				decks,
-				preserveAllDeckIds
+				preserveAllDeckIds,
 			);
 			const testDeckIds = referencedDeckIds.filter((deckId) => {
 				const matchedDeck = decks.find((deck) => deck.id === deckId);
@@ -1116,7 +1181,7 @@ export function getCardDeckIds(
 				const convertedIds = normalizeDeckIdentifiers(
 					metadata.we_decks,
 					decks,
-					preserveAllDeckIds
+					preserveAllDeckIds,
 				);
 				if (convertedIds.length > 0) {
 					result.deckIds = convertedIds;
@@ -1138,7 +1203,7 @@ export function getCardDeckIds(
 		const referencedDeckIds = normalizeDeckIdentifiers(
 			card.referencedByDecks,
 			decks,
-			preserveAllDeckIds
+			preserveAllDeckIds,
 		);
 		if (referencedDeckIds.length > 0) {
 			result.deckIds = referencedDeckIds;
@@ -1168,8 +1233,13 @@ export function getCardDeckIds(
  * - 不从 referencedByDecks / deckId 做兼容回退
  */
 export function getCardDeckIdsFromFormalSource(
-	card: { content?: string; deckId?: string; referencedByDecks?: string[]; cardPurpose?: string },
-	decks?: Array<{ id: string; name: string; purpose?: "memory" | "test" }>
+	card: {
+		content?: string;
+		deckId?: string;
+		referencedByDecks?: string[];
+		cardPurpose?: string;
+	},
+	decks?: Array<{ id: string; name: string; purpose?: "memory" | "test" }>,
 ): CardDeckInfo {
 	const result: CardDeckInfo = { deckIds: [] };
 
@@ -1180,7 +1250,11 @@ export function getCardDeckIdsFromFormalSource(
 	try {
 		const metadata = getCardMetadata(card.content);
 		if (metadata.we_decks && metadata.we_decks.length > 0) {
-			const convertedIds = normalizeDeckIdentifiers(metadata.we_decks, decks, false);
+			const convertedIds = normalizeDeckIdentifiers(
+				metadata.we_decks,
+				decks,
+				false,
+			);
 			if (convertedIds.length > 0) {
 				result.deckIds = convertedIds;
 				result.primaryDeckId = convertedIds[0];
@@ -1208,7 +1282,7 @@ export function getCardDeckIdsFromFormalSource(
 export function getCardDeckNames(
 	card: { content?: string; deckId?: string; referencedByDecks?: string[] },
 	decks: Array<{ id: string; name: string }>,
-	fallbackText = "未知牌组"
+	fallbackText = "未知牌组",
 ): string[] {
 	// 统一走 normalizeDeckIdentifiers，避免 we_decks 中名称/ID/旧值混杂时显示异常
 	const { deckIds } = getCardDeckIds(card, decks);
@@ -1236,7 +1310,7 @@ export function getCardDeckNames(
 export function getCardPrimaryDeckName(
 	card: { content?: string; deckId?: string; referencedByDecks?: string[] },
 	decks: Array<{ id: string; name: string }>,
-	fallbackText = "未知牌组"
+	fallbackText = "未知牌组",
 ): string {
 	const names = getCardDeckNames(card, decks, fallbackText);
 	return names[0];

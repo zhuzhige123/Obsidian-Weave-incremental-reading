@@ -1,5 +1,8 @@
+import {
+	type IRChunkFileYAML,
+	createDefaultChunkFileData,
+} from "../../../types/ir-types";
 import { IRChunkScheduleAdapter } from "../IRChunkScheduleAdapter";
-import { createDefaultChunkFileData, type IRChunkFileYAML } from "../../../types/ir-types";
 
 describe("IRChunkScheduleAdapter", () => {
 	it("在跳过 archived/removed/done 块前应先把 YAML 状态同步回存储", async () => {
@@ -36,7 +39,7 @@ describe("IRChunkScheduleAdapter", () => {
 				chunkId: chunk.chunkId,
 				scheduleStatus: "suspended",
 				priorityUi: 7,
-			})
+			}),
 		);
 	});
 
@@ -74,7 +77,7 @@ describe("IRChunkScheduleAdapter", () => {
 				chunkId: chunk.chunkId,
 				scheduleStatus: "queued",
 				priorityUi: 5,
-			})
+			}),
 		);
 	});
 });

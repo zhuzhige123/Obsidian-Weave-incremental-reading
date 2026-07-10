@@ -52,7 +52,11 @@ export class Logger {
 	 * @param args 额外参数
 	 */
 	debug(message: string, ...args: unknown[]): void {
-		if (this.isVerboseLoggingEnabled() && typeof console !== "undefined" && console.debug) {
+		if (
+			this.isVerboseLoggingEnabled() &&
+			typeof console !== "undefined" &&
+			console.debug
+		) {
 			const prefix = this.formatPrefix("DEBUG");
 			console.debug(`${prefix} ${message}`, ...args);
 		}
@@ -64,7 +68,11 @@ export class Logger {
 	 * @param args 额外参数
 	 */
 	info(message: string, ...args: unknown[]): void {
-		if (this.isVerboseLoggingEnabled() && typeof console !== "undefined" && console.debug) {
+		if (
+			this.isVerboseLoggingEnabled() &&
+			typeof console !== "undefined" &&
+			console.debug
+		) {
 			const prefix = this.formatPrefix("INFO");
 			console.debug(`${prefix} ${message}`, ...args);
 		}
@@ -101,7 +109,11 @@ export class Logger {
 	 * @param args 额外参数
 	 */
 	debugWithTag(tag: string, message: string, ...args: unknown[]): void {
-		if (this.isVerboseLoggingEnabled() && typeof console !== "undefined" && console.debug) {
+		if (
+			this.isVerboseLoggingEnabled() &&
+			typeof console !== "undefined" &&
+			console.debug
+		) {
 			const prefix = this.formatPrefix("DEBUG", tag);
 			console.debug(`${prefix} ${message}`, ...args);
 		}
@@ -114,7 +126,11 @@ export class Logger {
 	 * @param args 额外参数
 	 */
 	infoWithTag(tag: string, message: string, ...args: unknown[]): void {
-		if (this.isVerboseLoggingEnabled() && typeof console !== "undefined" && console.debug) {
+		if (
+			this.isVerboseLoggingEnabled() &&
+			typeof console !== "undefined" &&
+			console.debug
+		) {
 			const prefix = this.formatPrefix("INFO", tag);
 			console.debug(`${prefix} ${message}`, ...args);
 		}
@@ -138,7 +154,9 @@ export class Logger {
 	 * @param tag 可选标签
 	 */
 	private formatPrefix(level: string, tag?: string): string {
-		const timestamp = this.enableTimestamp ? `[${new Date().toISOString().substring(11, 23)}]` : "";
+		const timestamp = this.enableTimestamp
+			? `[${new Date().toISOString().substring(11, 23)}]`
+			: "";
 		const tagStr = tag ? `[${tag}]` : "";
 		return `${timestamp}[${level}]${tagStr}`;
 	}
@@ -182,14 +200,24 @@ const logger = Logger.getInstance();
 /**
  * 便捷的日志函数
  */
-export const logDebug = (message: string, ...args: unknown[]) => logger.debug(message, ...args);
-export const logInfo = (message: string, ...args: unknown[]) => logger.info(message, ...args);
-export const logWarn = (message: string, ...args: unknown[]) => logger.warn(message, ...args);
-export const logError = (message: string, ...args: unknown[]) => logger.error(message, ...args);
-export const logDebugWithTag = (tag: string, message: string, ...args: unknown[]) =>
-	logger.debugWithTag(tag, message, ...args);
-export const logInfoWithTag = (tag: string, message: string, ...args: unknown[]) =>
-	logger.infoWithTag(tag, message, ...args);
+export const logDebug = (message: string, ...args: unknown[]) =>
+	logger.debug(message, ...args);
+export const logInfo = (message: string, ...args: unknown[]) =>
+	logger.info(message, ...args);
+export const logWarn = (message: string, ...args: unknown[]) =>
+	logger.warn(message, ...args);
+export const logError = (message: string, ...args: unknown[]) =>
+	logger.error(message, ...args);
+export const logDebugWithTag = (
+	tag: string,
+	message: string,
+	...args: unknown[]
+) => logger.debugWithTag(tag, message, ...args);
+export const logInfoWithTag = (
+	tag: string,
+	message: string,
+	...args: unknown[]
+) => logger.infoWithTag(tag, message, ...args);
 
 /**
  * 性能追踪便捷函数

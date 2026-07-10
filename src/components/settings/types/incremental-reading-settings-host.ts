@@ -18,7 +18,7 @@ export interface IncrementalReadingSettingsHost {
 	getIncrementalReadingSettings(): IncrementalReadingSettings;
 	saveIncrementalReadingSettings(
 		settings: IncrementalReadingSettings,
-		options?: { syncFolderSubscription?: boolean }
+		options?: { syncFolderSubscription?: boolean },
 	): Promise<IncrementalReadingSettings>;
 	saveSettings(): Promise<void>;
 	syncIncrementalReadingFolderSubscriptionFromSettings?: (options?: {

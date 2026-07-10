@@ -1,14 +1,20 @@
-import type { IRBlockMeta } from "../../types/ir-types";
 import type { App } from "obsidian";
+import type { IRBlockMeta } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
 import { IRChunkScheduleAdapter } from "./IRChunkScheduleAdapter";
-import { isEpubBookmarkTaskId, IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
 import type { IRLoadDeferralRecord } from "./IRDailyLoadAllocator";
+import {
+	IREpubBookmarkTaskService,
+	isEpubBookmarkTaskId,
+} from "./IREpubBookmarkTaskService";
 import { IRMonitoringService } from "./IRMonitoringService";
-import { isPdfBookmarkTaskId, IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
+import {
+	IRPdfBookmarkTaskService,
+	isPdfBookmarkTaskId,
+} from "./IRPdfBookmarkTaskService";
+import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import type { ScheduleRecomputeReason } from "./IRScheduleKernel";
 import { IRStorageService } from "./IRStorageService";
-import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { getSharedIRWorkspaceSnapshotService } from "./IRWorkspaceSnapshotService";
 
 const SKIP_PERSIST_REASONS = new Set<ScheduleRecomputeReason>([
@@ -44,7 +50,7 @@ function isSameDay(leftMs: number, rightMs: number): boolean {
 export async function applyLoadDeferralsFromPlan(
 	app: App,
 	deferrals: IRLoadDeferralRecord[],
-	options: ApplyLoadDeferralsOptions
+	options: ApplyLoadDeferralsOptions,
 ): Promise<number> {
 	if (deferrals.length === 0 || SKIP_PERSIST_REASONS.has(options.reason)) {
 		return 0;
@@ -57,7 +63,8 @@ export async function applyLoadDeferralsFromPlan(
 	const epubService = new IREpubBookmarkTaskService(app);
 	await Promise.all([pdfService.initialize(), epubService.initialize()]);
 
-	const workspace = await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
+	const workspace =
+		await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
 	const monitoring = new IRMonitoringService(app.vault);
 	await monitoring.load();
 
@@ -110,9 +117,12 @@ export async function applyLoadDeferralsFromPlan(
 		await monitoring.save();
 		getSharedIRWorkspaceSnapshotService(app).invalidate();
 		getSharedIRScheduleIndexService(app).invalidate();
-		logger.info(`[IRLoadDeferService] 负载顺延已写入 ${appliedCount} 个阅读点`, {
-			reason: options.reason,
-		});
+		logger.info(
+			`[IRLoadDeferService] 负载顺延已写入 ${appliedCount} 个阅读点`,
+			{
+				reason: options.reason,
+			},
+		);
 	}
 
 	return appliedCount;
@@ -120,9 +130,11 @@ export async function applyLoadDeferralsFromPlan(
 
 function readCurrentNextRepDate(
 	workspace: Awaited<
-		ReturnType<ReturnType<typeof getSharedIRWorkspaceSnapshotService>["getWorkspaceData"]>
+		ReturnType<
+			ReturnType<typeof getSharedIRWorkspaceSnapshotService>["getWorkspaceData"]
+		>
 	>,
-	itemId: string
+	itemId: string,
 ): number {
 	const chunk = workspace.chunksRecord[itemId];
 	if (chunk) {

@@ -94,7 +94,9 @@ function createApp(harness: AdapterHarness) {
 	};
 }
 
-function createMaterial(overrides: Partial<ReadingMaterial> = {}): ReadingMaterial {
+function createMaterial(
+	overrides: Partial<ReadingMaterial> = {},
+): ReadingMaterial {
 	const now = "2026-04-17T10:00:00.000Z";
 	return {
 		uuid: "mat-1",
@@ -127,10 +129,14 @@ describe("ReadingMaterialStorage", () => {
 		const app = createApp(harness) as any;
 		const storage = new ReadingMaterialStorage(app);
 		const runtimePath = normalizePath(
-			getPluginPaths(app).state.incrementalReading.readingMaterialsRuntime
+			getPluginPaths(app).state.incrementalReading.readingMaterialsRuntime,
 		);
-		const legacyMaterialsRoot = normalizePath(getV2PathsFromApp(app).ir.materials.root);
-		const legacyMaterialsIndex = normalizePath(getV2PathsFromApp(app).ir.materials.index);
+		const legacyMaterialsRoot = normalizePath(
+			getV2PathsFromApp(app).ir.materials.root,
+		);
+		const legacyMaterialsIndex = normalizePath(
+			getV2PathsFromApp(app).ir.materials.index,
+		);
 
 		await storage.initialize();
 		await storage.saveMaterial(createMaterial());
@@ -168,26 +174,34 @@ describe("ReadingMaterialStorage", () => {
 		};
 
 		const legacyFiles = {
-			"weave/incremental-reading/materials/materials.json": JSON.stringify(legacyIndex),
-			[`weave/incremental-reading/materials/sessions/${legacyMaterial.uuid}.json`]: JSON.stringify({
-				sessions: [legacySession],
-			}),
+			"weave/incremental-reading/materials/materials.json":
+				JSON.stringify(legacyIndex),
+			[`weave/incremental-reading/materials/sessions/${legacyMaterial.uuid}.json`]:
+				JSON.stringify({
+					sessions: [legacySession],
+				}),
 		};
 		const harness = createAdapterHarness(legacyFiles);
 		const app = createApp(harness) as any;
 		const storage = new ReadingMaterialStorage(app);
 		const runtimePath = normalizePath(
-			getPluginPaths(app).state.incrementalReading.readingMaterialsRuntime
+			getPluginPaths(app).state.incrementalReading.readingMaterialsRuntime,
 		);
 
 		await storage.initialize();
 
-		expect(storage.getMaterialById(legacyMaterial.uuid)?.title).toBe("Legacy Material");
-		expect(await storage.getSessionsForMaterial(legacyMaterial.uuid)).toEqual([legacySession]);
+		expect(storage.getMaterialById(legacyMaterial.uuid)?.title).toBe(
+			"Legacy Material",
+		);
+		expect(await storage.getSessionsForMaterial(legacyMaterial.uuid)).toEqual([
+			legacySession,
+		]);
 		expect(harness.files.has(runtimePath)).toBe(true);
 
 		const saved = JSON.parse(harness.files.get(runtimePath) || "{}");
-		expect(saved.materials[legacyMaterial.uuid]?.filePath).toBe("docs/legacy.md");
+		expect(saved.materials[legacyMaterial.uuid]?.filePath).toBe(
+			"docs/legacy.md",
+		);
 		expect(saved.sessionsByMaterial[legacyMaterial.uuid]).toHaveLength(1);
 	});
 
@@ -203,14 +217,22 @@ describe("ReadingMaterialStorage", () => {
 				primaryAssociatedNotePath: "Folder/Topic.md",
 				associatedNotePath: "Folder/Topic.md",
 				associatedNotePaths: ["Folder/Topic", "Folder/Appendix.md"],
-			})
+			}),
 		);
 
-		expect(await storage.remapAssociatedNoteFileReferences("Folder/Topic.md", "Folder/Renamed Topic.md")).toBe(1);
+		expect(
+			await storage.remapAssociatedNoteFileReferences(
+				"Folder/Topic.md",
+				"Folder/Renamed Topic.md",
+			),
+		).toBe(1);
 
 		const updated = storage.getMaterialById("mat-linked");
 		expect(updated?.primaryAssociatedNotePath).toBe("Folder/Renamed Topic.md");
 		expect(updated?.associatedNotePath).toBe("Folder/Renamed Topic.md");
-		expect(updated?.associatedNotePaths).toEqual(["Folder/Renamed Topic.md", "Folder/Appendix.md"]);
+		expect(updated?.associatedNotePaths).toEqual([
+			"Folder/Renamed Topic.md",
+			"Folder/Appendix.md",
+		]);
 	});
 });

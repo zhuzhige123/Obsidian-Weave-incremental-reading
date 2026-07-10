@@ -21,7 +21,8 @@ const {
 		listPointSnapshots: vi.fn().mockResolvedValue([]),
 		listPointDecks: vi.fn(async () => ({ ...pointStorageState.pointDecks })),
 		upsertPointDeck: vi.fn(async (deck: any) => {
-			pointStorageState.pointDecks[String(deck.id || deck.path || "").trim()] = { ...deck };
+			pointStorageState.pointDecks[String(deck.id || deck.path || "").trim()] =
+				{ ...deck };
 			return { ...deck };
 		}),
 		deletePointDeck: vi.fn(async (topicId: string) => {
@@ -70,12 +71,13 @@ const {
 });
 
 vi.mock("obsidian", async () => {
-	const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
-		"../../../tests/mocks/obsidian"
-	);
+	const actual = await vi.importActual<
+		typeof import("../../../tests/mocks/obsidian")
+	>("../../../tests/mocks/obsidian");
 	return {
 		...actual,
-		normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/+/g, "/"),
+		normalizePath: (path: string) =>
+			path.replace(/\\/g, "/").replace(/\/+/g, "/"),
 	};
 });
 
@@ -98,7 +100,12 @@ function parentPath(path: string): string {
 
 function createMemoryApp(initialFiles: Record<string, string> = {}) {
 	const files = new Map<string, string>();
-	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave"]);
+	const folders = new Set<string>([
+		"",
+		".obsidian",
+		".obsidian/plugins",
+		".obsidian/plugins/weave",
+	]);
 
 	const ensureDir = (dir: string) => {
 		const normalized = normalizeTestPath(dir);
@@ -136,7 +143,8 @@ function createMemoryApp(initialFiles: Record<string, string> = {}) {
 			const childFiles: string[] = [];
 
 			for (const folder of folders) {
-				if (!folder || folder === normalized || !folder.startsWith(prefix)) continue;
+				if (!folder || folder === normalized || !folder.startsWith(prefix))
+					continue;
 				const rest = folder.slice(prefix.length);
 				if (!rest || rest.includes("/")) continue;
 				childFolders.add(folder);
@@ -200,138 +208,155 @@ describe("IRStorageService point sync", () => {
 		pointStorageState.pointDecks = {};
 		pointStorageState.pointSnapshots = [];
 		pointStorageState.snapshotCacheVersion = 0;
-		pointStorageSpies.syncChunkPoint.mockImplementation(async (chunk: any, options?: any) => {
-			const sourcePath =
-				options?.source?.originalPath || options?.source?.rawFilePath || chunk.filePath || "";
-			const updatedAtIso = new Date(chunk.updatedAt || Date.now()).toISOString();
-			const nextReviewAtIso =
-				typeof chunk.nextRepDate === "number" && chunk.nextRepDate > 0
-					? new Date(chunk.nextRepDate).toISOString()
-					: updatedAtIso;
-			const topicIds = Array.isArray(chunk.topicIds)
-				? [...chunk.topicIds]
-				: Array.isArray(chunk.deckIds)
+		pointStorageSpies.syncChunkPoint.mockImplementation(
+			async (chunk: any, options?: any) => {
+				const sourcePath =
+					options?.source?.originalPath ||
+					options?.source?.rawFilePath ||
+					chunk.filePath ||
+					"";
+				const updatedAtIso = new Date(
+					chunk.updatedAt || Date.now(),
+				).toISOString();
+				const nextReviewAtIso =
+					typeof chunk.nextRepDate === "number" && chunk.nextRepDate > 0
+						? new Date(chunk.nextRepDate).toISOString()
+						: updatedAtIso;
+				const topicIds = Array.isArray(chunk.topicIds)
+					? [...chunk.topicIds]
+					: Array.isArray(chunk.deckIds)
 					? [...chunk.deckIds]
 					: [];
-			const topicId = topicIds[0] || "";
-			const snapshot = {
-				point: {
-					id: chunk.chunkId,
-					pointType: "chunk-entry",
-					materialId: chunk.sourceId,
-					source: {
-						id: options?.source?.sourceId || chunk.sourceId,
-						type: "markdown",
-						path: sourcePath,
-						title: options?.source?.title || chunk.chunkId,
-					},
-					timestamps: {
-						createdAt: updatedAtIso,
-						updatedAt: updatedAtIso,
-						lastInteractionAt: updatedAtIso,
-					},
-					trace: {
-						locatorType: "markdown-chunk",
-						locator: {
+				const topicId = topicIds[0] || "";
+				const snapshot = {
+					point: {
+						id: chunk.chunkId,
+						pointType: "chunk-entry",
+						materialId: chunk.sourceId,
+						source: {
+							id: options?.source?.sourceId || chunk.sourceId,
+							type: "markdown",
+							path: sourcePath,
+							title: options?.source?.title || chunk.chunkId,
+						},
+						timestamps: {
+							createdAt: updatedAtIso,
+							updatedAt: updatedAtIso,
+							lastInteractionAt: updatedAtIso,
+						},
+						trace: {
+							locatorType: "markdown-chunk",
+							locator: {
+								sourcePath,
+								chunkFilePath: chunk.filePath,
+							},
+							traceState: "verified",
+							traceConfidence: 1,
+							fallbackLocators: [],
+						},
+						parameterContext: {
+							materialClass: "reference-note",
+							scheduleProfileRef: "profile-reference-note",
+							classificationSource: "manual",
+							isOverride: false,
+						},
+						schedule: {
+							status: chunk.scheduleStatus || "queued",
+							priorityScore: Number(chunk.priorityEff || 0),
+							manualPriority: Number(chunk.priorityUi || 0),
+							nextReviewAt: nextReviewAtIso,
+							lastReviewedAt: updatedAtIso,
+							intervalDays: Number(chunk.intervalDays || 0),
+						},
+						relations: {
+							topicIds,
+							linkedCardIds: [],
+							linkedNotePaths: [],
+						},
+						userData: {
+							title: options?.source?.title || chunk.chunkId,
+							note: "",
+							tags: Array.isArray(chunk.tags) ? [...chunk.tags] : [],
+							isStarred: Boolean(chunk.favorite),
+						},
+						stats: {
+							impressionCount: Number(chunk?.stats?.impressions || 0),
+							reviewCount: 0,
+							extractCount: Number(chunk?.stats?.extracts || 0),
+							cardCreatedCount: Number(chunk?.stats?.cardsCreated || 0),
+							noteCreatedCount: Number(chunk?.stats?.notesWritten || 0),
+							totalReadingTimeMs:
+								Number(chunk?.stats?.totalReadingTimeSec || 0) * 1000,
+						},
+						audit: {
+							createdBy: "test",
+							origin: {
+								type: "ir-chunk",
+								id: chunk.chunkId,
+							},
+						},
+						metadata: {
+							sourceTitle: options?.source?.title || chunk.chunkId,
 							sourcePath,
+							rawFilePath: options?.source?.rawFilePath,
+							indexFilePath: options?.source?.indexFilePath,
 							chunkFilePath: chunk.filePath,
-						},
-						traceState: "verified",
-						traceConfidence: 1,
-						fallbackLocators: [],
-					},
-					parameterContext: {
-						materialClass: "reference-note",
-						scheduleProfileRef: "profile-reference-note",
-						classificationSource: "manual",
-						isOverride: false,
-					},
-					schedule: {
-						status: chunk.scheduleStatus || "queued",
-						priorityScore: Number(chunk.priorityEff || 0),
-						manualPriority: Number(chunk.priorityUi || 0),
-						nextReviewAt: nextReviewAtIso,
-						lastReviewedAt: updatedAtIso,
-						intervalDays: Number(chunk.intervalDays || 0),
-					},
-					relations: {
-						topicIds,
-						linkedCardIds: [],
-						linkedNotePaths: [],
-					},
-					userData: {
-						title: options?.source?.title || chunk.chunkId,
-						note: "",
-						tags: Array.isArray(chunk.tags) ? [...chunk.tags] : [],
-						isStarred: Boolean(chunk.favorite),
-					},
-					stats: {
-						impressionCount: Number(chunk?.stats?.impressions || 0),
-						reviewCount: 0,
-						extractCount: Number(chunk?.stats?.extracts || 0),
-						cardCreatedCount: Number(chunk?.stats?.cardsCreated || 0),
-						noteCreatedCount: Number(chunk?.stats?.notesWritten || 0),
-						totalReadingTimeMs: Number(chunk?.stats?.totalReadingTimeSec || 0) * 1000,
-					},
-					audit: {
-						createdBy: "test",
-						origin: {
-							type: "ir-chunk",
-							id: chunk.chunkId,
+							tagGroupId:
+								options?.source?.tagGroup || chunk?.meta?.tagGroup || "default",
 						},
 					},
-					metadata: {
-						sourceTitle: options?.source?.title || chunk.chunkId,
-						sourcePath,
-						rawFilePath: options?.source?.rawFilePath,
-						indexFilePath: options?.source?.indexFilePath,
-						chunkFilePath: chunk.filePath,
-						tagGroupId: options?.source?.tagGroup || chunk?.meta?.tagGroup || "default",
-					},
-				},
-				material: null,
-				topicId,
-				topicName: options?.topicNamesById?.get(topicId) || topicId,
-			};
-			const existingIndex = pointStorageState.pointSnapshots.findIndex(
-				(existing) => existing?.point?.id === chunk.chunkId
-			);
-			if (existingIndex >= 0) {
-				pointStorageState.pointSnapshots[existingIndex] = snapshot;
-			} else {
-				pointStorageState.pointSnapshots.push(snapshot);
-			}
-			pointStorageState.snapshotCacheVersion += 1;
-			return snapshot.point;
-		});
-		pointStorageSpies.deletePointByLegacyId.mockImplementation(async (pointId: string) => {
-			const before = pointStorageState.pointSnapshots.length;
-			pointStorageState.pointSnapshots = pointStorageState.pointSnapshots.filter(
-				(snapshot) => snapshot?.point?.id !== pointId
-			);
-			if (before !== pointStorageState.pointSnapshots.length) {
+					material: null,
+					topicId,
+					topicName: options?.topicNamesById?.get(topicId) || topicId,
+				};
+				const existingIndex = pointStorageState.pointSnapshots.findIndex(
+					(existing) => existing?.point?.id === chunk.chunkId,
+				);
+				if (existingIndex >= 0) {
+					pointStorageState.pointSnapshots[existingIndex] = snapshot;
+				} else {
+					pointStorageState.pointSnapshots.push(snapshot);
+				}
 				pointStorageState.snapshotCacheVersion += 1;
-			}
-			return before !== pointStorageState.pointSnapshots.length;
-		});
-		pointStorageSpies.listPointSnapshots.mockImplementation(
-			async () => JSON.parse(JSON.stringify(pointStorageState.pointSnapshots))
+				return snapshot.point;
+			},
 		);
-		pointStorageSpies.listPointDecks.mockImplementation(async () => ({ ...pointStorageState.pointDecks }));
+		pointStorageSpies.deletePointByLegacyId.mockImplementation(
+			async (pointId: string) => {
+				const before = pointStorageState.pointSnapshots.length;
+				pointStorageState.pointSnapshots =
+					pointStorageState.pointSnapshots.filter(
+						(snapshot) => snapshot?.point?.id !== pointId,
+					);
+				if (before !== pointStorageState.pointSnapshots.length) {
+					pointStorageState.snapshotCacheVersion += 1;
+				}
+				return before !== pointStorageState.pointSnapshots.length;
+			},
+		);
+		pointStorageSpies.listPointSnapshots.mockImplementation(async () =>
+			JSON.parse(JSON.stringify(pointStorageState.pointSnapshots)),
+		);
+		pointStorageSpies.listPointDecks.mockImplementation(async () => ({
+			...pointStorageState.pointDecks,
+		}));
 		pointStorageSpies.upsertPointDeck.mockImplementation(async (deck: any) => {
-			pointStorageState.pointDecks[String(deck.id || deck.path || "").trim()] = { ...deck };
+			pointStorageState.pointDecks[String(deck.id || deck.path || "").trim()] =
+				{ ...deck };
 			return { ...deck };
 		});
-		pointStorageSpies.deletePointDeck.mockImplementation(async (topicId: string) => {
-			const existing = pointStorageState.pointDecks[topicId];
-			delete pointStorageState.pointDecks[topicId];
-			return {
-				removed: Boolean(existing),
-				topicName: existing?.name || "",
-				pointIds: [],
-				sourceFiles: [],
-			};
-		});
+		pointStorageSpies.deletePointDeck.mockImplementation(
+			async (topicId: string) => {
+				const existing = pointStorageState.pointDecks[topicId];
+				delete pointStorageState.pointDecks[topicId];
+				return {
+					removed: Boolean(existing),
+					topicName: existing?.name || "",
+					pointIds: [],
+					sourceFiles: [],
+				};
+			},
+		);
 		pointStorageSpies.getPointTopicIds.mockResolvedValue([]);
 		pointStorageSpies.updatePointTopicIds.mockResolvedValue(true);
 	});
@@ -356,7 +381,7 @@ describe("IRStorageService point sync", () => {
 		expect(decks).toEqual({});
 		expect(pointStorageSpies.listPointDecks).toHaveBeenCalled();
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/topics.json"
+			"weave/incremental-reading/topics.json",
 		);
 	});
 
@@ -396,7 +421,7 @@ describe("IRStorageService point sync", () => {
 			tagGroup: "group-a",
 		});
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/sources.json"
+			"weave/incremental-reading/sources.json",
 		);
 
 		await service.saveChunkData({
@@ -430,14 +455,20 @@ describe("IRStorageService point sync", () => {
 			expect.objectContaining({
 				source: expect.objectContaining({ sourceId: "source-1" }),
 				topicNamesById: expect.any(Map),
-			})
+			}),
 		);
 
 		await service.deleteChunkData("chunk-1");
-		expect(pointStorageSpies.deletePointByLegacyId).toHaveBeenCalledWith("chunk-1");
+		expect(pointStorageSpies.deletePointByLegacyId).toHaveBeenCalledWith(
+			"chunk-1",
+		);
 		expect(await service.getSource("source-1")).toBeNull();
-		expect(files.get("weave/incremental-reading/chunks.json")).toBe(legacyChunks);
-		expect(files.get("weave/incremental-reading/sources.json")).toBe(legacySources);
+		expect(files.get("weave/incremental-reading/chunks.json")).toBe(
+			legacyChunks,
+		);
+		expect(files.get("weave/incremental-reading/sources.json")).toBe(
+			legacySources,
+		);
 	});
 
 	it("ignores legacy chunks.json and sources.json for runtime reads once points exist", async () => {
@@ -589,10 +620,10 @@ describe("IRStorageService point sync", () => {
 		});
 		expect(chunks["legacy-chunk-only"]).toBeUndefined();
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/sources.json"
+			"weave/incremental-reading/sources.json",
 		);
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/chunks.json"
+			"weave/incremental-reading/chunks.json",
 		);
 	});
 
@@ -628,7 +659,7 @@ describe("IRStorageService point sync", () => {
 
 		expect(pointStorageSpies.syncChunkPoint).toHaveBeenCalledWith(
 			expect.objectContaining({ chunkId: "chunk-point-only" }),
-			expect.anything()
+			expect.anything(),
 		);
 		expect(files.has("weave/incremental-reading/chunks.json")).toBe(false);
 		expect(files.has("weave/incremental-reading/sources.json")).toBe(false);
@@ -685,7 +716,11 @@ describe("IRStorageService point sync", () => {
 					relations: {
 						topicIds: ["topic-1"],
 						linkedCardIds: ["card-1"],
-						linkedNotePaths: ["Notes/Legacy", "Notes/Legacy.md", "Notes/Appendix.md"],
+						linkedNotePaths: [
+							"Notes/Legacy",
+							"Notes/Legacy.md",
+							"Notes/Appendix.md",
+						],
 					},
 					userData: {
 						title: "旧块标题",
@@ -761,11 +796,13 @@ describe("IRStorageService point sync", () => {
 				note: "已更新备注",
 				linkedNotePaths: [],
 			}),
-			expect.objectContaining({ preserveExisting: false })
+			expect.objectContaining({ preserveExisting: false }),
 		);
 
 		await service.deleteBlock("legacy-block-1");
-		expect(pointStorageSpies.deletePointByLegacyId).toHaveBeenCalledWith("legacy-block-1");
+		expect(pointStorageSpies.deletePointByLegacyId).toHaveBeenCalledWith(
+			"legacy-block-1",
+		);
 		expect(files.has("weave/incremental-reading/blocks.json")).toBe(false);
 	});
 });

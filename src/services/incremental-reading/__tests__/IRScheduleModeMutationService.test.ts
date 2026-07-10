@@ -9,7 +9,8 @@ import {
 const persistBlockScheduleStateMock = vi.fn();
 
 vi.mock("../IRPointScheduleMutator", () => ({
-	persistBlockScheduleState: (...args: unknown[]) => persistBlockScheduleStateMock(...args),
+	persistBlockScheduleState: (...args: unknown[]) =>
+		persistBlockScheduleStateMock(...args),
 }));
 
 vi.mock("../../utils/ir-plugin-host-access", () => ({
@@ -47,20 +48,31 @@ describe("IRScheduleModeMutationService", () => {
 	it("uses shared preview formula for menu actions", () => {
 		const beforeBlock = createBlock();
 		const input = buildScheduleModePreviewInput({} as any, beforeBlock, 1);
-		const afterBlock = computeScheduleMenuActionBlock(beforeBlock, "normal", input);
+		const afterBlock = computeScheduleMenuActionBlock(
+			beforeBlock,
+			"normal",
+			input,
+		);
 		expect(afterBlock.nextRepDate).toBeGreaterThan(beforeBlock.nextRepDate);
 		expect(afterBlock.status).toBe("queued");
 	});
 
 	it("persists via L0 mutator with skipInvalidate", async () => {
 		const beforeBlock = createBlock();
-		const afterBlock = createBlock({ nextRepDate: beforeBlock.nextRepDate + 86_400_000 });
+		const afterBlock = createBlock({
+			nextRepDate: beforeBlock.nextRepDate + 86_400_000,
+		});
 		const app = {} as import("obsidian").App;
 
 		await persistScheduleMenuActionL0(app, beforeBlock, afterBlock);
 
-		expect(persistBlockScheduleStateMock).toHaveBeenCalledWith(app, beforeBlock, afterBlock, {
-			skipInvalidate: true,
-		});
+		expect(persistBlockScheduleStateMock).toHaveBeenCalledWith(
+			app,
+			beforeBlock,
+			afterBlock,
+			{
+				skipInvalidate: true,
+			},
+		);
 	});
 });

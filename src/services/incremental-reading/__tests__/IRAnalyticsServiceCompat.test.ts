@@ -7,7 +7,10 @@ import { createMemoryApp } from "./testMemoryApp";
 
 vi.mock("../../epub-integration/ir-epub-storage-access", () => ({
 	getIrEpubStorageService: () => ({
-		async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+		async ensureSourceIdentity(
+			filePath: string,
+			options?: { preferredSourceId?: string },
+		) {
 			return {
 				sourceId: options?.preferredSourceId || `src-${filePath}`,
 				filePath,
@@ -113,11 +116,17 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-04-17T09:00:00.000Z"));
 		vi.restoreAllMocks();
-		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(undefined);
+		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(
+			undefined,
+		);
 		vi.spyOn(IRStorageService.prototype, "getAllSources").mockResolvedValue({});
-		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({});
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue(
+			{},
+		);
 		vi.spyOn(IRStorageService.prototype, "getAllBlocks").mockResolvedValue({});
-		vi.spyOn(IRStorageService.prototype, "getHistory").mockResolvedValue({ sessions: [] } as any);
+		vi.spyOn(IRStorageService.prototype, "getHistory").mockResolvedValue({
+			sessions: [],
+		} as any);
 		vi.spyOn(IRStorageService.prototype, "getAllDecks").mockResolvedValue({
 			"deck-1": {
 				id: "deck-1",
@@ -126,16 +135,23 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 				blockIds: [],
 			} as any,
 		});
-		vi.spyOn(IRMonitoringService.prototype, "load").mockResolvedValue(undefined);
-		vi.spyOn(IRMonitoringService.prototype, "getSummaryReport").mockReturnValue({
-			today: null,
-			weeklyAvg: {
-				readingMinutes: 0,
-				scheduledCount: 0,
-				completedCount: 0,
-			},
-		} as any);
-		vi.spyOn(IRMonitoringService.prototype, "getDecisionCalibrationSummary").mockReturnValue({
+		vi.spyOn(IRMonitoringService.prototype, "load").mockResolvedValue(
+			undefined,
+		);
+		vi.spyOn(IRMonitoringService.prototype, "getSummaryReport").mockReturnValue(
+			{
+				today: null,
+				weeklyAvg: {
+					readingMinutes: 0,
+					scheduledCount: 0,
+					completedCount: 0,
+				},
+			} as any,
+		);
+		vi.spyOn(
+			IRMonitoringService.prototype,
+			"getDecisionCalibrationSummary",
+		).mockReturnValue({
 			linkedOutcomeRate: 0,
 		} as any);
 	});
@@ -195,7 +211,7 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 					activeCount: 1,
 					notesWritten: 1,
 				}),
-			])
+			]),
 		);
 		expect(snapshot.monitoringSummary).toMatchObject({
 			dailyReadingMinutes: 0,
@@ -273,7 +289,7 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 					sourceKind: "markdown",
 					notesWritten: 1,
 				}),
-			])
+			]),
 		);
 	});
 
@@ -327,7 +343,11 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 					lastInteraction: Date.parse("2026-04-17T09:00:00.000Z"),
 				},
 				meta: {
-					associatedNotePaths: ["Notes/Chunk Linked", "Notes/Chunk Linked.md", "Notes/Appendix.md"],
+					associatedNotePaths: [
+						"Notes/Chunk Linked",
+						"Notes/Chunk Linked.md",
+						"Notes/Appendix.md",
+					],
 				},
 			} as any,
 		});
@@ -349,7 +369,7 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 					sourceKind: "markdown",
 					notesWritten: 2,
 				}),
-			])
+			]),
 		);
 	});
 });

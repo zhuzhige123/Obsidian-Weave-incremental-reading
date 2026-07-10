@@ -159,14 +159,14 @@
   });
 </script>
 
-<div class="weave-deck-edit-tag-input-wrapper reading-point-tag-input" class:is-disabled={disabled}>
+<div class="ir-tag-input-wrapper reading-point-tag-input" class:is-disabled={disabled}>
   {#each tags as tag, index (tag.toLowerCase())}
-    <span class="weave-deck-edit-tag-chip">
+    <span class="ir-tag-chip">
       {formatTagSuggestionLabel(tag)}
       {#if !disabled}
         <button
           type="button"
-          class="weave-deck-edit-tag-chip-remove"
+          class="ir-tag-chip-remove"
           aria-label={t('irReadingPointEdit.tags.removeAriaLabel', { tag })}
           onclick={() => removeTagAt(index)}
         >
@@ -177,7 +177,7 @@
   {/each}
   <input
     bind:this={tagInputEl}
-    class="weave-deck-edit-tag-input"
+    class="ir-tag-input"
     type="text"
     bind:value={tagDraft}
     {disabled}

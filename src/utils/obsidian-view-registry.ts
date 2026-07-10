@@ -14,7 +14,10 @@ type AppWithViewRegistry = App & {
 	viewRegistry?: ObsidianViewRegistry;
 };
 
-function readMapValue<T>(map: Map<string, T> | Record<string, T> | undefined, key: string): T | null {
+function readMapValue<T>(
+	map: Map<string, T> | Record<string, T> | undefined,
+	key: string,
+): T | null {
 	if (!map || !key) {
 		return null;
 	}
@@ -30,7 +33,10 @@ export function getObsidianViewRegistry(app: App): ObsidianViewRegistry | null {
 	return (app as AppWithViewRegistry).viewRegistry ?? null;
 }
 
-export function getRegisteredViewTypeForExtension(app: App, extension: string): string | null {
+export function getRegisteredViewTypeForExtension(
+	app: App,
+	extension: string,
+): string | null {
 	const normalizedExtension = extension.trim().toLowerCase();
 	if (!normalizedExtension) {
 		return null;
@@ -47,7 +53,8 @@ export function isRegisteredViewType(app: App, viewType: string): boolean {
 		return false;
 	}
 
-	const creators = registry.viewByType ?? registry.viewCreators ?? registry.views;
+	const creators =
+		registry.viewByType ?? registry.viewCreators ?? registry.views;
 	const creator = readMapValue(creators, viewType);
 	return Boolean(creator);
 }

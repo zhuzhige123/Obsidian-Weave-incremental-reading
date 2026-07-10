@@ -32,6 +32,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { getSharedIRProjectionRuntime, type IRProjectionPriorityHydrateResult } from '../../services/incremental-reading/IRProjectionRuntime';
   import { getSharedIRRefreshScheduler } from '../../services/incremental-reading/IRRefreshScheduler';
   import { loadIRCalendarView, hydrateIRCalendarMonthHeatmap } from '../../services/incremental-reading/IRCalendarViewLoadService';
+  import { getSharedIRCalendarBackgroundLoadCoordinator } from '../../services/incremental-reading/IRCalendarBackgroundLoadCoordinator';
   import {
     buildVisibleDayCountsByDate,
     mergeCalendarDayCountMaps,
@@ -51,7 +52,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     buildScheduleItemFromPdfTask,
     type ScheduleItem
   } from '../../services/incremental-reading/IRCalendarScheduleItem';
-  import { compareScheduleItemsForDailyQueue, assembleScheduleItemsForDailyQueue } from '../../services/incremental-reading/IRScheduleItemSort';
+  import { compareScheduleItemsForDailyQueue, assembleScheduleItemsForDailyQueue, collectScheduleItemDateKeys } from '../../services/incremental-reading/IRScheduleItemSort';
   import {
     capItemLoadMinutes,
     computeDayOverloadLevel,
@@ -81,10 +82,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { enqueueScheduleFinalize } from '../../services/incremental-reading/IRScheduleFinalizeCoordinator';
   import { getSharedIRWorkspaceSnapshotService } from '../../services/incremental-reading/IRWorkspaceSnapshotService';
   import { calculatePsi } from '../../services/incremental-reading/IRCoreAlgorithmsV4';
-  import ObsidianIcon from '../ui/ObsidianIcon.svelte';
-  import FloatingMenu from '../ui/FloatingMenu.svelte';
-  import IRPrioritySlider from './IRPrioritySlider.svelte';
-  import IRScheduleImpactPreviewPanel, { type PreviewDetails } from './IRScheduleImpactPreviewPanel.svelte';
+  import type { PreviewDetails } from './ir-schedule-impact-preview-types';
   import { MaterialImportModalObsidian } from './MaterialImportModalObsidian';
   import { AddReadingTargetModalObsidian } from './AddReadingTargetModalObsidian';
   import { canEditReadingPointLink, resolveReadingPointOpenLink } from '../../services/incremental-reading/reading-point-edit/IRReadingPointEditLinkResolver';
@@ -99,7 +97,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { IRReadingPointBatchService } from '../../services/incremental-reading/reading-point-batch/IRReadingPointBatchService';
   import { populateReadingPointBatchSubmenu } from '../../services/incremental-reading/reading-point-batch/readingPointBatchSubmenu';
   import { resolveScheduleItemWriteTarget } from '../../services/incremental-reading/reading-point-batch/resolveScheduleItemWriteTarget';
-  import AddReadingPointModal from './AddReadingPointModal.svelte';
   import { IRAnalyticsModalObsidian } from './IRAnalyticsModalObsidian';
   import {
     IRContinueReadingSuggestionsModalObsidian,
@@ -134,18 +131,60 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { showMissingSourceDocumentModal } from './MissingSourceDocumentModal';
   import { IRMonitoringService } from '../../services/incremental-reading/IRMonitoringService';
   import { resolveScheduleItemWebUrl } from '../../services/incremental-reading/ir-web-reading-point';
-  import { resolveScheduleItemTypeBadge, resolveScheduleItemTypeIcon, matchesScheduleItemTypeSearch } from '../../services/incremental-reading/IRCalendarScheduleItemTypeBadge';
+  import { resolveScheduleItemTypeBadge, resolveScheduleItemTypeIcon } from '../../services/incremental-reading/IRCalendarScheduleItemTypeBadge';
   import type { IRCalendarSidebarSettings } from '../../types/plugin-settings.d';
-  import type { IRCalendarMaterialListProps } from './ir-calendar-sidebar-types';
+  import type { IRCalendarDayVisualState, IRCalendarMaterialListProps } from './ir-calendar-sidebar-types';
   import {
     getIRCalendarTimerRuntimeState,
     setIRCalendarTimerRuntimeState,
     type IRCalendarActiveReadingTimerState
   } from '../../stores/ir-calendar-timer-store';
-  import IRCalendarSearchInput from './IRCalendarSearchInput.svelte';
   import { parseSearchQuery, type SearchQuery } from '../../utils/search-parser';
-  import { buildMonthCalendarDays, IR_CALENDAR_WEEKDAY_KEYS } from './ir-calendar-date';
-  import IRCalendarMaterialList from './IRCalendarMaterialList.svelte';
+  import { buildMonthCalendarDays, IR_CALENDAR_WEEKDAY_KEYS, formatCalendarDateKey as formatDateKey, parseCalendarDateKey as parseDateKey, isSameCalendarDay as isSameDay } from './ir-calendar-date';
+  import IRCalendarTopToolbar from './ir-calendar-sidebar/IRCalendarTopToolbar.svelte';
+  import IRCalendarMonthHeader from './ir-calendar-sidebar/IRCalendarMonthHeader.svelte';
+  import IRCalendarMonthGrid from './ir-calendar-sidebar/IRCalendarMonthGrid.svelte';
+  import IRCalendarSearchPanel from './ir-calendar-sidebar/IRCalendarSearchPanel.svelte';
+  import IRCalendarReadingListSection from './ir-calendar-sidebar/IRCalendarReadingListSection.svelte';
+  import IRCalendarFooterTimerBar from './ir-calendar-sidebar/IRCalendarFooterTimerBar.svelte';
+  import IRCalendarBatchToolbar from './ir-calendar-sidebar/IRCalendarBatchToolbar.svelte';
+  import IRCalendarDayLoadPopover from './ir-calendar-sidebar/IRCalendarDayLoadPopover.svelte';
+  import IRCalendarBackgroundWall from './ir-calendar-sidebar/IRCalendarBackgroundWall.svelte';
+  import IRCalendarPriorityMenu from './ir-calendar-sidebar/IRCalendarPriorityMenu.svelte';
+  import IRCalendarSchedulingMenu from './ir-calendar-sidebar/IRCalendarSchedulingMenu.svelte';
+  import IRCalendarAddReadingPointHost from './ir-calendar-sidebar/IRCalendarAddReadingPointHost.svelte';
+  import {
+    IRCALENDAR_SCHEDULING_MENU_ACTIONS,
+    type IRCalendarSchedulingAction,
+    type IRCalendarSchedulingMenuContext,
+    type IRCalendarSchedulingMenuPreviewState,
+  } from './ir-calendar-sidebar/ir-calendar-scheduling-menu-types';
+  import './ir-calendar-sidebar-chrome.css';
+  import './ir-calendar-sidebar-content.css';
+  import './ir-calendar-sidebar-shell.css';
+  import './ir-calendar-sidebar-menus.css';
+  import {
+    buildIRCalendarSearchContext,
+    formatSearchResultDateLabel as formatSearchResultDateLabelText,
+    getMatchedSearchEntries as collectMatchedSearchEntries,
+    getMaterialTagLabels as resolveMaterialTagLabels,
+    getScheduleItemDeckName as resolveScheduleItemDeckName,
+    getScheduleItemFrontmatter as resolveScheduleItemFrontmatter,
+    getScheduleItemLabel as resolveScheduleItemLabel,
+    getScheduleItemSourceLabel as resolveScheduleItemSourceLabel,
+    getSearchableScheduleEntries as collectSearchableScheduleEntries,
+    getSearchResultIdentityKey,
+    getSourceDisplayLabel,
+    normalizeSourcePathKey,
+    type IRCalendarSearchContext
+  } from './ir-calendar-search-logic';
+  import {
+    formatCompactTimerDuration as formatCompactTimerDurationText,
+    formatTimerDuration as formatTimerDurationText,
+    getDisplayedTimerSeconds as resolveDisplayedTimerSeconds,
+    getReadingTimerButtonTitle as resolveReadingTimerButtonTitle
+  } from './ir-calendar-timer-utils';
+  import type { IRCalendarSearchResultEntry } from './ir-calendar-sidebar-types';
   import {
     populateCalendarBackgroundWallMenu,
     populateCalendarFolderSubscriptionSyncMenu,
@@ -308,6 +347,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let calendarListLoadProgressPercent = $state(0);
   let calendarLoadStageUpdatedAt = $state(0);
   let calendarLoadStageTick = $state(0);
+  let priorityDatesReconcilePending = $state(false);
   let selectedDateLoadToken = 0;
   let selectedDateHydrationAttemptAtByKey = new Map<string, number>();
   const SELECTED_DATE_HYDRATION_RETRY_MS = 5_000;
@@ -354,7 +394,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let schedulingMenuTarget = $state<ScheduleItem | null>(null);
   let schedulingMenuDateKey = $state<string>('');
   let schedulingMenuTagGroupIntervalFactor = $state(1);
-  let schedulingMenuPreparedBlocks = $state<Record<SchedulingAction, IRBlockV4> | null>(null);
+  let schedulingMenuPreparedBlocks = $state<Record<IRCalendarSchedulingAction, IRBlockV4> | null>(null);
 
   let priorityMenuAnchor = $state<HTMLElement | null>(null);
   let priorityMenuOpen = $state(false);
@@ -365,13 +405,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   type ImpactedPreviewItem = PreviewDetails['impactedItems'][number];
   type PreviewDayDelta = PreviewDetails['dayDeltas'][number];
   let priorityPreviewDetails = $state<PreviewDetails | null>(null);
-  let schedulingPreviewByAction = $state<Record<SchedulingAction, PreviewDetails | null>>({
+  let schedulingPreviewByAction = $state<Record<IRCalendarSchedulingAction, PreviewDetails | null>>({
     intensive: null,
     normal: null,
     slow: null,
     postpone: null
   });
-  let schedulingPreviewFocusAction = $state<SchedulingAction>('normal');
+  let schedulingPreviewFocusAction = $state<IRCalendarSchedulingAction>('normal');
 
   let blockInfoModalContainer: HTMLElement | null = null;
   let blockInfoModalInstance: any | null = null;
@@ -843,16 +883,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
   }
 
-  function formatDateKey(date: Date): string {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  }
-
-  function parseDateKey(dateKey: string): Date | null {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || '').trim());
-    if (!match) return null;
-    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  }
-
   function handleSearch(query: string): void {
     searchQuery = query;
     parsedSearchQuery = query.trim() ? parseSearchQuery(query) : null;
@@ -956,292 +986,49 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     return getMaterialTagLabels(material.id).some((tag) => tag.toLowerCase() === normalizedFilter);
   }
 
-  function getScheduleItemDeckName(material: ScheduleItem): string {
-    const deckId = resolveCanonicalDeckId(material.deckId || '');
-    if (!deckId) {
-      return '';
-    }
+  const calendarSearchContext = $derived(
+    buildIRCalendarSearchContext({
+      app: plugin.app,
+      readingMaterials,
+      irDecks,
+      materialTagLabelsById: readingPointTagsById,
+      resolveCanonicalDeckId
+    })
+  );
 
-    const matchedDeck = irDecks.find((deck) => resolveCanonicalDeckId(deck.id) === deckId);
-    return String(matchedDeck?.name || '').trim();
+  function getMaterialTagLabels(materialId: string): string[] {
+    return resolveMaterialTagLabels(materialId, readingPointTagsById);
   }
 
-  function getScheduleItemSourceTFile(material: ScheduleItem): TFile | null {
-    const abstractFile = plugin.app.vault.getAbstractFileByPath(String(material.sourceFile || '').trim());
-    return abstractFile instanceof TFile ? abstractFile : null;
+  function getScheduleItemDeckName(material: ScheduleItem): string {
+    return resolveScheduleItemDeckName(material, calendarSearchContext);
   }
 
   function getScheduleItemFrontmatter(material: ScheduleItem): Record<string, unknown> {
-    const file = getScheduleItemSourceTFile(material);
-    if (!file || file.extension !== 'md') {
-      return {};
-    }
-
-    return (plugin.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined) || {};
+    return resolveScheduleItemFrontmatter(material, plugin.app);
   }
 
-  function getReadingMaterialByPath(filePath: string): ReadingMaterial | undefined {
-    const normalizedPath = normalizePath(String(filePath || '').trim());
-    if (!normalizedPath) {
-      return undefined;
-    }
-
-    return readingMaterials.find((material) => normalizePath(String(material.filePath || '').trim()) === normalizedPath);
-  }
-
-  function getScheduleItemCreatedDate(material: ScheduleItem): string {
-    const readingMaterial = getReadingMaterialByPath(material.sourceFile);
-    if (readingMaterial?.created) {
-      return String(readingMaterial.created).slice(0, 10);
-    }
-
-    const file = getScheduleItemSourceTFile(material);
-    return file ? new Date(file.stat.ctime).toISOString().slice(0, 10) : '';
-  }
-
-  function getScheduleItemModifiedDate(material: ScheduleItem): string {
-    const readingMaterial = getReadingMaterialByPath(material.sourceFile);
-    if (readingMaterial?.modified) {
-      return String(readingMaterial.modified).slice(0, 10);
-    }
-
-    const file = getScheduleItemSourceTFile(material);
-    return file ? new Date(file.stat.mtime).toISOString().slice(0, 10) : '';
-  }
-
-  function getScheduleItemDueDate(material: ScheduleItem): string {
-    if (material.nextReviewDate instanceof Date && !Number.isNaN(material.nextReviewDate.getTime())) {
-      return material.nextReviewDate.toISOString().slice(0, 10);
-    }
-
-    if (material.nextRepDate > 0) {
-      return new Date(material.nextRepDate).toISOString().slice(0, 10);
-    }
-
-    return '';
-  }
-
-  function matchesDateRanges(
-    dateValue: string,
-    ranges: Array<{ from?: string; to?: string }>
-  ): boolean {
-    if (ranges.length === 0) {
-      return true;
-    }
-
-    if (!dateValue) {
-      return false;
-    }
-
-    return ranges.every((range) => {
-      if (range.from && dateValue < range.from) return false;
-      if (range.to && dateValue > range.to) return false;
-      return true;
+  function getSearchableScheduleEntries(): IRCalendarSearchResultEntry[] {
+    return collectSearchableScheduleEntries({
+      materialsByDate,
+      pinnedByDate,
+      matchesActiveDeckFilter
     });
   }
 
-  function matchesAnyTokens(value: string, tokens: string[]): boolean {
-    if (tokens.length === 0) {
-      return true;
-    }
-
-    const normalizedValue = value.toLowerCase();
-    return tokens.some((token) => normalizedValue.includes(token.toLowerCase()));
-  }
-
-  function excludesAllTokens(value: string, tokens: string[]): boolean {
-    if (tokens.length === 0) {
-      return true;
-    }
-
-    const normalizedValue = value.toLowerCase();
-    return tokens.every((token) => !normalizedValue.includes(token.toLowerCase()));
-  }
-
-  function getScheduleItemSearchText(material: ScheduleItem): string {
-    const frontmatter = getScheduleItemFrontmatter(material);
-    const readingMaterial = getReadingMaterialByPath(material.sourceFile);
-    const readingId = String(
-      frontmatter['weave-reading-id'] || readingMaterial?.uuid || ''
-    ).trim();
-    return [
-      material.id,
-      readingId,
-      material.displayName,
-      material.title,
-      material.sourceFile,
-      material.resumeLink,
-      getVisibleAssociatedNotePath(material),
-      getScheduleItemDeckName(material),
-      ...getMaterialTagLabels(material.id)
-    ]
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      .join(' ')
-      .toLowerCase();
-  }
-
-  function matchesSearchQueryForMaterial(material: ScheduleItem, query: SearchQuery): boolean {
-    if (!query.raw.trim()) {
-      return true;
-    }
-
-    const deckName = getScheduleItemDeckName(material);
-    const sourceFile = String(material.sourceFile || '');
-    const tags = getMaterialTagLabels(material.id);
-    const tagText = tags.join(' ').toLowerCase();
-    const stateText = String(material.scheduleStatus || '').toLowerCase();
-    const searchText = getScheduleItemSearchText(material);
-
-    if (query.decks.length > 0 && !matchesAnyTokens(deckName, query.decks)) {
-      return false;
-    }
-
-    if (query.tags.length > 0 && !query.tags.some((tag) => tagText.includes(tag.toLowerCase()))) {
-      return false;
-    }
-
-    if (query.priorities.length > 0 && !query.priorities.includes(Number(material.priority || 0))) {
-      return false;
-    }
-
-    if (query.sources.length > 0 && !matchesAnyTokens(sourceFile, query.sources)) {
-      return false;
-    }
-
-    if (query.statuses.length > 0 && !query.statuses.some((status) => stateText.includes(status.toLowerCase()))) {
-      return false;
-    }
-
-    if (query.states.length > 0 && !query.states.some((state) => stateText.includes(state.toLowerCase()))) {
-      return false;
-    }
-
-    if (
-      !matchesScheduleItemTypeSearch(
-        plugin.app,
-        material,
-        query.types,
-        query.excludeTypes
-      )
-    ) {
-      return false;
-    }
-
-    if (!matchesDateRanges(getScheduleItemCreatedDate(material), query.dateRanges)) {
-      return false;
-    }
-
-    if (!matchesDateRanges(getScheduleItemModifiedDate(material), query.modifiedRanges)) {
-      return false;
-    }
-
-    if (!matchesDateRanges(getScheduleItemDueDate(material), query.dueRanges)) {
-      return false;
-    }
-
-    if (query.yamlFilters.length > 0) {
-      const frontmatter = getScheduleItemFrontmatter(material);
-      const matchesYaml = query.yamlFilters.every((filter) => {
-        const rawValue = frontmatter[filter.key];
-        if (rawValue === undefined || rawValue === null) {
-          return false;
-        }
-
-        const valueText = Array.isArray(rawValue) ? rawValue.join(' ') : String(rawValue);
-        return valueText.toLowerCase().includes(filter.value.toLowerCase());
-      });
-      if (!matchesYaml) {
-        return false;
-      }
-    }
-
-    if (!excludesAllTokens(deckName, query.excludeDecks)) {
-      return false;
-    }
-
-    if (query.excludeTags.length > 0 && query.excludeTags.some((tag) => tagText.includes(tag.toLowerCase()))) {
-      return false;
-    }
-
-    if (!excludesAllTokens(sourceFile, query.excludeSources)) {
-      return false;
-    }
-
-    if (query.excludeStatuses.length > 0 && query.excludeStatuses.some((status) => stateText.includes(status.toLowerCase()))) {
-      return false;
-    }
-
-    if (query.text.length > 0 && !query.text.every((text) => searchText.includes(text.toLowerCase()))) {
-      return false;
-    }
-
-    if (query.excludeText.length > 0 && query.excludeText.some((text) => searchText.includes(text.toLowerCase()))) {
-      return false;
-    }
-
-    return true;
+  function getMatchedSearchEntries(): IRCalendarSearchResultEntry[] {
+    return collectMatchedSearchEntries({
+      materialsByDate,
+      pinnedByDate,
+      parsedSearchQuery,
+      matchesActiveDeckFilter,
+      matchesActiveTagFilter,
+      searchContext: calendarSearchContext
+    });
   }
 
   function formatSearchResultDateLabel(dateKey: string): string {
-    const parsed = parseDateKey(dateKey);
-    if (!parsed) {
-      return dateKey;
-    }
-
-    if (isSameDay(parsed, today)) {
-      return t('irSidebar.controls.today');
-    }
-
-    if (parsed.getFullYear() === today.getFullYear()) {
-      return t('irSidebar.calendar.dateMonthDay', {
-        month: parsed.getMonth() + 1,
-        day: parsed.getDate()
-      });
-    }
-
-    return t('irSidebar.calendar.dateFull', {
-      year: parsed.getFullYear(),
-      month: parsed.getMonth() + 1,
-      day: parsed.getDate()
-    });
-  }
-
-  function getSearchableScheduleEntries(): SearchResultEntry[] {
-    const merged = new Map<string, SearchResultEntry>();
-    const appendEntries = (input: Map<string, ScheduleItem[]>) => {
-      for (const [dateKey, items] of input.entries()) {
-        for (const item of items) {
-          if (!matchesActiveDeckFilter(item) || merged.has(item.id)) {
-            continue;
-          }
-
-          merged.set(item.id, { item, dateKey });
-        }
-      }
-    };
-
-    appendEntries(materialsByDate);
-    appendEntries(pinnedByDate);
-
-    return Array.from(merged.values()).sort((left, right) => {
-      const dateCompare = left.dateKey.localeCompare(right.dateKey);
-      if (dateCompare !== 0) {
-        return dateCompare;
-      }
-
-      return compareScheduleItemsForDailyQueue(left.item, right.item, left.dateKey);
-    });
-  }
-
-  function getMatchedSearchEntries(): SearchResultEntry[] {
-    const query = parsedSearchQuery;
-    if (!query?.raw.trim()) {
-      return [];
-    }
-
-    return getSearchableScheduleEntries().filter(
-      (entry) => matchesActiveTagFilter(entry.item) && matchesSearchQueryForMaterial(entry.item, query)
-    );
+    return formatSearchResultDateLabelText(dateKey, today, t);
   }
 
   function getDisplayedMaterialDateLabel(materialId: string, dateKeys: Map<string, string>): string {
@@ -1249,50 +1036,19 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     return dateKey ? formatSearchResultDateLabel(dateKey) : '';
   }
 
-  function getSearchResultIdentityKey(material: ScheduleItem): string {
-    const normalizedSource = normalizeSourcePathKey(material.sourceFile);
-    if (normalizedSource) {
-      return `${material.id}::${normalizedSource}`;
-    }
-
-    const title = String(material.title || '').trim();
-    if (title) {
-      return title;
-    }
-
-    return material.id;
-  }
-
   function getScheduleItemLabel(material: ScheduleItem): string {
-    const displayName = String(material.displayName || '').trim();
-    if (displayName) {
-      return displayName;
-    }
-
-    const title = String(material.title || '').trim();
-    if (title) {
-      return title;
-    }
-
-    const cachedResolvedTitle = String(continueReadingResolvedTitleById[material.id] || '').trim();
-    if (cachedResolvedTitle) {
-      return cachedResolvedTitle;
-    }
-
-    const sourceLabel = getSourceDisplayLabel(material.sourceFile);
-    return sourceLabel || t('irSidebar.calendar.untitledPoint');
+    return resolveScheduleItemLabel(material, {
+      continueReadingResolvedTitleById,
+      untitledLabel: t('irSidebar.calendar.untitledPoint')
+    });
   }
 
   function getScheduleItemSourceLabel(material: ScheduleItem): string {
-    if (isEpubBookmarkTaskId(material.id)) {
-      return t('irSidebar.calendar.epubSource');
-    }
-
-    if (isPdfBookmarkTaskId(material.id)) {
-      return t('irSidebar.calendar.pdfSource');
-    }
-
-    return t('irSidebar.calendar.sourceDocument');
+    return resolveScheduleItemSourceLabel(material, {
+      epubSource: t('irSidebar.calendar.epubSource'),
+      pdfSource: t('irSidebar.calendar.pdfSource'),
+      sourceDocument: t('irSidebar.calendar.sourceDocument')
+    });
   }
 
   async function showMissingSourceDocumentDialog(
@@ -1479,27 +1235,37 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function formatTimerDuration(totalSeconds: number): string {
-    const safeSeconds = Math.max(0, Math.floor(totalSeconds));
-    const hours = Math.floor(safeSeconds / 3600);
-    const minutes = Math.floor((safeSeconds % 3600) / 60);
-    const seconds = safeSeconds % 60;
-    if (hours > 0) {
-      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    return formatTimerDurationText(totalSeconds);
   }
 
   function formatCompactTimerDuration(totalSeconds: number): string {
-    const safeSeconds = Math.max(0, Math.floor(totalSeconds));
-    if (safeSeconds < 3600) {
-      const minutes = Math.floor(safeSeconds / 60);
-      const seconds = safeSeconds % 60;
-      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
+    return formatCompactTimerDurationText(totalSeconds, {
+      hoursShort: t('irSidebar.controls.timerHoursShort'),
+      minutesShort: t('irSidebar.controls.timerMinutesShort')
+    });
+  }
 
-    const hours = Math.floor(safeSeconds / 3600);
-    const minutes = Math.floor((safeSeconds % 3600) / 60);
-    return `${hours}${t('irSidebar.controls.timerHoursShort')} ${String(minutes).padStart(2, '0')}${t('irSidebar.controls.timerMinutesShort')}`;
+  function getDisplayedTimerSeconds(blockId: string): number {
+    return resolveDisplayedTimerSeconds({
+      blockId,
+      activeReadingTimer,
+      timerNowMs,
+      timerTotalsByBlockId
+    });
+  }
+
+  function getReadingTimerButtonTitle(blockId: string): string {
+    return resolveReadingTimerButtonTitle({
+      blockId,
+      activeReadingTimer,
+      timerNowMs,
+      timerTotalsByBlockId,
+      labels: {
+        pauseReadingTimer: t('irSidebar.controls.pauseReadingTimer'),
+        resumeTimer: (duration) => t('irSidebar.controls.resumeTimer', { duration }),
+        startTimer: t('irSidebar.controls.startTimer')
+      }
+    });
   }
 
   function ensureTimerTicker(): void {
@@ -1515,26 +1281,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     timerTickIntervalId = null;
   }
 
-  function getDisplayedTimerSeconds(blockId: string): number {
-    if (activeReadingTimer?.blockId === blockId) {
-      return activeReadingTimer.baseSeconds + Math.max(0, Math.floor((timerNowMs - activeReadingTimer.startedAtMs) / 1000));
-    }
-    return timerTotalsByBlockId[blockId] ?? 0;
-  }
-
   function isTimerRunningForBlock(blockId: string): boolean {
     return activeReadingTimer?.blockId === blockId;
-  }
-
-  function getReadingTimerButtonTitle(blockId: string): string {
-    const timerText = formatTimerDuration(getDisplayedTimerSeconds(blockId));
-    if (isTimerRunningForBlock(blockId)) {
-	  return t('irSidebar.controls.pauseReadingTimer') + ` (${timerText})`;
-    }
-    if (getDisplayedTimerSeconds(blockId) > 0) {
-	  return t('irSidebar.controls.resumeTimer', { duration: timerText });
-    }
-	return t('irSidebar.controls.startTimer');
   }
 
   async function loadTimerTotalsFromHistory(
@@ -1878,6 +1626,30 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     );
   }
 
+  function countVisibleMaterialsForDate(dateKey: string): number {
+    const ids = new Set<string>();
+    for (const item of getVisibleMaterialsForDate(dateKey)) {
+      ids.add(item.id);
+    }
+    for (const item of getVisiblePinnedForDate(dateKey)) {
+      ids.add(item.id);
+    }
+    return ids.size;
+  }
+
+  function isDateMaterialsLoadComplete(dateKey: string): boolean {
+    const normalized = String(dateKey || '').trim();
+    if (!normalized) {
+      return true;
+    }
+    const loadedCount = countVisibleMaterialsForDate(normalized);
+    const heatmapCount = calendarDayCountsByDate.get(normalized) ?? 0;
+    if (heatmapCount > loadedCount) {
+      return false;
+    }
+    return loadedCount > 0 || heatmapCount === 0;
+  }
+
   function isPriorityDateLoadSatisfied(dateKey: string): boolean {
     const normalized = String(dateKey || '').trim();
     if (!normalized) {
@@ -1893,22 +1665,24 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       }
       return selectedDateHydrationCompletedKeys.has(normalized);
     }
-    if (selectedDateHydrationCompletedKeys.has(normalized)) {
-      return true;
+    return isDateMaterialsLoadComplete(normalized);
+  }
+
+  function clearStaleSelectedDateHydrationFlags(dateKeys?: string[]): void {
+    const keysToCheck = dateKeys?.length
+      ? dateKeys
+      : [...selectedDateHydrationCompletedKeys];
+    const staleKeys = keysToCheck.filter((dateKey) => {
+      const normalized = String(dateKey || '').trim();
+      return (
+        normalized &&
+        selectedDateHydrationCompletedKeys.has(normalized) &&
+        !isPriorityDateLoadSatisfied(normalized)
+      );
+    });
+    if (staleKeys.length > 0) {
+      clearSelectedDateHydrationCompletedKeys(staleKeys);
     }
-    const visibleMaterials = getVisibleMaterialsForDate(normalized);
-    const visiblePinned = getVisiblePinnedForDate(normalized);
-    if (visibleMaterials.length > 0 || visiblePinned.length > 0) {
-      return true;
-    }
-    if (materialsByDate.has(normalized)) {
-      return true;
-    }
-    const heatmapCount = calendarDayCountsByDate.get(normalized) ?? 0;
-    if (heatmapCount === 0) {
-      return true;
-    }
-    return false;
   }
 
   function arePriorityDatesLoadSatisfied(dateKeys: string[]): boolean {
@@ -1933,12 +1707,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function mergeMaterialsByDate(
     base: Map<string, ScheduleItem[]>,
-    updates: Map<string, ScheduleItem[]>
+    updates: Map<string, ScheduleItem[]>,
+    options?: { forceReplaceDateKeys?: string[] }
   ): Map<string, ScheduleItem[]> {
+    const forceReplace = new Set(
+      (options?.forceReplaceDateKeys || []).map((key) => String(key || '').trim()).filter(Boolean)
+    );
     const merged = new Map(base);
     for (const [dateKey, items] of updates) {
       const existing = merged.get(dateKey) || [];
-      if (existing.length === 0 || items.length > 0) {
+      if (existing.length === 0 || items.length > 0 || forceReplace.has(dateKey)) {
         merged.set(dateKey, items);
       }
     }
@@ -2072,23 +1850,106 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     priorityDateKeys: string[],
     deckIds?: string[]
   ): void {
-    scheduleBackgroundCalendarReconcile(priorityDateKeys, deckIds, 'priority-dates');
+    scheduleBackgroundCalendarReconcile(priorityDateKeys, deckIds, 'priority-dates', true);
   }
 
   function scheduleBackgroundCalendarReconcile(
     priorityDateKeys: string[],
     deckIds?: string[],
-    reason?: string
+    reason?: string,
+    immediate = false
   ): void {
     if (isCalendarSidebarInteractionPaused() || isDegradedReconcileWindow()) {
       return;
     }
-    getSharedIRRefreshScheduler(plugin.app).scheduleCalendarReconcile({
-      deckIds,
-      forceRecompute: calendarScheduleNeedsRecompute,
-      priorityDateKeys,
-      reason: reason || 'sidebar',
+    getSharedIRRefreshScheduler(plugin.app).scheduleCalendarReconcile(
+      {
+        deckIds,
+        forceRecompute: calendarScheduleNeedsRecompute,
+        priorityDateKeys,
+        reason: reason || 'sidebar',
+      },
+      immediate
+    );
+  }
+
+  function arePriorityDatesSatisfiedInQuery(
+    dateKeys: string[],
+    materialsByDateMap: Map<string, ScheduleItem[]>
+  ): boolean {
+    return dateKeys.every((dateKey) => {
+      const items = materialsByDateMap.get(dateKey) || [];
+      const heatmapCount = calendarDayCountsByDate.get(dateKey) ?? 0;
+      if (heatmapCount === 0) {
+        return true;
+      }
+      return items.length >= heatmapCount;
     });
+  }
+
+  async function reconcilePriorityDatesForeground(
+    priorityDateKeys: string[],
+    deckIds?: string[]
+  ): Promise<void> {
+    const normalizedKeys = Array.from(
+      new Set(priorityDateKeys.map((key) => String(key || '').trim()).filter(Boolean))
+    );
+    if (normalizedKeys.length === 0 || arePriorityDatesLoadSatisfied(normalizedKeys)) {
+      priorityDatesReconcilePending = false;
+      return;
+    }
+    if (isCalendarSidebarInteractionPaused() || isDegradedReconcileWindow()) {
+      priorityDatesReconcilePending = true;
+      scheduleBackgroundCalendarReconcile(normalizedKeys, deckIds, 'sidebar-deferred', true);
+      return;
+    }
+
+    priorityDatesReconcilePending = true;
+    setCalendarLoadStage('day_list_assemble', 48);
+    let scheduledFallbackReconcile = false;
+    try {
+      await ensureIrDeckCatalogLoaded();
+      const coordinator = getSharedIRCalendarBackgroundLoadCoordinator(plugin.app);
+      const queryService = getCalendarQueryService();
+      let queryResult = await coordinator.runHeavyLoad('sidebar-load', () =>
+        queryService.getCalendarQueryResult({
+          deckIds,
+          priorityDateKeys: normalizedKeys,
+          includeReadingMaterials: false,
+          preferDiskCache: true,
+          reason: 'ui_refresh',
+        })
+      );
+      if (!arePriorityDatesSatisfiedInQuery(normalizedKeys, queryResult.materialsByDate)) {
+        queryResult = await coordinator.runHeavyLoad('sidebar-load', () =>
+          queryService.getCalendarQueryResult({
+            deckIds,
+            priorityDateKeys: normalizedKeys,
+            includeReadingMaterials: false,
+            preferDiskCache: false,
+            reason: 'ui_refresh',
+            forceRecompute: calendarScheduleNeedsRecompute,
+          })
+        );
+      }
+
+      const priorityMaterials = new Map<string, ScheduleItem[]>();
+      for (const dateKey of normalizedKeys) {
+        priorityMaterials.set(dateKey, queryResult.materialsByDate.get(dateKey) || []);
+      }
+      applyCalendarQueryResult(queryResult, { mergeMaterialsByDate: true });
+      await applyProjectionPriorityDatePatch(normalizedKeys, deckIds, priorityMaterials);
+      calendarScheduleNeedsRecompute = false;
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] priority date foreground reconcile failed:', error);
+      scheduledFallbackReconcile = true;
+      scheduleBackgroundCalendarReconcile(normalizedKeys, deckIds, 'sidebar-fallback', true);
+    } finally {
+      if (!scheduledFallbackReconcile) {
+        priorityDatesReconcilePending = false;
+        maybeClearCalendarLoadStage();
+      }
+    }
   }
 
   function applyMonthHeatmapLoadResult(
@@ -2107,6 +1968,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         )
       );
     }
+    syncCalendarDayCountsFromLoadedMaterials(
+      Array.from(materialsByDate.keys()).filter((dateKey) => {
+        const items = materialsByDate.get(dateKey) || [];
+        const pinned = pinnedByDate.get(dateKey) || [];
+        return items.length > 0 || pinned.length > 0;
+      })
+    );
   }
 
   function applyProjectionLoadResult(
@@ -2126,7 +1994,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       mergeCalendarDaySummaries(projection.daySummaries);
     }
     for (const dateKey of priorityDateKeys) {
-      if (materialsByDate.has(dateKey)) {
+      if (isDateMaterialsLoadComplete(dateKey)) {
         markSelectedDateHydrationComplete(dateKey);
       }
     }
@@ -2189,6 +2057,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     priorityDateKeys: string[],
     deckIds?: string[]
   ): Promise<void> {
+    clearStaleSelectedDateHydrationFlags(priorityDateKeys);
     if (!arePriorityDatesLoadSatisfied(priorityDateKeys)) {
       await mergePriorityDatesFromLocalCache(priorityDateKeys, deckIds);
     }
@@ -2197,6 +2066,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     if (!isPriorityDateLoadSatisfied(selectedKey)) {
       await ensureSelectedDateMaterialsLoaded(selectedKey);
     }
+
+    if (!arePriorityDatesLoadSatisfied(priorityDateKeys)) {
+      await reconcilePriorityDatesForeground(priorityDateKeys, deckIds);
+      return;
+    }
+
+    priorityDatesReconcilePending = false;
+    scheduleBackgroundCalendarReconcile(priorityDateKeys, deckIds, 'sidebar-load-refresh');
   }
 
   function markRecoverableErrorPhase(): void {
@@ -2277,8 +2154,33 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   async function applyProjectionPriorityDatePatch(
     priorityDateKeys: string[],
-    deckIds?: string[]
+    deckIds?: string[],
+    reconciledMaterialsByDate?: Map<string, ScheduleItem[]>
   ): Promise<void> {
+    await ensureIrDeckCatalogLoaded();
+    if (reconciledMaterialsByDate) {
+      materialsByDate = mergeMaterialsByDate(materialsByDate, reconciledMaterialsByDate, {
+        forceReplaceDateKeys: priorityDateKeys,
+      });
+      syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
+      for (const dateKey of priorityDateKeys) {
+        lazyMetadataLoadedDateKeys.delete(dateKey);
+        if (isDateMaterialsLoadComplete(dateKey)) {
+          markSelectedDateHydrationComplete(dateKey);
+        }
+      }
+      if (arePriorityDatesLoadSatisfied(priorityDateKeys)) {
+        priorityDatesReconcilePending = false;
+        maybeClearCalendarLoadStage();
+      }
+      markWarmReadyPhase();
+      const selectedKey = formatDateKey(selectedDate);
+      if (priorityDateKeys.includes(selectedKey)) {
+        void ensureLazyMetadataForSelectedDate(selectedKey);
+      }
+      return;
+    }
+
     const projection = await getSharedIRProjectionRuntime(plugin.app).hydratePriorityDatesFromProjection(
       deckIds,
       priorityDateKeys
@@ -2289,6 +2191,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       if (isPriorityDateLoadSatisfied(dateKey)) {
         markSelectedDateHydrationComplete(dateKey);
       }
+    }
+    if (arePriorityDatesLoadSatisfied(priorityDateKeys)) {
+      priorityDatesReconcilePending = false;
+      maybeClearCalendarLoadStage();
     }
     syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
     markWarmReadyPhase();
@@ -2344,6 +2250,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       isSelectedDatePreparing = false;
       return;
     }
+    clearStaleSelectedDateHydrationFlags([normalizedDateKey]);
     if (isPriorityDateLoadSatisfied(normalizedDateKey)) {
       isSelectedDatePreparing = false;
       return;
@@ -2355,7 +2262,20 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     selectedDateHydrationAttemptAtByKey.set(normalizedDateKey, Date.now());
 
     if (hasHydratedCalendarData && calendarDataPhase !== 'cold_start_blocking') {
-      schedulePriorityDatesBackgroundRefresh([normalizedDateKey], getActiveDeckIdsForQuery());
+      priorityDatesReconcilePending = true;
+      const deckIds = getActiveDeckIdsForQuery();
+      await ensureIrDeckCatalogLoaded();
+      await mergePriorityDatesFromLocalCache([normalizedDateKey], deckIds);
+      if (isPriorityDateLoadSatisfied(normalizedDateKey)) {
+        priorityDatesReconcilePending = false;
+        maybeClearCalendarLoadStage();
+        return;
+      }
+      if (isCalendarSidebarInteractionPaused() || isDegradedReconcileWindow()) {
+        schedulePriorityDatesBackgroundRefresh([normalizedDateKey], deckIds);
+        return;
+      }
+      await reconcilePriorityDatesForeground([normalizedDateKey], deckIds);
       return;
     }
 
@@ -2401,20 +2321,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     return level > 0 ? Array.from({ length: level }, (_, index) => index) : [];
   }
 
-  type CalendarDayVisualState = {
-    key: string;
-    totalCount: number;
-    completedCount: number;
-    pendingCount: number;
-    completionRatio: number;
-    hasTasks: boolean;
-    isFullyCompleted: boolean;
-    isPartiallyCompleted: boolean;
-    isTodayPending: boolean;
-    isOverduePending: boolean;
-  };
-
-  function getCalendarDayVisualState(date: Date): CalendarDayVisualState {
+  function getCalendarDayVisualState(date: Date): IRCalendarDayVisualState {
     const key = formatDateKey(date);
     if (isPastCalendarDate(date, today)) {
       const completedIds = Array.isArray(calendarProgressByDate[key])
@@ -2466,7 +2373,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     };
   }
 
-  function getCalendarDayCellTitle(dayState: CalendarDayVisualState): string {
+  function getCalendarDayCellTitle(dayState: IRCalendarDayVisualState): string {
     if (!dayState.hasTasks) return '';
     if (isPastCalendarDateKey(dayState.key, today)) {
       return t('irSidebar.calendar.historyDayTitle', { completed: dayState.completedCount });
@@ -2476,10 +2383,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function getMaterialExpandButtonLabel(isExpanded: boolean): string {
     return isExpanded ? 'Collapse related materials' : 'Expand related materials';
-  }
-
-  function getMaterialTagLabels(materialId: string): string[] {
-    return readingPointTagsById[materialId] || [];
   }
 
   function collectDayQueueSourceItems(dateKey: string): ScheduleItem[] {
@@ -2626,21 +2529,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     if (!parsed) return null;
     parsed.setHours(0, 0, 0, 0);
     return Math.round((parsed.getTime() - today.getTime()) / DAY_IN_MS);
-  }
-
-  function normalizeSourcePathKey(path?: string): string {
-    const normalized = normalizePath(String(path || '').trim());
-    return normalized ? normalized.toLowerCase() : '';
-  }
-
-  function getSourceDisplayLabel(path?: string): string {
-    const normalized = normalizePath(String(path || '').trim());
-    if (!normalized) {
-      return '';
-    }
-
-    const baseName = normalized.split('/').pop() || normalized;
-    return baseName.replace(/\.md$/i, '');
   }
 
   function getContinueReadingSourceHints(): Set<string> {
@@ -3302,13 +3190,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
 
-  function isSameDay(d1: Date, d2: Date): boolean {
-    return d1.getFullYear() === d2.getFullYear() &&
-           d1.getMonth() === d2.getMonth() &&
-           d1.getDate() === d2.getDate();
-  }
-
-
   function openAddReadingTargetModal(): void {
     if (addReadingTargetModalInstance) {
       addReadingTargetModalInstance.close();
@@ -3393,6 +3274,26 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
     await irStorage.initialize();
     return irStorage;
+  }
+
+  async function ensureIrDeckCatalogLoaded(): Promise<void> {
+    if (irDecks.length > 0) {
+      return;
+    }
+
+    const cachedSnapshot = getWorkspaceSnapshotService().getCachedWorkspaceData();
+    const cachedDecks = Object.values(cachedSnapshot?.decksRecord || {});
+    if (cachedDecks.length > 0) {
+      irDecks = cachedDecks;
+      return;
+    }
+
+    try {
+      const storage = await getStorage();
+      irDecks = Object.values((await storage.getAllDecks()) || {});
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to load IR deck catalog:', error);
+    }
   }
 
   async function loadCalendarProgress(): Promise<void> {
@@ -3947,11 +3848,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
 
-  interface SearchResultEntry {
-    item: ScheduleItem;
-    dateKey: string;
-  }
-
   interface ContinueReadingSuggestion {
     item: ScheduleItem;
     dateKey: string;
@@ -4273,11 +4169,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
 
-  const SCHEDULING_MENU_ACTIONS = ['intensive', 'normal', 'slow', 'postpone'] as const;
-  type SchedulingAction = typeof SCHEDULING_MENU_ACTIONS[number];
-  type SchedulingMenuPreviewState = 'idle' | 'loading' | 'ready' | 'error';
-  let schedulingMenuPreviewState = $state<SchedulingMenuPreviewState>('idle');
-  let schedulingDateByAction = $state<Record<SchedulingAction, string>>({
+  let schedulingMenuPreviewState = $state<IRCalendarSchedulingMenuPreviewState>('idle');
+  let schedulingDateByAction = $state<Record<IRCalendarSchedulingAction, string>>({
     intensive: '',
     normal: '',
     slow: '',
@@ -4286,7 +4179,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let schedulingPreviewLoadToken = 0;
 
   let schedulingConfig = $derived(
-    SCHEDULING_MENU_ACTIONS.map((action) => ({
+    IRCALENDAR_SCHEDULING_MENU_ACTIONS.map((action) => ({
       action,
       label: t(`irSidebar.scheduling.${action}`),
       color:
@@ -4303,10 +4196,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }))
   );
 
-  type SchedulingMenuContext = {
-    target: ScheduleItem;
-    pinnedKey: string;
-  };
+  type SchedulingMenuContext = IRCalendarSchedulingMenuContext;
 
   function captureSchedulingMenuContext(): SchedulingMenuContext | null {
     const target = schedulingMenuTarget;
@@ -4317,7 +4207,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     };
   }
 
-  function activateSchedulingMenuAction(action: SchedulingAction, event: MouseEvent | PointerEvent) {
+  function activateSchedulingMenuAction(action: IRCalendarSchedulingAction, event: MouseEvent | PointerEvent) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -4534,7 +4424,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         return;
       }
 
-      const next: Record<SchedulingAction, PreviewDetails | null> = {
+      const next: Record<IRCalendarSchedulingAction, PreviewDetails | null> = {
         ...schedulingPreviewByAction,
       };
       for (const entry of entries) {
@@ -4563,8 +4453,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     block: IRBlockV4,
     tagGroupIntervalFactor = 1
   ): {
-    dates: Record<SchedulingAction, string>;
-    previews: Record<SchedulingAction, PreviewDetails | null>;
+    dates: Record<IRCalendarSchedulingAction, string>;
+    previews: Record<IRCalendarSchedulingAction, PreviewDetails | null>;
   } {
     const advancedSettings = readAdvancedScheduleSettingsSnapshot(plugin.app);
     const menuBlocks = computeAllScheduleMenuBlocks(block, {
@@ -4578,13 +4468,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       normal: '',
       slow: '',
       postpone: '',
-    } satisfies Record<SchedulingAction, string>;
+    } satisfies Record<IRCalendarSchedulingAction, string>;
     const previews = {
       intensive: null,
       normal: null,
       slow: null,
       postpone: null,
-    } as Record<SchedulingAction, PreviewDetails | null>;
+    } as Record<IRCalendarSchedulingAction, PreviewDetails | null>;
 
     for (const cfg of schedulingConfig) {
       const updatedBlock = menuBlocks[cfg.action];
@@ -4919,10 +4809,25 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       }
 
       await removeLocalMaterialReferences(material.id);
+
+      const affectedDateKeys = Array.from(
+        new Set(
+          [formatDateKey(selectedDate), ...collectScheduleItemDateKeys(material.id, materialsByDate, pinnedByDate)]
+            .map((key) => String(key || '').trim())
+            .filter(Boolean)
+        )
+      );
+      clearSelectedDateHydrationCompletedKeys(affectedDateKeys);
+      getCalendarQueryService().invalidate();
+      getSharedIRProjectionRuntime(plugin.app).markStale();
+
       new Notice(t('irSidebar.notices.removed'));
       closePriorityMenu();
       closeSchedulingMenu();
-      await recomputeAndRefreshSidebar('ui_refresh');
+      await recomputeAndRefreshSidebar('ui_refresh', {
+        forceRecompute: true,
+        priorityDateKeys: affectedDateKeys,
+      });
     } catch (error) {
       logger.error('[IRCalendarSidebar] Recovered error message.', error);
       new Notice(t('irSidebar.notices.removeFailed'));
@@ -5461,7 +5366,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
   ): void {
     const { workspaceData } = queryResult;
-    irDecks = Object.values(workspaceData.decksRecord || {});
+    const nextDecks = Object.values(workspaceData.decksRecord || {});
+    if (nextDecks.length > 0) {
+      irDecks = nextDecks;
+    }
     allBlocks = [];
     readingMaterials = queryResult.readingMaterials;
     if (options?.mergeMaterialsByDate) {
@@ -6014,8 +5922,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function resolveOptimisticScheduleMenuBlock(
     target: ScheduleItem,
-    action: SchedulingAction,
-    preparedBlocks: Record<SchedulingAction, IRBlockV4> | null,
+    action: IRCalendarSchedulingAction,
+    preparedBlocks: Record<IRCalendarSchedulingAction, IRBlockV4> | null,
     tagGroupIntervalFactor: number
   ): IRBlockV4 {
     if (preparedBlocks?.[action]) {
@@ -6074,7 +5982,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   async function persistSchedulingActionInBackground(input: {
     target: ScheduleItem;
     pinnedKey: string;
-    action: SchedulingAction;
+    action: IRCalendarSchedulingAction;
     isPostpone: boolean;
     shouldPauseTargetTimer: boolean;
     nextMaterialId?: string;
@@ -6148,7 +6056,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
   }
 
-  async function handleSchedulingAction(action: SchedulingAction, context: SchedulingMenuContext) {
+  async function handleSchedulingAction(action: IRCalendarSchedulingAction, context: SchedulingMenuContext) {
     const { target, pinnedKey } = context;
     if (!target) return;
     if (isPastCalendarDateKey(pinnedKey, today)) {
@@ -6232,7 +6140,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     pinnedKey: string;
     deckId: string;
     isPostpone: boolean;
-    action: SchedulingAction;
+    action: IRCalendarSchedulingAction;
     nextRepDate: number;
     previousNextRepDate?: number;
     shouldPauseTargetTimer: boolean;
@@ -6368,6 +6276,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     const requestId = ++loadDataRequestId;
     loadDataInFlight = (async () => {
       const loadStartedAt = Date.now();
+      await ensureIrDeckCatalogLoaded();
       const shouldShowBlockingLoading = !hasHydratedCalendarData;
       if (shouldShowBlockingLoading) {
         setCalendarDataPhase('cold_start_blocking');
@@ -6461,11 +6370,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         }
 
         markWarmReadyPhase();
-        scheduleBackgroundCalendarReconcile(
-          loadResult.scheduleReconcile.priorityDateKeys,
-          loadResult.scheduleReconcile.deckIds,
-          'sidebar-load-complete'
-        );
+        if (arePriorityDatesLoadSatisfied(priorityDateKeys)) {
+          scheduleBackgroundCalendarReconcile(
+            loadResult.scheduleReconcile.priorityDateKeys,
+            loadResult.scheduleReconcile.deckIds,
+            'sidebar-load-complete'
+          );
+        }
         void ensureLazyMetadataForSelectedDate(selectedKey);
       } catch (error) {
         markRecoverableErrorPhase();
@@ -6478,9 +6389,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         if (requestId === loadDataRequestId) {
           if (shouldShowBlockingLoading) {
             isLoading = false;
+          }
+          await finalizePriorityDatesAfterLoad(priorityDateKeys, deckIds);
+          if (!priorityDatesReconcilePending) {
             maybeClearCalendarLoadStage();
           }
-          void finalizePriorityDatesAfterLoad(priorityDateKeys, deckIds);
         }
       }
     })();
@@ -6505,6 +6418,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     refreshCalendarBackgroundPauseState();
     unsubscribeProjectionRuntime = getSharedIRProjectionRuntime(plugin.app).subscribe((patch) => {
       if (patch.reconcileFailed) {
+        priorityDatesReconcilePending = false;
+        maybeClearCalendarLoadStage();
         recordReconcileFailure();
         return;
       }
@@ -6515,11 +6430,17 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         return;
       }
       recordReconcileSuccess();
-      void applyProjectionPriorityDatePatch(priorityDateKeys, patch.deckIds ?? getActiveDeckIdsForQuery());
+      void applyProjectionPriorityDatePatch(
+        priorityDateKeys,
+        patch.deckIds ?? getActiveDeckIdsForQuery(),
+        patch.reconciledMaterialsByDate
+      );
     });
-    void refreshSidebarData().then(() => {
-      void ensureSelectedDateMaterialsLoaded(formatDateKey(selectedDate));
-    });
+    void ensureIrDeckCatalogLoaded()
+      .then(() => refreshSidebarData())
+      .then(() => {
+        void ensureSelectedDateMaterialsLoaded(formatDateKey(selectedDate));
+      });
     void refreshRecentSpreadCount();
 
     const handleVisibilityChange = () => {
@@ -6800,12 +6721,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   );
   let showSelectedDateMaterialsPending = $derived(
     !isSelectedDatePast &&
-    calendarDataPhase === 'cold_start_blocking' &&
-    !isLoading &&
     !hasActiveSearch &&
     unfilteredSelectedMaterials.length === 0 &&
-    getScheduledCountForDateKey(formatDateKey(selectedDate)) > 0 &&
-    !isPriorityDateLoadSatisfied(formatDateKey(selectedDate))
+    !isPriorityDateLoadSatisfied(formatDateKey(selectedDate)) &&
+    (
+      priorityDatesReconcilePending ||
+      calendarDataPhase === 'cold_start_blocking' ||
+      getScheduledCountForDateKey(formatDateKey(selectedDate)) > 0
+    )
   );
   let showTodayAllDoneHeaderChip = $derived(
     !hasActiveSearch &&
@@ -6940,1843 +6863,159 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   style={`--calendar-background-wall-fade-ratio: ${Number(calendarBackgroundWallFadePercent) / 100};`}
   bind:this={calendarSidebarEl}
 >
-  <div class="calendar-background-wall" aria-hidden="true">
-    {#if calendarBackgroundWallImageUrl}
-      <div class="calendar-background-wall__image" style={`background-image: url('${calendarBackgroundWallImageUrl}');`}></div>
-      <div class="calendar-background-wall__veil"></div>
-      <div class="calendar-background-wall__mist"></div>
-    {/if}
-  </div>
+  <IRCalendarBackgroundWall imageUrl={calendarBackgroundWallImageUrl || ''} />
   <!-- Incremental reading calendar sidebar -->
-  <div class="calendar-top-tools nav-header" role="toolbar" aria-label={t('irSidebar.calendar.topToolbarAria')}>
-    <div class="calendar-top-actions nav-buttons-container">
-      <button
-        class="calendar-top-action-btn clickable-icon nav-action-button"
-        type="button"
-        onclick={() => openAddReadingTargetModal()}
-        title={t('irCommands.addReadingTarget')}
-        aria-label={t('irCommands.addReadingTarget')}
-      >
-        <ObsidianIcon name="plus" size="var(--icon-size)" />
-      </button>
-      <button
-        class="calendar-top-action-btn clickable-icon nav-action-button"
-        type="button"
-        onclick={() => { void scanVaultIncrementalReadingDeckFiles(); }}
-        title={t('irSidebar.calendar.scanTopics')}
-        aria-label={t('irSidebar.calendar.scanTopics')}
-      >
-        <ObsidianIcon name="scan-search" size="var(--icon-size)" />
-      </button>
-      {#if showDayLoadInfoButton}
-        <button
-          class="calendar-top-action-btn clickable-icon nav-action-button day-load-trigger-btn"
-          class:day-load-trigger-btn--warning={selectedDayLoadStats?.overloadLevel === 'warning'}
-          class:day-load-trigger-btn--overloaded={selectedDayLoadStats?.overloadLevel === 'overloaded'}
-          type="button"
-          bind:this={dayLoadTriggerEl}
-          onclick={toggleDayLoadPopover}
-          title={t('irSidebar.calendar.dayLoadInfoTitle')}
-          aria-label={t('irSidebar.calendar.dayLoadInfo')}
-          aria-expanded={dayLoadPopoverOpen}
-          aria-haspopup="dialog"
-        >
-          <ObsidianIcon name="gauge" size="var(--icon-size)" />
-        </button>
-      {/if}
-      <button
-        class="calendar-top-action-btn clickable-icon nav-action-button"
-        type="button"
-        class:is-active={showSearchPanel}
-        onclick={toggleSearchPanel}
-        title={t('irSidebar.calendar.searchMaterials')}
-        aria-label={t('irSidebar.calendar.searchMaterials')}
-      >
-        <ObsidianIcon name="search" size="var(--icon-size)" />
-      </button>
-      <button
-        class="calendar-top-action-btn clickable-icon nav-action-button"
-        type="button"
-        bind:this={calendarToolsTriggerEl}
-        onclick={showMonthCalendarToolsMenu}
-        title={t('irSidebar.calendar.moreActions')}
-        aria-label={t('irSidebar.calendar.moreActions')}
-      >
-        <ObsidianIcon name="settings" size="var(--icon-size)" />
-      </button>
-    </div>
-  </div>
-  <div class="calendar-header nav-header">
-    <div class="calendar-title-group">
-      <span class="month-title">
-        <span class="month-title__month">{monthNumber}</span>
-        <span class="month-title__year">{monthYear}</span>
-      </span>
-      {#if getActiveDeckFilterName()}
-        <span class="month-focus-topic" title={sourceFilePath || getActiveDeckFilterName()}>
-          {t('irSidebar.header.topicPrefix')}：{getActiveDeckFilterName()}
-        </span>
-      {/if}
-    </div>
-    <div class="calendar-header-actions">
-      <div class="month-nav" aria-label={t('irSidebar.title')}>
-      <button
-        class="calendar-tool-btn clickable-icon nav-btn"
-        type="button"
-        onclick={prevMonth}
-        aria-label={t('irSidebar.header.prevMonth')}
-        title={t('irSidebar.header.prevMonth')}
-      >
-        <ObsidianIcon name="chevron-left" size={14} />
-      </button>
-      <button class="today-btn clickable-icon" type="button" onclick={goToToday} title={t('irSidebar.header.today')}>{t('irSidebar.header.today')}</button>
-      {#if showTodayAllDoneHeaderChip}
-        <span
-          class="calendar-day-complete-chip"
-          role="status"
-          aria-live="polite"
-          title={t('irSidebar.calendar.todayAllDone')}
-        >
-          <ObsidianIcon name="check" size={12} />
-          <span>{t('irSidebar.calendar.todayAllDoneShort')}</span>
-        </span>
-      {/if}
-      <button
-        class="calendar-tool-btn clickable-icon nav-btn"
-        type="button"
-        onclick={nextMonth}
-        aria-label={t('irSidebar.header.nextMonth')}
-        title={t('irSidebar.header.nextMonth')}
-      >
-        <ObsidianIcon name="chevron-right" size={14} />
-      </button>
-      </div>
-      {#if showCalendarTools}
-        <div class="calendar-tools nav-buttons-container" role="toolbar" aria-label={t('irSidebar.title')}>
-          {#if hasContinueReadingSuggestionOffer}
-            <button
-              class="today-btn clickable-icon continue-reading-trigger-btn"
-              type="button"
-              bind:this={continueReadingTriggerEl}
-              onclick={() => { void openContinueReadingSuggestionsModal(true); }}
-              title={t('irSidebar.calendar.openContinueReading')}
-              aria-label={t('irSidebar.calendar.openContinueReading')}
-            >
-              {t('irSidebar.calendar.suggestionsShort')}
-            </button>
-          {/if}
-          {#if calendarDataPhase === 'degraded'}
-            <span
-              class="calendar-sync-status calendar-sync-status--degraded"
-              aria-live="polite"
-              title={t('irSidebar.calendar.performanceGuardTitle')}
-            >
-              <ObsidianIcon name="gauge" size={14} />
-              <span class="calendar-sync-status__label">{t('irSidebar.calendar.performanceGuardLabel')}</span>
-            </span>
-          {:else if calendarDataPhase === 'error_recoverable'}
-            <span
-              class="calendar-sync-status calendar-sync-status--recoverable"
-              aria-live="polite"
-              title={t('irSidebar.calendar.backgroundRetryTitle')}
-            >
-              <ObsidianIcon name="alert-triangle" size={14} />
-              <span class="calendar-sync-status__label">{t('irSidebar.calendar.backgroundRetryLabel')}</span>
-            </span>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  </div>
+  <IRCalendarTopToolbar
+    {t}
+    {showDayLoadInfoButton}
+    {selectedDayLoadStats}
+    {dayLoadPopoverOpen}
+    {showSearchPanel}
+    bind:dayLoadTriggerEl
+    bind:calendarToolsTriggerEl
+    onAddReadingTarget={() => openAddReadingTargetModal()}
+    onScanTopics={() => { void scanVaultIncrementalReadingDeckFiles(); }}
+    onToggleDayLoadPopover={toggleDayLoadPopover}
+    onToggleSearchPanel={toggleSearchPanel}
+    onShowMonthCalendarToolsMenu={showMonthCalendarToolsMenu}
+  />
+  <IRCalendarMonthHeader
+    {t}
+    {monthNumber}
+    {monthYear}
+    activeDeckFilterName={getActiveDeckFilterName()}
+    {sourceFilePath}
+    {showTodayAllDoneHeaderChip}
+    {showCalendarTools}
+    {hasContinueReadingSuggestionOffer}
+    {calendarDataPhase}
+    bind:continueReadingTriggerEl
+    onPrevMonth={prevMonth}
+    onNextMonth={nextMonth}
+    onGoToToday={goToToday}
+    onOpenContinueReadingSuggestions={() => { void openContinueReadingSuggestionsModal(true); }}
+  />
 
   {#if showSearchPanel}
-    <div class="calendar-search-panel">
-      <IRCalendarSearchInput
-        bind:value={searchQuery}
-        app={plugin.app}
-        dataSource="incremental-reading"
-        showSortButton={false}
-        availableDecks={searchAvailableDecks}
-        availableTags={searchAvailableTags}
-        availablePriorities={searchAvailablePriorities}
-        availableSources={searchAvailableSources}
-        availableStates={searchAvailableStates}
-        availableYamlKeys={searchAvailableYamlKeys}
-        matchCount={hasActiveSearch ? searchMatchedEntries.length : -1}
-        totalCount={searchableScheduleEntries.length}
-        onSearch={handleSearch}
-        onClear={clearSearch}
-        placeholder={t('irSidebar.calendar.searchPlaceholder')}
-      />
-    </div>
+    <IRCalendarSearchPanel
+      app={plugin.app}
+      bind:searchQuery
+      {t}
+      availableDecks={searchAvailableDecks}
+      availableTags={searchAvailableTags}
+      availablePriorities={searchAvailablePriorities}
+      availableSources={searchAvailableSources}
+      availableStates={searchAvailableStates}
+      availableYamlKeys={searchAvailableYamlKeys}
+      {hasActiveSearch}
+      searchMatchedCount={searchMatchedEntries.length}
+      searchableTotalCount={searchableScheduleEntries.length}
+      onSearch={handleSearch}
+      onClear={clearSearch}
+    />
   {/if}
 
 
-  <div class="calendar-grid-container">
-    <div class="weekdays">
-      {#each weekdayLabels as weekday}
-        <span class="weekday" class:weekend={weekday.isWeekend}>{weekday.label}</span>
-      {/each}
-    </div>
-    <div class="calendar-grid">
-      {#each monthDays as { date, otherMonth }}
-        {@const isToday = isSameDay(date, today)}
-        {@const isSelected = isSameDay(date, selectedDate)}
-        {@const heatLevel = getHeatLevel(date)}
-        {@const dayState = getCalendarDayVisualState(date)}
-        <button
-          class="day-cell"
-          class:other-month={otherMonth}
-          class:today={isToday}
-          class:selected={isSelected}
-          class:has-tasks={dayState.hasTasks}
-          class:fully-completed={dayState.isFullyCompleted}
-          class:partially-completed={dayState.isPartiallyCompleted}
-          class:today-pending={dayState.isTodayPending}
-          class:overdue-pending={dayState.isOverduePending}
-          onclick={() => selectDay(date)}
-          title={getCalendarDayCellTitle(dayState)}
-        >
-          <span class="day-surface" aria-hidden="true"></span>
-          {#if dayState.isFullyCompleted}
-            <span class="day-complete-icon" aria-hidden="true">
-              <ObsidianIcon name="check" size={14} />
-            </span>
-          {:else}
-            <span class="day-number">{date.getDate()}</span>
-          {/if}
-          {#if dayState.hasTasks && !dayState.isFullyCompleted}
-            <span
-              class="day-status-chip"
-              class:neutral={!dayState.isTodayPending && !dayState.isOverduePending}
-              class:warn={dayState.isTodayPending}
-              class:danger={dayState.isOverduePending}
-              aria-hidden="true"
-            >
-              {#if dayState.isOverduePending}
-                <ObsidianIcon name="x" size={10} />
-              {:else}
-                <span class="day-status-dot"></span>
-              {/if}
-            </span>
-          {/if}
-          <span class="heat-dot-row" aria-hidden="true">
-            {#each getHeatDots(date) as dotIndex}
-              <span class="heat-dot level-{heatLevel}" data-dot-index={dotIndex}></span>
-            {/each}
-          </span>
-        </button>
-      {/each}
-    </div>
-  </div>
+  <IRCalendarMonthGrid
+    {weekdayLabels}
+    {monthDays}
+    {today}
+    {selectedDate}
+    {isSameDay}
+    {getHeatLevel}
+    {getHeatDots}
+    {getCalendarDayVisualState}
+    {getCalendarDayCellTitle}
+    onSelectDay={selectDay}
+  />
 
 
-  <div class="reading-list">
-    {#if showReadingListLoading}
-      <div
-        class="loading-state loading-state--preparing"
-        role={showReadingListProgress ? 'progressbar' : 'status'}
-        aria-live="polite"
-        aria-valuemin={showReadingListProgress ? 0 : undefined}
-        aria-valuemax={showReadingListProgress ? 100 : undefined}
-        aria-valuenow={showReadingListProgress ? calendarListLoadProgressPercent : undefined}
-      >
-        <ObsidianIcon name="loader" size={20} />
-        <span class="loading-state__message">{calendarListLoadingMessage}</span>
-        {#if showReadingListProgress}
-          <div class="calendar-load-progress loading-state__progress" aria-hidden="true">
-            <div
-              class="calendar-load-progress__bar"
-              style={`width: ${calendarListLoadProgressPercent}%`}
-            ></div>
-          </div>
-          <span class="loading-state__percent">{calendarListLoadProgressPercent}%</span>
-        {/if}
-        {#if calendarLoadStageStaleHint}
-          <span class="loading-state__hint">{t('irSidebar.loadStage.stillWorking')}</span>
-        {/if}
-      </div>
-    {:else if displayedMaterials.length > 0}
-      {#if isSelectedDatePast}
-        <div class="history-mode-banner" role="note">
-          <span class="history-mode-banner__title">
-            {t('irSidebar.calendar.historyModeBanner', { completed: selectedHistoryCompletedCount })}
-          </span>
-          <span class="history-mode-banner__hint">{t('irSidebar.calendar.historyModeHint')}</span>
-        </div>
-      {/if}
-      <IRCalendarMaterialList {...materialListProps} />
-    {:else if isSelectedDatePast && !hasActiveSearch}
-      <div class="loading-state history-empty-state">
-        <ObsidianIcon name="history" size={20} />
-        <span>{t('irSidebar.calendar.historyEmpty')}</span>
-        <span class="history-empty-state__hint">{t('irSidebar.calendar.historyEmptyHint')}</span>
-      </div>
-    {:else if hasActiveSearch}
-      <div class="loading-state search-empty-state">
-        <ObsidianIcon name="search" size={20} />
-        <span>{t('irSidebar.calendar.searchNoResults')}</span>
-        <button
-          type="button"
-          class="clickable-icon clear-tag-filter-btn"
-          onclick={clearSearch}>{t('irSidebar.calendar.clearSearch')}</button>
-      </div>
-    {:else if unfilteredSelectedMaterials.length > 0 && activeReadingTagFilter}
-      <div class="loading-state">
-        <ObsidianIcon name="tag" size={20} />
-        <span>{t('irSidebar.calendar.tagFilterNoMatch', { tag: activeReadingTagFilter })}</span>
-        <button
-          type="button"
-          class="clickable-icon clear-tag-filter-btn"
-          onclick={() => { activeReadingTagFilter = ''; }}>{t('irSidebar.calendar.clearTagFilter')}</button>
-      </div>
-    {/if}
-  </div>
+  <IRCalendarReadingListSection
+    {t}
+    {showReadingListLoading}
+    {showReadingListProgress}
+    {calendarListLoadProgressPercent}
+    {calendarListLoadingMessage}
+    {calendarLoadStageStaleHint}
+    {displayedMaterials}
+    {isSelectedDatePast}
+    {selectedHistoryCompletedCount}
+    {hasActiveSearch}
+    {unfilteredSelectedMaterials}
+    {activeReadingTagFilter}
+    {materialListProps}
+    onClearSearch={clearSearch}
+    onClearTagFilter={() => { activeReadingTagFilter = ''; }}
+  />
 
   {#if activeReadingTimer}
-    <div class="footer-timer-bar">
-      <div class="footer-timer-info">
-        <span class="footer-timer-kicker">Active timer</span>
-        <span class="footer-timer-title" title={getActiveReadingTimerLabel()}>{getActiveReadingTimerLabel()}</span>
-      </div>
-      <div class="footer-timer-meta">
-        <span class="footer-timer-value">{formatTimerDuration(getDisplayedTimerSeconds(activeReadingTimer.blockId))}</span>
-        <button
-          type="button"
-          class="footer-timer-pause"
-          onclick={() => void pauseActiveReadingTimer('manual')}
-          title="Pause timer"
-        >
-          <ObsidianIcon name="pause" size={12} />
-        </button>
-      </div>
-    </div>
+    <IRCalendarFooterTimerBar
+      timerLabel={getActiveReadingTimerLabel()}
+      timerDurationLabel={formatTimerDuration(getDisplayedTimerSeconds(activeReadingTimer.blockId))}
+      onPause={() => void pauseActiveReadingTimer('manual')}
+    />
   {/if}
 
   {#if batchSelectionMode}
-    <div class="batch-floating-toolbar" role="toolbar" aria-label={t('irSidebar.batch.modeActive')}>
-      <span
-        class="batch-floating-toolbar__count"
-        title={t('irSidebar.batch.selectedCount', { count: batchSelectedIds.size })}
-        aria-label={t('irSidebar.batch.selectedCount', { count: batchSelectedIds.size })}
-      >
-        {batchSelectedIds.size}
-      </span>
-      <div class="batch-floating-toolbar__actions">
-        <button
-          type="button"
-          class="clickable-icon batch-floating-toolbar__btn"
-          onclick={selectAllDisplayedMaterials}
-          title={t('irSidebar.batch.selectAllVisible')}
-          aria-label={t('irSidebar.batch.selectAllVisible')}
-        >
-          <ObsidianIcon name="square-check" size={16} />
-        </button>
-        {#if batchSelectedIds.size > 0}
-          <button
-            type="button"
-            class="clickable-icon batch-floating-toolbar__btn"
-            onclick={clearBatchSelection}
-            title={t('irSidebar.batch.clearSelection')}
-            aria-label={t('irSidebar.batch.clearSelection')}
-          >
-            <ObsidianIcon name="eraser" size={16} />
-          </button>
-          <button
-            type="button"
-            class="clickable-icon batch-floating-toolbar__btn batch-floating-toolbar__btn--primary"
-            onclick={(event) => showBatchActionsMenu(event)}
-            title={t('irSidebar.batch.openBatchActions')}
-            aria-label={t('irSidebar.batch.openBatchActions')}
-          >
-            <ObsidianIcon name="copy-check" size={16} />
-          </button>
-        {/if}
-        <button
-          type="button"
-          class="clickable-icon batch-floating-toolbar__btn"
-          onclick={exitBatchSelectionMode}
-          title={t('irSidebar.batch.exitSelectionMode')}
-          aria-label={t('irSidebar.batch.exitSelectionMode')}
-        >
-          <ObsidianIcon name="x" size={16} />
-        </button>
-      </div>
-    </div>
+    <IRCalendarBatchToolbar
+      {t}
+      selectedCount={batchSelectedIds.size}
+      onSelectAllDisplayed={selectAllDisplayedMaterials}
+      onClearSelection={clearBatchSelection}
+      onShowBatchActionsMenu={showBatchActionsMenu}
+      onExitSelectionMode={exitBatchSelectionMode}
+    />
   {/if}
 
 </div>
 
-<FloatingMenu
+<IRCalendarPriorityMenu
   bind:show={priorityMenuOpen}
   anchor={priorityMenuAnchor}
-  placement="left-start"
-  portal={false}
+  target={priorityMenuTarget}
+  {priorityPreviewDetails}
+  bind:prioritySliderExpanded
   onClose={closePriorityMenu}
-  class="ir-calendar-priority-menu"
->
-  {#snippet children()}
-    {#if priorityMenuTarget}
-      <div class="ir-calendar-priority-panel">
-        <IRPrioritySlider
-          value={priorityMenuTarget.priority ?? 5}
-          expanded={prioritySliderExpanded}
-          onToggle={() => {
-            prioritySliderExpanded = !prioritySliderExpanded;
-            if (!prioritySliderExpanded) closePriorityMenu();
-          }}
-          onPreview={handlePriorityPreview}
-          onChange={handlePriorityUiChange}
-        />
-        <IRScheduleImpactPreviewPanel preview={priorityPreviewDetails} />
-      </div>
-    {/if}
-  {/snippet}
-</FloatingMenu>
+  onToggleSlider={() => {
+    prioritySliderExpanded = !prioritySliderExpanded;
+    if (!prioritySliderExpanded) closePriorityMenu();
+  }}
+  onPreview={handlePriorityPreview}
+  onChange={handlePriorityUiChange}
+/>
 
-<FloatingMenu
+<IRCalendarSchedulingMenu
   bind:show={schedulingMenuOpen}
   anchor={schedulingMenuAnchor}
-  placement="left-start"
-  portal={false}
+  target={schedulingMenuTarget}
+  {schedulingConfig}
+  {schedulingDateByAction}
+  bind:schedulingPreviewFocusAction
+  {schedulingMenuPreviewState}
+  {schedulingPreviewByAction}
+  {showSchedulingPreview}
+  {t}
   onClose={closeSchedulingMenu}
-  class="ir-calendar-scheduling-menu"
->
-  {#snippet children()}
-    {#if schedulingMenuTarget}
-      <div class="ir-calendar-scheduling-panel">
-        <div class="ir-calendar-scheduling-grid" role="group">
-          {#each schedulingConfig as cfg (cfg.action)}
-            <button
-              type="button"
-              class="ir-calendar-scheduling-btn"
-              class:is-focused={schedulingPreviewFocusAction === cfg.action}
-              onclick={(event) => activateSchedulingMenuAction(cfg.action, event)}
-              onmouseenter={() => {
-                schedulingPreviewFocusAction = cfg.action;
-              }}
-              onfocus={() => {
-                schedulingPreviewFocusAction = cfg.action;
-              }}
-            >
-              <span class="ir-calendar-scheduling-label" style:color={cfg.color}>{cfg.label}</span>
-              {#if schedulingDateByAction[cfg.action]}
-                <span class="ir-calendar-scheduling-date">{schedulingDateByAction[cfg.action]}</span>
-              {:else if schedulingMenuPreviewState === 'error'}
-                <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.scheduling.previewUnavailable')}</span>
-              {:else}
-                <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.controls.unscheduled')}</span>
-              {/if}
-            </button>
-          {/each}
-        </div>
-        {#if showSchedulingPreview}
-          <IRScheduleImpactPreviewPanel preview={schedulingPreviewByAction[schedulingPreviewFocusAction]} />
-        {/if}
-      </div>
-    {/if}
-  {/snippet}
-</FloatingMenu>
+  onActivateAction={activateSchedulingMenuAction}
+  onFocusAction={(action) => { schedulingPreviewFocusAction = action; }}
+/>
 
-<FloatingMenu
+<IRCalendarDayLoadPopover
   bind:show={dayLoadPopoverOpen}
   anchor={dayLoadTriggerEl}
-  placement="bottom-end"
-  offset={6}
+  {selectedDayLoadStats}
+  {recentSpreadCount}
+  {t}
   onClose={closeDayLoadPopover}
-  role="dialog"
-  class="ir-calendar-day-load-popover"
->
-  {#snippet children()}
-    {#if selectedDayLoadStats?.enabled}
-      <div
-        class="day-load-popover-panel"
-        class:day-load-popover-panel--warning={selectedDayLoadStats.overloadLevel === 'warning'}
-        class:day-load-popover-panel--overloaded={selectedDayLoadStats.overloadLevel === 'overloaded'}
-        role="status"
-        aria-live="polite"
-      >
-        <div class="day-load-popover-panel__summary">
-          {t('irSidebar.dayLoadSummary', {
-            baseline: selectedDayLoadStats.baseline,
-            stretch: selectedDayLoadStats.stretchCeiling,
-            assigned: selectedDayLoadStats.assignedMinutes,
-          })}
-        </div>
-        <div class="day-load-popover-panel__summary">
-          {t('irSidebar.dayLoadCountSummary', {
-            assigned: selectedDayLoadStats.assignedCount,
-            stretch: selectedDayLoadStats.stretchCount,
-            baseline: selectedDayLoadStats.baselineCount,
-          })}
-        </div>
-        {#if recentSpreadCount > 0}
-          <div class="day-load-popover-panel__hint">{t('irSidebar.dayLoadSpreadNote', { count: recentSpreadCount })}</div>
-        {/if}
-        {#if selectedDayLoadStats.overloadLevel === 'warning'}
-          <div class="day-load-popover-panel__hint">{t('irSidebar.dayLoadStretchHint')}</div>
-        {:else if selectedDayLoadStats.overloadLevel === 'overloaded'}
-          <div class="day-load-popover-panel__hint">{t('irSidebar.dayLoadOverloadedHint')}</div>
-        {/if}
-      </div>
-    {/if}
-  {/snippet}
-</FloatingMenu>
+/>
+
+<IRCalendarAddReadingPointHost
+  bind:show={showAddReadingPointModal}
+  {plugin}
+  deckId={arpDeckId}
+  pdfPath={arpPdfPath}
+  parentTitle={arpParentTitle}
+  onClose={() => { showAddReadingPointModal = false; }}
+  onCreated={() => { showAddReadingPointModal = false; }}
+/>
 
-
-{#if showAddReadingPointModal}
-  <AddReadingPointModal
-    {plugin}
-    deckId={arpDeckId}
-    pdfPath={arpPdfPath}
-    parentTitle={arpParentTitle}
-    onClose={() => { showAddReadingPointModal = false; }}
-    onCreated={() => { showAddReadingPointModal = false; }}
-  />
-{/if}
-
-<style>
-  :global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view) {
-    padding: 0;
-    overflow: hidden;
-    --weave-ir-calendar-host-background: var(--weave-surface-background, var(--background-primary));
-    background: var(--weave-ir-calendar-host-background);
-  }
-
-  :global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view[data-weave-surface-context="sidebar"]) {
-    /* 侧边栏里尽量继承 Obsidian/主题提供的宿主背景，避免我们再叠一层“secondary”底色导致偏色。 */
-    --weave-ir-calendar-host-background: transparent;
-    background: transparent;
-  }
-
-  .ir-calendar-sidebar {
-    /*
-     * 与 EPUB 侧栏一致：优先继承 view-content 宿主背景，避免在特定主题（如 Composer）
-     * 被固定的 surface token（例如 background-secondary）拉出色差。
-     */
-    --weave-ir-sidebar-surface-background: var(
-      --weave-ir-calendar-host-background,
-      var(--weave-surface-background, var(--background-primary))
-    );
-    --weave-ir-sidebar-elevated-background: var(--weave-elevated-background, var(--background-primary));
-    --calendar-background-wall-fade-ratio: 0.72;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-width: 100%;
-    height: 100%;
-    min-height: 0;
-    padding: 12px;
-    background: var(--weave-ir-sidebar-surface-background);
-    box-sizing: border-box;
-    container-type: inline-size;
-    overflow: hidden;
-    position: relative;
-    isolation: isolate;
-  }
-
-  .ir-calendar-sidebar > :not(.calendar-background-wall) {
-    position: relative;
-    z-index: 1;
-  }
-
-  .calendar-background-wall {
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: min(58%, 420px);
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-  }
-
-  .calendar-background-wall__image,
-  .calendar-background-wall__veil,
-  .calendar-background-wall__mist {
-    position: absolute;
-    inset: 0;
-  }
-
-  .calendar-background-wall__image {
-    background-position: center top;
-    background-repeat: no-repeat;
-    background-size: cover;
-    opacity: calc(1 - (var(--calendar-background-wall-fade-ratio) * 0.78));
-    transform: scale(calc(1 + (var(--calendar-background-wall-fade-ratio) * 0.04)));
-    filter:
-      saturate(calc(1 - (var(--calendar-background-wall-fade-ratio) * 0.1)))
-      contrast(calc(1 - (var(--calendar-background-wall-fade-ratio) * 0.04)));
-    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.78) 54%, transparent 100%);
-    -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.78) 54%, transparent 100%);
-  }
-
-  .calendar-background-wall__veil {
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 18%), transparent) 0%,
-        color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 34%), transparent) 22%,
-        color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 62%), transparent) 58%,
-        var(--weave-ir-sidebar-surface-background) 100%
-      );
-  }
-
-  .calendar-background-wall__mist {
-    background:
-      radial-gradient(circle at 14% 14%, color-mix(in srgb, white calc(var(--calendar-background-wall-fade-ratio) * 12%), transparent) 0%, transparent 48%),
-      radial-gradient(circle at 86% 22%, color-mix(in srgb, white calc(var(--calendar-background-wall-fade-ratio) * 10%), transparent) 0%, transparent 42%),
-      linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--weave-ir-sidebar-surface-background) calc(var(--calendar-background-wall-fade-ratio) * 12%), transparent) 72%, transparent 100%);
-    opacity: calc(var(--calendar-background-wall-fade-ratio) * 0.78);
-  }
-
-  .ir-calendar-sidebar.has-background-wall .calendar-grid-container {
-    position: relative;
-  }
-
-
-  .calendar-top-tools {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    min-height: var(--header-height);
-    margin-bottom: 0;
-    padding: var(--size-4-2);
-    border-bottom: none;
-    background-color: transparent;
-    box-sizing: border-box;
-  }
-
-  .calendar-top-tools .calendar-top-actions.nav-buttons-container {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--size-2-1);
-    width: fit-content;
-    max-width: 100%;
-    flex-wrap: nowrap;
-    margin-inline: auto;
-    padding: var(--size-2-1);
-    border-radius: var(--radius-m);
-    background-color: var(--nav-button-container-bg, var(--background-secondary-alt));
-    box-sizing: border-box;
-  }
-
-  .calendar-top-tools .calendar-top-action-btn.nav-action-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--size-2-2) var(--size-2-3);
-    border: none;
-    border-radius: var(--clickable-icon-radius);
-    background-color: transparent;
-    color: var(--icon-color);
-    box-shadow: none;
-    opacity: var(--icon-opacity);
-    cursor: pointer;
-    transition:
-      opacity var(--anim-duration-fast) ease-in-out,
-      color var(--anim-duration-fast) ease-in-out,
-      background-color var(--anim-duration-fast) ease-in-out;
-  }
-
-  .calendar-top-tools .calendar-top-action-btn.nav-action-button:hover {
-    color: var(--icon-color-hover);
-  }
-
-  .calendar-top-tools .calendar-top-action-btn.nav-action-button :global(svg) {
-    width: var(--icon-size);
-    height: var(--icon-size);
-  }
-
-  .calendar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 18px;
-    min-width: 0;
-  }
-
-  .calendar-header-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    flex: 0 0 auto;
-    min-width: 0;
-    margin-left: auto;
-  }
-
-  .month-focus-topic {
-    display: inline-flex;
-    align-items: center;
-    max-width: 100%;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--text-muted);
-    background: color-mix(in srgb, var(--background-modifier-border) 30%, transparent);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .calendar-title-group {
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-
-  .month-title {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 6px;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .month-title__month {
-    font-size: 18px;
-    font-weight: 560;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    color: color-mix(in srgb, var(--text-normal) 92%, white);
-  }
-
-  .month-title__year {
-    font-size: 11px;
-    font-weight: 650;
-    line-height: 1;
-    letter-spacing: 0;
-    color: color-mix(in srgb, var(--color-orange) 58%, var(--text-normal));
-  }
-
-  .calendar-tool-btn {
-    width: var(--clickable-icon-size, 32px);
-    height: var(--clickable-icon-size, 32px);
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: color-mix(in srgb, var(--text-normal) 66%, transparent);
-    border-radius: 999px;
-    box-shadow: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    cursor: pointer;
-    transition:
-      background-color 0.18s ease,
-      color 0.18s ease,
-      transform 0.18s ease;
-  }
-
-  .calendar-tool-btn:hover {
-    color: var(--text-normal);
-    background: color-mix(in srgb, var(--background-modifier-hover) 78%, transparent);
-  }
-
-  .calendar-tool-btn.active {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover);
-  }
-
-  .calendar-tool-btn:focus-visible {
-    outline: 2px solid var(--background-modifier-border-focus, rgba(var(--interactive-accent-rgb), 0.22));
-    outline-offset: 1px;
-  }
-
-  .calendar-tools {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 2px;
-    min-width: 0;
-    padding: 2px 4px;
-    border-radius: var(--radius-s, 6px);
-    background: color-mix(in srgb, var(--background-modifier-hover) 42%, transparent);
-  }
-
-  .calendar-sync-status {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    max-width: min(11rem, 42vw);
-    height: var(--clickable-icon-size, 32px);
-    padding: 0 6px;
-    flex-shrink: 1;
-    min-width: 0;
-    color: var(--interactive-accent);
-    opacity: var(--icon-opacity, 0.85);
-  }
-
-  .calendar-sync-status__label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
-    color: color-mix(in srgb, var(--interactive-accent) 72%, var(--text-muted));
-  }
-
-  .calendar-sync-status__percent {
-    font-size: 10px;
-    font-weight: 600;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    color: color-mix(in srgb, var(--interactive-accent) 82%, var(--text-muted));
-  }
-
-  .calendar-sync-status :global(svg) {
-    animation: ir-calendar-sync-spin 0.9s linear infinite;
-  }
-
-  .calendar-sync-status--degraded {
-    color: color-mix(in srgb, var(--color-yellow) 72%, var(--text-muted));
-  }
-
-  .calendar-sync-status--recoverable {
-    color: color-mix(in srgb, var(--color-orange) 74%, var(--text-muted));
-  }
-
-  .calendar-sync-status--degraded .calendar-sync-status__label,
-  .calendar-sync-status--recoverable .calendar-sync-status__label {
-    color: currentColor;
-  }
-
-  .calendar-sync-status--degraded :global(svg),
-  .calendar-sync-status--recoverable :global(svg) {
-    animation: none;
-  }
-
-  @keyframes ir-calendar-sync-spin {
-    from {
-      transform: rotate(0deg);
-    }
-
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .calendar-search-panel {
-    margin: 0 0 10px;
-  }
-
-  .calendar-search-panel__pending {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: 0 0 6px;
-  }
-
-  .calendar-search-panel__pending-text {
-    margin: 0;
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--text-muted);
-  }
-
-  .calendar-load-progress {
-    width: 100%;
-    height: 3px;
-    border-radius: 999px;
-    overflow: hidden;
-    background: color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
-  }
-
-  .calendar-load-progress__bar {
-    height: 100%;
-    border-radius: inherit;
-    background: var(--interactive-accent);
-    transition: width 0.22s ease;
-  }
-
-
-  .month-nav {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-    justify-content: flex-end;
-    min-width: 0;
-    padding: 0;
-  }
-
-  .calendar-top-tools .day-load-trigger-btn--warning,
-  .calendar-top-tools .day-load-trigger-btn--overloaded {
-    opacity: 1;
-  }
-
-  .calendar-top-tools .day-load-trigger-btn--warning:hover,
-  .calendar-top-tools .day-load-trigger-btn--overloaded:hover {
-    color: var(--icon-color-hover);
-  }
-
-  .nav-btn {
-    color: color-mix(in srgb, var(--text-normal) 58%, transparent);
-  }
-
-  .today-btn {
-    width: auto;
-    min-width: 0;
-    height: 22px;
-    padding: 0 6px;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    color: color-mix(in srgb, var(--text-normal) 68%, transparent);
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 560;
-    line-height: 1;
-    cursor: pointer;
-    transition:
-      background-color 0.18s ease,
-      color 0.18s ease,
-      transform 0.18s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-  }
-
-  .today-btn:hover {
-    color: var(--text-normal);
-    background: color-mix(in srgb, var(--background-modifier-hover) 78%, transparent);
-  }
-
-  .today-btn:focus-visible {
-    outline: 2px solid var(--background-modifier-border-focus, rgba(var(--interactive-accent-rgb), 0.22));
-    outline-offset: 1px;
-  }
-
-  .calendar-day-complete-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    max-width: min(120px, 100%);
-    padding: 2px 8px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--color-green) 28%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--color-green) 10%, transparent);
-    color: var(--text-muted);
-    font-size: 11px;
-    line-height: 1.3;
-    white-space: nowrap;
-  }
-
-  .calendar-day-complete-chip :global(svg) {
-    color: var(--color-green);
-    flex: 0 0 auto;
-  }
-
-  .continue-reading-trigger-btn {
-    color: var(--text-normal);
-    border: none;
-    background: transparent;
-  }
-
-  .continue-reading-trigger-btn:hover {
-    color: var(--text-normal);
-    border: none;
-    background: var(--background-modifier-hover);
-  }
-
-
-  .calendar-grid-container {
-    background: transparent;
-    border-radius: 0;
-    padding: 0 0 8px;
-    margin-bottom: 10px;
-    min-width: 0;
-    overflow: clip;
-    box-sizing: border-box;
-  }
-
-  .weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 14px;
-    margin-bottom: 12px;
-    min-width: 0;
-  }
-
-  .weekday {
-    min-width: 0;
-    text-align: center;
-    font-size: 8px;
-    font-weight: 540;
-    letter-spacing: 0.01em;
-    color: color-mix(in srgb, var(--text-muted) 96%, var(--text-normal));
-    padding: 0;
-  }
-
-  .weekday.weekend {
-    color: color-mix(in srgb, var(--color-orange) 26%, var(--text-muted));
-  }
-
-  .ir-calendar-sidebar.has-background-wall .weekday {
-    color: color-mix(in srgb, var(--text-normal) 84%, var(--weave-ir-sidebar-surface-background));
-    text-shadow:
-      0 1px 2px color-mix(in srgb, var(--weave-ir-sidebar-surface-background) 74%, transparent),
-      0 0 1px color-mix(in srgb, var(--weave-ir-sidebar-surface-background) 68%, transparent);
-  }
-
-  .ir-calendar-sidebar.has-background-wall .weekday.weekend {
-    color: color-mix(in srgb, var(--color-orange) 42%, var(--text-normal));
-  }
-
-  .calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 14px;
-    min-width: 0;
-  }
-
-  .day-cell {
-    width: 100%;
-    aspect-ratio: 1;
-    min-width: 0;
-    padding: 0;
-    border: 0 !important;
-    border-color: transparent !important;
-    border-style: solid !important;
-    border-width: 0 !important;
-    border-image: none !important;
-    background: transparent !important;
-    border-radius: 0;
-    box-shadow: none !important;
-    filter: none !important;
-    outline: none;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    position: relative;
-    transition:
-      transform 0.18s ease,
-      color 0.18s ease,
-      opacity 0.18s ease;
-  }
-
-  .day-surface {
-    position: absolute;
-    top: calc(50% - 1px);
-    left: 50%;
-    width: 28px;
-    height: 28px;
-    transform: translate(-50%, -50%);
-    border-radius: 999px;
-    background: transparent;
-    border: 1px solid transparent;
-    pointer-events: none;
-    transition:
-      background-color 0.18s ease,
-      border-color 0.18s ease,
-      box-shadow 0.18s ease;
-  }
-
-  .day-cell:hover {
-    background: transparent !important;
-    transform: translateY(-1px);
-  }
-
-  .day-cell.other-month {
-    opacity: 1;
-  }
-
-  .day-cell.other-month .day-number {
-    color: color-mix(in srgb, var(--text-muted) 86%, var(--weave-ir-sidebar-surface-background));
-    opacity: 0.72;
-  }
-
-  .day-cell.other-month .day-status-chip,
-  .day-cell.other-month .heat-dot-row {
-    opacity: 0.52;
-  }
-
-  .day-cell.selected {
-    background: transparent !important;
-  }
-
-  .day-cell.has-tasks.selected .day-surface {
-    background: color-mix(in srgb, var(--interactive-accent) 5%, transparent);
-    border-color: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
-  }
-
-  .day-cell.today-pending .day-surface {
-    background: transparent;
-    border-color: color-mix(in srgb, var(--color-orange) 22%, transparent);
-  }
-
-  .day-cell.has-tasks.today .day-surface,
-  .day-cell.has-tasks.selected .day-surface {
-    width: 28px;
-    height: 28px;
-  }
-
-  .day-cell.overdue-pending .day-surface {
-    background: transparent;
-    border-color: transparent;
-  }
-
-  .day-cell.has-tasks.selected .day-number {
-    color: color-mix(in srgb, var(--text-normal) 96%, white);
-    font-weight: 620;
-  }
-
-  .day-cell.has-tasks.selected .heat-dot {
-    transform: scale(1.05);
-    opacity: 1;
-  }
-
-  .day-cell.has-tasks.today .day-number {
-    font-weight: 580;
-    color: color-mix(in srgb, var(--text-normal) 92%, white);
-  }
-
-  .day-cell.has-tasks.selected.today .day-number {
-    color: color-mix(in srgb, var(--text-normal) 96%, white);
-  }
-
-  .day-cell:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--interactive-accent) 38%, transparent);
-    outline-offset: 2px;
-    border-radius: 6px;
-  }
-
-  .day-number {
-    position: relative;
-    z-index: 1;
-    font-size: 13px;
-    font-weight: 560;
-    line-height: 1;
-    letter-spacing: -0.01em;
-    color: color-mix(in srgb, var(--text-normal) 86%, transparent);
-    font-variation-settings: "wght" 500;
-    text-shadow: none;
-  }
-
-  .ir-calendar-sidebar.has-background-wall .day-number {
-    color: color-mix(in srgb, var(--text-normal) 94%, var(--weave-ir-sidebar-surface-background));
-    text-shadow:
-      0 1px 2px color-mix(in srgb, var(--weave-ir-sidebar-surface-background) 76%, transparent),
-      0 0 1px color-mix(in srgb, var(--weave-ir-sidebar-surface-background) 62%, transparent);
-  }
-
-  .ir-calendar-sidebar.has-background-wall .day-cell.other-month .day-number {
-    color: color-mix(in srgb, var(--text-muted) 92%, var(--weave-ir-sidebar-surface-background));
-    opacity: 0.78;
-  }
-
-  .day-complete-icon {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    color: color-mix(in srgb, var(--color-green) 88%, black);
-  }
-
-  .day-status-chip {
-    position: relative;
-    z-index: 1;
-    min-width: auto;
-    height: auto;
-    padding: 0;
-    border-radius: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 8px;
-    font-weight: 600;
-    line-height: 1;
-    color: var(--text-faint);
-    background: transparent;
-  }
-
-  .day-status-chip.warn {
-    color: color-mix(in srgb, var(--color-orange) 88%, black);
-  }
-
-  .day-status-chip.danger {
-    color: color-mix(in srgb, var(--color-red) 88%, white);
-  }
-
-  .day-status-chip.neutral {
-    color: var(--text-faint);
-  }
-
-  .day-status-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--text-muted) 62%, var(--background-modifier-border));
-  }
-
-  .heat-dot-row {
-    position: relative;
-    z-index: 1;
-    min-height: 4px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-  }
-
-
-  .heat-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    transition:
-      opacity 0.18s ease,
-      transform 0.18s ease;
-  }
-
-  .heat-dot.level-0 { background: color-mix(in srgb, var(--background-modifier-border) 72%, transparent); opacity: 0.35; }
-  .heat-dot.level-1 { background: color-mix(in srgb, var(--color-green) 68%, white); opacity: 0.28; }
-  .heat-dot.level-2 { background: color-mix(in srgb, var(--color-green) 80%, white); opacity: 0.42; }
-  .heat-dot.level-3 { background: color-mix(in srgb, var(--color-yellow) 78%, white); opacity: 0.5; }
-  .heat-dot.level-4 { background: color-mix(in srgb, var(--color-orange) 80%, white); opacity: 0.58; }
-  .heat-dot.level-5 { background: color-mix(in srgb, var(--color-red) 80%, white); opacity: 0.64; }
-
-  :global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] .view-content.weave-ir-calendar-view .day-cell) {
-    border: 0 !important;
-    border-image: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-
-  :global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] .view-content.weave-ir-calendar-view .day-cell:hover) {
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-
-
-  .reading-tag-filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 0 0 8px;
-    margin-bottom: 4px;
-    scrollbar-width: none;
-  }
-
-  .reading-tag-filter-bar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .reading-tag-filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--weave-ir-sidebar-elevated-background);
-    color: var(--text-muted);
-    border-radius: 999px;
-    padding: 4px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .reading-tag-filter-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 16px;
-    height: 16px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
-    color: var(--text-faint);
-    font-size: 10px;
-    padding: 0 4px;
-  }
-
-  .reading-tag-filter-chip.active {
-    border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--weave-ir-sidebar-surface-background));
-    color: var(--interactive-accent);
-  }
-
-
-  .day-load-trigger-btn--warning {
-    color: color-mix(in srgb, var(--color-yellow) 82%, var(--text-muted));
-  }
-
-  .day-load-trigger-btn--overloaded {
-    color: color-mix(in srgb, var(--color-orange) 86%, var(--text-muted));
-  }
-
-  .day-load-trigger-btn--warning:hover,
-  .day-load-trigger-btn--overloaded:hover {
-    color: var(--text-normal);
-  }
-
-  :global(.floating-menu.ir-calendar-day-load-popover) {
-    min-width: 240px;
-    max-width: min(360px, calc(100vw - 16px));
-    border-radius: var(--radius-m, 10px);
-    box-shadow:
-      0 10px 28px color-mix(in srgb, var(--background-modifier-border) 45%, transparent),
-      0 2px 8px rgba(0, 0, 0, 0.08);
-  }
-
-  .day-load-popover-panel {
-    padding: 10px 12px;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    line-height: var(--line-height-normal);
-  }
-
-  .day-load-popover-panel--warning {
-    color: var(--text-normal);
-  }
-
-  .day-load-popover-panel--overloaded {
-    color: var(--text-normal);
-  }
-
-  .day-load-popover-panel__summary {
-    font-weight: 500;
-  }
-
-  .day-load-popover-panel__hint {
-    margin-top: 4px;
-    color: var(--text-muted);
-  }
-
-  .day-load-popover-panel--warning .day-load-popover-panel__summary:first-child {
-    color: color-mix(in srgb, var(--color-yellow) 78%, var(--text-normal));
-  }
-
-  .day-load-popover-panel--overloaded .day-load-popover-panel__summary:first-child {
-    color: color-mix(in srgb, var(--color-orange) 82%, var(--text-normal));
-  }
-
-  .reading-list {
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    /* 与 EPUB 目录修复策略一致：列表层不再单独刷底色，直接继承宿主表面，避免出现分层色差。 */
-    background: transparent;
-    padding: 0;
-    min-width: 0;
-  }
-
-  .history-mode-banner {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 0 0 8px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--background-modifier-hover) 55%, transparent);
-    color: var(--text-muted);
-    font-size: var(--font-ui-small);
-    line-height: 1.45;
-  }
-
-  .history-mode-banner__title {
-    color: var(--text-normal);
-    font-weight: 600;
-  }
-
-  .history-empty-state {
-    text-align: center;
-    gap: 6px;
-  }
-
-  .history-empty-state__hint {
-    color: var(--text-faint);
-    font-size: var(--font-ui-small);
-    line-height: 1.45;
-    max-width: 28rem;
-  }
-
-  .ir-calendar-sidebar.batch-selection-mode .reading-list {
-    padding-bottom: 56px;
-  }
-
-  .batch-floating-toolbar {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: auto;
-    padding: 6px 8px;
-    border-radius: 12px;
-    border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--weave-ir-sidebar-elevated-background) 92%, transparent);
-    box-shadow:
-      0 8px 24px color-mix(in srgb, var(--background-modifier-border) 55%, transparent),
-      0 1px 0 color-mix(in srgb, var(--background-modifier-border) 40%, transparent);
-    backdrop-filter: blur(10px);
-    flex-shrink: 0;
-  }
-
-  .batch-floating-toolbar__count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 28px;
-    height: 28px;
-    padding: 0 8px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-modifier-hover));
-    color: var(--interactive-accent);
-    font-size: 12px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-  }
-
-  .batch-floating-toolbar__actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 2px;
-    min-width: 0;
-    flex: 1;
-  }
-
-  .ir-calendar-sidebar button.batch-floating-toolbar__btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: none;
-    box-shadow: none;
-    background: transparent;
-    border-radius: var(--clickable-icon-radius);
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
-  .ir-calendar-sidebar button.batch-floating-toolbar__btn:hover {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover);
-  }
-
-  .ir-calendar-sidebar button.batch-floating-toolbar__btn--primary {
-    color: var(--interactive-accent);
-  }
-
-  .ir-calendar-sidebar button  .batch-floating-toolbar__btn--primary:hover {
-    color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-modifier-hover));
-  }
-
-  @container (max-width: 340px) {
-    .ir-calendar-sidebar {
-      padding: 8px;
-    }
-
-    .calendar-top-tools {
-      padding-inline: 8px;
-    }
-
-    .calendar-header {
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .month-title {
-      gap: 6px;
-    }
-
-    .month-title__month {
-      font-size: 16px;
-    }
-
-    .month-title__year {
-      font-size: 10px;
-    }
-
-    .calendar-tool-btn {
-      width: 28px;
-      height: 28px;
-    }
-
-    .month-nav {
-      gap: 4px;
-      padding: 0;
-    }
-
-    .today-btn {
-      height: 28px;
-      padding: 0 8px;
-      font-size: 10px;
-    }
-
-    .calendar-sync-status__label {
-      display: none;
-    }
-
-    .calendar-sync-status {
-      max-width: none;
-      padding: 0 4px;
-    }
-
-    .calendar-grid-container {
-      padding: 0 0 6px;
-      margin-bottom: 6px;
-    }
-
-    .weekdays,
-    .calendar-grid {
-      gap: 6px;
-    }
-
-    .weekday {
-      font-size: 8px;
-    }
-
-    .day-number {
-      font-size: 11px;
-    }
-
-    .day-complete-icon {
-      width: 16px;
-      height: 16px;
-    }
-
-    .day-surface,
-    .day-cell.has-tasks.today .day-surface,
-    .day-cell.has-tasks.selected .day-surface {
-      width: 24px;
-      height: 24px;
-      top: calc(50% - 1px);
-    }
-
-    .heat-dot {
-      width: 4px;
-      height: 4px;
-    }
-  }
-
-  @container (max-width: 280px) {
-    .ir-calendar-sidebar {
-      padding: 6px;
-    }
-
-    .calendar-top-tools {
-      padding-inline: 6px;
-    }
-
-    .calendar-header {
-      gap: 4px;
-    }
-
-    .month-title {
-      gap: 4px;
-    }
-
-    .month-title__month {
-      font-size: 14px;
-    }
-
-    .month-title__year {
-      font-size: 10px;
-    }
-
-    .calendar-tool-btn {
-      width: 26px;
-      height: 26px;
-    }
-
-    .month-nav {
-      gap: 3px;
-    }
-
-    .today-btn {
-      height: 26px;
-      padding: 0 5px;
-      font-size: 9px;
-    }
-
-    .calendar-grid-container {
-      padding: 0 0 4px;
-    }
-
-    .day-number {
-      font-size: 10px;
-    }
-
-    .day-complete-icon {
-      width: 14px;
-      height: 14px;
-    }
-
-    .day-surface,
-    .day-cell.has-tasks.today .day-surface,
-    .day-cell.has-tasks.selected .day-surface {
-      width: 22px;
-      height: 22px;
-      top: calc(50% - 1px);
-    }
-  }
-
-  .footer-timer-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 8px 10px;
-    margin-top: 8px;
-    border-radius: 10px;
-    border: 1px solid color-mix(in srgb, var(--interactive-accent) 32%, var(--background-modifier-border));
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--interactive-accent) 8%, var(--weave-ir-sidebar-elevated-background)),
-      var(--weave-ir-sidebar-surface-background)
-    );
-  }
-
-  .footer-timer-info {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .footer-timer-kicker {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--text-faint);
-  }
-
-  .footer-timer-title {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-normal);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .footer-timer-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .footer-timer-value {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--interactive-accent);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .footer-timer-pause {
-    width: 24px;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 7px;
-    background: var(--weave-ir-sidebar-elevated-background);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .footer-timer-pause:hover {
-    color: var(--text-normal);
-    border-color: var(--interactive-accent);
-  }
-
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 24px;
-    color: var(--text-muted);
-    font-size: 12px;
-  }
-
-  .loading-state__message {
-    text-align: center;
-    line-height: 1.5;
-    max-width: min(320px, 100%);
-  }
-
-  .loading-state__progress {
-    width: min(280px, 100%);
-  }
-
-  .loading-state__percent {
-    font-size: 11px;
-    color: var(--text-faint);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .loading-state__hint {
-    font-size: 11px;
-    line-height: 1.45;
-    text-align: center;
-    color: var(--text-faint);
-    max-width: min(320px, 100%);
-  }
-  
-  .ir-calendar-scheduling-menu {
-    min-width: 220px;
-    z-index: var(--weave-z-menu, 1200);
-  }
-
-  :global(.floating-menu.ir-calendar-scheduling-menu) {
-    pointer-events: auto;
-    min-width: min(240px, calc(100vw - 24px));
-    border-radius: var(--radius-m, 10px);
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-    box-shadow: var(--shadow-s);
-    overflow: hidden;
-  }
-
-  :global(.floating-menu.ir-calendar-scheduling-menu .ir-calendar-scheduling-panel) {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-  }
-
-  :global(.floating-menu.ir-calendar-priority-menu) {
-    width: min(360px, calc(100vw - 24px));
-    min-width: min(360px, calc(100vw - 24px));
-    max-width: calc(100vw - 24px);
-    border-radius: 20px;
-    border: 1px solid color-mix(in srgb, var(--interactive-accent) 16%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--background-primary) 94%, var(--background-secondary));
-    box-shadow:
-      0 18px 40px color-mix(in srgb, var(--background-primary) 18%, transparent),
-      0 4px 14px rgba(0, 0, 0, 0.08);
-    backdrop-filter: blur(10px);
-    overflow: hidden;
-  }
-
-  :global(.floating-menu.ir-calendar-priority-menu .ir-calendar-priority-panel) {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    width: 100%;
-    background: transparent;
-  }
-
-  :global(.floating-menu.ir-calendar-priority-menu .ir-calendar-preview-summary) {
-    margin: 0 16px 16px;
-    padding: 12px 14px;
-    border-radius: 16px;
-    border-color: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-modifier-border));
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--interactive-accent) 5%, var(--background-secondary)),
-      color-mix(in srgb, var(--background-primary) 96%, var(--background-secondary))
-    );
-    box-shadow: none;
-  }
-
-  .ir-calendar-scheduling-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px;
-  }
-
-  .ir-calendar-scheduling-btn {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    appearance: none;
-    -webkit-appearance: none;
-    border: none;
-    background: transparent;
-    border-radius: var(--clickable-icon-radius, 6px);
-    min-height: 36px;
-    width: 100%;
-    padding: 6px 10px;
-    cursor: pointer;
-    text-align: left;
-    box-shadow: none;
-    outline: none;
-    pointer-events: auto;
-    transition: background-color 0.15s ease, color 0.15s ease;
-  }
-
-  .ir-calendar-scheduling-btn:hover,
-  .ir-calendar-scheduling-btn.is-focused {
-    background: var(--background-modifier-hover);
-    transform: none;
-    box-shadow: none;
-  }
-
-  .ir-calendar-scheduling-label {
-    font-size: var(--font-ui-small, 13px);
-    font-weight: 600;
-    color: var(--text-normal);
-  }
-
-  .ir-calendar-scheduling-date {
-    font-size: var(--font-ui-smaller, 11px);
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .ir-calendar-scheduling-date.is-loading {
-    opacity: 0.45;
-  }
-
-  .ir-calendar-scheduling-date.is-unavailable {
-    opacity: 0.55;
-    font-style: italic;
-  }
-
-  .clear-tag-filter-btn {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    border-radius: var(--clickable-icon-radius, 8px);
-    padding: 6px 10px;
-    font-size: 11px;
-    cursor: pointer;
-  }
-
-  .clear-tag-filter-btn:hover {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover);
-  }
-
-  .search-empty-state {
-    gap: 8px;
-  }
-</style>

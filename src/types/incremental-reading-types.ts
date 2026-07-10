@@ -184,7 +184,7 @@ export interface ReadingYAMLFields {
 	"weave-reading-priority": number;
 	"weave-reading-topic-id"?: string;
 	"weave-reading-ir-deck-id"?: string;
-	"weave_tags"?: string[];
+	weave_tags?: string[];
 }
 
 // ===== 专题扩展 =====

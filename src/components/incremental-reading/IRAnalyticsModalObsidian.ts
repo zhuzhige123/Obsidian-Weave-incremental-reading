@@ -21,7 +21,9 @@ export class IRAnalyticsModalObsidian extends Modal {
 
 	onOpen() {
 		this.setTitle(
-			i18n.getCurrentLanguage() === "zh-CN" ? "增量阅读分析图表" : "Incremental Reading Analytics"
+			i18n.getCurrentLanguage() === "zh-CN"
+				? "增量阅读分析图表"
+				: "Incremental Reading Analytics",
 		);
 		configureWeaveObsidianModalLayout(this, {
 			modalClass: "weave-ir-analytics-modal",

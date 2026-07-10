@@ -25,8 +25,12 @@ export function supportsPointLinkedNotes(sourceType?: string | null): boolean {
 	return PDF_EPUB_SOURCE_TYPES.has(normalizeSourceType(sourceType));
 }
 
-export function supportsPointLinkedNotesForSourcePath(sourcePath?: string | null): boolean {
-	const normalized = normalizePath(String(sourcePath || "").trim()).toLowerCase();
+export function supportsPointLinkedNotesForSourcePath(
+	sourcePath?: string | null,
+): boolean {
+	const normalized = normalizePath(
+		String(sourcePath || "").trim(),
+	).toLowerCase();
 	if (!normalized) {
 		return false;
 	}
@@ -34,7 +38,7 @@ export function supportsPointLinkedNotesForSourcePath(sourcePath?: string | null
 }
 
 export function supportsPointLinkedNotesForScheduleItem(
-	item?: PointLinkedNotesScheduleCarrier | null
+	item?: PointLinkedNotesScheduleCarrier | null,
 ): boolean {
 	if (!item) {
 		return false;
@@ -53,7 +57,7 @@ export function supportsPointLinkedNotesForScheduleItem(
 }
 
 export function resolveExternalBookmarkTaskKind(
-	item?: PointLinkedNotesScheduleCarrier | null
+	item?: PointLinkedNotesScheduleCarrier | null,
 ): "pdf" | "epub" | null {
 	if (!item) {
 		return null;
@@ -75,7 +79,9 @@ export function resolveExternalBookmarkTaskKind(
 		return "epub";
 	}
 
-	const sourcePath = normalizePath(String(item.sourceFile || "").trim()).toLowerCase();
+	const sourcePath = normalizePath(
+		String(item.sourceFile || "").trim(),
+	).toLowerCase();
 	if (sourcePath.endsWith(".pdf")) {
 		return "pdf";
 	}
@@ -90,7 +96,9 @@ function hasExplicitExtension(path: string): boolean {
 	return /\.[^/.]+$/i.test(path);
 }
 
-export function isLinkableVaultNotePath(path: string | undefined | null): boolean {
+export function isLinkableVaultNotePath(
+	path: string | undefined | null,
+): boolean {
 	const normalized = normalizePath(String(path || "").trim());
 	if (!normalized) {
 		return false;
@@ -117,7 +125,9 @@ export function listLinkableVaultNoteFiles(app: App): TFile[] {
 	return app.vault.getFiles().filter((file) => isLinkableVaultNoteFile(file));
 }
 
-export function getLinkableVaultNoteIcon(path: string | undefined | null): string {
+export function getLinkableVaultNoteIcon(
+	path: string | undefined | null,
+): string {
 	const normalized = normalizePath(String(path || "").trim()).toLowerCase();
 	if (normalized.endsWith(".canvas")) {
 		return "layout-grid";

@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IR_CALENDAR_DAY_INDEX_VERSION, IRCalendarDayIndexService } from "../IRCalendarDayIndexService";
+import {
+	IRCalendarDayIndexService,
+	IR_CALENDAR_DAY_INDEX_VERSION,
+} from "../IRCalendarDayIndexService";
 
 vi.mock("../../../config/paths", () => ({
 	getPluginPaths: vi.fn(() => ({
 		cache: {
 			incrementalReading: {
-				irCalendarDayIndex: ".obsidian/plugins/weave-incremental-reading/cache/ir-calendar-day-index.json",
+				irCalendarDayIndex:
+					".obsidian/plugins/weave-incremental-reading/cache/ir-calendar-day-index.json",
 			},
 		},
 	})),
@@ -73,7 +77,9 @@ describe("IRCalendarDayIndexService", () => {
 		});
 
 		expect(tier0?.materialsByDate.get("2026-05-29")).toHaveLength(1);
-		expect(tier0?.materialsByDate.get("2026-05-29")?.[0]?.title).toBe("今日阅读点");
+		expect(tier0?.materialsByDate.get("2026-05-29")?.[0]?.title).toBe(
+			"今日阅读点",
+		);
 		expect(tier0?.daySummaries.get("2026-05-29")?.totalCount).toBe(1);
 	});
 
@@ -199,6 +205,7 @@ describe("IRCalendarDayIndexService", () => {
 		const hydrated = await service.tryHydrateDateKeys({
 			cacheKey,
 			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
 			dateKeys: ["2026-05-29", "2026-05-30"],
 		});
 		expect(hydrated?.materialsByDate.get("2026-05-29")).toEqual([]);
@@ -206,8 +213,8 @@ describe("IRCalendarDayIndexService", () => {
 
 		const persisted = JSON.parse(
 			files.get(
-				".obsidian/plugins/weave-incremental-reading/cache/ir-calendar-day-index.json"
-			) || "{}"
+				".obsidian/plugins/weave-incremental-reading/cache/ir-calendar-day-index.json",
+			) || "{}",
 		);
 		expect(persisted.version).toBe(IR_CALENDAR_DAY_INDEX_VERSION);
 	});
@@ -281,11 +288,16 @@ describe("IRCalendarDayIndexService", () => {
 		const hydrated = await service.tryHydrateDateKeys({
 			cacheKey,
 			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-b",
 			dateKeys: ["2026-05-29", "2026-05-30"],
 		});
 		expect(hydrated?.materialsByDate.get("2026-05-29")).toHaveLength(1);
-		expect(hydrated?.materialsByDate.get("2026-05-29")?.[0]?.id).toBe("chunk-1");
-		expect(hydrated?.materialsByDate.get("2026-05-30")?.[0]?.id).toBe("chunk-2b");
+		expect(hydrated?.materialsByDate.get("2026-05-29")?.[0]?.id).toBe(
+			"chunk-1",
+		);
+		expect(hydrated?.materialsByDate.get("2026-05-30")?.[0]?.id).toBe(
+			"chunk-2b",
+		);
 
 		await service.flushPendingWrites();
 		const monthHeatmap = await service.tryHydrateMonthHeatmap({
@@ -295,6 +307,43 @@ describe("IRCalendarDayIndexService", () => {
 		});
 		expect(monthHeatmap?.get("2026-05")?.["2026-05-29"]).toBe(1);
 		expect(monthHeatmap?.get("2026-05")?.["2026-05-30"]).toBe(1);
+	});
+
+	it("drops shell hydration when schedule fingerprint changes", async () => {
+		const service = new IRCalendarDayIndexService(app);
+		const cacheKey = "__all__::__default__";
+		await service.syncFromMaterialsByDate({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
+			materialsByDate: new Map([
+				[
+					"2026-05-29",
+					[
+						{
+							id: "chunk-1",
+							title: "今日阅读点",
+							sourceFile: "Notes/demo.md",
+							priority: 5,
+							intervalDays: 1,
+							scheduleStatus: "scheduled",
+							nextRepDate: 0,
+							nextReviewDate: null,
+						} as any,
+					],
+				],
+			]),
+			priorityDateKeys: ["2026-05-29"],
+		});
+
+		const hydrated = await service.tryHydrateDateKeys({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-b",
+			dateKeys: ["2026-05-29"],
+		});
+
+		expect(hydrated).toBeNull();
 	});
 
 	it("hydrates tier-0 even when priority dates are empty", async () => {

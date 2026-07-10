@@ -10,7 +10,7 @@ export async function populateReadingPointTopicSubmenu(
 	submenu: Menu,
 	app: App,
 	material: ScheduleItem,
-	onSaved?: () => void
+	onSaved?: () => void,
 ): Promise<void> {
 	try {
 		const service = new IRReadingPointEditService(app);
@@ -46,7 +46,7 @@ export async function populateReadingPointTopicSubmenu(
 				.setTitle(
 					i18n.t("irServiceNotices.topicSubmenu.currentTopic", {
 						topic: draft.deckName || draft.deckId,
-					})
+					}),
 				)
 				.setDisabled(true);
 		});
@@ -63,8 +63,10 @@ export async function populateReadingPointTopicSubmenu(
 						const result = await service.saveTopicChange(material, deck.id);
 						if (result.changed) {
 							new Notice(
-								i18n.t("irServiceNotices.topicSubmenu.movedToTopic", { deckName: deck.name }),
-								2500
+								i18n.t("irServiceNotices.topicSubmenu.movedToTopic", {
+									deckName: deck.name,
+								}),
+								2500,
 							);
 						}
 						onSaved?.();

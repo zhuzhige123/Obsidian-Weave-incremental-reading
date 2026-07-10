@@ -46,14 +46,20 @@ export class DeferredLeafRedirectController {
 		this.disposed = false;
 
 		if (typeof this.workspace.on === "function") {
-			this.activeLeafChangeRef = this.workspace.on("active-leaf-change", (leaf) => {
-				if (leaf === this.leaf) {
-					this.request();
-				}
-			});
+			this.activeLeafChangeRef = this.workspace.on(
+				"active-leaf-change",
+				(leaf) => {
+					if (leaf === this.leaf) {
+						this.request();
+					}
+				},
+			);
 		}
 
-		if (!this.isLayoutReady() && typeof this.workspace.onLayoutReady === "function") {
+		if (
+			!this.isLayoutReady() &&
+			typeof this.workspace.onLayoutReady === "function"
+		) {
 			try {
 				this.workspace.onLayoutReady(() => {
 					if (this.disposed) {
@@ -72,7 +78,10 @@ export class DeferredLeafRedirectController {
 		this.disposed = true;
 		this.clearTimer();
 
-		if (this.activeLeafChangeRef && typeof this.workspace.offref === "function") {
+		if (
+			this.activeLeafChangeRef &&
+			typeof this.workspace.offref === "function"
+		) {
 			this.workspace.offref(this.activeLeafChangeRef);
 		}
 		this.activeLeafChangeRef = null;

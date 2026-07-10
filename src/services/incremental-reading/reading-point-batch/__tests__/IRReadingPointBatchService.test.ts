@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleItem } from "../../IRCalendarScheduleItem";
 import {
-	dedupeMaterials,
 	IRReadingPointBatchService,
+	dedupeMaterials,
 } from "../IRReadingPointBatchService";
 
 vi.mock("../../../../utils/obsidian-confirm", () => ({
@@ -85,7 +85,10 @@ describe("IRReadingPointBatchService", () => {
 			resolveBlockV4: vi.fn(),
 		});
 
-		const result = await service.batchMoveTopic([makeMaterial("point-1")], "deck-a");
+		const result = await service.batchMoveTopic(
+			[makeMaterial("point-1")],
+			"deck-a",
+		);
 
 		expect(result).toEqual({ total: 1, success: 0, failed: 0, skipped: 1 });
 	});

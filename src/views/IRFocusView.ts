@@ -1,4 +1,9 @@
-import { ItemView, Platform, type ViewStateResult, WorkspaceLeaf } from "obsidian";
+import {
+	ItemView,
+	Platform,
+	type ViewStateResult,
+	WorkspaceLeaf,
+} from "obsidian";
 import type { WeavePlugin } from "../main";
 import { IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
 import { i18n } from "../utils/i18n";
@@ -64,7 +69,10 @@ export class IRFocusView extends ItemView {
 		};
 	}
 
-	async setState(state: Record<string, unknown>, result: ViewStateResult): Promise<void> {
+	async setState(
+		state: Record<string, unknown>,
+		result: ViewStateResult,
+	): Promise<void> {
 		await super.setState(state, result);
 
 		this.deckPath = typeof state?.deckPath === "string" ? state.deckPath : "";
@@ -89,7 +97,9 @@ export class IRFocusView extends ItemView {
 	private renderLegacyRemovedMessage(): void {
 		this.contentEl.empty();
 
-		const container = this.contentEl.createDiv({ cls: "weave-legacy-ir-focus-redirect" });
+		const container = this.contentEl.createDiv({
+			cls: "weave-legacy-ir-focus-redirect",
+		});
 		container.createEl("h3", {
 			text: i18n.t("irViews.focus.removedTitle"),
 		});
@@ -111,7 +121,7 @@ export class IRFocusView extends ItemView {
 			{
 				deckPath: this.deckPath,
 				deckName: this.deckName,
-			}
+			},
 		);
 
 		await this.plugin.redirectIncrementalReadingToSidebar({

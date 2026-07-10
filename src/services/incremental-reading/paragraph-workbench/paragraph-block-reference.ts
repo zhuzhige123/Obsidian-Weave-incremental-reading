@@ -1,7 +1,7 @@
-import { normalizePath, TFile, type App } from "obsidian";
+import { type App, TFile, normalizePath } from "obsidian";
 import { i18n } from "../../../utils/i18n";
-import type { ParagraphWorkbenchSegment } from "./types";
 import { logger } from "../../../utils/logger";
+import type { ParagraphWorkbenchSegment } from "./types";
 
 /** Obsidian 官方块 ID 行内标记：^block-id（含 IR 管理的 ir_ 前缀） */
 export const OBSIDIAN_BLOCK_ID_LINE_REGEX = /\^([A-Za-z0-9_-]+)/;
@@ -21,19 +21,29 @@ export function cleanParagraphBlockTitle(rawTitle: string): string {
 		.trim();
 }
 
-export function deriveSegmentTitleDraft(segment: ParagraphWorkbenchSegment | null | undefined): SegmentTitleDraft {
+export function deriveSegmentTitleDraft(
+	segment: ParagraphWorkbenchSegment | null | undefined,
+): SegmentTitleDraft {
 	if (!segment) {
-		return { title: i18n.t("irSidebar.calendar.untitledPoint"), titleDetected: false };
+		return {
+			title: i18n.t("irSidebar.calendar.untitledPoint"),
+			titleDetected: false,
+		};
 	}
 
-	const headingTitle = cleanParagraphBlockTitle(String(segment.title || segment.chapterTitle || ""));
+	const headingTitle = cleanParagraphBlockTitle(
+		String(segment.title || segment.chapterTitle || ""),
+	);
 	if (headingTitle) {
 		return { title: headingTitle, titleDetected: true };
 	}
 
-	const normalized = String(segment.text || "").replace(/\r\n?/g, "\n").trim();
+	const normalized = String(segment.text || "")
+		.replace(/\r\n?/g, "\n")
+		.trim();
 	const lines = normalized.split("\n");
-	const firstNonEmptyLine = lines.find((line) => line.trim().length > 0) || normalized;
+	const firstNonEmptyLine =
+		lines.find((line) => line.trim().length > 0) || normalized;
 	const headingMatch = firstNonEmptyLine.trim().match(/^#{1,6}\s+(.+)$/);
 	if (headingMatch?.[1]) {
 		const title = cleanParagraphBlockTitle(headingMatch[1]);
@@ -44,12 +54,17 @@ export function deriveSegmentTitleDraft(segment: ParagraphWorkbenchSegment | nul
 
 	const cleanedLine = cleanParagraphBlockTitle(firstNonEmptyLine);
 	return {
-		title: cleanedLine.length > 80 ? `${cleanedLine.slice(0, 80).trim()}...` : cleanedLine || i18n.t("irSidebar.calendar.untitledPoint"),
+		title:
+			cleanedLine.length > 80
+				? `${cleanedLine.slice(0, 80).trim()}...`
+				: cleanedLine || i18n.t("irSidebar.calendar.untitledPoint"),
 		titleDetected: false,
 	};
 }
 
-export function normalizeObsidianBlockId(raw: string | null | undefined): string | null {
+export function normalizeObsidianBlockId(
+	raw: string | null | undefined,
+): string | null {
 	const value = String(raw || "").trim();
 	if (!value) {
 		return null;
@@ -70,7 +85,7 @@ export function extractObsidianBlockIdFromText(text: string): string | null {
 }
 
 export function extractObsidianBlockIdFromSegment(
-	segment: ParagraphWorkbenchSegment | null | undefined
+	segment: ParagraphWorkbenchSegment | null | undefined,
 ): string | null {
 	if (!segment) {
 		return null;
@@ -89,18 +104,26 @@ export function generateObsidianBlockId(prefix = "ir_"): string {
 		suffix += chars.charAt(Math.floor(Math.random() * chars.length));
 	}
 	const normalizedPrefix = String(prefix || "ir_").trim() || "ir_";
-	return normalizedPrefix.endsWith("_") ? `${normalizedPrefix}${suffix}` : `${normalizedPrefix}_${suffix}`;
+	return normalizedPrefix.endsWith("_")
+		? `${normalizedPrefix}${suffix}`
+		: `${normalizedPrefix}_${suffix}`;
 }
 
 export function extractWikiLinkTarget(raw: string): string {
-	const match = String(raw || "").trim().match(WIKI_LINK_INNER_REGEX);
+	const match = String(raw || "")
+		.trim()
+		.match(WIKI_LINK_INNER_REGEX);
 	if (!match?.[1]) {
 		return "";
 	}
 	return match[1].split("|")[0]?.trim() || "";
 }
 
-export function buildObsidianBlockResumeLink(sourcePath: string, blockId: string, alias?: string): string {
+export function buildObsidianBlockResumeLink(
+	sourcePath: string,
+	blockId: string,
+	alias?: string,
+): string {
 	return buildObsidianBlockWikiLink(sourcePath, blockId, alias);
 }
 
@@ -119,19 +142,25 @@ export function resolveLegacyBlockResumeLink(block: {
 export function buildObsidianBlockWikiLink(
 	sourcePath: string,
 	blockId: string,
-	alias?: string
+	alias?: string,
 ): string {
 	const normalizedPath = normalizePath(String(sourcePath || "").trim());
 	const normalizedBlockId = formatObsidianBlockId(blockId);
 	if (!normalizedPath || !normalizedBlockId) {
 		return "";
 	}
-	const base = `${normalizedPath}${normalizedBlockId.startsWith("#") ? "" : `#${normalizedBlockId}`}`;
+	const base = `${normalizedPath}${
+		normalizedBlockId.startsWith("#") ? "" : `#${normalizedBlockId}`
+	}`;
 	const trimmedAlias = String(alias || "").trim();
 	return trimmedAlias ? `[[${base}|${trimmedAlias}]]` : `[[${base}]]`;
 }
 
-export function buildObsidianEmbedBlockWikiLink(sourcePath: string, blockId: string, alias?: string): string {
+export function buildObsidianEmbedBlockWikiLink(
+	sourcePath: string,
+	blockId: string,
+	alias?: string,
+): string {
 	const link = buildObsidianBlockWikiLink(sourcePath, blockId, alias);
 	return link ? `!${link}` : "";
 }
@@ -139,7 +168,7 @@ export function buildObsidianEmbedBlockWikiLink(sourcePath: string, blockId: str
 export function buildCanvasNodeWikiLink(
 	canvasPath: string,
 	nodeId: string,
-	alias?: string
+	alias?: string,
 ): string {
 	const normalizedPath = normalizePath(String(canvasPath || "").trim());
 	const normalizedNodeId = String(nodeId || "").trim();
@@ -151,12 +180,19 @@ export function buildCanvasNodeWikiLink(
 	return trimmedAlias ? `[[${base}|${trimmedAlias}]]` : `[[${base}]]`;
 }
 
-export function buildCanvasNodeEmbedWikiLink(canvasPath: string, nodeId: string, alias?: string): string {
+export function buildCanvasNodeEmbedWikiLink(
+	canvasPath: string,
+	nodeId: string,
+	alias?: string,
+): string {
 	const link = buildCanvasNodeWikiLink(canvasPath, nodeId, alias);
 	return link ? `!${link}` : "";
 }
 
-export function blockReferencesObsidianId(block: { notes?: string }, blockId: string): boolean {
+export function blockReferencesObsidianId(
+	block: { notes?: string },
+	blockId: string,
+): boolean {
 	const normalized = normalizeObsidianBlockId(blockId);
 	if (!normalized) {
 		return false;
@@ -166,20 +202,33 @@ export function blockReferencesObsidianId(block: { notes?: string }, blockId: st
 }
 
 export function findDuplicateBlockForSegment(
-	blocks: Array<{ id: string; startLine?: number; endLine?: number; notes?: string }>,
+	blocks: Array<{
+		id: string;
+		startLine?: number;
+		endLine?: number;
+		notes?: string;
+	}>,
 	segment: ParagraphWorkbenchSegment,
-	obsidianBlockId?: string | null
-): { id: string; startLine?: number; endLine?: number; notes?: string } | undefined {
-	const normalizedBlockId = normalizeObsidianBlockId(obsidianBlockId || extractObsidianBlockIdFromSegment(segment));
+	obsidianBlockId?: string | null,
+):
+	| { id: string; startLine?: number; endLine?: number; notes?: string }
+	| undefined {
+	const normalizedBlockId = normalizeObsidianBlockId(
+		obsidianBlockId || extractObsidianBlockIdFromSegment(segment),
+	);
 	if (normalizedBlockId) {
-		const byBlockId = blocks.find((block) => blockReferencesObsidianId(block, normalizedBlockId));
+		const byBlockId = blocks.find((block) =>
+			blockReferencesObsidianId(block, normalizedBlockId),
+		);
 		if (byBlockId) {
 			return byBlockId;
 		}
 	}
 
 	const startLine =
-		typeof segment.metadata?.startLine === "number" ? Number(segment.metadata.startLine) : 0;
+		typeof segment.metadata?.startLine === "number"
+			? Number(segment.metadata.startLine)
+			: 0;
 	const endLine =
 		typeof segment.metadata?.endLine === "number"
 			? Number(segment.metadata.endLine)
@@ -188,13 +237,18 @@ export function findDuplicateBlockForSegment(
 	return blocks.find(
 		(block) =>
 			block.startLine === startLine &&
-			(typeof block.endLine !== "number" || block.endLine === endLine)
+			(typeof block.endLine !== "number" || block.endLine === endLine),
 	);
 }
 
-function readSegmentLineRange(segment: ParagraphWorkbenchSegment): { startLine: number; endLine: number } {
+function readSegmentLineRange(segment: ParagraphWorkbenchSegment): {
+	startLine: number;
+	endLine: number;
+} {
 	const startLine =
-		typeof segment.metadata?.startLine === "number" ? Number(segment.metadata.startLine) : 0;
+		typeof segment.metadata?.startLine === "number"
+			? Number(segment.metadata.startLine)
+			: 0;
 	const endLine =
 		typeof segment.metadata?.endLine === "number"
 			? Number(segment.metadata.endLine)
@@ -208,7 +262,7 @@ function readSegmentLineRange(segment: ParagraphWorkbenchSegment): { startLine: 
 export async function ensureSegmentBlockIdInSourceFile(
 	app: App,
 	sourcePath: string,
-	segment: ParagraphWorkbenchSegment
+	segment: ParagraphWorkbenchSegment,
 ): Promise<string> {
 	const normalizedPath = normalizePath(String(sourcePath || "").trim());
 	const file = app.vault.getAbstractFileByPath(normalizedPath);
@@ -224,7 +278,10 @@ export async function ensureSegmentBlockIdInSourceFile(
 	const content = await app.vault.read(file);
 	const lines = content.split(/\r\n?/);
 	const { endLine } = readSegmentLineRange(segment);
-	const targetLineIndex = Math.min(Math.max(endLine, 0), Math.max(lines.length - 1, 0));
+	const targetLineIndex = Math.min(
+		Math.max(endLine, 0),
+		Math.max(lines.length - 1, 0),
+	);
 	const blockId = generateObsidianBlockId();
 	const currentLine = lines[targetLineIndex] ?? "";
 
@@ -236,18 +293,22 @@ export async function ensureSegmentBlockIdInSourceFile(
 	}
 
 	const trimmedLine = currentLine.replace(/\s+$/, "");
-	lines[targetLineIndex] = trimmedLine ? `${trimmedLine} ^${blockId}` : `^${blockId}`;
+	lines[targetLineIndex] = trimmedLine
+		? `${trimmedLine} ^${blockId}`
+		: `^${blockId}`;
 	await app.vault.modify(file, lines.join("\n"));
 
 	logger.debug(
-		`[paragraph-block-reference] inserted block id ^${blockId} at ${normalizedPath}:${targetLineIndex + 1}`
+		`[paragraph-block-reference] inserted block id ^${blockId} at ${normalizedPath}:${
+			targetLineIndex + 1
+		}`,
 	);
 	return blockId;
 }
 
 export function resolveParagraphWorkbenchSourcePath(
 	sessionSourcePath: string,
-	editorSourcePath?: string | null
+	editorSourcePath?: string | null,
 ): string {
 	const sessionPath = normalizePath(String(sessionSourcePath || "").trim());
 	if (sessionPath) {

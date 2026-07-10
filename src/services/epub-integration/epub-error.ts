@@ -20,7 +20,11 @@ export class EpubError extends Error {
 	readonly code: EpubErrorCode;
 	readonly context?: Record<string, unknown>;
 
-	constructor(code: EpubErrorCode, message: string, context?: Record<string, unknown>) {
+	constructor(
+		code: EpubErrorCode,
+		message: string,
+		context?: Record<string, unknown>,
+	) {
 		super(message);
 		this.name = "EpubError";
 		this.code = code;
@@ -42,7 +46,7 @@ function isEpubError(error: unknown): error is EpubError {
 
 export function classifyEpubError(
 	error: unknown,
-	operation: EpubErrorOperation = "open"
+	operation: EpubErrorOperation = "open",
 ): ClassifiedEpubError {
 	const message = extractErrorMessage(error);
 	const code = resolveEpubErrorCode(error, message, operation);
@@ -57,7 +61,7 @@ export function classifyEpubError(
 
 export function reportEpubError(
 	error: unknown,
-	operation: EpubErrorOperation = "open"
+	operation: EpubErrorOperation = "open",
 ): ClassifiedEpubError {
 	const classified = classifyEpubError(error, operation);
 	logger.error(classified.logMessage, {
@@ -70,14 +74,17 @@ export function reportEpubError(
 function resolveEpubErrorCode(
 	error: unknown,
 	message: string,
-	operation: EpubErrorOperation
+	operation: EpubErrorOperation,
 ): EpubErrorCode {
 	if (isEpubError(error)) {
 		return error.code;
 	}
 
 	const normalizedMessage = String(message || "").toLowerCase();
-	if (normalizedMessage.includes("加载超时") || normalizedMessage.includes("timeout")) {
+	if (
+		normalizedMessage.includes("加载超时") ||
+		normalizedMessage.includes("timeout")
+	) {
 		return "load_timeout";
 	}
 	if (
@@ -87,16 +94,25 @@ function resolveEpubErrorCode(
 	) {
 		return "invalid_archive";
 	}
-	if (normalizedMessage.includes("epub 文件不存在") || normalizedMessage.includes("file not found")) {
+	if (
+		normalizedMessage.includes("epub 文件不存在") ||
+		normalizedMessage.includes("file not found")
+	) {
 		return "file_not_found";
 	}
 	if (normalizedMessage.includes("meta-inf/container.xml")) {
 		return "missing_container";
 	}
-	if (normalizedMessage.includes("package 文档路径") || normalizedMessage.includes("package document")) {
+	if (
+		normalizedMessage.includes("package 文档路径") ||
+		normalizedMessage.includes("package document")
+	) {
 		return "missing_package_document";
 	}
-	if (normalizedMessage.includes("xml parse failed") || normalizedMessage.includes("parsererror")) {
+	if (
+		normalizedMessage.includes("xml parse failed") ||
+		normalizedMessage.includes("parsererror")
+	) {
 		return "invalid_markup";
 	}
 	if (
@@ -106,7 +122,10 @@ function resolveEpubErrorCode(
 	) {
 		return operation === "render" ? "render_failed" : "invalid_cfi_target";
 	}
-	if (normalizedMessage.includes("reader_interop_unavailable") || normalizedMessage.includes("epub-reader-plugin-required")) {
+	if (
+		normalizedMessage.includes("reader_interop_unavailable") ||
+		normalizedMessage.includes("epub-reader-plugin-required")
+	) {
 		return "reader_interop_unavailable";
 	}
 	if (operation === "render") {
@@ -118,7 +137,11 @@ function resolveEpubErrorCode(
 	return "unknown";
 }
 
-function buildUserMessage(code: EpubErrorCode, operation: EpubErrorOperation, rawMessage: string): string {
+function buildUserMessage(
+	code: EpubErrorCode,
+	operation: EpubErrorOperation,
+	rawMessage: string,
+): string {
 	switch (code) {
 		case "file_not_found":
 			return "EPUB 文件不存在或已被移动，请确认源文件仍在库中";
@@ -147,10 +170,16 @@ function buildUserMessage(code: EpubErrorCode, operation: EpubErrorOperation, ra
 				? rawMessage
 				: "导入 EPUB 目录需要启用并更新 Weave EPUB 阅读器插件";
 		default:
-			return rawMessage && rawMessage !== "未知错误" ? `EPUB 处理失败：${rawMessage}` : "EPUB 处理失败";
+			return rawMessage && rawMessage !== "未知错误"
+				? `EPUB 处理失败：${rawMessage}`
+				: "EPUB 处理失败";
 	}
 }
 
-function buildLogMessage(code: EpubErrorCode, operation: EpubErrorOperation, message: string): string {
+function buildLogMessage(
+	code: EpubErrorCode,
+	operation: EpubErrorOperation,
+	message: string,
+): string {
 	return `[EPUB:${operation}:${code}] ${message}`;
 }

@@ -1,18 +1,22 @@
 import { getV2Paths } from "../../../config/paths";
 
 vi.mock("obsidian", async () => {
-	const actual = await vi.importActual<typeof import("../../../tests/mocks/obsidian")>(
-		"../../../tests/mocks/obsidian"
-	);
+	const actual = await vi.importActual<
+		typeof import("../../../tests/mocks/obsidian")
+	>("../../../tests/mocks/obsidian");
 	return {
 		...actual,
-		normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, ""),
+		normalizePath: (path: string) =>
+			path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, ""),
 	};
 });
 
 vi.mock("../../epub-integration/ir-epub-storage-access", () => ({
 	getIrEpubStorageService: () => ({
-		async ensureSourceIdentity(filePath: string, options?: { preferredSourceId?: string }) {
+		async ensureSourceIdentity(
+			filePath: string,
+			options?: { preferredSourceId?: string },
+		) {
 			return {
 				sourceId: options?.preferredSourceId || `src-${filePath}`,
 				filePath,
@@ -44,8 +48,8 @@ vi.mock("../IRProjectedScheduleSummary", () => ({
 	})),
 }));
 
-import { IRStorageService } from "../IRStorageService";
 import { IRPointStorageService } from "../IRPointStorageService";
+import { IRStorageService } from "../IRStorageService";
 import { IRWorkspaceSnapshotService } from "../IRWorkspaceSnapshotService";
 
 function normalizeTestPath(path: string): string {
@@ -58,9 +62,17 @@ function parentPath(path: string): string {
 	return idx > 0 ? normalized.slice(0, idx) : "";
 }
 
-function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs: string[] = []) {
+function createMemoryApp(
+	initialFiles: Record<string, string> = {},
+	initialDirs: string[] = [],
+) {
 	const files = new Map<string, string>();
-	const folders = new Set<string>(["", ".obsidian", ".obsidian/plugins", ".obsidian/plugins/weave"]);
+	const folders = new Set<string>([
+		"",
+		".obsidian",
+		".obsidian/plugins",
+		".obsidian/plugins/weave",
+	]);
 
 	const ensureDir = (dir: string) => {
 		const normalized = normalizeTestPath(dir);
@@ -102,7 +114,8 @@ function createMemoryApp(initialFiles: Record<string, string> = {}, initialDirs:
 			const childFiles: string[] = [];
 
 			for (const folder of folders) {
-				if (!folder || folder === normalized || !folder.startsWith(prefix)) continue;
+				if (!folder || folder === normalized || !folder.startsWith(prefix))
+					continue;
 				const rest = folder.slice(prefix.length);
 				if (!rest || rest.includes("/")) continue;
 				childFolders.add(folder);
@@ -161,7 +174,9 @@ describe("IRWorkspaceSnapshotService", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-04-17T09:00:00.000Z"));
 		vi.restoreAllMocks();
-		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(undefined);
+		vi.spyOn(IRStorageService.prototype, "initialize").mockResolvedValue(
+			undefined,
+		);
 		vi.spyOn(IRStorageService.prototype, "getAllDecks").mockResolvedValue({
 			"topic-1": {
 				id: "topic-1",
@@ -171,9 +186,13 @@ describe("IRWorkspaceSnapshotService", () => {
 			} as any,
 		});
 		vi.spyOn(IRStorageService.prototype, "getAllBlocks").mockResolvedValue({});
-		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue({});
+		vi.spyOn(IRStorageService.prototype, "getAllChunkData").mockResolvedValue(
+			{},
+		);
 		vi.spyOn(IRStorageService.prototype, "getAllSources").mockResolvedValue({});
-		vi.spyOn(IRStorageService.prototype, "getHistory").mockResolvedValue({ sessions: [] });
+		vi.spyOn(IRStorageService.prototype, "getHistory").mockResolvedValue({
+			sessions: [],
+		});
 	});
 
 	afterEach(() => {
@@ -349,9 +368,13 @@ describe("IRWorkspaceSnapshotService", () => {
 			"pdfbm-1",
 			"pdfbm-legacy-only",
 		]);
-		expect(workspaceData.epubTasks.map((task) => task.id)).toEqual(["epubbm-1"]);
+		expect(workspaceData.epubTasks.map((task) => task.id)).toEqual([
+			"epubbm-1",
+		]);
 		expect(workspaceData.blocksRecord).toEqual({});
-		expect(workspaceData.pdfTasks.find((task) => task.id === "pdfbm-1")).toMatchObject({
+		expect(
+			workspaceData.pdfTasks.find((task) => task.id === "pdfbm-1"),
+		).toMatchObject({
 			title: "新 PDF",
 			status: "active",
 			priorityUi: 7,
@@ -379,23 +402,25 @@ describe("IRWorkspaceSnapshotService", () => {
 		let resolveFirstDecks!: (value: Record<string, any>) => void;
 		let getAllDecksCallCount = 0;
 
-		vi.spyOn(IRStorageService.prototype, "getAllDecks").mockImplementation(async () => {
-			getAllDecksCallCount += 1;
-			if (getAllDecksCallCount === 1) {
-				return await new Promise((resolve) => {
-					resolveFirstDecks = resolve;
-				});
-			}
+		vi.spyOn(IRStorageService.prototype, "getAllDecks").mockImplementation(
+			async () => {
+				getAllDecksCallCount += 1;
+				if (getAllDecksCallCount === 1) {
+					return await new Promise((resolve) => {
+						resolveFirstDecks = resolve;
+					});
+				}
 
-			return {
-				"topic-2": {
-					id: "topic-2",
-					name: "专题二",
-					path: "topic-2",
-					blockIds: [],
-				} as any,
-			};
-		});
+				return {
+					"topic-2": {
+						id: "topic-2",
+						name: "专题二",
+						path: "topic-2",
+						blockIds: [],
+					} as any,
+				};
+			},
+		);
 
 		const service = new IRWorkspaceSnapshotService(app);
 		const stalePromise = service.getDeckOverview();

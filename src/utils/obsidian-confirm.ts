@@ -16,7 +16,7 @@ export interface ConfirmOptions {
 export function showObsidianConfirm(
 	app: App,
 	message: string,
-	options: ConfirmOptions = {}
+	options: ConfirmOptions = {},
 ): Promise<boolean> {
 	const {
 		title = i18n.t("irMain.dialog.confirm"),
@@ -29,18 +29,24 @@ export function showObsidianConfirm(
 		const modal = new Modal(app);
 		modal.titleEl.setText(title);
 
-		const messageEl = modal.contentEl.createDiv({ cls: "obsidian-confirm-message" });
+		const messageEl = modal.contentEl.createDiv({
+			cls: "obsidian-confirm-message",
+		});
 		message.split("\n").forEach((line) => {
 			if (line.trim()) {
 				messageEl.createEl("p", { text: line });
 			}
 		});
 
-		const buttonContainer = modal.contentEl.createDiv({ cls: "obsidian-confirm-buttons" });
+		const buttonContainer = modal.contentEl.createDiv({
+			cls: "obsidian-confirm-buttons",
+		});
 
 		let confirmed = false;
 
-		const cancelButton = buttonContainer.createEl("button", { text: cancelText });
+		const cancelButton = buttonContainer.createEl("button", {
+			text: cancelText,
+		});
 		cancelButton.onclick = () => modal.close();
 
 		const confirmButton = buttonContainer.createEl("button", {
@@ -60,7 +66,7 @@ export function showObsidianConfirm(
 export function showDeleteConfirm(
 	app: App,
 	itemName: string,
-	customMessage?: string
+	customMessage?: string,
 ): Promise<boolean> {
 	const message =
 		customMessage || i18n.t("irMain.dialog.deleteMessage", { itemName });
@@ -74,7 +80,7 @@ export function showDeleteConfirm(
 export function showDangerConfirm(
 	app: App,
 	message: string,
-	title = i18n.t("irMain.dialog.warning")
+	title = i18n.t("irMain.dialog.warning"),
 ): Promise<boolean> {
 	return showObsidianConfirm(app, message, {
 		title,
@@ -107,7 +113,7 @@ export interface InputOptions {
 export function showObsidianChoice<T extends string>(
 	app: App,
 	message: string,
-	options: ChoiceDialogOptions<T>
+	options: ChoiceDialogOptions<T>,
 ): Promise<T | null> {
 	const {
 		title = i18n.t("irMain.dialog.chooseTitle"),
@@ -121,7 +127,9 @@ export function showObsidianChoice<T extends string>(
 		modal.titleEl.setText(title);
 
 		if (message) {
-			const messageEl = modal.contentEl.createDiv({ cls: "obsidian-confirm-message" });
+			const messageEl = modal.contentEl.createDiv({
+				cls: "obsidian-confirm-message",
+			});
 			message.split("\n").forEach((line) => {
 				if (line.trim()) {
 					messageEl.createEl("p", { text: line });
@@ -129,17 +137,21 @@ export function showObsidianChoice<T extends string>(
 			});
 		}
 
-		const choiceContainer = modal.contentEl.createDiv({ cls: "obsidian-choice-buttons" });
+		const choiceContainer = modal.contentEl.createDiv({
+			cls: "obsidian-choice-buttons",
+		});
 		choiceContainer.addClass(
 			layout === "horizontal"
 				? "obsidian-choice-buttons--horizontal"
-				: "obsidian-choice-buttons--vertical"
+				: "obsidian-choice-buttons--vertical",
 		);
 
 		let result: T | null = null;
 
 		for (const choice of choices) {
-			const optionEl = choiceContainer.createDiv({ cls: "obsidian-choice-option" });
+			const optionEl = choiceContainer.createDiv({
+				cls: "obsidian-choice-option",
+			});
 			if (layout === "horizontal") {
 				optionEl.addClass("obsidian-choice-option--horizontal");
 			}
@@ -152,7 +164,7 @@ export function showObsidianChoice<T extends string>(
 			button.addClass(
 				layout === "horizontal"
 					? "obsidian-choice-option-button--center"
-					: "obsidian-choice-option-button--left"
+					: "obsidian-choice-option-button--left",
 			);
 
 			if (choice.description) {
@@ -167,17 +179,25 @@ export function showObsidianChoice<T extends string>(
 		}
 
 		if (layout === "horizontal") {
-			const cancelOptionEl = choiceContainer.createDiv({ cls: "obsidian-choice-option" });
+			const cancelOptionEl = choiceContainer.createDiv({
+				cls: "obsidian-choice-option",
+			});
 			cancelOptionEl.addClass("obsidian-choice-option--horizontal");
 
-			const cancelButton = cancelOptionEl.createEl("button", { text: cancelText });
+			const cancelButton = cancelOptionEl.createEl("button", {
+				text: cancelText,
+			});
 			cancelButton.addClass("obsidian-choice-option-button");
 			cancelButton.addClass("obsidian-choice-option-button--center");
 			cancelButton.addClass("obsidian-choice-option-button--secondary");
 			cancelButton.onclick = () => modal.close();
 		} else {
-			const buttonContainer = modal.contentEl.createDiv({ cls: "obsidian-confirm-buttons" });
-			const cancelButton = buttonContainer.createEl("button", { text: cancelText });
+			const buttonContainer = modal.contentEl.createDiv({
+				cls: "obsidian-confirm-buttons",
+			});
+			const cancelButton = buttonContainer.createEl("button", {
+				text: cancelText,
+			});
 			cancelButton.onclick = () => modal.close();
 		}
 
@@ -190,7 +210,7 @@ export function showObsidianInput(
 	app: App,
 	message: string,
 	defaultValue = "",
-	options: InputOptions = {}
+	options: InputOptions = {},
 ): Promise<string | null> {
 	const {
 		title = i18n.t("irMain.dialog.inputTitle"),
@@ -214,11 +234,15 @@ export function showObsidianInput(
 		});
 		inputEl.addClass("obsidian-confirm-input");
 
-		const buttonContainer = modal.contentEl.createDiv({ cls: "obsidian-input-buttons" });
+		const buttonContainer = modal.contentEl.createDiv({
+			cls: "obsidian-input-buttons",
+		});
 
 		let result: string | null = null;
 
-		const cancelButton = buttonContainer.createEl("button", { text: cancelText });
+		const cancelButton = buttonContainer.createEl("button", {
+			text: cancelText,
+		});
 		cancelButton.onclick = () => modal.close();
 
 		const confirmButton = buttonContainer.createEl("button", {

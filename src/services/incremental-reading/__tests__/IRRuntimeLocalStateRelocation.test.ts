@@ -7,9 +7,13 @@ import { createMemoryApp, normalizeTestPath } from "./testMemoryApp";
 describe("IR runtime local state relocation", () => {
 	it("reads legacy sync-state but persists updates into plugin cache only", async () => {
 		const v2Paths = getV2Paths("");
-		const pluginPaths = getPluginPaths({ vault: { configDir: ".obsidian" } } as any);
+		const pluginPaths = getPluginPaths({
+			vault: { configDir: ".obsidian" },
+		} as any);
 		const legacyPath = normalizeTestPath(`${v2Paths.ir.root}/sync-state.json`);
-		const localPath = normalizeTestPath(pluginPaths.cache.incrementalReading.syncState);
+		const localPath = normalizeTestPath(
+			pluginPaths.cache.incrementalReading.syncState,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[legacyPath]: JSON.stringify({
@@ -60,9 +64,13 @@ describe("IR runtime local state relocation", () => {
 
 	it("reuses legacy document-group-map cache but writes the cache into plugin directory only", async () => {
 		const v2Paths = getV2Paths("");
-		const pluginPaths = getPluginPaths({ vault: { configDir: ".obsidian" } } as any);
+		const pluginPaths = getPluginPaths({
+			vault: { configDir: ".obsidian" },
+		} as any);
 		const legacyPath = normalizeTestPath(v2Paths.ir.documentGroupMap);
-		const localPath = normalizeTestPath(pluginPaths.cache.incrementalReading.documentGroupMap);
+		const localPath = normalizeTestPath(
+			pluginPaths.cache.incrementalReading.documentGroupMap,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[legacyPath]: JSON.stringify({
@@ -80,7 +88,9 @@ describe("IR runtime local state relocation", () => {
 		});
 		const service = new IRTagGroupService(app as any);
 
-		expect(await service.matchGroupForDocument("notes/demo.md")).toBe("default");
+		expect(await service.matchGroupForDocument("notes/demo.md")).toBe(
+			"default",
+		);
 		await service.updateDocumentGroupManual("notes/next.md", "default");
 
 		expect(files.has(localPath)).toBe(true);
@@ -99,9 +109,13 @@ describe("IR runtime local state relocation", () => {
 
 	it("loads legacy monitoring data but saves monitoring into plugin state only", async () => {
 		const v2Paths = getV2Paths("");
-		const pluginPaths = getPluginPaths({ vault: { configDir: ".obsidian" } } as any);
+		const pluginPaths = getPluginPaths({
+			vault: { configDir: ".obsidian" },
+		} as any);
 		const legacyPath = normalizeTestPath(`${v2Paths.ir.root}/monitoring.json`);
-		const localPath = normalizeTestPath(pluginPaths.state.incrementalReading.monitoring);
+		const localPath = normalizeTestPath(
+			pluginPaths.state.incrementalReading.monitoring,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[legacyPath]: JSON.stringify({
@@ -137,24 +151,34 @@ describe("IR runtime local state relocation", () => {
 
 		expect(files.has(localPath)).toBe(true);
 		expect(JSON.parse(files.get(localPath) || "{}")).toMatchObject({
-			dailyStats: expect.arrayContaining([expect.objectContaining({ date: "2026-04-16", dueCount: 2 })]),
+			dailyStats: expect.arrayContaining([
+				expect.objectContaining({ date: "2026-04-16", dueCount: 2 }),
+			]),
 		});
 		expect(JSON.parse(files.get(legacyPath) || "{}")).toMatchObject({
-			dailyStats: [expect.objectContaining({ date: "2026-04-16", dueCount: 2 })],
+			dailyStats: [
+				expect.objectContaining({ date: "2026-04-16", dueCount: 2 }),
+			],
 		});
 	});
 
 	it("reads legacy history/calendar/session files but persists updates into plugin state only", async () => {
 		const v2Paths = getV2Paths("");
-		const pluginPaths = getPluginPaths({ vault: { configDir: ".obsidian" } } as any);
+		const pluginPaths = getPluginPaths({
+			vault: { configDir: ".obsidian" },
+		} as any);
 		const historyLegacyPath = normalizeTestPath(v2Paths.ir.history);
-		const historyLocalPath = normalizeTestPath(pluginPaths.state.incrementalReading.history);
+		const historyLocalPath = normalizeTestPath(
+			pluginPaths.state.incrementalReading.history,
+		);
 		const calendarLegacyPath = normalizeTestPath(v2Paths.ir.calendarProgress);
 		const calendarLocalPath = normalizeTestPath(
-			pluginPaths.state.incrementalReading.calendarProgress
+			pluginPaths.state.incrementalReading.calendarProgress,
 		);
 		const studyLegacyPath = normalizeTestPath(v2Paths.ir.studySessions);
-		const studyLocalPath = normalizeTestPath(pluginPaths.state.incrementalReading.studySessions);
+		const studyLocalPath = normalizeTestPath(
+			pluginPaths.state.incrementalReading.studySessions,
+		);
 		const { app, files } = createMemoryApp({
 			initialFiles: {
 				[historyLegacyPath]: JSON.stringify({
@@ -201,8 +225,12 @@ describe("IR runtime local state relocation", () => {
 		});
 		const service = new IRStorageService(app as any);
 
-		expect((await service.getHistory()).sessions[0]?.id).toBe("legacy-history-1");
-		expect((await service.getCalendarProgress())["2026-04-16"]).toEqual(["chunk-1"]);
+		expect((await service.getHistory()).sessions[0]?.id).toBe(
+			"legacy-history-1",
+		);
+		expect((await service.getCalendarProgress())["2026-04-16"]).toEqual([
+			"chunk-1",
+		]);
 		expect((await service.getStudySessions())[0]?.id).toBe("legacy-study-1");
 
 		await service.addSession({

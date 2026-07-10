@@ -1,7 +1,12 @@
-import type { IRBlock, IRBlockMeta, IRChunkFileData, IRDeck } from "../../types/ir-types";
 import type { IRPointFileIndex } from "../../types/ir-point-storage-types";
-import type { IRWorkspaceDataSnapshot } from "./IRWorkspaceSnapshotService";
+import type {
+	IRBlock,
+	IRBlockMeta,
+	IRChunkFileData,
+	IRDeck,
+} from "../../types/ir-types";
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
+import type { IRWorkspaceDataSnapshot } from "./IRWorkspaceSnapshotService";
 
 export interface IRScheduleFingerprintSource {
 	decksRecord?: Record<string, IRDeck>;
@@ -18,7 +23,8 @@ function collectBookmarkLinkedNotePaths(meta: unknown): string[] {
 
 	const record = meta as IRBlockMeta;
 	return resolveAssociatedNotePaths({
-		associatedNotePath: record.primaryAssociatedNotePath || record.associatedNotePath,
+		associatedNotePath:
+			record.primaryAssociatedNotePath || record.associatedNotePath,
 		associatedNotePaths: record.associatedNotePaths,
 	});
 }
@@ -65,7 +71,9 @@ function hashString(input: string): string {
 	return `fnv1a:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
-export function buildScheduleFingerprint(source: IRScheduleFingerprintSource): string {
+export function buildScheduleFingerprint(
+	source: IRScheduleFingerprintSource,
+): string {
 	const chunkSignals: Record<string, unknown> = {};
 	for (const [chunkId, chunk] of Object.entries(source.chunksRecord || {})) {
 		chunkSignals[chunkId] = {
@@ -124,7 +132,7 @@ export function buildScheduleFingerprint(source: IRScheduleFingerprintSource): s
 }
 
 export function buildScheduleFingerprintFromWorkspace(
-	workspaceData: IRWorkspaceDataSnapshot
+	workspaceData: IRWorkspaceDataSnapshot,
 ): string {
 	return buildScheduleFingerprint({
 		decksRecord: workspaceData.decksRecord,
@@ -147,7 +155,10 @@ export function buildPointFilesIndexRevision(index: IRPointFileIndex): string {
 			pointCount: Math.max(0, Number(entry.pointCount || 0)),
 			updatedAt: String(entry.updatedAt || "").trim(),
 			pointIds: Array.isArray(entry.pointIds)
-				? [...entry.pointIds].map((id) => String(id || "").trim()).filter(Boolean).sort()
+				? [...entry.pointIds]
+						.map((id) => String(id || "").trim())
+						.filter(Boolean)
+						.sort()
 				: [],
 		}))
 		.filter((entry) => entry.file)
@@ -161,7 +172,7 @@ export function buildPointFilesIndexRevision(index: IRPointFileIndex): string {
 }
 
 export function buildExternalBookmarkTasksRevision(
-	tasks: Array<{ id?: string; updatedAt?: number; meta?: unknown }>
+	tasks: Array<{ id?: string; updatedAt?: number; meta?: unknown }>,
 ): string {
 	const signals = tasks
 		.map((task) => ({

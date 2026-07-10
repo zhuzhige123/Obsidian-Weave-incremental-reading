@@ -1,7 +1,7 @@
 /** 数据管理界面用的路径展示：优先相对规范目录，否则截断为 …/父目录/文件名 */
 export function formatIRDataManagementPathLabel(
 	absolutePath: string,
-	baseDir = ""
+	baseDir = "",
 ): { display: string; full: string } {
 	const full = absolutePath;
 	const normalizedBase = baseDir.replace(/\/$/, "");

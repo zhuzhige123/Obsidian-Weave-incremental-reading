@@ -1,27 +1,40 @@
 import { getLanguage } from "obsidian";
-import { logger } from "../utils/logger";
-import { isRecord } from "./unknown-record";
-import { vaultStorage } from "../utils/vault-local-storage";
-import { translations, translationOverrides } from "./i18n/resources";
-import type { I18nConfig, SupportedLanguage, TranslationKey } from "./i18n/types";
-import {
-	normalizePluginUiLanguagePreference,
-	type PluginUiLanguagePreference,
-} from "./i18n/plugin-ui-language";
 import { derived, get, writable } from "svelte/store";
+import { logger } from "../utils/logger";
+import { vaultStorage } from "../utils/vault-local-storage";
+import {
+	type PluginUiLanguagePreference,
+	normalizePluginUiLanguagePreference,
+} from "./i18n/plugin-ui-language";
+import { translationOverrides, translations } from "./i18n/resources";
+import type {
+	I18nConfig,
+	SupportedLanguage,
+	TranslationKey,
+} from "./i18n/types";
+import { isRecord } from "./unknown-record";
 
-export type { I18nConfig, SupportedLanguage, TranslationKey } from "./i18n/types";
+export type {
+	I18nConfig,
+	SupportedLanguage,
+	TranslationKey,
+} from "./i18n/types";
 export type { PluginUiLanguagePreference } from "./i18n/plugin-ui-language";
 export {
 	normalizePluginUiLanguagePreference,
 	PLUGIN_UI_LANGUAGE_OPTIONS,
 } from "./i18n/plugin-ui-language";
 
-function isTranslationBranch(value: string | TranslationKey | undefined): value is TranslationKey {
+function isTranslationBranch(
+	value: string | TranslationKey | undefined,
+): value is TranslationKey {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function mergeTranslationTrees(base: TranslationKey, override?: TranslationKey): TranslationKey {
+function mergeTranslationTrees(
+	base: TranslationKey,
+	override?: TranslationKey,
+): TranslationKey {
 	if (!override) {
 		return { ...base };
 	}
@@ -43,11 +56,20 @@ function mergeTranslationTrees(base: TranslationKey, override?: TranslationKey):
 }
 
 export const translationCatalog: Record<SupportedLanguage, TranslationKey> = {
-	"zh-CN": mergeTranslationTrees(translations["zh-CN"], translationOverrides["zh-CN"]),
-	"en-US": mergeTranslationTrees(translations["en-US"], translationOverrides["en-US"]),
+	"zh-CN": mergeTranslationTrees(
+		translations["zh-CN"],
+		translationOverrides["zh-CN"],
+	),
+	"en-US": mergeTranslationTrees(
+		translations["en-US"],
+		translationOverrides["en-US"],
+	),
 };
 
-export function flattenTranslationLeafKeys(tree: TranslationKey, prefix = ""): string[] {
+export function flattenTranslationLeafKeys(
+	tree: TranslationKey,
+	prefix = "",
+): string[] {
 	return Object.entries(tree).flatMap(([key, value]) => {
 		const nextKey = prefix ? `${prefix}.${key}` : key;
 		if (typeof value === "string") {
@@ -96,8 +118,12 @@ function getTranslationAliasCandidates(key: string): string[] {
 		}
 
 		const baseSegment = lastSegment.slice(0, -suffix.length);
-		const normalizedBase = `${baseSegment.charAt(0).toLowerCase()}${baseSegment.slice(1)}`;
-		candidates.add([...parts.slice(0, -1), normalizedBase, targetSegment].join("."));
+		const normalizedBase = `${baseSegment
+			.charAt(0)
+			.toLowerCase()}${baseSegment.slice(1)}`;
+		candidates.add(
+			[...parts.slice(0, -1), normalizedBase, targetSegment].join("."),
+		);
 		candidates.add([...parts.slice(0, -1), normalizedBase].join("."));
 
 		if (targetSegment === "description") {
@@ -105,8 +131,14 @@ function getTranslationAliasCandidates(key: string): string[] {
 		}
 	}
 
-	if (lastSegment === "connected" || lastSegment === "disconnected" || lastSegment === "testing") {
-		candidates.add([...parts.slice(0, -1), "statusLabel", lastSegment].join("."));
+	if (
+		lastSegment === "connected" ||
+		lastSegment === "disconnected" ||
+		lastSegment === "testing"
+	) {
+		candidates.add(
+			[...parts.slice(0, -1), "statusLabel", lastSegment].join("."),
+		);
 		candidates.add([...parts.slice(0, -1), "status", lastSegment].join("."));
 	}
 
@@ -187,7 +219,9 @@ function detectObsidianLanguage(): SupportedLanguage {
 // 状态管理
 // ============================================================================
 
-export const currentLanguage = writable<SupportedLanguage>(defaultConfig.defaultLanguage);
+export const currentLanguage = writable<SupportedLanguage>(
+	defaultConfig.defaultLanguage,
+);
 let pluginUiLanguagePreference: PluginUiLanguagePreference = "auto";
 let lastDetectedLanguage: SupportedLanguage | null = null;
 let stableDetectionCount = 0;
@@ -202,7 +236,7 @@ export function shouldFollowObsidianUiLanguage(): boolean {
 }
 
 export function applyPluginUiLanguagePreference(
-	preference: unknown
+	preference: unknown,
 ): SupportedLanguage {
 	pluginUiLanguagePreference = normalizePluginUiLanguagePreference(preference);
 	const resolvedLanguage =
@@ -228,7 +262,10 @@ export function syncI18nWithObsidianLanguage(): SupportedLanguage {
 		stableDetectionCount = 1;
 	}
 
-	if (stableDetectionCount >= REQUIRED_STABLE_DETECTIONS && get(currentLanguage) !== detectedLang) {
+	if (
+		stableDetectionCount >= REQUIRED_STABLE_DETECTIONS &&
+		get(currentLanguage) !== detectedLang
+	) {
 		currentLanguage.set(detectedLang);
 	}
 	return detectedLang;
@@ -291,7 +328,7 @@ export class I18nService {
 			if (!this.missingKeyWarnings.has(key)) {
 				this.missingKeyWarnings.add(key);
 				logger.warn(
-					`Translation not found for key: ${key} (lang: ${this.currentLang}, fallback: ${this.config.fallbackLanguage})`
+					`Translation not found for key: ${key} (lang: ${this.currentLang}, fallback: ${this.config.fallbackLanguage})`,
 				);
 			}
 
@@ -308,14 +345,17 @@ export class I18nService {
 		return Boolean(
 			this.resolveTranslation(key, this.currentLang) ||
 				(this.currentLang !== this.config.fallbackLanguage &&
-					this.resolveTranslation(key, this.config.fallbackLanguage))
+					this.resolveTranslation(key, this.config.fallbackLanguage)),
 		);
 	}
 
 	/**
 	 * 获取指定语言的翻译（含兼容别名）
 	 */
-	private resolveTranslation(key: string, language: SupportedLanguage): string | null {
+	private resolveTranslation(
+		key: string,
+		language: SupportedLanguage,
+	): string | null {
 		const directTranslation = this.getDirectTranslation(key, language);
 		if (directTranslation) {
 			return directTranslation;
@@ -334,7 +374,10 @@ export class I18nService {
 	/**
 	 * 获取指定语言的直接翻译
 	 */
-	private getDirectTranslation(key: string, language: SupportedLanguage): string | null {
+	private getDirectTranslation(
+		key: string,
+		language: SupportedLanguage,
+	): string | null {
 		const keys = key.split(".");
 		let current: unknown = translationCatalog[language];
 
@@ -352,7 +395,10 @@ export class I18nService {
 	/**
 	 * 插值处理
 	 */
-	private interpolate(text: string, params?: Record<string, string | number>): string {
+	private interpolate(
+		text: string,
+		params?: Record<string, string | number>,
+	): string {
 		if (!params) return text;
 
 		return text.replace(/\{(\w+)\}/g, (match, key: string) => {
@@ -393,7 +439,9 @@ export class I18nService {
 	 * 检查是否支持指定语言
 	 */
 	isLanguageSupported(language: string): language is SupportedLanguage {
-		return this.config.supportedLanguages.includes(language as SupportedLanguage);
+		return this.config.supportedLanguages.includes(
+			language as SupportedLanguage,
+		);
 	}
 }
 
@@ -404,13 +452,15 @@ export class I18nService {
 export const i18n = I18nService.getInstance();
 
 // 便捷的翻译函数
-export const t = (key: string, params?: Record<string, string | number>) => i18n.t(key, params);
+export const t = (key: string, params?: Record<string, string | number>) =>
+	i18n.t(key, params);
 
 // Svelte store 用于响应式翻译
 export const tr = derived(
 	currentLanguage,
-	(_$currentLanguage) => (key: string, params?: Record<string, string | number>) =>
-		i18n.t(key, params)
+	(_$currentLanguage) =>
+		(key: string, params?: Record<string, string | number>) =>
+			i18n.t(key, params),
 );
 
 // 用于渲染列表型文案（按换行拆分）。缺失翻译时返回空数组，避免渲染键名。

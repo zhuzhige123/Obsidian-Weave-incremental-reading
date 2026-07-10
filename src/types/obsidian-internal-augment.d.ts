@@ -13,12 +13,12 @@ type CodeMirrorEditorCompat = {
 	addLineClass: (
 		line: number | CodeMirrorLineHandle,
 		where: string,
-		className: string
+		className: string,
 	) => CodeMirrorLineHandle;
 	removeLineClass: (
 		line: number | CodeMirrorLineHandle,
 		where: string,
-		className: string
+		className: string,
 	) => void;
 	state: CodeMirrorEditorState;
 	dispatch: (transaction: {
@@ -53,7 +53,7 @@ declare module "obsidian" {
 	interface Workspace {
 		on(
 			name: "canvas:node-menu",
-			callback: (menu: Menu, node: CanvasMenuNode) => void
+			callback: (menu: Menu, node: CanvasMenuNode) => void,
 		): EventRef;
 		on(name: string, callback: (...args: unknown[]) => void): EventRef;
 	}
@@ -70,5 +70,3 @@ declare module "obsidian" {
 		cm?: CodeMirrorEditorCompat;
 	}
 }
-
-export {};

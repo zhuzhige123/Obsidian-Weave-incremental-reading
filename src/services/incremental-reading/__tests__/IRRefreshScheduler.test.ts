@@ -6,6 +6,12 @@ const runHeavyLoadMock = vi.fn();
 const notifyMock = vi.fn();
 const markCompleteMock = vi.fn();
 
+vi.mock("../IRScheduleIndexService", () => ({
+	getSharedIRScheduleIndexService: () => ({
+		peekScheduleFingerprint: vi.fn().mockResolvedValue("schedule-test"),
+	}),
+}));
+
 vi.mock("../IRProjectionRuntime", () => ({
 	getSharedIRProjectionRuntime: () => ({
 		shouldSkipBackgroundReconcile: shouldSkipMock,
@@ -43,8 +49,12 @@ describe("IRRefreshScheduler", () => {
 		vi.useFakeTimers();
 		vi.clearAllMocks();
 		shouldSkipMock.mockResolvedValue(false);
-		getCalendarQueryResultMock.mockResolvedValue({ materialsByDate: new Map() });
-		runHeavyLoadMock.mockImplementation(async (_owner: string, task: () => Promise<unknown>) => task());
+		getCalendarQueryResultMock.mockResolvedValue({
+			materialsByDate: new Map([["2026-06-19", [{ id: "chunk-1" }]]]),
+		});
+		runHeavyLoadMock.mockImplementation(
+			async (_owner: string, task: () => Promise<unknown>) => task(),
+		);
 	});
 
 	afterEach(() => {
@@ -68,10 +78,14 @@ describe("IRRefreshScheduler", () => {
 			expect.objectContaining({
 				includeReadingMaterials: false,
 				priorityDateKeys: ["2026-06-19"],
-			})
+			}),
 		);
 		expect(markCompleteMock).toHaveBeenCalled();
-		expect(notifyMock).toHaveBeenCalled();
+		expect(notifyMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				reconciledMaterialsByDate: expect.any(Map),
+			}),
+		);
 	});
 
 	it("does not enqueue reconcile when projection is already fresh", async () => {
@@ -100,7 +114,7 @@ describe("IRRefreshScheduler", () => {
 			expect.objectContaining({
 				reconcileFailed: true,
 				reason: "test-failure",
-			})
+			}),
 		);
 	});
 });

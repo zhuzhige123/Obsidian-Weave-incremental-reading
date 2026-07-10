@@ -1,5 +1,6 @@
 /** 邮箱绑定冲突时对用户展示的文案（不得包含具体邮箱） */
-export const ACTIVATION_EMAIL_BOUND_USER_MESSAGE = "该激活码已被绑定，请输入正确的邮箱";
+export const ACTIVATION_EMAIL_BOUND_USER_MESSAGE =
+	"该激活码已被绑定，请输入正确的邮箱";
 
 const EMAIL_IN_TEXT = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 

@@ -1,4 +1,7 @@
-import type { IRPlannedSchedule, IRPlannedScheduleItem } from "./IRScheduleKernel";
+import type {
+	IRPlannedSchedule,
+	IRPlannedScheduleItem,
+} from "./IRScheduleKernel";
 
 /** 从 dateKey（YYYY-MM-DD）提取月份键 YYYY-MM */
 export function toCalendarMonthKey(dateKey: string): string {
@@ -9,20 +12,24 @@ export function toCalendarMonthKey(dateKey: string): string {
 	return normalized;
 }
 
-export function normalizeDateKeys(dateKeys: Array<string | null | undefined>): string[] {
+export function normalizeDateKeys(
+	dateKeys: Array<string | null | undefined>,
+): string[] {
 	return Array.from(
-		new Set(dateKeys.map((key) => String(key || "").trim()).filter(Boolean))
+		new Set(dateKeys.map((key) => String(key || "").trim()).filter(Boolean)),
 	).sort();
 }
 
 export function mergePriorityDateKeys(
 	primary: Array<string | null | undefined> | undefined,
-	secondary: Array<string | null | undefined> | undefined
+	secondary: Array<string | null | undefined> | undefined,
 ): string[] {
 	return normalizeDateKeys([...(primary || []), ...(secondary || [])]);
 }
 
-export function dateKeyFromRepTimestamp(nextRepDate: number | undefined | null): string | null {
+export function dateKeyFromRepTimestamp(
+	nextRepDate: number | undefined | null,
+): string | null {
 	const timestamp = Number(nextRepDate);
 	if (!Number.isFinite(timestamp) || timestamp <= 0) {
 		return null;
@@ -45,7 +52,7 @@ export function deriveAffectedDateKeysFromPlannedItems(
 	options?: {
 		previousDateKeys?: string[];
 		anchorDateKey?: string;
-	}
+	},
 ): string[] {
 	const keys = new Set<string>();
 	const anchor = String(options?.anchorDateKey || "").trim();
@@ -68,8 +75,10 @@ export function deriveAffectedDateKeysFromPlannedItems(
 }
 
 export function derivePriorityDateKeysFromSchedule(
-	schedule: IRPlannedSchedule | { days?: Array<{ dateKey?: string; items?: unknown[] }> },
-	options?: { anchorDateKey?: string; limit?: number }
+	schedule:
+		| IRPlannedSchedule
+		| { days?: Array<{ dateKey?: string; items?: unknown[] }> },
+	options?: { anchorDateKey?: string; limit?: number },
 ): string[] {
 	const keys = new Set<string>();
 	const anchor = String(options?.anchorDateKey || "").trim();
@@ -90,7 +99,7 @@ export function derivePriorityDateKeysFromSchedule(
 }
 
 export function buildMonthSummariesFromDayCounts(
-	daySummaries: Record<string, { totalCount: number }>
+	daySummaries: Record<string, { totalCount: number }>,
 ): Record<string, Record<string, number>> {
 	const monthSummaries: Record<string, Record<string, number>> = {};
 	for (const [dateKey, summary] of Object.entries(daySummaries)) {
@@ -102,7 +111,10 @@ export function buildMonthSummariesFromDayCounts(
 		if (!monthSummaries[monthKey]) {
 			monthSummaries[monthKey] = {};
 		}
-		monthSummaries[monthKey][normalizedDateKey] = Math.max(0, Number(summary?.totalCount || 0));
+		monthSummaries[monthKey][normalizedDateKey] = Math.max(
+			0,
+			Number(summary?.totalCount || 0),
+		);
 	}
 	return monthSummaries;
 }

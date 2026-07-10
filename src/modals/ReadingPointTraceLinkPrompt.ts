@@ -3,13 +3,16 @@ import { mount, unmount } from "svelte";
 import ReadingPointTraceLinkPromptPanel from "../components/incremental-reading/reading-point-edit/ReadingPointTraceLinkPromptPanel.svelte";
 import type { ReadingPointTraceLinkPanelState } from "../components/incremental-reading/reading-point-edit/ReadingPointTraceLinkPromptPanel.types";
 import type WeavePlugin from "../main";
-import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
 import { buildSaveInputFromDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditSaveBuilder";
-import type { IRReadingPointEditDraft, IRReadingPointEditSaveResult } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
+import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
+import type {
+	IRReadingPointEditDraft,
+	IRReadingPointEditSaveResult,
+} from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
 import { resolveReadingPointSaveErrorMessage } from "../services/incremental-reading/reading-point-edit/reading-point-modal-utils";
-import { showObsidianConfirm } from "../utils/obsidian-confirm";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
+import { showObsidianConfirm } from "../utils/obsidian-confirm";
 
 export interface ReadingPointTraceLinkPromptOptions {
 	plugin: WeavePlugin;
@@ -24,7 +27,7 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 
 	constructor(
 		app: App,
-		private readonly options: ReadingPointTraceLinkPromptOptions
+		private readonly options: ReadingPointTraceLinkPromptOptions,
 	) {
 		super(app);
 	}
@@ -33,7 +36,9 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 		this.setTitle(i18n.t("irModals.readingPointTraceLink.title"));
 		this.modalEl.addClass("weave-reading-point-trace-link-prompt");
 
-		const panelHost = this.contentEl.createDiv({ cls: "weave-reading-point-trace-link-panel-host" });
+		const panelHost = this.contentEl.createDiv({
+			cls: "weave-reading-point-trace-link-panel-host",
+		});
 		this.component = mount(ReadingPointTraceLinkPromptPanel, {
 			target: panelHost,
 			props: {
@@ -45,13 +50,20 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 			},
 		});
 
-		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
-		const cancelButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.cancel") });
+		const buttonRow = this.contentEl.createDiv({
+			cls: "modal-button-container",
+		});
+		const cancelButton = buttonRow.createEl("button", {
+			text: i18n.t("irModals.common.cancel"),
+		});
 		cancelButton.onclick = () => {
 			void this.requestClose();
 		};
 
-		const saveButton = buttonRow.createEl("button", { text: i18n.t("irModals.common.save"), cls: "mod-cta" });
+		const saveButton = buttonRow.createEl("button", {
+			text: i18n.t("irModals.common.save"),
+			cls: "mod-cta",
+		});
 		saveButton.onclick = () => {
 			void this.submit();
 		};
@@ -62,12 +74,16 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 			this.forceClose();
 			return;
 		}
-		const confirmed = await showObsidianConfirm(this.app, i18n.t("irModals.common.discardChangesMessage"), {
-			title: i18n.t("irModals.common.discardChangesTitle"),
-			confirmText: i18n.t("irModals.common.close"),
-			cancelText: i18n.t("irModals.common.continueEditing"),
-			confirmClass: "mod-warning",
-		});
+		const confirmed = await showObsidianConfirm(
+			this.app,
+			i18n.t("irModals.common.discardChangesMessage"),
+			{
+				title: i18n.t("irModals.common.discardChangesTitle"),
+				confirmText: i18n.t("irModals.common.close"),
+				cancelText: i18n.t("irModals.common.continueEditing"),
+				confirmClass: "mod-warning",
+			},
+		);
 		if (confirmed) {
 			this.forceClose();
 		}
@@ -98,9 +114,10 @@ export class ReadingPointTraceLinkPrompt extends Modal {
 					{ linkInput: this.panelState.linkInput },
 					{
 						parsedTarget: this.panelState.parsedTarget,
-						preserveScheduleOnLinkChange: this.panelState.preserveScheduleOnLinkChange,
-					}
-				)
+						preserveScheduleOnLinkChange:
+							this.panelState.preserveScheduleOnLinkChange,
+					},
+				),
 			);
 
 			if (result.changed) {

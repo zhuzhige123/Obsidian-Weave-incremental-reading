@@ -20,12 +20,12 @@ import type {
 	IRSourceFileMeta,
 } from "../../types/ir-types";
 import { migrateToIRBlockV4 } from "../../types/ir-types";
-import { logger } from "../../utils/logger";
 import { i18n } from "../../utils/i18n";
 import {
 	readAdvancedScheduleSettingsSnapshot,
 	readTagGroupFollowMode,
 } from "../../utils/ir-plugin-host-access";
+import { logger } from "../../utils/logger";
 import { generateCardUUID } from "../identifier/WeaveIDGenerator";
 import { IRChunkScheduleAdapter } from "./IRChunkScheduleAdapter";
 import { IRCognitiveProfileService } from "./IRCognitiveProfileService";
@@ -35,29 +35,36 @@ import {
 	calculateNextRepDate,
 	calculatePriorityEWMA,
 } from "./IRCoreAlgorithmsV4";
-import { IREpubBookmarkTaskService, isEpubBookmarkTaskId } from "./IREpubBookmarkTaskService";
-import { IRPdfBookmarkTaskService, isPdfBookmarkTaskId } from "./IRPdfBookmarkTaskService";
-import { IRPlanGeneratorService } from "./IRPlanGeneratorService";
-import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
-import { persistBlockScheduleState } from "./IRPointScheduleMutator";
 import {
-	computeScheduleModeAdjustedBlock,
-} from "./IRScheduleModePreviewService";
-import { recordScheduleMenuActionInteraction } from "./IRScheduleModeMutationService";
-import { IRQueueGeneratorV4 } from "./IRQueueGeneratorV4";
+	IREpubBookmarkTaskService,
+	isEpubBookmarkTaskId,
+} from "./IREpubBookmarkTaskService";
+import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
+import {
+	IRPdfBookmarkTaskService,
+	isPdfBookmarkTaskId,
+} from "./IRPdfBookmarkTaskService";
+import { IRPlanGeneratorService } from "./IRPlanGeneratorService";
+import { persistBlockScheduleState } from "./IRPointScheduleMutator";
 import { IRPointWriteService } from "./IRPointWriteService";
+import { IRQueueGeneratorV4 } from "./IRQueueGeneratorV4";
 import { getSharedIRScheduleKernel } from "./IRScheduleKernel";
 import {
-	readSequenceMeta,
 	type IRPlannedDay,
 	type IRPlannedScheduleItem,
 	type IRScheduleExplanation,
+	readSequenceMeta,
 } from "./IRScheduleKernel";
+import { recordScheduleMenuActionInteraction } from "./IRScheduleModeMutationService";
+import { computeScheduleModeAdjustedBlock } from "./IRScheduleModePreviewService";
 import { calculateLoadSignal } from "./IRSchedulerV3";
 import { IRStateMachineV4 } from "./IRStateMachineV4";
 import { IRStorageAdapterV4 } from "./IRStorageAdapterV4";
 import { IRStorageService } from "./IRStorageService";
-import { computeTagGroupPriorityBias, IRTagGroupService } from "./IRTagGroupService";
+import {
+	IRTagGroupService,
+	computeTagGroupPriorityBias,
+} from "./IRTagGroupService";
 
 /**
  * 阅读完成数据
@@ -173,13 +180,15 @@ export class IRV4SchedulerService {
 
 		try {
 			this.autoBackfillTagGroupsOnce().catch((error) => {
-				logger.warn("[IRV4SchedulerService] autoBackfillTagGroupsOnce 失败:", error);
+				logger.warn(
+					"[IRV4SchedulerService] autoBackfillTagGroupsOnce 失败:",
+					error,
+				);
 			});
 			/*
 			logger.warn("[IRV4SchedulerService] autoBackfillTagGroupsOnce 失败:", error);
 			*/
-		} catch {
-		}
+		} catch {}
 		this.initialized = true;
 
 		logger.info("[IRV4SchedulerService] 初始化完成");
@@ -190,14 +199,18 @@ export class IRV4SchedulerService {
 			new Set(
 				(Array.isArray(values) ? values : [])
 					.map((value) => String(value || "").trim())
-					.filter(Boolean)
-			)
+					.filter(Boolean),
+			),
 		);
 	}
 
 	private async resolveDeckIdentifiers(deckPath: string): Promise<string[]> {
 		const deck = await this.storageAdapterV4.getDeckById(deckPath);
-		return this.toNormalizedDeckIdentifiers([deckPath, deck?.id || "", deck?.path || ""]);
+		return this.toNormalizedDeckIdentifiers([
+			deckPath,
+			deck?.id || "",
+			deck?.path || "",
+		]);
 	}
 
 	private async resolveCanonicalDeckId(deckPath: string): Promise<string> {
@@ -211,13 +224,14 @@ export class IRV4SchedulerService {
 	}
 
 	private async collectBookmarkTaskBlocks(
-		deckPath: string
+		deckPath: string,
 	): Promise<{ pdfTaskBlocks: IRBlockV4[]; epubTaskBlocks: IRBlockV4[] }> {
 		const deckIdentifiers = await this.resolveDeckIdentifiers(deckPath);
 
 		const pdfTaskMap = new Map<string, IRBlockV4>();
 		for (const identifier of deckIdentifiers) {
-			const tasks = await this._pdfBookmarkTaskService.getTasksByDeck(identifier);
+			const tasks =
+				await this._pdfBookmarkTaskService.getTasksByDeck(identifier);
 			for (const task of tasks) {
 				const block = this._pdfBookmarkTaskService.toBlockV4(task);
 				if (!pdfTaskMap.has(block.id)) {
@@ -228,7 +242,8 @@ export class IRV4SchedulerService {
 
 		const epubTaskMap = new Map<string, IRBlockV4>();
 		for (const identifier of deckIdentifiers) {
-			const tasks = await this._epubBookmarkTaskService.getTasksByDeck(identifier);
+			const tasks =
+				await this._epubBookmarkTaskService.getTasksByDeck(identifier);
 			for (const task of tasks) {
 				const block = this._epubBookmarkTaskService.toBlockV4(task);
 				if (!epubTaskMap.has(block.id)) {
@@ -254,14 +269,21 @@ export class IRV4SchedulerService {
 			}
 		} catch {}
 
-		let sources: Record<string, import("../../types/ir-types").IRSourceFileMeta> = {};
-		let chunks: Record<string, import("../../types/ir-types").IRChunkFileData> = {};
+		let sources: Record<
+			string,
+			import("../../types/ir-types").IRSourceFileMeta
+		> = {};
+		let chunks: Record<string, import("../../types/ir-types").IRChunkFileData> =
+			{};
 
 		try {
 			sources = await this.storageService.getAllSources();
 			chunks = await this.storageService.getAllChunkData();
 		} catch (error) {
-			logger.warn("[IRV4SchedulerService] 读取 sources/chunks 失败，跳过 tagGroup 回填:", error);
+			logger.warn(
+				"[IRV4SchedulerService] 读取 sources/chunks 失败，跳过 tagGroup 回填:",
+				error,
+			);
 			return;
 		}
 
@@ -284,7 +306,10 @@ export class IRV4SchedulerService {
 
 			let matched = "default";
 			try {
-				matched = await this.tagGroupService.matchGroupForDocument(originalPath, true);
+				matched = await this.tagGroupService.matchGroupForDocument(
+					originalPath,
+					true,
+				);
 			} catch {
 				matched = "default";
 			}
@@ -345,14 +370,14 @@ export class IRV4SchedulerService {
 						updatedChunkCount,
 					},
 					null,
-					2
-				)
+					2,
+				),
 			);
 		} catch {}
 
 		if (updatedSourceCount > 0 || updatedChunkCount > 0) {
 			logger.info(
-				`[IRV4SchedulerService] tagGroup 回填完成: sources=${updatedSourceCount}, chunks=${updatedChunkCount}`
+				`[IRV4SchedulerService] tagGroup 回填完成: sources=${updatedSourceCount}, chunks=${updatedChunkCount}`,
 			);
 		}
 	}
@@ -375,7 +400,7 @@ export class IRV4SchedulerService {
 			currentSourcePath?: string | null;
 			markActive?: boolean;
 			preloadedBlocks?: IRBlockV4[];
-		}
+		},
 	): Promise<{
 		queue: IRBlockV4[];
 		totalEstimatedMinutes: number;
@@ -401,7 +426,7 @@ export class IRV4SchedulerService {
 		this.queueGenerator.setAgingStrength(advSettings.agingStrength);
 		this.queueGenerator.setInterleavePreferences(
 			advSettings.interleaveMode !== false,
-			advSettings.maxConsecutiveSameTopic ?? 3
+			advSettings.maxConsecutiveSameTopic ?? 3,
 		);
 
 		const endOfToday = new Date();
@@ -409,7 +434,8 @@ export class IRV4SchedulerService {
 		const dueCutoffMs = endOfToday.getTime();
 
 		const preloadedBlocks =
-			Array.isArray(options?.preloadedBlocks) && options.preloadedBlocks.length > 0
+			Array.isArray(options?.preloadedBlocks) &&
+			options.preloadedBlocks.length > 0
 				? options.preloadedBlocks
 				: null;
 		const chunkBlocks = preloadedBlocks
@@ -425,18 +451,29 @@ export class IRV4SchedulerService {
 		} catch (error) {
 			logger.warn(
 				"[IRV4SchedulerService] 读取 PDF/EPUB 阅读点兼容视图失败（将继续仅使用 chunk 阅读点队列）",
-				error
+				error,
 			);
 		}
-		const allBlocks: IRBlockV4[] = [...chunkBlocks, ...pdfTaskBlocks, ...epubTaskBlocks];
+		const allBlocks: IRBlockV4[] = [
+			...chunkBlocks,
+			...pdfTaskBlocks,
+			...epubTaskBlocks,
+		];
 
 		// maxAppearancesPerDay 过滤：跳过今日已达上限的块
 		const maxPerDay = advSettings.maxAppearancesPerDay ?? 2;
 		const todayStr = new Date().toISOString().slice(0, 10);
 		const blocks = allBlocks.filter((_b) => {
-			if (_b.status === "done" || _b.status === "suspended" || _b.status === "removed")
+			if (
+				_b.status === "done" ||
+				_b.status === "suspended" ||
+				_b.status === "removed"
+			)
 				return false;
-			const count = _b.stats.todayShownDate === todayStr ? _b.stats.todayShownCount || 0 : 0;
+			const count =
+				_b.stats.todayShownDate === todayStr
+					? _b.stats.todayShownCount || 0
+					: 0;
 			return count < maxPerDay;
 		});
 		if (blocks.length === 0) {
@@ -474,7 +511,10 @@ export class IRV4SchedulerService {
 				next = this.stateMachine.transitionToQueued(next, 1);
 			}
 
-			if (next.status === "queued" && (next.nextRepDate === 0 || next.nextRepDate <= dueCutoffMs)) {
+			if (
+				next.status === "queued" &&
+				(next.nextRepDate === 0 || next.nextRepDate <= dueCutoffMs)
+			) {
 				next = {
 					...next,
 					status: "scheduled",
@@ -488,7 +528,11 @@ export class IRV4SchedulerService {
 		let persistedTransitions = 0;
 		const pendingChunkUpdates: Array<{
 			chunkId: string;
-			data: { scheduleStatus: IRBlockStatus; intervalDays: number; nextRepDate: number };
+			data: {
+				scheduleStatus: IRBlockStatus;
+				intervalDays: number;
+				nextRepDate: number;
+			};
 		}> = [];
 
 		for (const updated of transitioned) {
@@ -540,13 +584,21 @@ export class IRV4SchedulerService {
 		// 自动后推：过载时将低优先级 scheduled 块推迟
 		// 当启用负载顺延（IRDailyLoadAllocator）时，由计划生成器统一处理，跳过旧 1.5× 阈值逻辑。
 		const postponeStrategy = advSettings.autoPostponeStrategy;
-		const loadDeferEnabled = advSettings.enableLoadBasedDefer !== false || advSettings.enableHorizonSmoothing !== false;
-		if (!loadDeferEnabled && postponeStrategy !== "off" && candidates.length > 0) {
-			const AUTO_POSTPONE_CFG: Record<string, { priorityThreshold: number; postponeDays: number }> =
-				{
-					gentle: { priorityThreshold: 3, postponeDays: 1 },
-					aggressive: { priorityThreshold: 5, postponeDays: 3 },
-				};
+		const loadDeferEnabled =
+			advSettings.enableLoadBasedDefer !== false ||
+			advSettings.enableHorizonSmoothing !== false;
+		if (
+			!loadDeferEnabled &&
+			postponeStrategy !== "off" &&
+			candidates.length > 0
+		) {
+			const AUTO_POSTPONE_CFG: Record<
+				string,
+				{ priorityThreshold: number; postponeDays: number }
+			> = {
+				gentle: { priorityThreshold: 3, postponeDays: 1 },
+				aggressive: { priorityThreshold: 5, postponeDays: 3 },
+			};
 			const totalCost = candidates.reduce((sum, b) => {
 				const cost =
 					b.stats.impressions > 0 && b.stats.effectiveReadingTimeSec > 0
@@ -566,7 +618,8 @@ export class IRV4SchedulerService {
 					const remaining: IRBlockV4[] = [];
 					for (const block of candidates) {
 						if (block.priorityEff <= cfg.priorityThreshold) {
-							const newDate = Date.now() + cfg.postponeDays * 24 * 60 * 60 * 1000;
+							const newDate =
+								Date.now() + cfg.postponeDays * 24 * 60 * 60 * 1000;
 							postponeUpdates.push({
 								chunkId: block.id,
 								data: { scheduleStatus: "queued", nextRepDate: newDate },
@@ -579,7 +632,7 @@ export class IRV4SchedulerService {
 						await this.chunkAdapter.batchUpdateChunkSchedules(postponeUpdates);
 						candidates = remaining;
 						logger.info(
-							`[IRV4SchedulerService] 自动后推 ${postponeUpdates.length} 个低优先级块 (策略=${postponeStrategy})`
+							`[IRV4SchedulerService] 自动后推 ${postponeUpdates.length} 个低优先级块 (策略=${postponeStrategy})`,
 						);
 					}
 				}
@@ -589,7 +642,7 @@ export class IRV4SchedulerService {
 		const generatedQueue = await this.generateUnifiedQueue(
 			candidates,
 			timeBudgetMinutes,
-			currentSourcePath
+			currentSourcePath,
 		);
 
 		let queue: IRBlockV4[];
@@ -597,7 +650,10 @@ export class IRV4SchedulerService {
 
 		if (activeBlock) {
 			activeBlockId = activeBlock.id;
-			queue = [activeBlock, ...generatedQueue.queue.filter((b) => b.id !== activeBlock.id)];
+			queue = [
+				activeBlock,
+				...generatedQueue.queue.filter((b) => b.id !== activeBlock.id),
+			];
 		} else {
 			queue = [...generatedQueue.queue];
 		}
@@ -611,17 +667,29 @@ export class IRV4SchedulerService {
 
 				if (isPdfBookmarkTaskId(updatedFirst.id)) {
 					await this._pdfBookmarkTaskService.updateTaskFromBlock(updatedFirst);
-					await this._pdfBookmarkTaskService.recordTaskInteraction(updatedFirst.id, 0, {});
+					await this._pdfBookmarkTaskService.recordTaskInteraction(
+						updatedFirst.id,
+						0,
+						{},
+					);
 					persistedTransitions++;
 				} else if (isEpubBookmarkTaskId(updatedFirst.id)) {
 					await this._epubBookmarkTaskService.updateTaskFromBlock(updatedFirst);
-					await this._epubBookmarkTaskService.recordTaskInteraction(updatedFirst.id, 0, {});
+					await this._epubBookmarkTaskService.recordTaskInteraction(
+						updatedFirst.id,
+						0,
+						{},
+					);
 					persistedTransitions++;
 				} else {
 					await this.chunkAdapter.updateChunkSchedule(updatedFirst.id, {
 						scheduleStatus: updatedFirst.status,
 					});
-					await this.chunkAdapter.recordChunkInteraction(updatedFirst.id, 0, {});
+					await this.chunkAdapter.recordChunkInteraction(
+						updatedFirst.id,
+						0,
+						{},
+					);
 					persistedTransitions++;
 				}
 			}
@@ -641,7 +709,7 @@ export class IRV4SchedulerService {
 	private async generateUnifiedQueue(
 		candidates: IRBlockV4[],
 		timeBudgetMinutes: number,
-		currentSourcePath: string | null
+		currentSourcePath: string | null,
 	): Promise<{
 		queue: IRBlockV4[];
 		totalEstimatedMinutes: number;
@@ -653,7 +721,9 @@ export class IRV4SchedulerService {
 			overBudgetRatio: number;
 		};
 	}> {
-		const plannedItems = candidates.map((block) => this.toPlannedItem(block, currentSourcePath));
+		const plannedItems = candidates.map((block) =>
+			this.toPlannedItem(block, currentSourcePath),
+		);
 		const advSettings = this.getAdvancedSettingsSnapshot();
 		await this.applyTagGroupPriorityBiases(plannedItems, advSettings);
 		const plan = this.planGenerator.generatePlan(plannedItems, {
@@ -682,14 +752,18 @@ export class IRV4SchedulerService {
 
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
-		const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
-			2,
-			"0"
-		)}-${String(today.getDate()).padStart(2, "0")}`;
+		const todayKey = `${today.getFullYear()}-${String(
+			today.getMonth() + 1,
+		).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 		const todayItems = plan.itemsByDate.get(todayKey) || [];
 		const byId = new Map(candidates.map((block) => [block.id, block]));
-		const queue = todayItems.map((item) => byId.get(item.id)).filter(Boolean) as IRBlockV4[];
-		const totalEstimatedMinutes = todayItems.reduce((sum, item) => sum + item.estimatedMinutes, 0);
+		const queue = todayItems
+			.map((item) => byId.get(item.id))
+			.filter(Boolean) as IRBlockV4[];
+		const totalEstimatedMinutes = todayItems.reduce(
+			(sum, item) => sum + item.estimatedMinutes,
+			0,
+		);
 		const groupDistribution: Record<string, number> = {};
 
 		for (const block of queue) {
@@ -699,9 +773,11 @@ export class IRV4SchedulerService {
 
 		if (queue.length > 0) {
 			logger.info(
-				`[IRV4SchedulerService] 统一计划生成器产出今日队列: candidate=${candidates.length}, queue=${
-					queue.length
-				}, est=${totalEstimatedMinutes.toFixed(1)}min/${timeBudgetMinutes}min`
+				`[IRV4SchedulerService] 统一计划生成器产出今日队列: candidate=${
+					candidates.length
+				}, queue=${queue.length}, est=${totalEstimatedMinutes.toFixed(
+					1,
+				)}min/${timeBudgetMinutes}min`,
 			);
 			return {
 				queue,
@@ -711,18 +787,25 @@ export class IRV4SchedulerService {
 					scheduledCount: queue.length,
 					groupDistribution,
 					overBudget: totalEstimatedMinutes > timeBudgetMinutes,
-					overBudgetRatio: timeBudgetMinutes > 0 ? totalEstimatedMinutes / timeBudgetMinutes : 0,
+					overBudgetRatio:
+						timeBudgetMinutes > 0
+							? totalEstimatedMinutes / timeBudgetMinutes
+							: 0,
 				},
 			};
 		}
 
-		logger.info("[IRV4SchedulerService] 统一计划生成器未产出今日队列，回退到 DRR 生成器");
+		logger.info(
+			"[IRV4SchedulerService] 统一计划生成器未产出今日队列，回退到 DRR 生成器",
+		);
 		return this.queueGenerator.generateQueue(
 			candidates,
-			Object.fromEntries(candidates.map((block) => [block.id, this.resolveTopicKey(block)])),
+			Object.fromEntries(
+				candidates.map((block) => [block.id, this.resolveTopicKey(block)]),
+			),
 			undefined,
 			timeBudgetMinutes,
-			currentSourcePath
+			currentSourcePath,
 		);
 	}
 
@@ -736,7 +819,9 @@ export class IRV4SchedulerService {
 
 	private async applyTagGroupPriorityBiases(
 		items: IRPlannedScheduleItem[],
-		advSettings: ReturnType<IRV4SchedulerService["getAdvancedSettingsSnapshot"]>
+		advSettings: ReturnType<
+			IRV4SchedulerService["getAdvancedSettingsSnapshot"]
+		>,
 	): Promise<void> {
 		if (advSettings.enableTagGroupPrior === false || items.length === 0) {
 			for (const item of items) {
@@ -749,8 +834,8 @@ export class IRV4SchedulerService {
 			new Set(
 				items
 					.map((item) => String(item.tagGroupId || "default").trim())
-					.filter((groupId) => groupId && groupId !== "default")
-			)
+					.filter((groupId) => groupId && groupId !== "default"),
+			),
 		);
 		const biasByGroup = new Map<string, number>();
 		await Promise.all(
@@ -761,39 +846,44 @@ export class IRV4SchedulerService {
 					computeTagGroupPriorityBias(profile, {
 						groupId,
 						defaultIntervalFactor: advSettings.defaultIntervalFactor,
-					})
+					}),
 				);
-			})
+			}),
 		);
 
 		for (const item of items) {
 			const groupId = String(item.tagGroupId || "default").trim() || "default";
 			const bias = biasByGroup.get(groupId) ?? 0;
 			item.tagGroupPriorityBias = bias;
-			item.explanation.secondaryReasons = item.explanation.secondaryReasons.filter(
-				(reason) => !reason.startsWith("标签组倾向 ")
-			);
+			item.explanation.secondaryReasons =
+				item.explanation.secondaryReasons.filter(
+					(reason) => !reason.startsWith("标签组倾向 "),
+				);
 			if (Math.abs(bias) >= 0.05) {
 				item.explanation.secondaryReasons.push(
-					`标签组倾向 ${bias > 0 ? "+" : ""}${bias.toFixed(2)}`
+					`标签组倾向 ${bias > 0 ? "+" : ""}${bias.toFixed(2)}`,
 				);
 			}
 		}
 	}
 
-	private toPlannedItem(block: IRBlockV4, currentSourcePath: string | null): IRPlannedScheduleItem {
+	private toPlannedItem(
+		block: IRBlockV4,
+		currentSourcePath: string | null,
+	): IRPlannedScheduleItem {
 		const estimatedMinutes =
 			block.stats.impressions > 0 && block.stats.effectiveReadingTimeSec > 0
 				? block.stats.effectiveReadingTimeSec / block.stats.impressions / 60
 				: 2;
-		const nextReviewDate = block.nextRepDate > 0 ? new Date(block.nextRepDate) : null;
+		const nextReviewDate =
+			block.nextRepDate > 0 ? new Date(block.nextRepDate) : null;
 		const sourceType = isPdfBookmarkTaskId(block.id)
 			? "pdf"
 			: isEpubBookmarkTaskId(block.id)
 			? "epub"
 			: "chunk";
 		const sequenceMeta = readSequenceMeta(
-			(block.meta || {}) as unknown as Record<string, unknown>
+			(block.meta || {}) as unknown as Record<string, unknown>,
 		);
 
 		return {
@@ -810,14 +900,18 @@ export class IRV4SchedulerService {
 			estimatedMinutes,
 			sourceType,
 			...sequenceMeta,
-			explanation: this.buildQueueExplanation(block, estimatedMinutes, currentSourcePath),
+			explanation: this.buildQueueExplanation(
+				block,
+				estimatedMinutes,
+				currentSourcePath,
+			),
 		};
 	}
 
 	private buildQueueExplanation(
 		block: IRBlockV4,
 		estimatedMinutes: number,
-		currentSourcePath: string | null
+		currentSourcePath: string | null,
 	): IRScheduleExplanation {
 		const scoreBreakdown = this.profileService.computeProfile({
 			scheduleStatus: block.status,
@@ -828,7 +922,8 @@ export class IRV4SchedulerService {
 			estimatedMinutes,
 			stats: block.stats,
 			nowMs: Date.now(),
-			continuityHint: currentSourcePath && currentSourcePath === block.sourcePath ? 3 : 0,
+			continuityHint:
+				currentSourcePath && currentSourcePath === block.sourcePath ? 3 : 0,
 		});
 
 		return {
@@ -843,7 +938,12 @@ export class IRV4SchedulerService {
 			isOverdue: block.nextRepDate > 0 && block.nextRepDate < Date.now(),
 			overdueDays:
 				block.nextRepDate > 0 && block.nextRepDate < Date.now()
-					? Math.max(1, Math.floor((Date.now() - block.nextRepDate) / (24 * 60 * 60 * 1000)))
+					? Math.max(
+							1,
+							Math.floor(
+								(Date.now() - block.nextRepDate) / (24 * 60 * 60 * 1000),
+							),
+					  )
 					: 0,
 			hasManualSchedule: Boolean(block.meta?.manualSchedulePinnedDateKey),
 			estimatedMinutes,
@@ -863,7 +963,7 @@ export class IRV4SchedulerService {
 	async completeBlockV4(
 		blockV4: IRBlockV4,
 		data: ReadingCompletionDataV4,
-		deckPath = ""
+		deckPath = "",
 	): Promise<CompleteBlockResultV4> {
 		await this.initialize();
 
@@ -873,7 +973,9 @@ export class IRV4SchedulerService {
 		const advancedSettings = this.getAdvancedSettingsSnapshot();
 		const tagGroup = blockV4.meta?.tagGroup || "default";
 		const profile = await this.tagGroupService.getProfile(tagGroup);
-		const mGroup = advancedSettings.enableTagGroupPrior ? profile.intervalFactorBase || 1.0 : 1.0;
+		const mGroup = advancedSettings.enableTagGroupPrior
+			? profile.intervalFactorBase || 1.0
+			: 1.0;
 
 		// 2. 更新统计数据
 		let updatedBlock = this.stateMachine.updateStats(
@@ -882,7 +984,7 @@ export class IRV4SchedulerService {
 			Math.min(data.readingTimeSeconds, 600), // 有效时长最多10分钟
 			data.createdExtractCount,
 			data.createdCardCount,
-			data.createdNoteCount
+			data.createdNoteCount,
 		);
 
 		// 3. 根据评分计算优先级调整
@@ -894,16 +996,19 @@ export class IRV4SchedulerService {
 			4: -1, // 掌握 → 优先级-1
 		};
 		const priorityDelta = ratingPriorityAdjust[data.rating] || 0;
-		const newPriorityUi = Math.max(0, Math.min(10, data.priorityUi + priorityDelta));
+		const newPriorityUi = Math.max(
+			0,
+			Math.min(10, data.priorityUi + priorityDelta),
+		);
 
 		// 更新优先级（使用时间感知 EWMA，读取 halfLifeDays 设置）
 		const halfLifeDays = advancedSettings.priorityHalfLifeDays;
 		const lastInteractionMs = updatedBlock.stats.lastInteraction || 0;
-		let newPriorityEff = calculatePriorityEWMA(
+		const newPriorityEff = calculatePriorityEWMA(
 			newPriorityUi,
 			updatedBlock.priorityEff,
 			halfLifeDays,
-			lastInteractionMs > 0 ? lastInteractionMs : undefined
+			lastInteractionMs > 0 ? lastInteractionMs : undefined,
 		);
 
 		updatedBlock = {
@@ -922,7 +1027,7 @@ export class IRV4SchedulerService {
 				updatedBlock,
 				mBase,
 				mGroup,
-				maxInterval
+				maxInterval,
 			);
 		} else if (updatedBlock.status === "scheduled") {
 			updatedBlock = this.stateMachine.transitionToActive(updatedBlock);
@@ -930,7 +1035,7 @@ export class IRV4SchedulerService {
 				updatedBlock,
 				mBase,
 				mGroup,
-				maxInterval
+				maxInterval,
 			);
 		} else {
 			const newInterval = calculateNextInterval(
@@ -938,7 +1043,7 @@ export class IRV4SchedulerService {
 				mBase,
 				mGroup,
 				updatedBlock.priorityEff,
-				maxInterval
+				maxInterval,
 			);
 			const newNextRepDate = calculateNextRepDate(newInterval);
 			updatedBlock = {
@@ -961,7 +1066,7 @@ export class IRV4SchedulerService {
 					extracts: data.createdExtractCount,
 					cardsCreated: data.createdCardCount,
 					notesWritten: data.createdNoteCount,
-				}
+				},
 			);
 		} else if (isEpubBookmarkTaskId(updatedBlock.id)) {
 			await this._epubBookmarkTaskService.recordTaskInteraction(
@@ -971,7 +1076,7 @@ export class IRV4SchedulerService {
 					extracts: data.createdExtractCount,
 					cardsCreated: data.createdCardCount,
 					notesWritten: data.createdNoteCount,
-				}
+				},
 			);
 		} else {
 			await this.chunkAdapter.recordChunkInteraction(
@@ -982,7 +1087,7 @@ export class IRV4SchedulerService {
 					cardsCreated: data.createdCardCount,
 					notesWritten: data.createdNoteCount,
 				},
-				{ skipScheduleCacheInvalidate: true }
+				{ skipScheduleCacheInvalidate: true },
 			);
 		}
 
@@ -995,20 +1100,23 @@ export class IRV4SchedulerService {
 				data.readingTimeSeconds,
 				data.createdCardCount,
 				data.createdExtractCount,
-				data.createdNoteCount
+				data.createdNoteCount,
 			);
 
 			const priorityEff = updatedBlock.priorityEff ?? 5;
 			const priorityWeight = Math.max(
 				advancedSettings.priorityWeightClamp[0],
-				Math.min(advancedSettings.priorityWeightClamp[1], 0.5 + priorityEff / 10)
+				Math.min(
+					advancedSettings.priorityWeightClamp[1],
+					0.5 + priorityEff / 10,
+				),
 			);
 
 			await this.tagGroupService.updateGroupProfile(
 				tagGroup,
 				loadSignal,
 				priorityWeight,
-				advancedSettings
+				advancedSettings,
 			);
 		}
 
@@ -1022,19 +1130,28 @@ export class IRV4SchedulerService {
 				const followMode = this.getTagGroupFollowMode();
 				if (followMode !== "off") {
 					// 通过 sourceId 获取源文档的真实原始路径（而非 chunk 文件路径）
-					const chunkData = await this.storageService.getChunkData(updatedBlock.id);
+					const chunkData = await this.storageService.getChunkData(
+						updatedBlock.id,
+					);
 					const sourceId = chunkData?.sourceId;
-					const source = sourceId ? await this.storageService.getSource(sourceId) : null;
+					const source = sourceId
+						? await this.storageService.getSource(sourceId)
+						: null;
 					const originalPath = source?.originalPath || updatedBlock.sourcePath;
 
 					if (originalPath) {
 						// 检查源文件是否存在，不存在则跳过漂移检测
-						const sourceFile = this.app.vault.getAbstractFileByPath(originalPath);
+						const sourceFile =
+							this.app.vault.getAbstractFileByPath(originalPath);
 						if (sourceFile) {
-							const drift = await this.tagGroupService.detectTagGroupDrift(originalPath, tagGroup);
+							const drift = await this.tagGroupService.detectTagGroupDrift(
+								originalPath,
+								tagGroup,
+							);
 							if (drift) {
 								const storageAdapter = {
-									getChunkData: (id: string) => this.storageService.getChunkData(id),
+									getChunkData: (id: string) =>
+										this.storageService.getChunkData(id),
 									saveChunkData: (data: IRChunkFileData) =>
 										this.storageService.saveChunkData(data),
 									getSource: (id: string) => this.storageService.getSource(id),
@@ -1049,7 +1166,7 @@ export class IRV4SchedulerService {
 										updatedBlock.id,
 										sourceId,
 										drift.newGroupId,
-										storageAdapter
+										storageAdapter,
 									);
 									updatedBlock = {
 										...updatedBlock,
@@ -1057,7 +1174,7 @@ export class IRV4SchedulerService {
 									};
 									logger.info(
 										`[IRV4SchedulerService] 标签组自动切换: ${updatedBlock.id}, ` +
-											`${drift.oldGroupName} -> ${drift.newGroupName}`
+											`${drift.oldGroupName} -> ${drift.newGroupName}`,
 									);
 								} else {
 									// ask 模式：弹出通知提醒用户
@@ -1073,10 +1190,13 @@ export class IRV4SchedulerService {
 										}),
 									});
 									msgEl.createEl("div", {
-										text: i18n.t("irServiceNotices.scheduler.tagDriftDescription", {
-											newName: drift.newGroupName,
-											oldName: drift.oldGroupName,
-										}),
+										text: i18n.t(
+											"irServiceNotices.scheduler.tagDriftDescription",
+											{
+												newName: drift.newGroupName,
+												oldName: drift.oldGroupName,
+											},
+										),
 										cls: "weave-ir-tag-drift-description",
 									});
 									const btnRow = msgEl.createEl("div", {
@@ -1100,15 +1220,21 @@ export class IRV4SchedulerService {
 													blockId,
 													capturedSourceId,
 													newGroupId,
-													storageAdapter
+													storageAdapter,
 												);
 												new Notice(
-													i18n.t("irServiceNotices.scheduler.switchedTagGroup", {
-														groupName: drift.newGroupName,
-													})
+													i18n.t(
+														"irServiceNotices.scheduler.switchedTagGroup",
+														{
+															groupName: drift.newGroupName,
+														},
+													),
 												);
 											} catch (e) {
-												logger.error("[IRV4SchedulerService] 标签组切换失败:", e);
+												logger.error(
+													"[IRV4SchedulerService] 标签组切换失败:",
+													e,
+												);
 											}
 											notice.hide();
 										})();
@@ -1122,18 +1248,27 @@ export class IRV4SchedulerService {
 					}
 				}
 			} catch (driftError) {
-				logger.debug("[IRV4SchedulerService] 标签漂移检测失败（不影响主流程）:", driftError);
+				logger.debug(
+					"[IRV4SchedulerService] 标签漂移检测失败（不影响主流程）:",
+					driftError,
+				);
 			}
 		}
 
 		logger.info(
 			`[IRV4SchedulerService] completeBlockV4: ${updatedBlock.id}, ` +
-				`rating=${data.rating}, interval=${updatedBlock.intervalDays.toFixed(1)}d, ` +
-				`nextRep=${new Date(updatedBlock.nextRepDate).toLocaleDateString()}`
+				`rating=${data.rating}, interval=${updatedBlock.intervalDays.toFixed(
+					1,
+				)}d, ` +
+				`nextRep=${new Date(updatedBlock.nextRepDate).toLocaleDateString()}`,
 		);
 
 		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
 			: undefined;
 
 		return {
@@ -1165,7 +1300,7 @@ export class IRV4SchedulerService {
 				createdNoteCount: 0,
 			},
 			deckPath,
-			"skipped"
+			"skipped",
 		);
 
 		logger.debug(`[IRV4SchedulerService] skipBlockV4: ${blockV4.id}`);
@@ -1182,11 +1317,15 @@ export class IRV4SchedulerService {
 	async updatePriorityV4(
 		blockV4: IRBlockV4,
 		newPriorityUi: number,
-		reason: string
+		reason: string,
 	): Promise<IRBlockV4> {
 		await this.initialize();
 
-		const updatedBlock = this.createPriorityUpdatedBlock(blockV4, newPriorityUi, reason);
+		const updatedBlock = this.createPriorityUpdatedBlock(
+			blockV4,
+			newPriorityUi,
+			reason,
+		);
 
 		// 持久化
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
@@ -1202,7 +1341,9 @@ export class IRV4SchedulerService {
 
 		logger.info(
 			`[IRV4SchedulerService] updatePriorityV4: ${updatedBlock.id}, ` +
-				`UI=${blockV4.priorityUi}→${newPriorityUi}, Eff=${updatedBlock.priorityEff.toFixed(2)}`
+				`UI=${
+					blockV4.priorityUi
+				}→${newPriorityUi}, Eff=${updatedBlock.priorityEff.toFixed(2)}`,
 		);
 
 		return updatedBlock;
@@ -1212,10 +1353,14 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		newPriorityUi: number,
 		reason: string,
-		_deckPath: string
+		_deckPath: string,
 	): Promise<IRPriorityUpdateResultV4> {
 		await this.initialize();
-		const updatedBlock = this.createPriorityUpdatedBlock(blockV4, newPriorityUi, reason);
+		const updatedBlock = this.createPriorityUpdatedBlock(
+			blockV4,
+			newPriorityUi,
+			reason,
+		);
 
 		return {
 			block: updatedBlock,
@@ -1227,9 +1372,13 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		newPriorityUi: number,
 		reason: string,
-		_deckPath: string
+		_deckPath: string,
 	): Promise<IRPriorityUpdateResultV4> {
-		const updatedBlock = await this.updatePriorityV4(blockV4, newPriorityUi, reason);
+		const updatedBlock = await this.updatePriorityV4(
+			blockV4,
+			newPriorityUi,
+			reason,
+		);
 
 		return {
 			block: updatedBlock,
@@ -1263,11 +1412,15 @@ export class IRV4SchedulerService {
 
 	async suspendBlockWithPreviewV4(
 		blockV4: IRBlockV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		const updatedBlock = await this.suspendBlockV4(blockV4);
 		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
 			: undefined;
 
 		return {
@@ -1315,11 +1468,15 @@ export class IRV4SchedulerService {
 
 	async resumeBlockWithPreviewV4(
 		blockV4: IRBlockV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		const updatedBlock = await this.resumeBlockV4(blockV4);
 		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
 			: undefined;
 
 		return {
@@ -1374,7 +1531,7 @@ export class IRV4SchedulerService {
 				createdNoteCount: 0,
 			},
 			"",
-			"completed"
+			"completed",
 		);
 
 		logger.info(`[IRV4SchedulerService] archiveBlockV4: ${updatedBlock.id}`);
@@ -1434,11 +1591,15 @@ export class IRV4SchedulerService {
 
 	async archiveBlockWithPreviewV4(
 		blockV4: IRBlockV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		const updatedBlock = await this.archiveBlockV4(blockV4);
 		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
 			: undefined;
 
 		return {
@@ -1449,11 +1610,15 @@ export class IRV4SchedulerService {
 
 	async removeBlockWithPreviewV4(
 		blockV4: IRBlockV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		const updatedBlock = await this.removeBlockV4(blockV4);
 		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
 			: undefined;
 
 		return {
@@ -1465,7 +1630,7 @@ export class IRV4SchedulerService {
 	async manualRescheduleBlockWithPreviewV4(
 		blockV4: IRBlockV4,
 		options: IRManualRescheduleOptionsV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		await this.initialize();
 
@@ -1475,7 +1640,11 @@ export class IRV4SchedulerService {
 		await recordScheduleMenuActionInteraction(this.app, updatedBlock.id);
 
 		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
 			: undefined;
 
 		logger.info(
@@ -1484,7 +1653,7 @@ export class IRV4SchedulerService {
 					updatedBlock.nextRepDate > 0
 						? new Date(updatedBlock.nextRepDate).toLocaleDateString()
 						: "unset"
-				}`
+				}`,
 		);
 
 		return {
@@ -1497,7 +1666,7 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		options: IRManualRescheduleOptionsV4,
 		deckPath: string,
-		previewOptions?: { includeImpactPreview?: boolean }
+		previewOptions?: { includeImpactPreview?: boolean },
 	): Promise<IRBlockMutationPreviewResultV4> {
 		await this.initialize();
 
@@ -1505,7 +1674,11 @@ export class IRV4SchedulerService {
 		const includeImpactPreview = previewOptions?.includeImpactPreview === true;
 		const futurePlanPreview =
 			includeImpactPreview && deckPath
-				? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+				? await this.previewFuturePlanForBlockMutation(
+						deckPath,
+						blockV4,
+						updatedBlock,
+				  )
 				: undefined;
 
 		return {
@@ -1517,9 +1690,10 @@ export class IRV4SchedulerService {
 	async postponeBlockWithPreviewV4(
 		blockV4: IRBlockV4,
 		days: number,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
-		const base = blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
+		const base =
+			blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
 		base.setHours(0, 0, 0, 0);
 		base.setDate(base.getDate() + Math.max(1, Math.round(days)));
 
@@ -1529,16 +1703,17 @@ export class IRV4SchedulerService {
 				nextRepDate: base.getTime(),
 				scheduleStatus: "queued",
 			},
-			deckPath
+			deckPath,
 		);
 	}
 
 	async previewPostponeBlockV4(
 		blockV4: IRBlockV4,
 		days: number,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
-		const base = blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
+		const base =
+			blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
 		base.setHours(0, 0, 0, 0);
 		base.setDate(base.getDate() + Math.max(1, Math.round(days)));
 
@@ -1548,17 +1723,20 @@ export class IRV4SchedulerService {
 				nextRepDate: base.getTime(),
 				scheduleStatus: "queued",
 			},
-			deckPath
+			deckPath,
 		);
 	}
 
 	async applyScheduleModeWithPreviewV4(
 		blockV4: IRBlockV4,
 		mode: IRScheduleModeV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		await this.initialize();
-		const updatedBlock = await this.createScheduleModeAdjustedBlock(blockV4, mode);
+		const updatedBlock = await this.createScheduleModeAdjustedBlock(
+			blockV4,
+			mode,
+		);
 
 		return this.manualRescheduleBlockWithPreviewV4(
 			blockV4,
@@ -1567,17 +1745,20 @@ export class IRV4SchedulerService {
 				intervalDays: updatedBlock.intervalDays,
 				scheduleStatus: updatedBlock.status,
 			},
-			deckPath
+			deckPath,
 		);
 	}
 
 	async previewScheduleModeBlockV4(
 		blockV4: IRBlockV4,
 		mode: IRScheduleModeV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		await this.initialize();
-		const updatedBlock = await this.createScheduleModeAdjustedBlock(blockV4, mode);
+		const updatedBlock = await this.createScheduleModeAdjustedBlock(
+			blockV4,
+			mode,
+		);
 
 		return this.previewManualRescheduleBlockV4(
 			blockV4,
@@ -1586,19 +1767,21 @@ export class IRV4SchedulerService {
 				intervalDays: updatedBlock.intervalDays,
 				scheduleStatus: updatedBlock.status,
 			},
-			deckPath
+			deckPath,
 		);
 	}
 
 	private createManualRescheduledBlock(
 		blockV4: IRBlockV4,
-		options: IRManualRescheduleOptionsV4
+		options: IRManualRescheduleOptionsV4,
 	): IRBlockV4 {
 		const meta = { ...(blockV4.meta || {}) };
 		if (options.nextRepDate > 0) {
-			meta.manualSchedulePinnedDateKey = this.formatScheduleDateKey(options.nextRepDate);
+			meta.manualSchedulePinnedDateKey = this.formatScheduleDateKey(
+				options.nextRepDate,
+			);
 		} else {
-			delete meta.manualSchedulePinnedDateKey;
+			meta.manualSchedulePinnedDateKey = undefined;
 		}
 		return {
 			...blockV4,
@@ -1612,27 +1795,30 @@ export class IRV4SchedulerService {
 
 	private formatScheduleDateKey(timestamp: number): string {
 		const date = new Date(timestamp);
-		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-			date.getDate()
-		).padStart(2, "0")}`;
+		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+			2,
+			"0",
+		)}-${String(date.getDate()).padStart(2, "0")}`;
 	}
 
 	private createPriorityUpdatedBlock(
 		blockV4: IRBlockV4,
 		newPriorityUi: number,
-		reason: string
+		reason: string,
 	): IRBlockV4 {
 		return this.stateMachine.updatePriority(blockV4, newPriorityUi, reason);
 	}
 
 	private async createScheduleModeAdjustedBlock(
 		blockV4: IRBlockV4,
-		mode: IRScheduleModeV4
+		mode: IRScheduleModeV4,
 	): Promise<IRBlockV4> {
 		const advancedSettings = this.getAdvancedSettingsSnapshot();
 		const tagGroup = blockV4.meta?.tagGroup || "default";
 		const profile = await this.tagGroupService.getProfile(tagGroup);
-		const mGroup = advancedSettings.enableTagGroupPrior ? profile.intervalFactorBase || 1.0 : 1.0;
+		const mGroup = advancedSettings.enableTagGroupPrior
+			? profile.intervalFactorBase || 1.0
+			: 1.0;
 
 		return computeScheduleModeAdjustedBlock(blockV4, mode, {
 			block: blockV4,
@@ -1644,7 +1830,10 @@ export class IRV4SchedulerService {
 	/**
 	 * 删除内容块（彻底清除调度记录，可选删除 chunk 文件，不删除源文档）
 	 */
-	async deleteBlockV4(blockV4: IRBlockV4, deleteChunkFile = true): Promise<void> {
+	async deleteBlockV4(
+		blockV4: IRBlockV4,
+		deleteChunkFile = true,
+	): Promise<void> {
 		await this.initialize();
 
 		if (isPdfBookmarkTaskId(blockV4.id)) {
@@ -1661,10 +1850,15 @@ export class IRV4SchedulerService {
 					const file = this.app.vault.getAbstractFileByPath(blockV4.sourcePath);
 					if (file instanceof TFile) {
 						await this.app.fileManager.trashFile(file);
-						logger.debug(`[IRV4SchedulerService] 已删除 chunk 文件: ${blockV4.sourcePath}`);
+						logger.debug(
+							`[IRV4SchedulerService] 已删除 chunk 文件: ${blockV4.sourcePath}`,
+						);
 					}
 				} catch (error) {
-					logger.warn(`[IRV4SchedulerService] 删除 chunk 文件失败: ${blockV4.sourcePath}`, error);
+					logger.warn(
+						`[IRV4SchedulerService] 删除 chunk 文件失败: ${blockV4.sourcePath}`,
+						error,
+					);
 				}
 			}
 
@@ -1673,7 +1867,9 @@ export class IRV4SchedulerService {
 				const sources = await this.storageService.getAllSources();
 				for (const source of Object.values(sources)) {
 					if (source.chunkIds?.includes(blockV4.id)) {
-						source.chunkIds = source.chunkIds.filter((_id) => _id !== blockV4.id);
+						source.chunkIds = source.chunkIds.filter(
+							(_id) => _id !== blockV4.id,
+						);
 						source.updatedAt = Date.now();
 						await this.storageService.saveSource(source);
 					}
@@ -1684,7 +1880,7 @@ export class IRV4SchedulerService {
 		}
 
 		logger.info(
-			`[IRV4SchedulerService] deleteBlockV4: ${blockV4.id}, deleteFile=${deleteChunkFile}`
+			`[IRV4SchedulerService] deleteBlockV4: ${blockV4.id}, deleteFile=${deleteChunkFile}`,
 		);
 	}
 
@@ -1708,18 +1904,24 @@ export class IRV4SchedulerService {
 			});
 		}
 
-		logger.info(`[IRV4SchedulerService] forceReactivateBlockV4: ${updatedBlock.id}`);
+		logger.info(
+			`[IRV4SchedulerService] forceReactivateBlockV4: ${updatedBlock.id}`,
+		);
 
 		return updatedBlock;
 	}
 
 	async forceReactivateBlockWithPreviewV4(
 		blockV4: IRBlockV4,
-		deckPath: string
+		deckPath: string,
 	): Promise<IRBlockMutationPreviewResultV4> {
 		const updatedBlock = await this.forceReactivateBlockV4(blockV4);
 		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(deckPath, blockV4, updatedBlock)
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
 			: undefined;
 
 		return {
@@ -1735,7 +1937,7 @@ export class IRV4SchedulerService {
 		block: IRBlockV4,
 		data: ReadingCompletionDataV4,
 		deckPath: string,
-		action: "completed" | "skipped"
+		action: "completed" | "skipped",
 	): Promise<void> {
 		const now = new Date();
 		const canonicalDeckId = await this.resolveCanonicalDeckId(deckPath);
@@ -1744,7 +1946,9 @@ export class IRV4SchedulerService {
 			id: generateCardUUID(),
 			blockId: block.id,
 			deckId: canonicalDeckId,
-			startTime: new Date(now.getTime() - data.readingTimeSeconds * 1000).toISOString(),
+			startTime: new Date(
+				now.getTime() - data.readingTimeSeconds * 1000,
+			).toISOString(),
 			endTime: now.toISOString(),
 			duration: data.readingTimeSeconds,
 			action,
@@ -1764,7 +1968,7 @@ export class IRV4SchedulerService {
 	async completeBlockFromV3(
 		blockV3: IRBlock,
 		data: ReadingCompletionDataV4,
-		deckPath = ""
+		deckPath = "",
 	): Promise<{ block: IRBlock; nextRepDate: number; intervalDays: number }> {
 		// 转换为 V4
 		const blockV4 = migrateToIRBlockV4(blockV3);
@@ -1807,7 +2011,7 @@ export class IRV4SchedulerService {
 	async previewFuturePlanForBlockMutation(
 		deckPath: string,
 		originalBlock: IRBlockV4,
-		updatedBlock: IRBlockV4
+		updatedBlock: IRBlockV4,
 	): Promise<IRFuturePlanPreview | undefined> {
 		try {
 			const kernel = getSharedIRScheduleKernel(this.app);
@@ -1822,9 +2026,12 @@ export class IRV4SchedulerService {
 				},
 				{
 					deckIds: [deckPath],
-				}
+				},
 			);
-			const changeSummary = this.summarizeFuturePlanChanges(impact.before.days, impact.after.days);
+			const changeSummary = this.summarizeFuturePlanChanges(
+				impact.before.days,
+				impact.after.days,
+			);
 
 			return {
 				generatedAt: impact.after.generatedAt,
@@ -1832,14 +2039,17 @@ export class IRV4SchedulerService {
 				changeSummary,
 			};
 		} catch (error) {
-			logger.warn("[IRV4SchedulerService] 生成 futurePlanPreview 失败:", { deckPath, error });
+			logger.warn("[IRV4SchedulerService] 生成 futurePlanPreview 失败:", {
+				deckPath,
+				error,
+			});
 			return undefined;
 		}
 	}
 
 	private summarizeFuturePlanChanges(
 		beforeDays: IRPlannedDay[],
-		afterDays: IRPlannedDay[]
+		afterDays: IRPlannedDay[],
 	): IRFuturePlanChangeSummary {
 		const beforeByItem = new Map<string, { dateKey: string; title: string }>();
 		const afterByItem = new Map<string, { dateKey: string; title: string }>();
@@ -1855,7 +2065,10 @@ export class IRV4SchedulerService {
 			}
 		}
 
-		const allItemIds = new Set<string>([...beforeByItem.keys(), ...afterByItem.keys()]);
+		const allItemIds = new Set<string>([
+			...beforeByItem.keys(),
+			...afterByItem.keys(),
+		]);
 		const movedItems: Array<{
 			itemId: string;
 			title: string;
@@ -1892,9 +2105,16 @@ export class IRV4SchedulerService {
 			}
 		}
 
-		const beforeByDay = new Map(beforeDays.map((day) => [day.dateKey, day.totalEstimatedMinutes]));
-		const afterByDay = new Map(afterDays.map((day) => [day.dateKey, day.totalEstimatedMinutes]));
-		const allDayKeys = new Set<string>([...beforeByDay.keys(), ...afterByDay.keys()]);
+		const beforeByDay = new Map(
+			beforeDays.map((day) => [day.dateKey, day.totalEstimatedMinutes]),
+		);
+		const afterByDay = new Map(
+			afterDays.map((day) => [day.dateKey, day.totalEstimatedMinutes]),
+		);
+		const allDayKeys = new Set<string>([
+			...beforeByDay.keys(),
+			...afterByDay.keys(),
+		]);
 		const impactedDays = Array.from(allDayKeys)
 			.map((dateKey) => ({
 				dateKey,

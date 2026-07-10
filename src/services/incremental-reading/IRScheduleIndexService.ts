@@ -1,22 +1,23 @@
 import type { App } from "obsidian";
 import { getPluginPaths } from "../../config/paths";
 import type { IRBlock, IRChunkFileData } from "../../types/ir-types";
-import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
-import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { DirectoryUtils } from "../../utils/directory-utils";
+import { isIRInternalScheduleSourcePath } from "../../utils/ir-internal-data-path";
 import { logger } from "../../utils/logger";
-import {
-	isIRInternalScheduleSourcePath,
-} from "../../utils/ir-internal-data-path";
+import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
+import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
 import {
 	buildLegacyChunkFromPointSnapshot,
 	buildLegacyEpubTaskFromPointSnapshot,
 	buildLegacyPdfTaskFromPointSnapshot,
 	getStoredPointKind,
 } from "./IRLegacyTaskCompatAdapter";
-import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
+import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
-import { getSharedIRPointStorageService, type IRPointStorageService } from "./IRPointStorageService";
+import {
+	type IRPointStorageService,
+	getSharedIRPointStorageService,
+} from "./IRPointStorageService";
 import {
 	buildExternalBookmarkTasksRevision,
 	buildScheduleFingerprint,
@@ -83,7 +84,10 @@ export class IRScheduleIndexService {
 	 * 冷启动预读：将新鲜磁盘索引载入内存，避免月历打开时重复判 stale。
 	 */
 	async warmDiskCache(): Promise<boolean> {
-		if (this.memoryStore && (await this.matchesPointFilesRevision(this.memoryStore))) {
+		if (
+			this.memoryStore &&
+			(await this.matchesPointFilesRevision(this.memoryStore))
+		) {
 			return true;
 		}
 
@@ -107,10 +111,15 @@ export class IRScheduleIndexService {
 	async peekScheduleFingerprint(): Promise<string | null> {
 		try {
 			if (await this.warmDiskCache()) {
-				return String(this.memoryStore?.scheduleFingerprint || "").trim() || null;
+				return (
+					String(this.memoryStore?.scheduleFingerprint || "").trim() || null
+				);
 			}
 		} catch (error) {
-			logger.debug("[IRScheduleIndexService] peekScheduleFingerprint unavailable", error);
+			logger.debug(
+				"[IRScheduleIndexService] peekScheduleFingerprint unavailable",
+				error,
+			);
 		}
 		return null;
 	}
@@ -124,10 +133,12 @@ export class IRScheduleIndexService {
 			return null;
 		}
 		const candidate = raw as Partial<IRScheduleIndexStore>;
+		const legacyFields = raw as Record<string, unknown>;
 		const version = String(candidate.version || "").trim();
 		if (version !== IR_SCHEDULE_INDEX_VERSION && version !== "1.0.0") {
 			return null;
 		}
+		const legacySnapshotCacheVersion = legacyFields.snapshotCacheVersion;
 		return {
 			version: IR_SCHEDULE_INDEX_VERSION,
 			updatedAt:
@@ -135,18 +146,16 @@ export class IRScheduleIndexService {
 					? candidate.updatedAt
 					: new Date().toISOString(),
 			snapshotCacheVersion:
-				typeof candidate.snapshotCacheVersion === "number"
-					? candidate.snapshotCacheVersion
+				typeof legacySnapshotCacheVersion === "number"
+					? legacySnapshotCacheVersion
 					: undefined,
 			pointFilesRevision: String(candidate.pointFilesRevision || "").trim(),
 			externalTasksRevision: String(candidate.externalTasksRevision || ""),
 			scheduleFingerprint: String(candidate.scheduleFingerprint || ""),
-			chunks: Array.isArray(candidate.chunks) ? (candidate.chunks) : [],
-			blocks: Array.isArray(candidate.blocks) ? (candidate.blocks) : [],
-			pdfTasks: Array.isArray(candidate.pdfTasks) ? (candidate.pdfTasks) : [],
-			epubTasks: Array.isArray(candidate.epubTasks)
-				? (candidate.epubTasks)
-				: [],
+			chunks: Array.isArray(candidate.chunks) ? candidate.chunks : [],
+			blocks: Array.isArray(candidate.blocks) ? candidate.blocks : [],
+			pdfTasks: Array.isArray(candidate.pdfTasks) ? candidate.pdfTasks : [],
+			epubTasks: Array.isArray(candidate.epubTasks) ? candidate.epubTasks : [],
 		};
 	}
 
@@ -177,7 +186,10 @@ export class IRScheduleIndexService {
 	}
 
 	private async getExternalTasksRevision(): Promise<string> {
-		await Promise.all([this.pdfService.initialize(), this.epubService.initialize()]);
+		await Promise.all([
+			this.pdfService.initialize(),
+			this.epubService.initialize(),
+		]);
 		const [pdfTasks, epubTasks] = await Promise.all([
 			this.pdfService.getAllTasks(),
 			this.epubService.getAllTasks(),
@@ -185,13 +197,16 @@ export class IRScheduleIndexService {
 		return buildExternalBookmarkTasksRevision([...pdfTasks, ...epubTasks]);
 	}
 
-	private async matchesPointFilesRevision(store: IRScheduleIndexStore): Promise<boolean> {
+	private async matchesPointFilesRevision(
+		store: IRScheduleIndexStore,
+	): Promise<boolean> {
 		const pointFilesRevision = String(store.pointFilesRevision || "").trim();
 		if (!pointFilesRevision) {
 			return false;
 		}
 		await this.pointStorage.initialize();
-		const currentRevision = await this.pointStorage.getPointFilesIndexRevision();
+		const currentRevision =
+			await this.pointStorage.getPointFilesIndexRevision();
 		return pointFilesRevision === currentRevision;
 	}
 
@@ -279,12 +294,14 @@ export class IRScheduleIndexService {
 					epubTasks.push(task);
 					seenIds.add(task.id);
 				}
-				continue;
 			}
 			// Phase 3：legacy-block 不再进入 schedule index；请用数据管理窗「统一阅读点格式」迁移。
 		}
 
-		await Promise.all([this.pdfService.initialize(), this.epubService.initialize()]);
+		await Promise.all([
+			this.pdfService.initialize(),
+			this.epubService.initialize(),
+		]);
 		for (const task of await this.pdfService.getAllTasks()) {
 			const taskId = String(task?.id || "").trim();
 			if (!taskId || seenIds.has(taskId)) {
@@ -302,16 +319,24 @@ export class IRScheduleIndexService {
 			seenIds.add(taskId);
 		}
 
-		const chunksRecord = Object.fromEntries(chunks.map((chunk) => [chunk.chunkId, chunk]));
-		const blocksRecord = Object.fromEntries(blocks.map((block) => [block.id, block]));
+		const chunksRecord = Object.fromEntries(
+			chunks.map((chunk) => [chunk.chunkId, chunk]),
+		);
+		const blocksRecord = Object.fromEntries(
+			blocks.map((block) => [block.id, block]),
+		);
 		const scheduleFingerprint = buildScheduleFingerprint({
 			chunksRecord,
 			blocksRecord,
 			pdfTasks,
 			epubTasks,
 		});
-		const externalTasksRevision = buildExternalBookmarkTasksRevision([...pdfTasks, ...epubTasks]);
-		const pointFilesRevision = await this.pointStorage.getPointFilesIndexRevision();
+		const externalTasksRevision = buildExternalBookmarkTasksRevision([
+			...pdfTasks,
+			...epubTasks,
+		]);
+		const pointFilesRevision =
+			await this.pointStorage.getPointFilesIndexRevision();
 		const store: IRScheduleIndexStore = {
 			version: IR_SCHEDULE_INDEX_VERSION,
 			updatedAt: new Date().toISOString(),
@@ -338,7 +363,9 @@ export class IRScheduleIndexService {
 
 const scheduleIndexServiceByApp = new WeakMap<App, IRScheduleIndexService>();
 
-export function getSharedIRScheduleIndexService(app: App): IRScheduleIndexService {
+export function getSharedIRScheduleIndexService(
+	app: App,
+): IRScheduleIndexService {
 	let service = scheduleIndexServiceByApp.get(app);
 	if (!service) {
 		service = new IRScheduleIndexService(app);

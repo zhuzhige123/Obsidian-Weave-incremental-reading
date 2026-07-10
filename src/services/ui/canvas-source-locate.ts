@@ -1,4 +1,7 @@
-import { extractBodyContent, parseYAMLFromContent } from "../../utils/yaml-utils";
+import {
+	extractBodyContent,
+	parseYAMLFromContent,
+} from "../../utils/yaml-utils";
 
 export type CanvasSourceNodeRect = {
 	x: number;
@@ -15,7 +18,9 @@ export type CanvasLocateSupport = {
 
 function getCanvasSourceValues(content: string): string[] {
 	const yaml = parseYAMLFromContent(content);
-	const sourceValues = Array.isArray(yaml.we_source) ? yaml.we_source : [yaml.we_source];
+	const sourceValues = Array.isArray(yaml.we_source)
+		? yaml.we_source
+		: [yaml.we_source];
 
 	return sourceValues
 		.filter((value): value is string => typeof value === "string")
@@ -26,7 +31,9 @@ function getCanvasSourceValues(content: string): string[] {
 export function getPrimaryCanvasWeSource(content: string): string | null {
 	const sourceValues = getCanvasSourceValues(content);
 	return (
-		sourceValues.find((value) => value.toLowerCase().includes(".canvas") && value.includes("?")) ??
+		sourceValues.find(
+			(value) => value.toLowerCase().includes(".canvas") && value.includes("?"),
+		) ??
 		sourceValues.find((value) => value.toLowerCase().includes(".canvas")) ??
 		sourceValues.find((value) => value.includes("?")) ??
 		sourceValues[0] ??
@@ -34,7 +41,9 @@ export function getPrimaryCanvasWeSource(content: string): string | null {
 	);
 }
 
-export function normalizeCanvasNodeId(value: string | null | undefined): string | undefined {
+export function normalizeCanvasNodeId(
+	value: string | null | undefined,
+): string | undefined {
 	const normalized = String(value || "")
 		.trim()
 		.replace(/^canvas-file-node:/, "")
@@ -56,7 +65,8 @@ export function resolveCanvasMenuNodeId(node: unknown): string | undefined {
 		typeof (record as { getData?: () => unknown }).getData === "function"
 			? (record as { getData: () => unknown }).getData()
 			: node;
-	const dataRecord = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+	const dataRecord =
+		data && typeof data === "object" ? (data as Record<string, unknown>) : null;
 	const unknownData =
 		record.unknownData && typeof record.unknownData === "object"
 			? (record.unknownData as Record<string, unknown>)
@@ -64,7 +74,7 @@ export function resolveCanvasMenuNodeId(node: unknown): string | undefined {
 
 	for (const candidate of [record.id, dataRecord?.id, unknownData?.id]) {
 		const normalized = normalizeCanvasNodeId(
-			typeof candidate === "string" ? candidate : undefined
+			typeof candidate === "string" ? candidate : undefined,
 		);
 		if (normalized) {
 			return normalized;
@@ -74,7 +84,9 @@ export function resolveCanvasMenuNodeId(node: unknown): string | undefined {
 	return undefined;
 }
 
-export function getCanvasNodeIdFromSourceLink(sourceLink: string): string | undefined {
+export function getCanvasNodeIdFromSourceLink(
+	sourceLink: string,
+): string | undefined {
 	const rawLink = String(sourceLink || "").trim();
 	if (!rawLink) return undefined;
 
@@ -90,7 +102,9 @@ export function getCanvasNodeIdFromSourceLink(sourceLink: string): string | unde
 	return normalizeCanvasNodeId(fragment);
 }
 
-export function getCanvasSourceNodeRectFromSourceLink(sourceLink: string): CanvasSourceNodeRect | null {
+export function getCanvasSourceNodeRectFromSourceLink(
+	sourceLink: string,
+): CanvasSourceNodeRect | null {
 	const weSource = String(sourceLink || "").trim();
 	if (!weSource) return null;
 
@@ -100,10 +114,14 @@ export function getCanvasSourceNodeRectFromSourceLink(sourceLink: string): Canva
 	const aliasIndex = weSource.indexOf("|", queryIndex);
 	const queryEndCandidate = weSource.lastIndexOf("]]");
 	const queryEnd =
-		aliasIndex !== -1 && (queryEndCandidate === -1 || aliasIndex < queryEndCandidate)
+		aliasIndex !== -1 &&
+		(queryEndCandidate === -1 || aliasIndex < queryEndCandidate)
 			? aliasIndex
 			: queryEndCandidate;
-	const query = weSource.slice(queryIndex + 1, queryEnd > queryIndex ? queryEnd : undefined);
+	const query = weSource.slice(
+		queryIndex + 1,
+		queryEnd > queryIndex ? queryEnd : undefined,
+	);
 	const params = new URLSearchParams(query);
 	const x = Number(params.get("x"));
 	const y = Number(params.get("y"));
@@ -120,7 +138,9 @@ export function getCanvasSourceNodeRectFromSourceLink(sourceLink: string): Canva
 	};
 }
 
-export function getCanvasSourceNodeRectFromCardContent(content: string): CanvasSourceNodeRect | null {
+export function getCanvasSourceNodeRectFromCardContent(
+	content: string,
+): CanvasSourceNodeRect | null {
 	const weSource = getPrimaryCanvasWeSource(content);
 	if (!weSource) return null;
 	return getCanvasSourceNodeRectFromSourceLink(weSource);
@@ -147,11 +167,15 @@ export function getCanvasTextCandidatesFromText(content: string): string[] {
 	return Array.from(uniqueCandidates);
 }
 
-export function getCanvasTextCandidatesFromCardContent(content: string): string[] {
+export function getCanvasTextCandidatesFromCardContent(
+	content: string,
+): string[] {
 	return getCanvasTextCandidatesFromText(extractBodyContent(content || ""));
 }
 
-export function getCanvasLocateSupportFromCardContent(content: string): CanvasLocateSupport {
+export function getCanvasLocateSupportFromCardContent(
+	content: string,
+): CanvasLocateSupport {
 	return {
 		rawWeSource: getPrimaryCanvasWeSource(content),
 		nodeRect: getCanvasSourceNodeRectFromCardContent(content),

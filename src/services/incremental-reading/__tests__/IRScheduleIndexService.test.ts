@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createStandaloneIRTestApp } from "../../../tests/mocks/test-app";
-import { IR_SCHEDULE_INDEX_VERSION, IRScheduleIndexService } from "../IRScheduleIndexService";
-import { buildExternalBookmarkTasksRevision, buildPointFilesIndexRevision } from "../IRScheduleFingerprint";
+import { createStandaloneIRTestApp } from "./standalone-ir-test-app";
+import {
+	buildExternalBookmarkTasksRevision,
+	buildPointFilesIndexRevision,
+} from "../IRScheduleFingerprint";
+import {
+	IRScheduleIndexService,
+	IR_SCHEDULE_INDEX_VERSION,
+} from "../IRScheduleIndexService";
 
 const getPointFilesIndexRevisionMock = vi.fn();
 const listPointSnapshotsMock = vi.fn();
@@ -94,7 +100,9 @@ describe("IRScheduleIndexService", () => {
 			epubTasks: [],
 		};
 
-		await expect((service as any).isStoreFresh(legacyStore)).resolves.toBe(false);
+		await expect((service as any).isStoreFresh(legacyStore)).resolves.toBe(
+			false,
+		);
 	});
 
 	it("treats disk store as fresh when pointFilesRevision matches across restart", async () => {
@@ -131,7 +139,9 @@ describe("IRScheduleIndexService", () => {
 		vi.spyOn(service as any, "readDiskStore").mockResolvedValue(store);
 
 		await expect(service.warmDiskCache()).resolves.toBe(true);
-		await expect(service.peekScheduleFingerprint()).resolves.toBe("schedule-fp");
+		await expect(service.peekScheduleFingerprint()).resolves.toBe(
+			"schedule-fp",
+		);
 	});
 
 	it("peekScheduleFingerprint returns null without throwing when cache is empty", async () => {

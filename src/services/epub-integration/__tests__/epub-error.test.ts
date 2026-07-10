@@ -1,10 +1,14 @@
-import { classifyEpubError, EpubError } from "../epub-error";
+import { EpubError, classifyEpubError } from "../epub-error";
 
 describe("epub-error classification", () => {
 	it("keeps typed parser errors stable for users and logs", () => {
-		const error = new EpubError("missing_container", "EPUB 缺少 META-INF/container.xml", {
-			filePath: "Books/demo.epub",
-		});
+		const error = new EpubError(
+			"missing_container",
+			"EPUB 缺少 META-INF/container.xml",
+			{
+				filePath: "Books/demo.epub",
+			},
+		);
 
 		const classified = classifyEpubError(error, "open");
 
@@ -17,7 +21,7 @@ describe("epub-error classification", () => {
 	it("classifies malformed cfi crashes into a stable EPUB navigation category", () => {
 		const classified = classifyEpubError(
 			new Error("Cannot read properties of null (reading 'childNodes')"),
-			"open"
+			"open",
 		);
 
 		expect(classified.code).toBe("invalid_cfi_target");
@@ -26,8 +30,10 @@ describe("epub-error classification", () => {
 
 	it("classifies corrupted zip archive failures as invalid_archive", () => {
 		const classified = classifyEpubError(
-			new Error("End of data reached (data length = 7942498, asked index = 7942736). Corrupted zip ?"),
-			"open"
+			new Error(
+				"End of data reached (data length = 7942498, asked index = 7942736). Corrupted zip ?",
+			),
+			"open",
 		);
 
 		expect(classified.code).toBe("invalid_archive");

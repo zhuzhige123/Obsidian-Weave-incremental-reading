@@ -1,20 +1,20 @@
 import type { App } from "obsidian";
-import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
+import type { ScheduleItem } from "./IRCalendarScheduleItem";
+import { isEpubBookmarkTaskId } from "./IREpubBookmarkTaskService";
+import { isPdfBookmarkTaskId } from "./IRPdfBookmarkTaskService";
 import { buildScheduleFingerprintFromWorkspace } from "./IRScheduleFingerprint";
 import {
+	type IRScheduleSortableItem,
 	collectScheduleItemDateKeys,
 	patchScheduleItemPriorityFields,
 	patchScheduleItemsInMapByDate,
 	sortScheduleItemsForDailyQueue,
-	type IRScheduleSortableItem,
 } from "./IRScheduleItemSort";
 import { patchCalendarProjectionDaySlices } from "./IRScheduleRefreshService";
-import { isEpubBookmarkTaskId } from "./IREpubBookmarkTaskService";
-import { isPdfBookmarkTaskId } from "./IRPdfBookmarkTaskService";
 import {
-	getSharedIRWorkspaceSnapshotService,
 	type IRWorkspaceDataSnapshot,
+	getSharedIRWorkspaceSnapshotService,
 } from "./IRWorkspaceSnapshotService";
 
 export interface StoredSchedulePriority {
@@ -28,13 +28,22 @@ export interface PriorityChangePreviewDetails {
 	afterDateText: string;
 	changedItemCount: number;
 	impactedDays: number;
-	impactedItems: Array<{ id: string; title: string; beforeDateText: string; afterDateText: string }>;
-	dayDeltas: Array<{ dateKey: string; beforeMinutes: number; afterMinutes: number }>;
+	impactedItems: Array<{
+		id: string;
+		title: string;
+		beforeDateText: string;
+		afterDateText: string;
+	}>;
+	dayDeltas: Array<{
+		dateKey: string;
+		beforeMinutes: number;
+		afterMinutes: number;
+	}>;
 }
 
 export function readStoredPriorityFromWorkspaceSnapshot(
 	snapshot: IRWorkspaceDataSnapshot,
-	itemId: string
+	itemId: string,
 ): StoredSchedulePriority | null {
 	const normalizedId = String(itemId || "").trim();
 	if (!normalizedId) {
@@ -78,9 +87,11 @@ export function mergeScheduleItemDateKeys(
 	itemId: string,
 	materialsByDate: Map<string, IRScheduleSortableItem[]>,
 	pinnedByDate: Map<string, IRScheduleSortableItem[]>,
-	extraDateKeys: string[] = []
+	extraDateKeys: string[] = [],
 ): string[] {
-	const keys = new Set(collectScheduleItemDateKeys(itemId, materialsByDate, pinnedByDate));
+	const keys = new Set(
+		collectScheduleItemDateKeys(itemId, materialsByDate, pinnedByDate),
+	);
 	for (const key of extraDateKeys) {
 		const normalized = String(key || "").trim();
 		if (normalized) {
@@ -90,7 +101,9 @@ export function mergeScheduleItemDateKeys(
 	return Array.from(keys);
 }
 
-export function applyLocalSchedulePriorityPatch<T extends IRScheduleSortableItem>(input: {
+export function applyLocalSchedulePriorityPatch<
+	T extends IRScheduleSortableItem,
+>(input: {
 	materialsByDate: Map<string, T[]>;
 	pinnedByDate: Map<string, T[]>;
 	siblingCache: Map<string, T[]>;
@@ -110,43 +123,60 @@ export function applyLocalSchedulePriorityPatch<T extends IRScheduleSortableItem
 		input.itemId,
 		input.priorityUi,
 		input.priorityEff,
-		dateKeys
+		dateKeys,
 	);
 	const pinnedByDate = patchScheduleItemsInMapByDate(
 		input.pinnedByDate,
 		input.itemId,
 		input.priorityUi,
 		input.priorityEff,
-		dateKeys
+		dateKeys,
 	);
-	const siblingSortKey = String(input.sortSiblingCacheByDateKey || dateKeys[0] || "").trim();
+	const siblingSortKey = String(
+		input.sortSiblingCacheByDateKey || dateKeys[0] || "",
+	).trim();
 	const siblingCache = new Map(
 		Array.from(input.siblingCache.entries(), ([cacheKey, siblings]) => {
 			const patched = siblings.map((item) =>
-				patchScheduleItemPriorityFields(item, input.itemId, input.priorityUi, input.priorityEff)
+				patchScheduleItemPriorityFields(
+					item,
+					input.itemId,
+					input.priorityUi,
+					input.priorityEff,
+				),
 			) as T[];
 			return [
 				cacheKey,
-				siblingSortKey ? sortScheduleItemsForDailyQueue(patched, siblingSortKey) : patched,
+				siblingSortKey
+					? sortScheduleItemsForDailyQueue(patched, siblingSortKey)
+					: patched,
 			];
-		})
+		}),
 	);
 
 	return { materialsByDate, pinnedByDate, siblingCache };
 }
 
-export async function syncScheduleMapsPrioritiesFromWorkspace<T extends ScheduleItem>(
+export async function syncScheduleMapsPrioritiesFromWorkspace<
+	T extends ScheduleItem,
+>(
 	app: App,
 	materialsByDate: Map<string, T[]>,
 	pinnedByDate: Map<string, T[]>,
-	dateKeys: string[]
-): Promise<{ materialsByDate: Map<string, T[]>; pinnedByDate: Map<string, T[]> }> {
-	const normalizedDateKeys = dateKeys.map((key) => String(key || "").trim()).filter(Boolean);
+	dateKeys: string[],
+): Promise<{
+	materialsByDate: Map<string, T[]>;
+	pinnedByDate: Map<string, T[]>;
+}> {
+	const normalizedDateKeys = dateKeys
+		.map((key) => String(key || "").trim())
+		.filter(Boolean);
 	if (normalizedDateKeys.length === 0) {
 		return { materialsByDate, pinnedByDate };
 	}
 
-	const snapshot = await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
+	const snapshot =
+		await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
 	let nextMaterials = materialsByDate;
 	let nextPinned = pinnedByDate;
 
@@ -169,14 +199,14 @@ export async function syncScheduleMapsPrioritiesFromWorkspace<T extends Schedule
 				itemId,
 				stored.priorityUi,
 				stored.priorityEff,
-				[dateKey]
+				[dateKey],
 			);
 			nextPinned = patchScheduleItemsInMapByDate(
 				nextPinned,
 				itemId,
 				stored.priorityUi,
 				stored.priorityEff,
-				[dateKey]
+				[dateKey],
 			);
 		}
 	}
@@ -188,16 +218,19 @@ export async function persistSchedulePriorityDaySlices(
 	app: App,
 	materialsByDate: Map<string, ScheduleItem[]>,
 	dateKeys: string[],
-	deckIds?: string[]
+	deckIds?: string[],
 ): Promise<void> {
-	const normalizedDateKeys = dateKeys.map((key) => String(key || "").trim()).filter(Boolean);
+	const normalizedDateKeys = dateKeys
+		.map((key) => String(key || "").trim())
+		.filter(Boolean);
 	if (normalizedDateKeys.length === 0) {
 		return;
 	}
 
 	try {
 		const queryService = getSharedIRCalendarQueryService(app);
-		const workspaceData = await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
+		const workspaceData =
+			await getSharedIRWorkspaceSnapshotService(app).getWorkspaceData();
 		const dayPatches = new Map<string, ScheduleItem[]>();
 		for (const dateKey of normalizedDateKeys) {
 			const items = materialsByDate.get(dateKey);

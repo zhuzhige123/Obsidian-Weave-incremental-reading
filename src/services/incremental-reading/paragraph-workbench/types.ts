@@ -1,4 +1,8 @@
-export type ParagraphWorkbenchSourceType = "epub" | "markdown" | "canvas" | "ir-point";
+export type ParagraphWorkbenchSourceType =
+	| "epub"
+	| "markdown"
+	| "canvas"
+	| "ir-point";
 
 export interface ParagraphWorkbenchSegment {
 	id: string;

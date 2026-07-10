@@ -4,7 +4,10 @@ import type { SupportedLanguage, TranslationKey } from "../types";
  * 独立 IR 插件运行时仍需要的 Weave 管理 UI 文案子集。
  * 禁止再引入完整的 management-ui.ts / management.ts（主插件拆仓残留，体积过大）。
  */
-export const irStandaloneUiTranslationOverrides: Record<SupportedLanguage, TranslationKey> = {
+export const irStandaloneUiTranslationOverrides: Record<
+	SupportedLanguage,
+	TranslationKey
+> = {
 	"zh-CN": {
 		management: {
 			cardSearch: {
@@ -88,7 +91,8 @@ export const irStandaloneUiTranslationOverrides: Record<SupportedLanguage, Trans
 					cleanupPreparing: "准备扫描...",
 					cleanupRunning: "正在清理残留元数据",
 					currentProcessing: "当前处理：{file}",
-					detailSummary: "检测：{detected} ｜ 已清理：{cleaned} ｜ 错误：{errors}",
+					detailSummary:
+						"检测：{detected} ｜ 已清理：{cleaned} ｜ 错误：{errors}",
 					seconds: "{count}秒",
 					statusCompleted: "已完成",
 					statusCancelled: "已取消",
@@ -205,7 +209,8 @@ export const irStandaloneUiTranslationOverrides: Record<SupportedLanguage, Trans
 					cleanupPreparing: "Preparing scan...",
 					cleanupRunning: "Cleaning leftover metadata",
 					currentProcessing: "Processing: {file}",
-					detailSummary: "Detected: {detected} | Cleaned: {cleaned} | Errors: {errors}",
+					detailSummary:
+						"Detected: {detected} | Cleaned: {cleaned} | Errors: {errors}",
 					seconds: "{count}s",
 					statusCompleted: "Completed",
 					statusCancelled: "Cancelled",

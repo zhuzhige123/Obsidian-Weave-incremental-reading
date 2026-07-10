@@ -1,6 +1,9 @@
-
 vi.mock("obsidian", () => ({
-	normalizePath: (path: string) => path.replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/\/$/, ""),
+	normalizePath: (path: string) =>
+		path
+			.replace(/\\/g, "/")
+			.replace(/\/{2,}/g, "/")
+			.replace(/\/$/, ""),
 	Notice: class {},
 	TFile: class {
 		path: string;
@@ -32,7 +35,7 @@ describe("IRAssociatedNoteMenu", () => {
 			resolvePreferredAssociatedNoteFolder(app, {
 				notePaths: ["Notes/Primary.md", "Other/Extra.md"],
 				fallbackFilePath: "Source/Doc.pdf",
-			})
+			}),
 		).toBe("Notes");
 	});
 
@@ -47,7 +50,7 @@ describe("IRAssociatedNoteMenu", () => {
 			resolvePreferredAssociatedNoteFolder(app, {
 				notePaths: [],
 				fallbackFilePath: "Books/Chapter/source.md",
-			})
+			}),
 		).toBe("Books/Chapter");
 	});
 

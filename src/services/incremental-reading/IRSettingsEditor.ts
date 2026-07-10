@@ -1,11 +1,11 @@
+import type { IncrementalReadingSettingsHost } from "../../components/settings/types/incremental-reading-settings-host";
+import { getLegacyIRImportFolder } from "../../config/paths";
 import type {
 	IncrementalReadingFolderSubscriptionInitialScheduleMode,
 	IncrementalReadingFolderSubscriptionRule,
 	IncrementalReadingFolderSubscriptionSettings,
 	IncrementalReadingSettings,
 } from "../../types/plugin-settings.d";
-import type { IncrementalReadingSettingsHost } from "../../components/settings/types/incremental-reading-settings-host";
-import { getLegacyIRImportFolder } from "../../config/paths";
 import {
 	createIncrementalReadingFolderSubscriptionRuleId,
 	normalizeIncrementalReadingFolderSubscriptionSettings,
@@ -35,12 +35,14 @@ export class IRSettingsEditor {
 
 	getNormalizedIncrementalReadingSettings(): IncrementalReadingSettings {
 		const defaultIRSettings = buildDefaultIncrementalReadingSettings(
-			this.plugin.settings?.weaveParentFolder
+			this.plugin.settings?.weaveParentFolder,
 		);
 		return {
 			...defaultIRSettings,
 			...this.plugin.getIncrementalReadingSettings(),
-			importFolder: getLegacyIRImportFolder(this.plugin.settings?.weaveParentFolder),
+			importFolder: getLegacyIRImportFolder(
+				this.plugin.settings?.weaveParentFolder,
+			),
 		};
 	}
 
@@ -57,11 +59,16 @@ export class IRSettingsEditor {
 		return state.incrementalReading;
 	}
 
-	async save(syncFolderSubscription = false): Promise<IncrementalReadingSettings> {
+	async save(
+		syncFolderSubscription = false,
+	): Promise<IncrementalReadingSettings> {
 		const incrementalReading = this.ensureIncrementalReadingSettings();
-		const savedSettings = (await this.plugin.saveIncrementalReadingSettings(incrementalReading, {
-			syncFolderSubscription,
-		}));
+		const savedSettings = await this.plugin.saveIncrementalReadingSettings(
+			incrementalReading,
+			{
+				syncFolderSubscription,
+			},
+		);
 		this.updateState({
 			...this.getState(),
 			incrementalReading: savedSettings,
@@ -71,15 +78,16 @@ export class IRSettingsEditor {
 
 	getFolderSubscriptionSettingsSnapshot(): IncrementalReadingFolderSubscriptionSettings {
 		return normalizeIncrementalReadingFolderSubscriptionSettings(
-			this.ensureIncrementalReadingSettings().folderSubscription
+			this.ensureIncrementalReadingSettings().folderSubscription,
 		);
 	}
 
 	applyNormalizedFolderSubscriptionSettings(): void {
 		const incrementalReading = this.ensureIncrementalReadingSettings();
-		const normalizedFolderSubscription = normalizeIncrementalReadingFolderSubscriptionSettings(
-			incrementalReading.folderSubscription
-		);
+		const normalizedFolderSubscription =
+			normalizeIncrementalReadingFolderSubscriptionSettings(
+				incrementalReading.folderSubscription,
+			);
 		if (
 			JSON.stringify(incrementalReading.folderSubscription || {}) !==
 			JSON.stringify(normalizedFolderSubscription)
@@ -94,13 +102,14 @@ export class IRSettingsEditor {
 
 	updateFolderSubscriptionSettings(
 		updater: (
-			current: IncrementalReadingFolderSubscriptionSettings
-		) => IncrementalReadingFolderSubscriptionSettings
+			current: IncrementalReadingFolderSubscriptionSettings,
+		) => IncrementalReadingFolderSubscriptionSettings,
 	): void {
 		const incrementalReading = this.ensureIncrementalReadingSettings();
-		incrementalReading.folderSubscription = normalizeIncrementalReadingFolderSubscriptionSettings(
-			updater(this.getFolderSubscriptionSettingsSnapshot())
-		);
+		incrementalReading.folderSubscription =
+			normalizeIncrementalReadingFolderSubscriptionSettings(
+				updater(this.getFolderSubscriptionSettingsSnapshot()),
+			);
 	}
 
 	createEmptyFolderSubscriptionRule(): IncrementalReadingFolderSubscriptionRule {
@@ -113,7 +122,9 @@ export class IRSettingsEditor {
 	}
 
 	getFolderSubscriptionImportConfirmThreshold(): number {
-		const value = Number(this.getFolderSubscriptionSettingsSnapshot().importConfirmThreshold ?? 20);
+		const value = Number(
+			this.getFolderSubscriptionSettingsSnapshot().importConfirmThreshold ?? 20,
+		);
 		if (!Number.isFinite(value) || value < 0) {
 			return 20;
 		}
@@ -121,12 +132,15 @@ export class IRSettingsEditor {
 	}
 
 	getFolderSubscriptionInitialScheduleMode(): IncrementalReadingFolderSubscriptionInitialScheduleMode {
-		return this.getFolderSubscriptionSettingsSnapshot().initialScheduleMode === "scheduled"
+		return this.getFolderSubscriptionSettingsSnapshot().initialScheduleMode ===
+			"scheduled"
 			? "scheduled"
 			: "today";
 	}
 
-	updateIncrementalReading(updater: (settings: IncrementalReadingSettings) => void): void {
+	updateIncrementalReading(
+		updater: (settings: IncrementalReadingSettings) => void,
+	): void {
 		updater(this.ensureIncrementalReadingSettings());
 	}
 }

@@ -1,6 +1,9 @@
 import type { SupportedLanguage, TranslationKey } from "../types";
 
-export const licenseUiTranslationOverrides: Record<SupportedLanguage, TranslationKey> = {
+export const licenseUiTranslationOverrides: Record<
+	SupportedLanguage,
+	TranslationKey
+> = {
 	"zh-CN": {
 		about: {
 			license: {
@@ -46,7 +49,8 @@ export const licenseUiTranslationOverrides: Record<SupportedLanguage, Translatio
 			license: {
 				activation: {
 					activating: "Activating...",
-					codePlaceholder: "Paste the full activation code (usually around 500-800 characters)",
+					codePlaceholder:
+						"Paste the full activation code (usually around 500-800 characters)",
 					confirmEmailPlaceholder: "Re-enter your email",
 					helpFormatBody:
 						"An activation code is a long string, typically 500-800 characters, made of two parts separated by a period.",
@@ -67,10 +71,12 @@ export const licenseUiTranslationOverrides: Record<SupportedLanguage, Translatio
 					sharedLicenseFrom: "Shared license (from {product})",
 				},
 				notices: {
-					resetConfirm: "Reset the license? This will clear the current activation state.",
+					resetConfirm:
+						"Reset the license? This will clear the current activation state.",
 					resetConfirmTitle: "Confirm reset",
 					resetSuccess: "License reset",
-					inheritedDisabled: "Weave main-plugin license inheritance has been turned off.",
+					inheritedDisabled:
+						"Weave main-plugin license inheritance has been turned off.",
 					standaloneDescription:
 						"Current features are free in this release. Standalone incremental-reading activation and Weave license inheritance remain available for future premium features.",
 					verifyAction: "License verification",

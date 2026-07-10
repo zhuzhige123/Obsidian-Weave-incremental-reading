@@ -36,7 +36,9 @@ vi.mock("../IRScheduleIndexService", () => ({
 	getSharedIRScheduleIndexService: () => ({
 		peekScheduleFingerprint: peekScheduleFingerprintMock,
 		warmDiskCache: vi.fn().mockResolvedValue(true),
-		getScheduleSources: vi.fn().mockResolvedValue({ scheduleFingerprint: "schedule-fp" }),
+		getScheduleSources: vi
+			.fn()
+			.mockResolvedValue({ scheduleFingerprint: "schedule-fp" }),
 	}),
 }));
 
@@ -88,7 +90,9 @@ describe("IRProjectionRuntime", () => {
 			result: { materialsByDate },
 			daySummaries: new Map([["2026-06-19", { totalCount: 1 }]]),
 		});
-		tryHydrateMonthHeatmapMock.mockResolvedValue(new Map([["2026-06", { "2026-06-19": 2 }]]));
+		tryHydrateMonthHeatmapMock.mockResolvedValue(
+			new Map([["2026-06", { "2026-06-19": 2 }]]),
+		);
 
 		const runtime = getSharedIRProjectionRuntime(app);
 		const result = await runtime.ensureReady({
