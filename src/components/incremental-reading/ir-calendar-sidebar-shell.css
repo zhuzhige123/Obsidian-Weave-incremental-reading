@@ -6,9 +6,18 @@
   background: var(--weave-ir-calendar-host-background);
 }
 
+:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"][data-weave-surface-context="sidebar"]) {
+  background: transparent;
+}
+
 :global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view[data-weave-surface-context="sidebar"]) {
   /* 侧边栏里尽量继承 Obsidian/主题提供的宿主背景，避免我们再叠一层“secondary”底色导致偏色。 */
   --weave-ir-calendar-host-background: transparent;
+  background: transparent;
+}
+
+:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"][data-weave-surface-context="sidebar"] > .view-content.weave-ir-calendar-view .ir-calendar-sidebar) {
+  --weave-ir-sidebar-surface-background: transparent;
   background: transparent;
 }
 
@@ -97,19 +106,52 @@
 
 
 
-:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] .view-content.weave-ir-calendar-view .day-cell) {
-  border: 0 !important;
-  border-image: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
+:global(
+  .workspace-leaf-content[data-type^="weave-ir-calendar-view"]
+    .view-content.weave-ir-calendar-view
+    .calendar-grid
+    button.day-cell.clickable-icon
+),
+.ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon {
+  border: none;
+  border-width: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-image: none;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  filter: none;
+  min-height: unset;
+  height: auto;
+  padding: 0;
 }
 
-:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] .view-content.weave-ir-calendar-view .day-cell:hover) {
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
+:global(
+  .workspace-leaf-content[data-type^="weave-ir-calendar-view"]
+    .view-content.weave-ir-calendar-view
+    .calendar-grid
+    button.day-cell.clickable-icon:hover
+),
+.ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon:hover {
+  border: none;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
 }
 
+:global(
+  .workspace-leaf-content[data-type^="weave-ir-calendar-view"]
+    .view-content.weave-ir-calendar-view
+    .calendar-grid
+    button.day-cell.clickable-icon:active
+),
+.ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon:active {
+  border: none;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
 
 .reading-tag-filter-bar {
   display: flex;

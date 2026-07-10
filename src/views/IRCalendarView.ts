@@ -134,9 +134,7 @@ export class IRCalendarView extends ItemView {
 
 	private applySurfaceContext(): void {
 		const surfaceTokens = getViewSurfaceTokens(this.leaf);
-		const targets = [this.contentEl, this.contentEl.parentElement].filter(
-			Boolean,
-		) as HTMLElement[];
+		const targets = this.collectSurfaceContextTargets();
 
 		for (const target of targets) {
 			target.dataset.weaveSurfaceContext = surfaceTokens.context;
@@ -149,6 +147,30 @@ export class IRCalendarView extends ItemView {
 				surfaceTokens.elevatedBackground,
 			);
 		}
+	}
+
+	private collectSurfaceContextTargets(): HTMLElement[] {
+		const targets = new Set<HTMLElement>();
+		const queue: HTMLElement[] = [this.contentEl];
+
+		while (queue.length > 0) {
+			const current = queue.shift();
+			if (!current) {
+				continue;
+			}
+			if (targets.has(current)) {
+				continue;
+			}
+			targets.add(current);
+			if (current.classList.contains("workspace-leaf-content")) {
+				continue;
+			}
+			if (current.parentElement instanceof HTMLElement) {
+				queue.push(current.parentElement);
+			}
+		}
+
+		return Array.from(targets);
 	}
 
 	/**
@@ -264,7 +286,7 @@ export class IRCalendarView extends ItemView {
 			logger.debug(
 				"[IRCalendarView] allCoreServices 已就绪，继续确认插件注册状态",
 			);
-		} catch (_error) {
+		} catch { /* ignored */
 			logger.warn("[IRCalendarView] 事件等待超时，回退到轮询检查");
 		}
 

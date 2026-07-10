@@ -778,6 +778,7 @@ const zhIrAnalytics: TranslationKey = {
 		mode: "分析模式",
 		selection: "条件选择",
 		timeRange: "时间范围",
+		pickSelection: "选择",
 	},
 	modes: {
 		topic: "专题",
@@ -829,7 +830,7 @@ const zhIrAnalytics: TranslationKey = {
 		cards: "制卡",
 		notes: "笔记",
 	},
-	charts: {
+		charts: {
 		totalMaterials: "累计材料",
 		activeMaterials: "活跃材料",
 		closedMaterials: "已退出主队列",
@@ -839,12 +840,17 @@ const zhIrAnalytics: TranslationKey = {
 		minutes: "分钟",
 		plannedItems: "计划材料数",
 		estimatedMinutes: "预计阅读分钟",
+		overload: {
+			warning: "负荷偏高",
+			overloaded: "负荷过载",
+		},
 		tooltip: {
 			effectivePriority: "有效优先级: {value}",
 			schedulingUrgency: "调度紧迫度: {value}",
 			counts: "活跃项: {active} / 到期: {due} / 逾期: {overdue}",
 			readingHours: "阅读时长: {hours} 小时",
 			outcomes: "制卡: {cards} / 摘录: {extracts} / 笔记: {notes}",
+			plannedTotal: "计划合计: {count}",
 		},
 	},
 	monitoring:
@@ -867,6 +873,38 @@ const zhIrAnalytics: TranslationKey = {
 		pickTagDesc: "先在上方选择一个标签，下方内容区会显示对应的分析图表。",
 		tryOtherFilters:
 			"可以试试切换时间范围或分析条件，看看是否有可展示的图表数据。",
+	},
+	materialTypes: {
+		md: "Markdown",
+		canvas: "Canvas",
+		epub: "EPUB",
+		pdf: "PDF",
+		link: "网页链接",
+		other: "其它",
+	},
+	composition: {
+		title: "材料构成",
+		byDocuments: "按母文档数",
+		byHours: "按阅读时长",
+		byPoints: "按阅读点数",
+		legendCount: "{label} · {count} ({share}%)",
+		legendHours: "{label} · {hours}h ({share}%)",
+	},
+	outcomeTable: {
+		title: "类型产出效率",
+		type: "类型",
+		readingHours: "阅读时长",
+		extracts: "摘录",
+		cards: "制卡",
+		notes: "笔记",
+		outcomesPerHour: "产出/小时",
+	},
+	topMaterials: {
+		title: "重点母文档",
+		active: "活跃 {count}",
+		extracts: "摘录 {count}",
+		cards: "制卡 {count}",
+		notes: "笔记 {count}",
 	},
 };
 
@@ -891,6 +929,7 @@ const enIrAnalytics: TranslationKey = {
 		mode: "Analysis mode",
 		selection: "Filter",
 		timeRange: "Time range",
+		pickSelection: "Select",
 	},
 	modes: {
 		topic: "Topic",
@@ -952,12 +991,17 @@ const enIrAnalytics: TranslationKey = {
 		minutes: "Minutes",
 		plannedItems: "Planned items",
 		estimatedMinutes: "Estimated minutes",
+		overload: {
+			warning: "High load",
+			overloaded: "Overloaded",
+		},
 		tooltip: {
 			effectivePriority: "Effective priority: {value}",
 			schedulingUrgency: "Scheduling urgency: {value}",
 			counts: "Active: {active} / due: {due} / overdue: {overdue}",
 			readingHours: "Reading time: {hours} h",
 			outcomes: "Cards: {cards} / extracts: {extracts} / notes: {notes}",
+			plannedTotal: "Planned total: {count}",
 		},
 	},
 	monitoring:
@@ -984,6 +1028,38 @@ const enIrAnalytics: TranslationKey = {
 		pickTagDesc: "Choose a tag above and the chart area below will update.",
 		tryOtherFilters:
 			"Try switching the time range or filters to see whether chart data is available.",
+	},
+	materialTypes: {
+		md: "Markdown",
+		canvas: "Canvas",
+		epub: "EPUB",
+		pdf: "PDF",
+		link: "Web link",
+		other: "Other",
+	},
+	composition: {
+		title: "Material composition",
+		byDocuments: "By parent documents",
+		byHours: "By reading time",
+		byPoints: "By reading points",
+		legendCount: "{label} · {count} ({share}%)",
+		legendHours: "{label} · {hours}h ({share}%)",
+	},
+	outcomeTable: {
+		title: "Type outcome efficiency",
+		type: "Type",
+		readingHours: "Reading time",
+		extracts: "Extracts",
+		cards: "Cards",
+		notes: "Notes",
+		outcomesPerHour: "Outcomes/hour",
+	},
+	topMaterials: {
+		title: "Top parent documents",
+		active: "Active {count}",
+		extracts: "Extracts {count}",
+		cards: "Cards {count}",
+		notes: "Notes {count}",
 	},
 };
 

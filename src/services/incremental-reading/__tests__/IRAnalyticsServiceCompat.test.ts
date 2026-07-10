@@ -200,6 +200,7 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 				expect.objectContaining({
 					label: "PDF 分析点",
 					sourceKind: "pdf",
+					materialType: "pdf",
 					itemCount: 1,
 					activeCount: 1,
 					notesWritten: 1,
@@ -207,10 +208,24 @@ describe("IRAnalyticsService migrated point compatibility", () => {
 				expect.objectContaining({
 					label: "EPUB 分析点",
 					sourceKind: "epub",
+					materialType: "epub",
 					itemCount: 1,
 					activeCount: 1,
 					notesWritten: 1,
 				}),
+			]),
+		);
+		expect(snapshot.materialTypeBreakdown.totalPoints).toBe(2);
+		expect(snapshot.materialTypeBreakdown.slices).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ type: "pdf", pointCount: 1, documentCount: 1 }),
+				expect.objectContaining({ type: "epub", pointCount: 1, documentCount: 1 }),
+			]),
+		);
+		expect(snapshot.materialTypeOutcome).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ type: "pdf" }),
+				expect.objectContaining({ type: "epub" }),
 			]),
 		);
 		expect(snapshot.monitoringSummary).toMatchObject({

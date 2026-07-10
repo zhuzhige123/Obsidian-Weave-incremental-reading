@@ -90,7 +90,7 @@ export class SourceNavigationService {
 				block: "center",
 				inline: "nearest",
 			});
-		} catch (_e) {
+		} catch { /* ignored */
 			/* ignore */
 		}
 
@@ -121,7 +121,7 @@ export class SourceNavigationService {
 						return;
 					}
 				}
-			} catch (_e) {
+			} catch { /* ignored */
 				/* ignore */
 			}
 			if (attempt + 1 < this.markdownOverlayMaxAttempts) {
@@ -180,7 +180,7 @@ export class SourceNavigationService {
 						attempt + 1,
 					);
 				}
-			} catch (_e) {
+			} catch { /* ignored */
 				if (attempt + 1 < this.markdownOverlayMaxAttempts) {
 					this.showMarkdownOverlayWithRetry(
 						view,
@@ -244,7 +244,7 @@ export class SourceNavigationService {
 					}
 
 					new Notice(i18n.t("irServiceNotices.sourceNav.openedButNotLocated"));
-				} catch (_e) {
+				} catch { /* ignored */
 					/* ignore */
 				}
 			})();
@@ -325,7 +325,7 @@ export class SourceNavigationService {
 
 		try {
 			editor.setCursor(startPos);
-		} catch (_e) {
+		} catch { /* ignored */
 			/* ignore */
 		}
 
@@ -339,11 +339,11 @@ export class SourceNavigationService {
 			window.setTimeout(() => {
 				try {
 					editor.setCursor(startPos);
-				} catch (_e) {
+				} catch { /* ignored */
 					/* ignore */
 				}
 			}, 900);
-		} catch (_e) {
+		} catch { /* ignored */
 			/* ignore */
 		}
 
@@ -355,10 +355,10 @@ export class SourceNavigationService {
 				},
 				true,
 			);
-		} catch (_e) {
+		} catch { /* ignored */
 			try {
 				editor.scrollIntoView({ from: startPos, to: startPos }, true);
-			} catch (_inner) {
+			} catch { /* ignored */
 				/* ignore */
 			}
 		}
@@ -369,7 +369,7 @@ export class SourceNavigationService {
 	private safeGetEditorValue(editor: Editor): string {
 		try {
 			return String(editor.getValue() || "");
-		} catch (_e) {
+		} catch { /* ignored */
 			return "";
 		}
 	}
@@ -694,7 +694,7 @@ export class SourceNavigationService {
 						});
 					}, 120);
 				}
-			} catch (_e) {
+			} catch { /* ignored */
 				if (attempt < 5) {
 					this.locateCanvasNodeWithRetry(
 						canvasLeaf,

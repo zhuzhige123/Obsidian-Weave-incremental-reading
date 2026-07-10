@@ -188,7 +188,7 @@ export class IRV4SchedulerService {
 			/*
 			logger.warn("[IRV4SchedulerService] autoBackfillTagGroupsOnce 失败:", error);
 			*/
-		} catch {}
+		} catch { /* ignored */ }
 		this.initialized = true;
 
 		logger.info("[IRV4SchedulerService] 初始化完成");
@@ -267,7 +267,7 @@ export class IRV4SchedulerService {
 			if (await adapter.exists(markerPath)) {
 				return;
 			}
-		} catch {}
+		} catch { /* ignored */ }
 
 		let sources: Record<
 			string,
@@ -373,7 +373,7 @@ export class IRV4SchedulerService {
 					2,
 				),
 			);
-		} catch {}
+		} catch { /* ignored */ }
 
 		if (updatedSourceCount > 0 || updatedChunkCount > 0) {
 			logger.info(

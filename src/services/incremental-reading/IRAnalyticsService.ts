@@ -32,6 +32,8 @@ import {
 	buildProjectedDayLoadMap,
 	getProjectedScheduleSummary,
 } from "./IRProjectedScheduleSummary";
+import { getSharedIRScheduleKernel, type IRPlannedSchedule } from "./IRScheduleKernel";
+import { getSharedIRWorkspaceSnapshotService, type IRWorkspaceDataSnapshot } from "./IRWorkspaceSnapshotService";
 import {
 	type IRTraceSourceKind,
 	buildIRTraceOverviewStats,
@@ -41,7 +43,21 @@ import {
 	normalizeTraceSubunitKey,
 } from "./IRSourceTraceStats";
 import { IRStorageService } from "./IRStorageService";
+import {
+	type IRAnalyticsMaterialType,
+	type IRAnalyticsMaterialTypeBreakdown,
+	type IRAnalyticsMaterialTypeOutcome,
+	buildAnalyticsMaterialTypeBreakdown,
+	buildAnalyticsMaterialTypeOutcome,
+	createEmptyMaterialTypeCounts,
+	incrementMaterialTypeCount,
+	IR_ANALYTICS_MATERIAL_TYPE_LABELS_ZH,
+	resolveAnalyticsMaterialType,
+	resolveAnalyticsMaterialWebUrl,
+	type IRAnalyticsMaterialTypeCounts,
+} from "./IRAnalyticsMaterialType";
 import { getIncrementalReadingPlugin } from "./ir-runtime";
+import { resolveLegacyBlockResumeLink } from "./paragraph-workbench/paragraph-block-reference";
 
 export type IRAnalyticsMode = "overall" | "topic" | "tag";
 export type IRAnalyticsSourceKind = "topic" | "tag";
@@ -88,6 +104,7 @@ export interface IRAnalyticsQuantityPoint {
 	totalCount: number;
 	activeCount: number;
 	closedCount: number;
+	typeCounts: IRAnalyticsMaterialTypeCounts;
 }
 
 export type IRAnalyticsTimingBucketKey =
@@ -106,6 +123,7 @@ export interface IRAnalyticsTimingBucket {
 	key: IRAnalyticsTimingBucketKey;
 	label: string;
 	count: number;
+	typeCounts: IRAnalyticsMaterialTypeCounts;
 }
 
 export interface IRAnalyticsScatterPoint {
@@ -128,6 +146,7 @@ export interface IRAnalyticsForecastPoint {
 	itemCount: number;
 	totalEstimatedMinutes: number;
 	overloadLevel: "normal" | "warning" | "overloaded";
+	typeCounts: IRAnalyticsMaterialTypeCounts;
 }
 
 export interface IRLoadForecastSnapshot {
@@ -219,6 +238,7 @@ export interface IRAnalyticsSourceBreakdown {
 	label: string;
 	subtitle: string;
 	sourceKind: IRTraceSourceKind;
+	materialType: IRAnalyticsMaterialType;
 	itemCount: number;
 	activeCount: number;
 	extracts: number;
@@ -239,8 +259,25 @@ export interface IRAnalyticsSnapshot {
 	timingBuckets: IRAnalyticsTimingBucket[];
 	difficultyScatter: IRAnalyticsScatterPoint[];
 	forecast: IRAnalyticsForecastPoint[];
+	materialTypeBreakdown: IRAnalyticsMaterialTypeBreakdown;
+	materialTypeOutcome: IRAnalyticsMaterialTypeOutcome[];
 	monitoringSummary: IRAnalyticsMonitoringSummary | null;
 }
+
+export type {
+	IRAnalyticsMaterialType,
+	IRAnalyticsMaterialTypeBreakdown,
+	IRAnalyticsMaterialTypeOutcome,
+} from "./IRAnalyticsMaterialType";
+export {
+	IR_ANALYTICS_MATERIAL_TYPE_COLORS,
+	IR_ANALYTICS_MATERIAL_TYPE_ICONS,
+	IR_ANALYTICS_MATERIAL_TYPE_ORDER,
+	createEmptyMaterialTypeCounts,
+	getPresentMaterialTypes,
+	resolveAnalyticsMaterialType,
+} from "./IRAnalyticsMaterialType";
+export type { IRAnalyticsMaterialTypeCounts } from "./IRAnalyticsMaterialType";
 
 interface IRAnalyticsUnit {
 	id: string;
@@ -259,8 +296,12 @@ interface IRAnalyticsUnit {
 	tagKeys: string[];
 	tagLabels: string[];
 	sourceKind: IRTraceSourceKind;
+	sourcePath: string;
 	sourceDocumentKey: string;
 	sourceSubunitKey?: string;
+	resumeLink?: string;
+	webUrl?: string;
+	materialType: IRAnalyticsMaterialType;
 	associatedNotePath?: string;
 	associatedNotePaths?: string[];
 }
@@ -374,6 +415,7 @@ function buildUpcomingForecastPoints(days: number): IRAnalyticsForecastPoint[] {
 			itemCount: 0,
 			totalEstimatedMinutes: 0,
 			overloadLevel: "normal",
+			typeCounts: createEmptyMaterialTypeCounts(),
 		});
 	}
 
@@ -643,6 +685,7 @@ function toShortDateLabel(dateKey: string): string {
 export function buildAnalyticsForecastFromProjectedSummary(
 	summary: IRProjectedScheduleSummary,
 	filteredIdSet: Set<string>,
+	materialTypeByUnitId?: Map<string, IRAnalyticsMaterialType>,
 ): IRAnalyticsForecastPoint[] {
 	const projectedDayLoadMap = buildProjectedDayLoadMap(summary);
 	const overloadLevelByDate = new Map(
@@ -658,6 +701,11 @@ export function buildAnalyticsForecastFromProjectedSummary(
 			filteredIdSet.size > 0
 				? allItems.filter((item) => filteredIdSet.has(item.id))
 				: allItems;
+		const typeCounts = createEmptyMaterialTypeCounts();
+		for (const item of items) {
+			const materialType = materialTypeByUnitId?.get(item.id) ?? "other";
+			incrementMaterialTypeCount(typeCounts, materialType);
+		}
 
 		return {
 			dateKey: day.dateKey,
@@ -674,8 +722,14 @@ export function buildAnalyticsForecastFromProjectedSummary(
 				items.length === 0
 					? "normal"
 					: overloadLevelByDate.get(day.dateKey) || "normal",
+			typeCounts,
 		};
 	});
+}
+
+interface IRAnalyticsSnapshotCacheEntry {
+	stateKey: string;
+	snapshot: IRAnalyticsSnapshot;
 }
 
 export class IRAnalyticsService {
@@ -683,6 +737,8 @@ export class IRAnalyticsService {
 	private readonly pdfService: IRPdfBookmarkTaskService;
 	private readonly epubService: IREpubBookmarkTaskService;
 	private readonly monitoringService: IRMonitoringService;
+	private snapshotCache = new Map<string, IRAnalyticsSnapshotCacheEntry>();
+	private inflightSnapshots = new Map<string, Promise<IRAnalyticsSnapshot>>();
 
 	constructor(private readonly app: App) {
 		this.storage = new IRStorageService(app);
@@ -696,6 +752,38 @@ export class IRAnalyticsService {
 		await this.pdfService.initialize();
 		await this.epubService.initialize();
 		await this.monitoringService.load();
+	}
+
+	invalidateSnapshotCache(): void {
+		this.snapshotCache.clear();
+		this.inflightSnapshots.clear();
+	}
+
+	private buildSnapshotCacheKey(
+		mode: IRAnalyticsMode,
+		selectionKey: string,
+		days: number,
+	): string {
+		return `${mode}::${normalizeSelectionKey(selectionKey)}::${days}`;
+	}
+
+	private buildAnalyticsStateKey(
+		workspaceGeneratedAt: number,
+		scheduleGeneratedAt: number,
+	): string {
+		return `${workspaceGeneratedAt}::${scheduleGeneratedAt}`;
+	}
+
+	private withFreshMonitoringSummary(
+		snapshot: IRAnalyticsSnapshot,
+	): IRAnalyticsSnapshot {
+		if (snapshot.scopeMode !== "overall") {
+			return snapshot;
+		}
+		return {
+			...snapshot,
+			monitoringSummary: this.buildMonitoringSummary(),
+		};
 	}
 
 	async getAvailableDecks(): Promise<IRDeck[]> {
@@ -768,42 +856,93 @@ export class IRAnalyticsService {
 
 		const mode = options?.mode ?? "overall";
 		const days = Math.max(7, options?.days ?? 30);
-		const [
-			sourcesMap,
-			chunksMap,
-			pdfTasks,
-			epubTasks,
-			history,
-			decks,
-			cards,
-			readingMaterials,
-		] = await Promise.all([
-			this.storage.getAllSources(),
-			this.storage.getAllChunkData(),
-			this.pdfService.getAllTasks(),
-			this.epubService.getAllTasks(),
-			this.storage.getHistory(),
-			this.storage.getAllDecks(),
+		const normalizedSelectionKey = normalizeSelectionKey(
+			options?.selectionKey || "",
+		);
+		const cacheKey = this.buildSnapshotCacheKey(
+			mode,
+			normalizedSelectionKey,
+			days,
+		);
+
+		const workspaceData =
+			await getSharedIRWorkspaceSnapshotService(this.app).getWorkspaceData();
+		const scheduleKernel = getSharedIRScheduleKernel(this.app);
+		const cachedSchedule = scheduleKernel.getCachedSchedule({ horizonDays: days });
+		if (cachedSchedule) {
+			const stateKey = this.buildAnalyticsStateKey(
+				workspaceData.generatedAt,
+				cachedSchedule.generatedAt,
+			);
+			const cachedEntry = this.snapshotCache.get(cacheKey);
+			if (cachedEntry?.stateKey === stateKey) {
+				return this.withFreshMonitoringSummary(cachedEntry.snapshot);
+			}
+		}
+
+		const inflight = this.inflightSnapshots.get(cacheKey);
+		if (inflight) {
+			return inflight;
+		}
+
+		const snapshotPromise = this.buildSnapshot({
+			mode,
+			days,
+			normalizedSelectionKey,
+			workspaceData,
+			cachedSchedule,
+			cacheKey,
+		});
+		this.inflightSnapshots.set(cacheKey, snapshotPromise);
+		try {
+			return await snapshotPromise;
+		} finally {
+			if (this.inflightSnapshots.get(cacheKey) === snapshotPromise) {
+				this.inflightSnapshots.delete(cacheKey);
+			}
+		}
+	}
+
+	private async buildSnapshot(input: {
+		mode: IRAnalyticsMode;
+		days: number;
+		normalizedSelectionKey: string;
+		workspaceData: IRWorkspaceDataSnapshot;
+		cachedSchedule: IRPlannedSchedule | null;
+		cacheKey: string;
+	}): Promise<IRAnalyticsSnapshot> {
+		const {
+			mode,
+			days,
+			normalizedSelectionKey,
+			workspaceData,
+			cachedSchedule,
+			cacheKey,
+		} = input;
+		const [cards, readingMaterials, projectedSummary] = await Promise.all([
 			this.getAllMemoryCards(),
 			this.getAllReadingMaterials(),
+			getProjectedScheduleSummary(this.app, {
+				horizonDays: days,
+				schedule: cachedSchedule ?? undefined,
+				seedData: {
+					decksRecord: workspaceData.decksRecord,
+					blocksRecord: workspaceData.blocksRecord,
+					history: workspaceData.history,
+				},
+			}),
 		]);
-		const projectedSummary = await getProjectedScheduleSummary(this.app, {
-			horizonDays: days,
-			seedData: {
-				decksRecord: decks,
-				blocksRecord: {},
-				history,
-			},
-		});
 
+		const decks = workspaceData.decksRecord;
+		const history = workspaceData.history;
 		const topicLabelByKey = this.buildTopicLabelMap(decks);
 		const materialByPath = this.buildReadingMaterialByPath(readingMaterials);
 		const units = this.buildUnits({
-			sourcesMap,
+			sourcesMap: workspaceData.sourcesRecord,
 			legacyBlocks: [],
-			chunks: Object.values(chunksMap || {}),
-			pdfTasks,
-			epubTasks,
+			chunks: Object.values(workspaceData.chunksRecord || {}),
+			pdfTasks: workspaceData.pdfTasks,
+			epubTasks: workspaceData.epubTasks,
 			decksRecord: decks,
 			materialByPath,
 		});
@@ -828,9 +967,6 @@ export class IRAnalyticsService {
 						mode === "topic" ? topicLabelByKey : tagLabelByKey,
 				  );
 
-		const normalizedSelectionKey = normalizeSelectionKey(
-			options?.selectionKey || "",
-		);
 		const resolvedSelectionKey =
 			mode === "overall"
 				? ""
@@ -839,8 +975,27 @@ export class IRAnalyticsService {
 				: "";
 		const filteredUnits = this.filterUnits(units, mode, resolvedSelectionKey);
 		const filteredIdSet = new Set(filteredUnits.map((unit) => unit.id));
+		const readingHoursByUnitId = new Map(
+			filteredUnits.map((unit) => [
+				unit.id,
+				getReadingHoursForUnit(unit, sessionSecondsByBlockId),
+			]),
+		);
+		const materialTypeBreakdown = buildAnalyticsMaterialTypeBreakdown({
+			units: filteredUnits,
+			readingHoursByUnitId,
+			labelByType: IR_ANALYTICS_MATERIAL_TYPE_LABELS_ZH,
+		});
+		const materialTypeOutcome = buildAnalyticsMaterialTypeOutcome({
+			units: filteredUnits,
+			readingHoursByUnitId,
+			labelByType: IR_ANALYTICS_MATERIAL_TYPE_LABELS_ZH,
+		});
+		const materialTypeByUnitId = new Map(
+			filteredUnits.map((unit) => [unit.id, unit.materialType]),
+		);
 
-		return {
+		const snapshot: IRAnalyticsSnapshot = {
 			scopeMode: mode,
 			scopeKey: resolvedSelectionKey || null,
 			scopeLabel: this.buildScopeLabel(
@@ -871,10 +1026,22 @@ export class IRAnalyticsService {
 			forecast: buildAnalyticsForecastFromProjectedSummary(
 				projectedSummary,
 				filteredIdSet,
+				materialTypeByUnitId,
 			),
+			materialTypeBreakdown,
+			materialTypeOutcome,
 			monitoringSummary:
 				mode === "overall" ? this.buildMonitoringSummary() : null,
 		};
+
+		this.snapshotCache.set(cacheKey, {
+			stateKey: this.buildAnalyticsStateKey(
+				workspaceData.generatedAt,
+				projectedSummary.schedule.generatedAt,
+			),
+			snapshot,
+		});
+		return snapshot;
 	}
 
 	private buildTopicLabelMap(
@@ -946,6 +1113,8 @@ export class IRAnalyticsService {
 					legacyBlock.meta?.associatedNotePaths ||
 					material?.associatedNotePaths,
 			});
+			const resumeLink =
+				resolveLegacyBlockResumeLink(block) || material?.resumeLink;
 			units.push({
 				id: block.id,
 				title: sourceTitle,
@@ -971,7 +1140,15 @@ export class IRAnalyticsService {
 				tagKeys: normalizedTags.map((tag) => tag.key),
 				tagLabels: normalizedTags.map((tag) => tag.label),
 				sourceKind,
+				sourcePath,
 				sourceDocumentKey,
+				resumeLink,
+				materialType: resolveAnalyticsMaterialType({
+					id: block.id,
+					sourceKind,
+					sourcePath,
+					resumeLink,
+				}),
 				associatedNotePath: associatedNotePaths[0],
 				associatedNotePaths,
 			});
@@ -1006,6 +1183,11 @@ export class IRAnalyticsService {
 				associatedNotePaths:
 					chunk.meta?.associatedNotePaths || material?.associatedNotePaths,
 			});
+			const chunkMeta = (chunk.meta || {}) as unknown as Record<string, unknown>;
+			const resumeLink =
+				String(chunkMeta.resumeLink || material?.resumeLink || "").trim() ||
+				undefined;
+			const webUrl = resolveAnalyticsMaterialWebUrl(chunkMeta);
 			units.push({
 				id: chunk.chunkId,
 				title: sourceTitle,
@@ -1023,7 +1205,17 @@ export class IRAnalyticsService {
 				tagKeys: normalizedTags.map((tag) => tag.key),
 				tagLabels: normalizedTags.map((tag) => tag.label),
 				sourceKind,
+				sourcePath,
 				sourceDocumentKey,
+				resumeLink,
+				webUrl,
+				materialType: resolveAnalyticsMaterialType({
+					id: chunk.chunkId,
+					sourceKind,
+					sourcePath,
+					resumeLink,
+					webUrl,
+				}),
 				associatedNotePath: associatedNotePaths[0],
 				associatedNotePaths,
 			});
@@ -1043,6 +1235,7 @@ export class IRAnalyticsService {
 				associatedNotePath: resolveAssociatedNotePath(task.meta),
 				associatedNotePaths: task.meta?.associatedNotePaths,
 			});
+			const resumeLink = String(task.link || "").trim() || undefined;
 			units.push({
 				id: task.id,
 				title: task.title || stripExtension(getPathBaseName(task.pdfPath)),
@@ -1060,8 +1253,16 @@ export class IRAnalyticsService {
 				tagKeys: normalizedTags.map((tag) => tag.key),
 				tagLabels: normalizedTags.map((tag) => tag.label),
 				sourceKind,
+				sourcePath: task.pdfPath,
 				sourceDocumentKey,
 				sourceSubunitKey: normalizeTraceSubunitKey(task.link) || undefined,
+				resumeLink,
+				materialType: resolveAnalyticsMaterialType({
+					id: task.id,
+					sourceKind,
+					sourcePath: task.pdfPath,
+					resumeLink,
+				}),
 				associatedNotePath: associatedNotePaths[0],
 				associatedNotePaths,
 			});
@@ -1081,6 +1282,7 @@ export class IRAnalyticsService {
 				associatedNotePath: resolveAssociatedNotePath(task.meta),
 				associatedNotePaths: task.meta?.associatedNotePaths,
 			});
+			const resumeLink = String(task.tocHref || "").trim() || undefined;
 			units.push({
 				id: task.id,
 				title: task.title || stripExtension(getPathBaseName(task.epubFilePath)),
@@ -1098,9 +1300,17 @@ export class IRAnalyticsService {
 				tagKeys: normalizedTags.map((tag) => tag.key),
 				tagLabels: normalizedTags.map((tag) => tag.label),
 				sourceKind,
+				sourcePath: task.epubFilePath,
 				sourceDocumentKey,
 				sourceSubunitKey:
 					normalizeTraceSubunitKey(task.tocHref || task.id) || undefined,
+				resumeLink,
+				materialType: resolveAnalyticsMaterialType({
+					id: task.id,
+					sourceKind,
+					sourcePath: task.epubFilePath,
+					resumeLink,
+				}),
 				associatedNotePath: associatedNotePaths[0],
 				associatedNotePaths,
 			});
@@ -1306,6 +1516,7 @@ export class IRAnalyticsService {
 						documentKey,
 					),
 					sourceKind: firstUnit.sourceKind,
+					materialType: firstUnit.materialType,
 					itemCount,
 					activeCount,
 					extracts: docStats.extracts,
@@ -1788,12 +1999,17 @@ export class IRAnalyticsService {
 				const closedAt = toCloseTimestamp(unit);
 				return closedAt > 0 && closedAt <= point.endMs;
 			});
+			const typeCounts = createEmptyMaterialTypeCounts();
+			for (const unit of existing) {
+				incrementMaterialTypeCount(typeCounts, unit.materialType);
+			}
 			return {
 				dateKey: point.dateKey,
 				label: point.label,
 				totalCount: existing.length,
 				activeCount: existing.length - closed.length,
 				closedCount: closed.length,
+				typeCounts,
 			};
 		});
 	}
@@ -1809,24 +2025,31 @@ export class IRAnalyticsService {
 			key,
 			label: IR_TIMING_BUCKET_LABELS[key],
 			count: 0,
+			typeCounts: createEmptyMaterialTypeCounts(),
 		}));
 
 		for (const unit of activeUnits) {
+			let bucketIndex = 9;
 			if (unit.nextRepDate <= 0) {
-				buckets[9].count += 1;
-				continue;
+				bucketIndex = 9;
+			} else {
+				const diffDays = Math.floor((unit.nextRepDate - todayStart) / DAY_MS);
+				if (diffDays <= -7) bucketIndex = 0;
+				else if (diffDays <= -2) bucketIndex = 1;
+				else if (diffDays < 0) bucketIndex = 2;
+				else if (diffDays === 0) bucketIndex = 3;
+				else if (diffDays <= 3) bucketIndex = 4;
+				else if (diffDays <= 7) bucketIndex = 5;
+				else if (diffDays <= 14) bucketIndex = 6;
+				else if (diffDays <= 30) bucketIndex = 7;
+				else bucketIndex = 8;
 			}
 
-			const diffDays = Math.floor((unit.nextRepDate - todayStart) / DAY_MS);
-			if (diffDays <= -7) buckets[0].count += 1;
-			else if (diffDays <= -2) buckets[1].count += 1;
-			else if (diffDays < 0) buckets[2].count += 1;
-			else if (diffDays === 0) buckets[3].count += 1;
-			else if (diffDays <= 3) buckets[4].count += 1;
-			else if (diffDays <= 7) buckets[5].count += 1;
-			else if (diffDays <= 14) buckets[6].count += 1;
-			else if (diffDays <= 30) buckets[7].count += 1;
-			else buckets[8].count += 1;
+			buckets[bucketIndex].count += 1;
+			incrementMaterialTypeCount(
+				buckets[bucketIndex].typeCounts,
+				unit.materialType,
+			);
 		}
 
 		return buckets;
@@ -1894,4 +2117,15 @@ export class IRAnalyticsService {
 			linkedOutcomeRate: round(calibration.linkedOutcomeRate * 100, 1),
 		};
 	}
+}
+
+const analyticsServiceByApp = new WeakMap<App, IRAnalyticsService>();
+
+export function getSharedIRAnalyticsService(app: App): IRAnalyticsService {
+	let service = analyticsServiceByApp.get(app);
+	if (!service) {
+		service = new IRAnalyticsService(app);
+		analyticsServiceByApp.set(app, service);
+	}
+	return service;
 }

@@ -233,7 +233,7 @@ export class IRHostSharedService {
 			if (legacyPath) {
 				identifiers.add(legacyPath);
 			}
-		} catch {}
+		} catch { /* ignored */ }
 
 		return Array.from(identifiers);
 	}
@@ -272,7 +272,7 @@ export class IRHostSharedService {
 				(modal as { onClose?: () => void }).onClose = () => {
 					try {
 						originalOnClose?.();
-					} catch {}
+					} catch { /* ignored */ }
 					if (resolved || closeTimer) {
 						return;
 					}

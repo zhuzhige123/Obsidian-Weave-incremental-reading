@@ -118,14 +118,14 @@ export class DetachedLeafEditor extends Component {
 			try {
 				const current = this.getWorkspaceActiveLeaf();
 				if (current === leaf) return;
-			} catch {}
+			} catch { /* ignored */ }
 
 			try {
 				workspace.setActiveLeaf(leaf, { focus });
 			} catch {
 				workspace.setActiveLeaf(leaf, focus);
 			}
-		} catch {}
+		} catch { /* ignored */ }
 	}
 
 	private pushViewScope(): void {
@@ -137,7 +137,7 @@ export class DetachedLeafEditor extends Component {
 		try {
 			keymap.pushScope(scope);
 			this.viewScopePushed = true;
-		} catch {}
+		} catch { /* ignored */ }
 	}
 
 	private popViewScope(): void {
@@ -151,7 +151,7 @@ export class DetachedLeafEditor extends Component {
 
 		try {
 			keymap.popScope(scope);
-		} catch {}
+		} catch { /* ignored */ }
 		this.viewScopePushed = false;
 	}
 
@@ -168,7 +168,7 @@ export class DetachedLeafEditor extends Component {
 					resolve();
 				}
 			});
-		} catch {}
+		} catch { /* ignored */ }
 	}
 
 	private shouldHidePropertiesInDocument(): boolean {
@@ -238,7 +238,7 @@ export class DetachedLeafEditor extends Component {
 			) {
 				try {
 					this.setWorkspaceActiveLeaf(activeLeafBeforeInit, false);
-				} catch {}
+				} catch { /* ignored */ }
 			}
 
 			// 3. 打开文件
@@ -258,7 +258,7 @@ export class DetachedLeafEditor extends Component {
 			) {
 				try {
 					this.setWorkspaceActiveLeaf(activeLeafBeforeInit, false);
-				} catch {}
+				} catch { /* ignored */ }
 			}
 
 			logger.debug("[DetachedLeafEditor] 初始化完成");
@@ -273,7 +273,7 @@ export class DetachedLeafEditor extends Component {
 			if (this.readyResolve) {
 				try {
 					this.readyResolve();
-				} catch {}
+				} catch { /* ignored */ }
 				this.readyResolve = null;
 			}
 		}
@@ -460,9 +460,9 @@ export class DetachedLeafEditor extends Component {
 				.forEach((el) => {
 					try {
 						(el as HTMLElement).remove();
-					} catch {}
+					} catch { /* ignored */ }
 				});
-		} catch {}
+		} catch { /* ignored */ }
 
 		// 清空容器
 		this.containerEl.empty();
@@ -495,7 +495,7 @@ export class DetachedLeafEditor extends Component {
 						padding: "0",
 						border: "0",
 					});
-				} catch {}
+				} catch { /* ignored */ }
 			}
 		};
 
@@ -523,7 +523,7 @@ export class DetachedLeafEditor extends Component {
 						border: "",
 					});
 				}
-			} catch {}
+			} catch { /* ignored */ }
 		};
 
 		const applyHideChrome = () => {
@@ -564,7 +564,7 @@ export class DetachedLeafEditor extends Component {
 					const nodes = contentEl.querySelectorAll(selector);
 					nodes.forEach((n) => toggleHideNoSpace(n as HTMLElement, hideProps));
 				}
-			} catch {}
+			} catch { /* ignored */ }
 		};
 
 		applyHideChrome();
@@ -581,7 +581,7 @@ export class DetachedLeafEditor extends Component {
 				subtree: true,
 				attributes: true,
 			});
-		} catch {}
+		} catch { /* ignored */ }
 
 		// 隐藏 header 等不需要的元素（如果有）
 		// 通常 MarkdownView 的 contentEl 只包含编辑器内容，header 在 view.containerEl 中
@@ -718,7 +718,7 @@ export class DetachedLeafEditor extends Component {
 
 					try {
 						EditorContextManager.getInstance().registerActive(this);
-					} catch {}
+					} catch { /* ignored */ }
 
 					this.pushViewScope();
 
@@ -732,12 +732,12 @@ export class DetachedLeafEditor extends Component {
 					if (!fromProps) {
 						try {
 							this.editorView?.editor?.focus();
-						} catch {}
+						} catch { /* ignored */ }
 
 						window.requestAnimationFrame(() => {
 							try {
 								this.editorView?.editor?.focus();
-							} catch {}
+							} catch { /* ignored */ }
 						});
 					}
 				};
@@ -774,7 +774,7 @@ export class DetachedLeafEditor extends Component {
 				this.focusInHandler = (ev) => {
 					try {
 						EditorContextManager.getInstance().registerActive(this);
-					} catch {}
+					} catch { /* ignored */ }
 
 					this.pushViewScope();
 
@@ -791,7 +791,7 @@ export class DetachedLeafEditor extends Component {
 					if (!fromProps) {
 						try {
 							this.editorView?.editor?.focus();
-						} catch {}
+						} catch { /* ignored */ }
 					}
 				};
 			}
@@ -803,11 +803,11 @@ export class DetachedLeafEditor extends Component {
 						if (next && this.editorView?.contentEl?.contains(next)) {
 							return;
 						}
-					} catch {}
+					} catch { /* ignored */ }
 
 					try {
 						EditorContextManager.getInstance().unregisterActive(this);
-					} catch {}
+					} catch { /* ignored */ }
 
 					this.popViewScope();
 
@@ -894,13 +894,13 @@ export class DetachedLeafEditor extends Component {
 		if (this.readyResolve) {
 			try {
 				this.readyResolve();
-			} catch {}
+			} catch { /* ignored */ }
 			this.readyResolve = null;
 		}
 
 		try {
 			EditorContextManager.getInstance().unregisterActive(this);
-		} catch {}
+		} catch { /* ignored */ }
 
 		this.popViewScope();
 
@@ -947,7 +947,7 @@ export class DetachedLeafEditor extends Component {
 					true,
 				);
 			}
-		} catch {}
+		} catch { /* ignored */ }
 
 		this.contentChromeObserver = null;
 		this.pointerDownCaptureHandler = null;

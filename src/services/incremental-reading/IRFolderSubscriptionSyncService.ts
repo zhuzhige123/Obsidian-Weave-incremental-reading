@@ -93,7 +93,7 @@ async function readWeaveType(app: App, file: TFile): Promise<string> {
 		if (fmType) {
 			return fmType;
 		}
-	} catch {}
+	} catch { /* ignored */ }
 
 	if (file.extension !== "md") {
 		return "";

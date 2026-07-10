@@ -384,12 +384,10 @@
    减少动画模式支持
    ================================================================= */
 
-/* ✅ 保留 !important：无障碍功能，需要强制覆盖所有动画 */
-/* 参考：.augment/rules/core/04-anti-force-methods.md */
 @media (prefers-reduced-motion: reduce) {
   .weave-app .cm-editor,
   .weave-app .cm-editor * {
-    transition: none !important;
-    animation: none !important;
+    transition: none;
+    animation: none;
   }
 }

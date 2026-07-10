@@ -4,6 +4,7 @@
 
   interface Props {
     t: (key: string, vars?: Record<string, string | number>) => string;
+    showTodayAllDoneHeaderChip: boolean;
     showDayLoadInfoButton: boolean;
     selectedDayLoadStats: IRCalendarSelectedDayLoadStats | null;
     dayLoadPopoverOpen: boolean;
@@ -19,6 +20,7 @@
 
   let {
     t,
+    showTodayAllDoneHeaderChip,
     showDayLoadInfoButton,
     selectedDayLoadStats,
     dayLoadPopoverOpen,
@@ -31,6 +33,40 @@
     onToggleSearchPanel,
     onShowMonthCalendarToolsMenu,
   }: Props = $props();
+
+  let todayCompleteHintPinned = $state(false);
+  let todayCompleteChipEl = $state<HTMLButtonElement | null>(null);
+
+  function toggleTodayCompleteHint(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    todayCompleteHintPinned = !todayCompleteHintPinned;
+  }
+
+  $effect(() => {
+    if (!showTodayAllDoneHeaderChip) {
+      todayCompleteHintPinned = false;
+    }
+  });
+
+  $effect(() => {
+    if (!todayCompleteHintPinned) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent): void {
+      const target = event.target;
+      if (target instanceof Node && todayCompleteChipEl?.contains(target)) {
+        return;
+      }
+      todayCompleteHintPinned = false;
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  });
 </script>
 
 <div class="calendar-top-tools nav-header" role="toolbar" aria-label={t('irSidebar.calendar.topToolbarAria')}>
@@ -90,4 +126,26 @@
       <ObsidianIcon name="settings" size="var(--icon-size)" />
     </button>
   </div>
+  {#if showTodayAllDoneHeaderChip}
+    <button
+      type="button"
+      class="calendar-day-complete-chip clickable-icon"
+      class:is-hint-visible={todayCompleteHintPinned}
+      bind:this={todayCompleteChipEl}
+      aria-label={t('irSidebar.calendar.todayAllDoneShort')}
+      aria-describedby="calendar-day-complete-chip-hint"
+      aria-expanded={todayCompleteHintPinned}
+      onclick={toggleTodayCompleteHint}
+    >
+      <span
+        id="calendar-day-complete-chip-hint"
+        class="calendar-day-complete-chip__hint"
+        role="tooltip"
+      >
+        <span class="calendar-day-complete-chip__hint-title">{t('irSidebar.calendar.todayAllDoneShort')}</span>
+        <span class="calendar-day-complete-chip__hint-detail">{t('irSidebar.calendar.todayAllDone')}</span>
+      </span>
+      <ObsidianIcon name="check-circle" size={14} />
+    </button>
+  {/if}
 </div>

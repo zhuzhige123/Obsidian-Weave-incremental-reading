@@ -155,6 +155,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import IRCalendarAddReadingPointHost from './ir-calendar-sidebar/IRCalendarAddReadingPointHost.svelte';
   import {
     IRCALENDAR_SCHEDULING_MENU_ACTIONS,
+    sortSchedulingMenuActionsByDueDate,
     type IRCalendarSchedulingAction,
     type IRCalendarSchedulingMenuContext,
     type IRCalendarSchedulingMenuPreviewState,
@@ -4196,6 +4197,28 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }))
   );
 
+  let schedulingMenuDisplayConfig = $derived.by(() => {
+    const configByAction = new Map(schedulingConfig.map((cfg) => [cfg.action, cfg]));
+    const blocks = schedulingMenuPreparedBlocks;
+    if (!blocks) {
+      return schedulingConfig;
+    }
+
+    const nextRepDateByAction = Object.fromEntries(
+      IRCALENDAR_SCHEDULING_MENU_ACTIONS.map((action) => [
+        action,
+        blocks[action]?.nextRepDate ?? 0,
+      ]),
+    ) as Partial<Record<IRCalendarSchedulingAction, number>>;
+
+    return sortSchedulingMenuActionsByDueDate(
+      IRCALENDAR_SCHEDULING_MENU_ACTIONS,
+      nextRepDateByAction,
+    )
+      .map((action) => configByAction.get(action))
+      .filter((cfg): cfg is NonNullable<typeof cfg> => Boolean(cfg));
+  });
+
   type SchedulingMenuContext = IRCalendarSchedulingMenuContext;
 
   function captureSchedulingMenuContext(): SchedulingMenuContext | null {
@@ -6867,6 +6890,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   <!-- Incremental reading calendar sidebar -->
   <IRCalendarTopToolbar
     {t}
+    {showTodayAllDoneHeaderChip}
     {showDayLoadInfoButton}
     {selectedDayLoadStats}
     {dayLoadPopoverOpen}
@@ -6885,7 +6909,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     {monthYear}
     activeDeckFilterName={getActiveDeckFilterName()}
     {sourceFilePath}
-    {showTodayAllDoneHeaderChip}
     {showCalendarTools}
     {hasContinueReadingSuggestionOffer}
     {calendarDataPhase}
@@ -6988,7 +7011,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   bind:show={schedulingMenuOpen}
   anchor={schedulingMenuAnchor}
   target={schedulingMenuTarget}
-  {schedulingConfig}
+  schedulingConfig={schedulingMenuDisplayConfig}
   {schedulingDateByAction}
   bind:schedulingPreviewFocusAction
   {schedulingMenuPreviewState}

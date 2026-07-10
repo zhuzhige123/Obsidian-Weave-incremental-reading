@@ -163,30 +163,42 @@ describe("buildAnalyticsForecastFromProjectedSummary", () => {
 				dateKey: "2026-04-10",
 				itemCount: 1,
 				totalEstimatedMinutes: 12,
+				typeCounts: expect.objectContaining({ other: 1 }),
 			}),
 			expect.objectContaining({
 				dateKey: "2026-04-11",
 				itemCount: 1,
 				totalEstimatedMinutes: 8,
 				overloadLevel: "warning",
+				typeCounts: expect.objectContaining({ other: 1 }),
 			}),
 		]);
 
 		const filtered = buildAnalyticsForecastFromProjectedSummary(
 			summary,
 			new Set(["legacy-1"]),
+			new Map([["legacy-1", "md"]]),
 		);
 		expect(filtered).toEqual([
 			expect.objectContaining({
 				dateKey: "2026-04-10",
 				itemCount: 1,
 				totalEstimatedMinutes: 12,
+				typeCounts: expect.objectContaining({ md: 1 }),
 			}),
 			expect.objectContaining({
 				dateKey: "2026-04-11",
 				itemCount: 0,
 				totalEstimatedMinutes: 0,
 				overloadLevel: "normal",
+				typeCounts: expect.objectContaining({
+					md: 0,
+					canvas: 0,
+					epub: 0,
+					pdf: 0,
+					link: 0,
+					other: 0,
+				}),
 			}),
 		]);
 	});

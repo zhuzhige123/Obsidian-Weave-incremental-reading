@@ -812,7 +812,7 @@
       padding: 0.9rem;
     }
 
-    .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .row:has(.label-with-desc)) {
+    .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .row.row-has-desc) {
       align-items: stretch;
     }
 

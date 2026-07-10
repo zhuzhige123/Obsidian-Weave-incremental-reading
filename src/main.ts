@@ -77,6 +77,9 @@ import {
 	getCanvasTextCandidatesFromText,
 	resolveCanvasMenuNodeId,
 } from "./services/ui/canvas-source-locate";
+import {
+	installWeaveSettingsLayoutObserver,
+} from "./utils/weave-settings-layout-classes";
 import "./styles/global.css";
 import type { CanvasMenuNode } from "./types/canvas-menu-node";
 import {
@@ -208,6 +211,7 @@ export default class StandaloneIncrementalReadingPlugin
 		null;
 	private deferredStartupPromise: Promise<void> | null = null;
 	private unregisterPremiumFeaturePreviewHost: (() => void) | null = null;
+	private unregisterWeaveSettingsLayoutObserver: (() => void) | null = null;
 
 	async onload(): Promise<void> {
 		initI18n();
@@ -255,6 +259,8 @@ export default class StandaloneIncrementalReadingPlugin
 			});
 		registerLicenseSyncBridge(this, this);
 		this.addSettingTab(new StandaloneIRSettingsTab(this.app, this));
+		this.unregisterWeaveSettingsLayoutObserver =
+			installWeaveSettingsLayoutObserver(activeDocument.body);
 		this.registerWorkspaceViews();
 		this.registerIRDeckVaultSync();
 		this.registerIncrementalReadingFolderSubscriptionWatchers();
@@ -398,6 +404,8 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	onunload(): void {
+		this.unregisterWeaveSettingsLayoutObserver?.();
+		this.unregisterWeaveSettingsLayoutObserver = null;
 		this.unregisterPremiumFeaturePreviewHost?.();
 		this.unregisterPremiumFeaturePreviewHost = null;
 		if (this.irDeckIndexRefreshTimer !== null) {

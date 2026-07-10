@@ -273,7 +273,7 @@
 			if (document.fullscreenElement) {
 				await document.exitFullscreen?.();
 			}
-		} catch {}
+		} catch { /* ignored */ }
 	}
 
 	async function toggleImmersive(): Promise<void> {
