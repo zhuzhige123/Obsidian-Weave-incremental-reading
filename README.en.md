@@ -18,6 +18,11 @@ The plugin works on its own and does **not** require the Weave main plugin. Inst
 
 ---
 
+![QQ_1784229108205](https://github.com/user-attachments/assets/05b583f0-6485-45a9-9665-b7e4aa95f5ab)
+![QQ_1784229164256](https://github.com/user-attachments/assets/649226dd-db4c-4529-95dd-a412898dfe1a)
+![QQ20260717-031452-HD](https://github.com/user-attachments/assets/72411a43-638c-4ce8-80ff-8cf5fadbc8ae)
+
+
 ## Three core concepts
 
 | Concept | Meaning |
