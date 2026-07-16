@@ -37,8 +37,10 @@ generated-*.txt
 codes-*.txt
 codes-*.json
 
-# Internal docs (never publish to open-source main)
+# Development-only (must never appear in this public tree)
+src/
 docs/
+scripts/
 AGENTS.md
 .cursor/
 .codex/

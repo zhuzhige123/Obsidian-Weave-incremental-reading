@@ -1,60 +1,82 @@
 # Weave Incremental Reading
 
-[English](README.en.md)
+[中文](#中文文档) | [English](README.en.md)
 
 <div align="center">
 
-**独立的 Obsidian 增量阅读插件 — 专题、阅读点、日历调度与来源回跳**
+**把「以后再看」变成可持续推进的阅读队列**
+
+Standalone incremental reading for Obsidian — topics, reading points, calendar scheduling, and source resume
 
 </div>
 
-Weave Incremental Reading（插件 ID：`weave-incremental-reading`）帮助你在 Obsidian 里把「以后再看」的内容整理成可持续推进的**阅读点队列**，并通过**专题组织、日历调度、续读进度、来源回跳**形成长期可维护的阅读工作流。
+---
+
+## 中文文档
+
+**Weave Incremental Reading**（插件 ID：`weave-incremental-reading`）是一款**独立**的 Obsidian 增量阅读插件。
+
+它帮你把散落在 Markdown、内容块链接、PDF（配合 [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)）、Canvas、网页、EPUB 等处的材料，整理成可排期、可续读、可回跳的**阅读点队列**，再用**专题**与**日历**长期推进——而不是让内容停在「收藏了就算读过了」。
+
+本插件可单独使用，**不依赖** Weave 主插件。需要 EPUB 库内阅读或记忆牌组制卡时，再按需安装系列中的其它插件。
 
 ---
 
-## 核心能力
+### 三个核心概念
 
-- **阅读点与专题（IRDeck）**：从文档、选区或外部来源创建阅读点，归入 `.irdeck` 专题
-- **增量阅读日历**：按日期查看待处理、已排期与逾期的阅读点，安排复习与优先级
-- **调度与续读**：支持加工流、阅读清单等策略，可配置每日上限与时间预算
-- **来源回跳**：保留来源信息，便于回到原文继续阅读
+| 概念 | 说明 |
+|------|------|
+| **阅读点** | 一条待阅读任务，带来源溯源；可从队列一键回跳原文继续读。 |
+| **专题（IRDeck）** | 阅读点的容器，以 `.irdeck` 文件保存在知识库中，按主题或计划分组。 |
+| **增量阅读日历** | 插件主界面：按日期查看待处理、已排期与逾期的阅读点，安排每日节奏。 |
 
 ---
 
-## 安装与更新
+### 核心能力
 
-### 从 Release 安装（推荐）
+- **增量阅读日历** — 月历热力与当日队列；查看负载、优先级与逾期项；支持连续阅读等辅助操作
+- **统一「添加链接」** — 粘贴网页、双链、块引用、PDF++ 定位、Canvas 节点、EPUB 定位等，一次完成命名、专题与首次排期
+- **专题与阅读点管理** — 优先级、暂停、归档；打开 `.irdeck` 在专题视图与日历之间切换
+- **调度与续读** — 加工流 / 阅读清单等策略，每日上限与时间预算；完成后自动安排下次出现
+- **材料导入** — 从 Markdown 批量拆分导入；高级功能支持订阅文件夹、PDF / EPUB 章节批量导入
+- **来源回跳** — Markdown、PDF++、Canvas、网页、EPUB 等保留稳定续读位置
 
-1. 打开本仓库 [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases) 页面，下载最新版本附件。
+---
+
+### 快速上手
+
+1. 安装并启用插件（见下方[安装](#安装与更新)）
+2. 打开**增量阅读日历**（左侧功能区日历图标，或命令面板「打开增量阅读日历」）
+3. 点击日历顶部 **「+」/ 添加链接**：粘贴来源 → 修改名称 → 选择专题 → 安排首次阅读日 → 保存
+4. 在日历中打开今日待读项，回到原文续读；完成后标记进度，系统会安排下次出现时间
+
+日常主路径建议走 **添加链接**；选区命令与右键菜单仍可用。
+
+---
+
+### 安装与更新
+
+#### 从 Release 安装（当前推荐）
+
+1. 打开本仓库 [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases)，下载最新版本附件
 2. 在知识库中创建目录：
 
    ```text
    .obsidian/plugins/weave-incremental-reading/
    ```
 
-3. 将同一次 Release 中的以下文件放入该目录：
+3. 将同一次 Release 中的 `main.js`、`manifest.json`、`styles.css` 放入该目录
+4. 在 **设置 → 社区插件** 中启用 **Weave Incremental Reading**
 
-   - `main.js`
-   - `manifest.json`
-   - `styles.css`
-
-4. 在 **设置 → 社区插件** 中启用 **Weave Incremental Reading**。
-
-### 通过 BRAT 跟踪版本
+#### 通过 BRAT 跟踪版本
 
 若使用 [BRAT](https://github.com/TfTHacker/obsidian42-brat)，可添加本仓库并选择 **Weave Incremental Reading** 检查更新。
 
----
+#### Obsidian 社区插件目录
 
-## 快速上手
+若插件已出现在社区目录中，可在 **设置 → 社区插件** 中搜索 **Weave Incremental Reading** 安装与更新。
 
-1. 启用插件后，点击左侧功能区**日历**图标，或执行命令 **打开增量阅读日历**
-2. 在 Markdown 视图中选中内容，执行 **从当前选区创建增量阅读点**
-3. 在 **设置 → Weave Incremental Reading** 中配置默认专题、调度策略与每日上限
-
----
-
-## 系统要求
+#### 系统要求
 
 | 项目 | 要求 |
 |------|------|
@@ -63,40 +85,76 @@ Weave Incremental Reading（插件 ID：`weave-incremental-reading`）帮助你�
 
 ---
 
-## 与 Weave / EPUB 阅读器的关系
+### 与 Weave 系列的关系
 
-本插件是**独立产品**，可与 Weave 主插件、EPUB 阅读器插件协作，但各自职责分离：
+Weave 是一组面向 Obsidian 的知识工作流插件，围绕 **读 → 记 → 排 → 复习** 组织长期学习。本插件负责其中的**增量阅读队列与日历排期**，与其它成员职责分离、可组合使用。
 
 | 插件 | 主要职责 |
 |------|----------|
-| **Weave Incremental Reading**（本插件） | 增量阅读队列、阅读点、专题、调度、续读 |
-| **Weave 主插件** | 记忆牌组、题库、AI 制卡等宿主协作能力 |
-| **EPUB 阅读器插件** | EPUB 阅读与章节定位 |
+| **Weave Incremental Reading**（本插件） | 阅读点、专题、日历调度、续读与来源回跳 |
+| **Weave 主插件** | 记忆牌组、题库、摘录制卡、FSRS 复习等 |
+| **Weave EPUB Reader** | 库内 EPUB 阅读、摘录与章节定位 |
+
+怎么组合：
+
+- **只做增量阅读队列** — 只装本插件即可
+- **还要读 EPUB 并回跳章节** — 本插件 + Weave EPUB Reader
+- **还要制卡与复习** — 本插件 + Weave 主插件
+- **完整闭环（读 → 记 → 排 → 复习）** — 三款都装
+
+外部协作（非 Weave 系列）：**PDF++** 可用于 PDF 选区/定位链接，再通过「添加链接」纳入队列。
 
 ---
 
-## 数据与隐私
+### 免费功能与高级功能
 
-- 阅读点、专题与调度数据**默认保存在本地知识库**
+当前版本：**增量阅读日历与 Markdown 阅读点主流程免费开放**，足以完成日常增量阅读。
+
+| 免费 | 高级（需激活） |
+|------|----------------|
+| 日历与 Markdown 阅读点 | 批量导入 PDF / EPUB 章节阅读点 |
+| 专题与阅读点管理（优先级、暂停、归档） | 调度策略自定义、交错学习设置 |
+| 基础调度、今日待读、续读回跳 | 订阅文件夹自动同步 |
+| 添加链接创建阅读点（含 MD、块链接、PDF++ 等） | 统计分析、阅读计时器、日历背景墙等 |
+| 从 Markdown 拆分导入、数据管理工具 | 阅读点关联笔记等更多能力 |
+
+未激活时，高级入口会明确提示；基础阅读流程不受影响。
+
+若已安装并激活 **Weave 主插件**，本插件可继承其授权，无需重复激活。独立激活入口：**设置 → Weave Incremental Reading → 授权**。
+
+---
+
+### 数据与隐私
+
+- 阅读点、专题、调度与设置**默认保存在本地知识库**
 - 插件**不会主动上传**你的笔记内容
-- 跨插件协作仅在对应功能被实际使用时发生
+- 跨插件协作（如 EPUB 回跳、授权校验）仅在对应功能被实际使用时发生
+- 卸载插件**不会自动删除**已创建的 `.irdeck` 与阅读点数据；清理请用数据管理工具或手动删除
 
 ---
 
-## 分发说明
-
-本公开仓库用于 Obsidian 插件版本分发与社区审核配套材料。运行时文件通过 **GitHub Releases** 提供；完整 TypeScript/Svelte 开发源码不在此仓库公开维护。
-
-分发与授权说明：
-
-- 用户安装方式：Release 手动安装、BRAT，或 Obsidian 社区目录（若已通过审核）。
-- 本插件为 **GPL-3.0-or-later** 许可；Release 中的 `main.js` 为构建产物，可供安全审查。
-- 若需完整源码协作或二次开发，请通过 Issues 联系作者。
-
-如需反馈问题，请在 [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues) 提交。
-
----
-
-## 作者
+### 作者
 
 **Rabbit (zhuzhige)** — [GitHub](https://github.com/zhuzhige123)
+
+- 邮箱：tutaoyuan8@outlook.com
+- 问题与建议：[Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues)
+- 许可证：[GPL-3.0-or-later](LICENSE)
+
+---
+
+<div align="center">
+
+**让阅读队列真正动起来，而不是躺在收藏夹里。**
+
+</div>
+
+---
+
+## English (summary)
+
+Full English documentation: **[README.en.md](README.en.md)**
+
+**Weave Incremental Reading** turns scattered “read later” material into a durable **reading-point queue**, organized by **topics** (`.irdeck`) and advanced through a **calendar**—with source resume for Markdown, PDF++, Canvas, web pages, and EPUB.
+
+It is a **standalone** plugin in the Weave family: use it alone for incremental reading; add **Weave EPUB Reader** and/or the **Weave main plugin** when you need in-vault EPUB reading or spaced-repetition cards.
