@@ -1,6 +1,6 @@
 # Weave Incremental Reading
 
-[中文](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.md) | [English](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.en.md) | [日本語](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ja.md) | [한국어](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ko.md) | [繁體中文](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.zh-TW.md) | [Русский](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ru.md)
+[中文](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.md#中文文档) | [English](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.md#english) | [日本語](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ja.md) | [한국어](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ko.md) | [繁體中文](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.zh-TW.md) | [Русский](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ru.md)
 
 <div align="center">
 
