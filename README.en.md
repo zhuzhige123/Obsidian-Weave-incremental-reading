@@ -1,6 +1,6 @@
 # Weave Incremental Reading
 
-[中文说明](README.md)
+[中文](README.md) | [English](README.en.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [繁體中文](README.zh-TW.md) | [Русский](README.ru.md)
 
 <div align="center">
 
@@ -10,6 +10,11 @@ Standalone Obsidian incremental reading — topics, reading points, calendar sch
 
 </div>
 
+---
+![QQ_1784229108205](https://github.com/user-attachments/assets/05b583f0-6485-45a9-9665-b7e4aa95f5ab)
+![QQ_1784229164256](https://github.com/user-attachments/assets/649226dd-db4c-4529-95dd-a412898dfe1a)
+![QQ20260717-031452-HD](https://github.com/user-attachments/assets/72411a43-638c-4ce8-80ff-8cf5fadbc8ae)
+
 **Weave Incremental Reading** (plugin ID: `weave-incremental-reading`) is a **standalone** Obsidian plugin for incremental reading.
 
 It helps you turn scattered material from Markdown notes, block links, PDF (with [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)), Canvas, web pages, and EPUB into a maintainable **reading-point queue**, organized by **topics** and advanced through a **calendar**—so content does not stay stuck in “saved but never read.”
@@ -17,11 +22,6 @@ It helps you turn scattered material from Markdown notes, block links, PDF (with
 The plugin works on its own and does **not** require the Weave main plugin. Install other Weave family plugins only when you need in-vault EPUB reading or memory-deck / card workflows.
 
 ---
-
-![QQ_1784229108205](https://github.com/user-attachments/assets/05b583f0-6485-45a9-9665-b7e4aa95f5ab)
-![QQ_1784229164256](https://github.com/user-attachments/assets/649226dd-db4c-4529-95dd-a412898dfe1a)
-![QQ20260717-031452-HD](https://github.com/user-attachments/assets/72411a43-638c-4ce8-80ff-8cf5fadbc8ae)
-
 
 ## Three core concepts
 

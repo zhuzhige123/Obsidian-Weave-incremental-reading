@@ -1,6 +1,6 @@
 # Weave Incremental Reading
 
-[中文](#中文文档) | [English](README.en.md)
+[中文](#中文文档) | [English](README.en.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [繁體中文](README.zh-TW.md) | [Русский](README.ru.md)
 
 <div align="center">
 
