@@ -156,7 +156,7 @@ Weave 是一组面向 Obsidian 的知识工作流插件，围绕 **读 → 记 �
 
 ## English (summary)
 
-Full English documentation: **[README.en.md](README.en.md)**
+Full English documentation: **[README.en.md](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.en.md)**
 
 **Weave Incremental Reading** turns scattered “read later” material into a durable **reading-point queue**, organized by **topics** (`.irdeck`) and advanced through a **calendar**—with source resume for Markdown, PDF++, Canvas, web pages, and EPUB.
 
