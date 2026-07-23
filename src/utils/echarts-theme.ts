@@ -284,11 +284,10 @@ function resolveColorWithDom(
 		return null;
 	}
 
-	const probe = activeDocument.createElement("span");
+	const probe = activeDocument.body.createEl("span");
 	const sentinelColor = "rgb(1, 2, 3)";
 	probe.hidden = true;
 	probe.setAttribute("style", `color: ${sentinelColor}; color: ${colorStr};`);
-	activeDocument.body.appendChild(probe);
 
 	try {
 		const resolvedColor = getComputedStyle(probe).color.trim();

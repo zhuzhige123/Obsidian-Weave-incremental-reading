@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { App } from 'obsidian';
+  import { untrack } from 'svelte';
   import ObsidianIcon from '../../ui/ObsidianIcon.svelte';
   import { tr } from '../../../utils/i18n';
   import { createMaterialImportFileTreeHelpers } from './material-import-file-tree';
@@ -29,7 +30,9 @@
   }: Props = $props();
 
   let t = $derived($tr);
-  const treeHelpers = createMaterialImportFileTreeHelpers(app, excludedImportFolderPath);
+  const treeHelpers = untrack(() =>
+    createMaterialImportFileTreeHelpers(app, excludedImportFolderPath),
+  );
 
   let treeData = $state<MaterialImportTreeNode[]>([]);
   let searchQuery = $state('');

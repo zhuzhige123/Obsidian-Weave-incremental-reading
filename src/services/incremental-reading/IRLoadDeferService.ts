@@ -27,6 +27,12 @@ export interface ApplyLoadDeferralsOptions {
 	reason: ScheduleRecomputeReason;
 	/** 仅当工作区 nextRepDate 仍等于计划 defer 前的值时才写入，避免覆盖用户手动改期。 */
 	requireMatchingFromDate?: boolean;
+	/**
+	 * 是否把跨日平滑/负载顺延写回 point.nextRepDate。
+	 * 默认 false：完成时写入的 due 是承诺值；平滑只影响内存计划，不改磁盘真相。
+	 * 仅显式运维/实验场景传 true。
+	 */
+	persistDeferrals?: boolean;
 }
 
 function formatDateKeyFromMs(timestamp: number): string {
@@ -52,7 +58,11 @@ export async function applyLoadDeferralsFromPlan(
 	deferrals: IRLoadDeferralRecord[],
 	options: ApplyLoadDeferralsOptions,
 ): Promise<number> {
-	if (deferrals.length === 0 || SKIP_PERSIST_REASONS.has(options.reason)) {
+	if (
+		deferrals.length === 0 ||
+		options.persistDeferrals !== true ||
+		SKIP_PERSIST_REASONS.has(options.reason)
+	) {
 		return 0;
 	}
 

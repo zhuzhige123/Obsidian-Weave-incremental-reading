@@ -57,13 +57,15 @@ describe("FloatingMenu", () => {
 
 		await waitFor(() => {
 			const menu = document.body.querySelector(
-				".floating-menu",
+				".floating-menu.weave-floating-menu",
 			) as HTMLElement | null;
 			expect(menu).toBeInTheDocument();
 			expect(menu?.parentElement).toBe(document.body);
 		});
 
-		const menu = document.body.querySelector(".floating-menu") as HTMLElement;
+		const menu = document.body.querySelector(
+			".floating-menu.weave-floating-menu",
+		) as HTMLElement;
 		await waitFor(() => {
 			expect(menu.style.left).toBe("120px");
 			expect(menu.style.top).toBe("80px");

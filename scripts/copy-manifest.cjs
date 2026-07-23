@@ -4,13 +4,14 @@ const {
 	DEFAULT_PRUNABLE_RUNTIME_FILES,
 	copyFileAtomicWithRetry,
 	resolvePluginDir,
+	resolvePluginIdFromManifest,
 	syncRuntimeFiles,
 } = require("./hot-reload-utils.cjs");
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const DIST_DIR = path.join(PROJECT_ROOT, "dist");
 const MANIFEST_SOURCE = path.join(PROJECT_ROOT, "manifest.json");
-const PLUGIN_ID = "weave-incremental-reading";
+const PLUGIN_ID = resolvePluginIdFromManifest();
 
 function resolveTargetDirs() {
 	const targets = new Set();

@@ -1,23 +1,45 @@
 import { type App, TFile, normalizePath } from "obsidian";
 import type { IRChunkFileData, IRTagGroup } from "../../types/ir-types";
+import { readIncrementalReadingSettings } from "../../utils/ir-plugin-host-access";
 import { createYAMLFrontmatterManager } from "../../utils/yaml-frontmatter-utils";
 import {
 	type IREpubBookmarkTask,
 	IREpubBookmarkTaskService,
+	isEpubBookmarkTaskId,
 } from "./IREpubBookmarkTaskService";
 import {
 	type IRPdfBookmarkTask,
 	IRPdfBookmarkTaskService,
+	isPdfBookmarkTaskId,
 } from "./IRPdfBookmarkTaskService";
 import { IRStorageService } from "./IRStorageService";
 import { IRTagGroupService, matchTagGroupByTags } from "./IRTagGroupService";
+import { getSharedIRPointStorageService } from "./IRPointStorageService";
+import {
+	LEGACY_MARKDOWN_TAGS_YAML_KEY,
+	readTagsFromFrontmatterRecord,
+	resolveMarkdownTagsYamlKeyFromSettings,
+} from "./ir-tag-source-policy";
 
-export const READING_POINT_TAGS_YAML_KEY = "weave_tags";
+/** @deprecated Use resolveMarkdownTagsYamlKeyFromSettings / LEGACY_MARKDOWN_TAGS_YAML_KEY */
+export const READING_POINT_TAGS_YAML_KEY = LEGACY_MARKDOWN_TAGS_YAML_KEY;
+
+/** Paths currently being written by IR → vault; skip YAML→IR sync for these. */
+const writingMarkdownTagPaths = new Set<string>();
+
+export function isWritingMarkdownReadingTags(filePath: string): boolean {
+	return writingMarkdownTagPaths.has(
+		normalizePath(String(filePath || "").trim()),
+	);
+}
 
 export function normalizeReadingPointTags(tags: string[]): string[] {
 	const ordered = new Map<string, string>();
 	for (const rawTag of Array.isArray(tags) ? tags : []) {
-		const label = String(rawTag || "").trim();
+		// Strip leading # so storage matches tag-suggest / search / tag-group keys
+		const label = String(rawTag || "")
+			.trim()
+			.replace(/^#+/, "");
 		const key = label.toLowerCase();
 		if (!key || ordered.has(key)) continue;
 		ordered.set(key, label);
@@ -25,22 +47,55 @@ export function normalizeReadingPointTags(tags: string[]): string[] {
 	return Array.from(ordered.values());
 }
 
-function readFrontmatterTags(
-	frontmatter: Record<string, unknown> | null | undefined,
-): string[] {
-	if (!frontmatter) return [];
-	const rawValue = frontmatter[READING_POINT_TAGS_YAML_KEY];
-	if (Array.isArray(rawValue)) {
-		return normalizeReadingPointTags(rawValue.map((tag) => String(tag)));
+/**
+ * Resolve reading-point tags with the same precedence as the right-click
+ * "Edit tags" modal (`IRReadingPointEditService.loadTags`):
+ * 1. PDF / EPUB task tags
+ * 2. Unified point `userData.tags` when a point snapshot exists (canonical)
+ * 3. Chunk / markdown YAML tags fallback when canonical is empty
+ *    (heals pre-fix rows where sync had not yet written into userData)
+ */
+export async function resolveReadingPointTags(params: {
+	materialId: string;
+	sourceType?: string | null;
+	pdfTaskTags?: string[] | null;
+	epubTaskTags?: string[] | null;
+	/** Present when a point snapshot was loaded (even if tags are empty). */
+	hasPointSnapshot?: boolean;
+	pointUserDataTags?: string[] | null;
+	getChunkTags?: () => Promise<string[]>;
+}): Promise<string[]> {
+	const materialId = String(params.materialId || "").trim();
+	if (!materialId) {
+		return [];
 	}
-	if (typeof rawValue === "string") {
-		return normalizeReadingPointTags(
-			rawValue
-				.split(",")
-				.map((tag) => tag.trim())
-				.filter(Boolean),
-		);
+
+	if (isPdfBookmarkTaskId(materialId)) {
+		return normalizeReadingPointTags(params.pdfTaskTags || []);
 	}
+
+	if (isEpubBookmarkTaskId(materialId)) {
+		return normalizeReadingPointTags(params.epubTaskTags || []);
+	}
+
+	if (params.sourceType === "legacy-block") {
+		return [];
+	}
+
+	if (params.hasPointSnapshot) {
+		const fromPoint = normalizeReadingPointTags(params.pointUserDataTags || []);
+		if (fromPoint.length > 0 || !params.getChunkTags) {
+			return fromPoint;
+		}
+		// Empty canonical + dual-write present: prefer dual-write so search finds
+		// tags saved before syncChunkPoint wrote YAML tags into userData.
+		return normalizeReadingPointTags(await params.getChunkTags());
+	}
+
+	if (params.getChunkTags) {
+		return normalizeReadingPointTags(await params.getChunkTags());
+	}
+
 	return [];
 }
 
@@ -68,6 +123,16 @@ export class IRPointTagService {
 		]);
 	}
 
+	resolveMarkdownTagsYamlKey(): string {
+		return resolveMarkdownTagsYamlKeyFromSettings(
+			readIncrementalReadingSettings(this.app),
+		);
+	}
+
+	isWritingMarkdownTags(filePath: string): boolean {
+		return isWritingMarkdownReadingTags(filePath);
+	}
+
 	async readMarkdownReadingTags(filePath: string): Promise<string[]> {
 		const normalizedPath = normalizePath(String(filePath || "").trim());
 		if (!normalizedPath.toLowerCase().endsWith(".md")) {
@@ -78,8 +143,11 @@ export class IRPointTagService {
 			return [];
 		}
 		const cache = this.app.metadataCache.getFileCache(file);
-		return readFrontmatterTags(
-			(cache?.frontmatter as Record<string, unknown> | undefined) || {},
+		return normalizeReadingPointTags(
+			readTagsFromFrontmatterRecord(
+				(cache?.frontmatter as Record<string, unknown> | undefined) || {},
+				this.resolveMarkdownTagsYamlKey(),
+			),
 		);
 	}
 
@@ -94,10 +162,20 @@ export class IRPointTagService {
 		}
 
 		const normalizedTags = normalizeReadingPointTags(tags);
-		await this.yamlManager.updateReadingFields(file, {
-			weave_tags: normalizedTags,
-		});
-		return normalizedTags;
+		const yamlKey = this.resolveMarkdownTagsYamlKey();
+		writingMarkdownTagPaths.add(normalizedPath);
+		try {
+			await this.yamlManager.updateFrontmatterTagsProperty(
+				file,
+				yamlKey,
+				normalizedTags,
+			);
+			return normalizedTags;
+		} finally {
+			window.setTimeout(() => {
+				writingMarkdownTagPaths.delete(normalizedPath);
+			}, 500);
+		}
 	}
 
 	async getChunkTags(chunk: IRChunkFileData): Promise<string[]> {
@@ -186,10 +264,11 @@ export class IRPointTagService {
 	async getAllKnownTags(): Promise<string[]> {
 		await this.initialize();
 		const chunks = Object.values(await this.storage.getAllChunkData());
-		const [pdfTasks, epubTasks, groups] = await Promise.all([
+		const [pdfTasks, epubTasks, groups, snapshots] = await Promise.all([
 			this.pdfService.getAllTasks(),
 			this.epubService.getAllTasks(),
 			this.tagGroupService.getAllGroups(),
+			getSharedIRPointStorageService(this.app).listPointSnapshots(),
 		]);
 
 		const collected = new Set<string>();
@@ -204,6 +283,13 @@ export class IRPointTagService {
 				collected.add(tag);
 			}
 		}
+		for (const snapshot of snapshots) {
+			for (const tag of normalizeReadingPointTags(
+				snapshot.point?.userData?.tags || [],
+			)) {
+				collected.add(tag);
+			}
+		}
 		for (const group of groups) {
 			for (const tag of normalizeReadingPointTags(group.matchAnyTags || [])) {
 				collected.add(tag);
@@ -213,18 +299,21 @@ export class IRPointTagService {
 		return Array.from(collected).sort((a, b) => a.localeCompare(b, "zh-CN"));
 	}
 
+	/**
+	 * Pull Markdown YAML tags into IR chunk + point storage (vault → IR).
+	 * Does not write back to YAML.
+	 */
 	async syncMarkdownChunkTags(filePath: string): Promise<boolean> {
 		await this.initialize();
 		const normalizedPath = normalizePath(String(filePath || "").trim());
 		if (!normalizedPath.toLowerCase().endsWith(".md")) {
 			return false;
 		}
+		if (this.isWritingMarkdownTags(normalizedPath)) {
+			return false;
+		}
 
-		const allChunks = Object.values(await this.storage.getAllChunkData());
-		const affectedChunks = allChunks.filter(
-			(chunk) =>
-				normalizePath(String(chunk.filePath || "").trim()) === normalizedPath,
-		);
+		const affectedChunks = await this.storage.getChunksByFilePath(normalizedPath);
 		if (affectedChunks.length === 0) {
 			return false;
 		}
@@ -232,6 +321,7 @@ export class IRPointTagService {
 		const nextTags = await this.readMarkdownReadingTags(normalizedPath);
 		const nextGroupId = await this.matchGroupForTags(nextTags);
 		let changed = false;
+		const pointStorage = getSharedIRPointStorageService(this.app);
 
 		for (const chunk of affectedChunks) {
 			const currentTags = normalizeReadingPointTags(
@@ -255,10 +345,19 @@ export class IRPointTagService {
 				updatedAt: Date.now(),
 			};
 			await this.storage.saveChunkData(updatedChunk as IRChunkFileData);
+			await pointStorage.syncChunkPoint(updatedChunk as IRChunkFileData, {
+				preserveExisting: true,
+			});
 			changed = true;
 		}
 
 		return changed;
+	}
+
+	/** Fast path for vault sync: skip non-IR markdown without reading YAML. */
+	async hasChunksForMarkdownPath(filePath: string): Promise<boolean> {
+		await this.initialize();
+		return this.storage.hasChunksForFilePath(filePath);
 	}
 
 	async getTagGroups(): Promise<IRTagGroup[]> {

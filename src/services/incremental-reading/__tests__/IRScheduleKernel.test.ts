@@ -35,7 +35,7 @@ vi.mock("../../../config/paths", async (importOriginal) => {
 		getV2Paths: () => v2Paths,
 		getV2PathsFromApp: () => v2Paths,
 		resolveIRImportFolder: (chunkRoot?: string) =>
-			String(chunkRoot || "weave/incremental-reading/chunks"),
+			String(chunkRoot || "weave Incremental reading/chunks"),
 	};
 });
 
@@ -379,7 +379,7 @@ describe("IRScheduleKernel deck identifier compatibility", () => {
 			horizonDays: 3,
 		});
 
-		expect(chunkSpy).toHaveBeenCalledTimes(3);
+		expect(chunkSpy).toHaveBeenCalledTimes(2);
 		expect(shortPlan.days).toHaveLength(1);
 		expect(longPlan.days.length).toBeGreaterThan(1);
 		expect(

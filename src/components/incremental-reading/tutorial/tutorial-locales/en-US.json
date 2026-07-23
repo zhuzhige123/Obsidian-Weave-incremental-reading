@@ -1,0 +1,399 @@
+{
+  "basics": [
+    {
+      "title": "What this plugin is",
+      "paragraphs": [
+        "Weave Incremental Reading turns “read later” into a sustainable queue: materials from Markdown, PDF, Canvas, web pages, and EPUB become schedulable reading points you can resume and jump back to.",
+        "It is a standalone incremental-reading controller. It can work with the Weave main plugin and Weave EPUB Reader, and also works on its own."
+      ]
+    },
+    {
+      "title": "Three core concepts",
+      "listGroups": [
+        {
+          "items": [
+            "Reading point: one pending reading task with source tracing so you can jump back to the original location.",
+            "Topic (.irdeck): a container for reading points, stored as a topic file in your vault.",
+            "Incremental reading calendar: the main surface. Browse due, scheduled, and overdue points by date and keep a daily rhythm."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Core capabilities",
+      "listGroups": [
+        {
+          "items": [
+            "Unified “Add link” entry: paste web URLs, wikilinks, block refs, PDF++, Canvas nodes, or EPUB location links.",
+            "Material import and folder subscription: split Markdown or import PDF/EPUB chapters; optionally subscribe a folder so new notes are auto-added to a topic (premium).",
+            "Scheduling and resume: processing vs reading-list modes, daily caps and load smoothing; resume points jump back to source.",
+            "Continuous reading: expand related points from the same source document so you can advance through one note/book in order.",
+            "Associated notes: curated links for PDF / EPUB; outbound links from Markdown / web carriers (premium).",
+            "Source tracing: Markdown, PDF++, Canvas, web, and EPUB keep stable resume links."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Using the calendar",
+      "paragraphs": [
+        "Open the incremental reading calendar to see a month heatmap above and the selected day’s reading points below."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "Top “+”: open Add reading target (the daily path).",
+            "Top “More” menu: import materials, update subscribed folders, data management, view modes, and more.",
+            "Pick a date to inspect that day’s queue; after reading, scheduling decides when it returns.",
+            "Right-click / long-press a reading point for scheduling, priority, continuous reading, associated notes, tag groups, and more."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Continuous reading",
+      "paragraphs": [
+        "Useful when one source document has been split into many reading points: advance through them by source instead of hunting for the next piece in the list."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "Entry: reading-point context menu → More actions → Continuous reading.",
+            "When enabled, an expand control appears so you can show other reading points from the same source document.",
+            "This is part of basic scheduling assistance and does not require a premium license."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Associated notes",
+      "paragraphs": [
+        "Associated notes are split by reading-point type: PDF / EPUB use curated manual links; Markdown / web (excerpt-note carriers) use Obsidian outbound links for related-note stats and open actions."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "Entry: reading-point context menu → Associated notes.",
+            "PDF / EPUB: open, append, create, set primary, remove, and other curated actions.",
+            "Markdown / web: open the source note and browse its outbound related notes; web points can also open the original URL in a browser.",
+            "Web reading points already create an excerpt Markdown carrier on add; only if that carrier is missing does the menu offer recreating it.",
+            "When curated links or outbound links exist, a Notes badge may appear on the list item.",
+            "Associated notes are premium: without activation the entry may be hidden, or shown locked if “Show advanced feature preview” is on."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Tag groups",
+      "paragraphs": [
+        "Tag groups let different materials use separate scheduling preferences and interval factors, with priority deciding which group wins when several match.",
+        "Note: tag groups are still being improved and may not work reliably yet. Do not depend on them as a daily workflow in the current release; later versions will continue to harden this path."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "Settings: Settings → Weave Incremental Reading → Advanced scheduling → Tag group manager.",
+            "Calendar: reading-point context menu → Tag group (view or switch).",
+            "Tag groups are premium; until the feature is stable, prefer topics, priority, and basic scheduling to keep reading moving."
+          ]
+        }
+      ]
+    }
+  ],
+  "add": [
+    {
+      "title": "Recommended entry",
+      "paragraphs": [
+        "For adding one reading point, use the Add reading target modal—not material import.",
+        "Import is for turning a whole document or book into many points. Add is for one link, one selection, or one Canvas node."
+      ],
+      "buttons": [
+        {
+          "icon": "plus",
+          "label": "Add link",
+          "description": "Primary control on the calendar toolbar"
+        },
+        {
+          "icon": "command",
+          "label": "Command palette",
+          "description": "“Add reading target to incremental reading”"
+        }
+      ]
+    },
+    {
+      "title": "Five steps in the modal",
+      "listGroups": [
+        {
+          "items": [
+            "Paste a link, or use “Current location” to capture a Markdown block / line anchor.",
+            "Confirm the reading-point name.",
+            "Choose a topic (.irdeck).",
+            "Pick the first reading day (manual or recommended).",
+            "Optionally create a reading note or append a source marker, then confirm to enqueue and schedule."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Pasteable types",
+      "listGroups": [
+        {
+          "items": [
+            "Web: https://…",
+            "Vault links / block refs: [[Note]], [[Note#^blockId]]",
+            "PDF++ selection or bookmark links (including links inside PDF callouts)",
+            "Canvas nodes: [[board.canvas#^nodeId]]",
+            "EPUB location links (requires Weave EPUB Reader)"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Other shortcuts",
+      "buttons": [
+        {
+          "icon": "text-select",
+          "label": "Markdown selection",
+          "description": "Command “Create incremental reading point from selection”"
+        },
+        {
+          "icon": "globe",
+          "label": "Obsidian browser",
+          "description": "Web viewer menu / selection → Add to incremental reading"
+        },
+        {
+          "icon": "layout-dashboard",
+          "label": "Canvas node",
+          "description": "Node menu → Add to incremental reading"
+        }
+      ]
+    }
+  ],
+  "import": [
+    {
+      "title": "When to import materials",
+      "paragraphs": [
+        "Use Import reading materials when you want a whole Markdown file, PDF outline, or EPUB outline to become many reading points.",
+        "Entry: calendar “More” → Import reading materials."
+      ]
+    },
+    {
+      "title": "Import steps",
+      "listGroups": [
+        {
+          "items": [
+            "Choose files (one batch = one type only: md / pdf / epub).",
+            "PDF / EPUB first show an outline step so you can pick chapters.",
+            "Choose a split mode and configure options.",
+            "Preview generated reading points, then confirm."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Formats and limits",
+      "listGroups": [
+        {
+          "heading": "Markdown",
+          "items": [
+            "Split by headings, blank lines, and similar rules; whole-file mode can reference or copy.",
+            "Compatibility import folder defaults to “plugin data folder / IR”."
+          ]
+        },
+        {
+          "heading": "PDF / EPUB (premium)",
+          "items": [
+            "Create bookmark-style reading points from outlines with resume info.",
+            "EPUB outline parsing depends on Weave EPUB Reader."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Folder subscription",
+      "paragraphs": [
+        "Folder subscription fits inbox / clipping workflows: choose a Markdown folder in your vault, and the plugin scans and auto-adds matching new materials into a bound topic, then schedules them into the incremental reading queue.",
+        "This differs from one-shot Import reading materials: import is a manual file-split action; subscription keeps watching a folder and topping up automatically."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "Configure: Settings → Weave Incremental Reading → Basic → Subscribe clipping folders (add rules, choose folders, bind topics, initial schedule mode, bulk confirm threshold).",
+            "Manual sync: calendar More → Update subscribed folders, or the command “Update subscribed folders”.",
+            "Background sync also runs on plugin startup and relevant vault file changes.",
+            "Folder subscription is premium: without activation the entry may be hidden, or shown locked if “Show advanced feature preview” is on."
+          ]
+        }
+      ]
+    }
+  ],
+  "trace": [
+    {
+      "title": "Tracing principle",
+      "paragraphs": [
+        "Each reading point stores a stable resume link and source kind. Opening from the calendar routes by type and locates the original position when possible."
+      ]
+    },
+    {
+      "title": "Canvas nodes",
+      "paragraphs": [
+        "Add: Canvas node menu, or paste [[board.canvas#^nodeId]].",
+        "Resume: open the Canvas and highlight the node by ID (with text candidates if needed).",
+        "Requires: built-in Obsidian Canvas."
+      ]
+    },
+    {
+      "title": "Obsidian browser (web)",
+      "paragraphs": [
+        "Add: Web Viewer “Add to incremental reading”, or paste an https URL; web points usually create a reading note.",
+        "Resume: open the URL in Obsidian’s browser.",
+        "Requires: Obsidian’s built-in web viewer."
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader selection",
+      "paragraphs": [
+        "Add: use “Add to incremental reading” from a reader selection, or paste an EPUB location link. Highlights alone do not become reading points.",
+        "Resume: open via the obsidian://weave-epub-reader protocol and locate by CFI / chapter.",
+        "Requires: Weave EPUB Reader."
+      ]
+    },
+    {
+      "title": "Obsidian Markdown",
+      "paragraphs": [
+        "Add: block refs [[Note#^blockId]], line anchors, “Current location”, or selection quick-create.",
+        "Resume: open the note and scroll to the block or line, with a locate highlight when available.",
+        "Requires: native Obsidian Markdown."
+      ]
+    },
+    {
+      "title": "PDF (PDF++)",
+      "paragraphs": [
+        "Add: paste PDF++ selection / bookmark links, or import chapters from an outline.",
+        "Resume: open the PDF and resolve page / selection anchors.",
+        "Requires: Obsidian PDF support; precise selections work best with PDF++."
+      ]
+    }
+  ],
+  "data": [
+    {
+      "title": "Two storage layers",
+      "listGroups": [
+        {
+          "items": [
+            "Vault data: the source of truth for topics and reading points (back up and sync this).",
+            "Plugin folder: settings, cache, and runtime state (mostly rebuildable; prefer vault backups)."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Vault data root",
+      "paragraphs": [
+        "The default folder name is “weave Incremental reading” (configurable in settings). points, materials, registry, and related files live directly under it, isolated from the shared weave/ root used by other Weave plugins."
+      ],
+      "code": "weave Incremental reading/\n  points/                 # .irdeck topic files\n  materials/\n  registry/\n  pdf-bookmark-tasks.json\n  epub-bookmark-tasks.json\n  IR/                     # compatibility import folder"
+    },
+    {
+      "title": ".irdeck topic files",
+      "paragraphs": [
+        "Each topic is one .irdeck file: topic metadata plus a points array (schedule, trace, relations, and more). Cross-plugin workflows should treat .irdeck records as the L0 source of truth."
+      ]
+    },
+    {
+      "title": "Plugin folder and backup tips",
+      "listGroups": [
+        {
+          "items": [
+            "Settings live in .obsidian/plugins/weave-incremental-reading/data.json.",
+            "cache/ and state/ speed up local use; they need not match perfectly across machines.",
+            "Back up the whole plugin data folder (including every .irdeck). Confirm the old folder is ready before changing the data root."
+          ]
+        }
+      ]
+    }
+  ],
+  "family": [
+    {
+      "title": "What Weave is",
+      "paragraphs": [
+        "Weave is a set of Obsidian plugins organized around read → capture → schedule → review.",
+        "Weave EPUB Reader handles in-vault reading and excerpts; the Weave main plugin handles decks, quizzes, and card creation; Weave Incremental Reading (this plugin) handles the reading queue and calendar."
+      ],
+      "listGroups": [
+        {
+          "heading": "Division of labor",
+          "items": [
+            "Weave EPUB Reader: read books in Obsidian, manage highlights/excerpts, and link with notes, Canvas, and decks.",
+            "Weave main plugin: turn any source excerpt into traced memory cards, manage them in multiple views, and review with FSRS.",
+            "Weave Incremental Reading: turn “read later” into a reading-point queue scheduled by topics and a month calendar."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave Incremental Reading (this plugin)",
+      "paragraphs": [
+        "Built for “collected too much, opened too many books, finished too little”: advance reading points on a calendar instead of relying on willpower alone."
+      ],
+      "listGroups": [
+        {
+          "heading": "Core features",
+          "items": [
+            "Reading points and topics (.irdeck)",
+            "Incremental reading calendar, continuous reading, and load scheduling",
+            "Unified add-link flow, material import, and folder subscription",
+            "Associated notes (PDF / EPUB curated; Markdown / web outlinks) and tag groups (still being improved)",
+            "Source resume for Markdown / PDF / Canvas / web / EPUB"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave main plugin",
+      "paragraphs": [
+        "An Obsidian knowledge-card system: create traced memory cards from any vault excerpt, browse them in table/kanban/grid views, and practice with quizzes."
+      ],
+      "listGroups": [
+        {
+          "heading": "Core features",
+          "items": [
+            "Excerpt-to-card creation and multi-view management",
+            "Quiz banks, wrong-answer sets, and exam stats",
+            "FSRS spaced repetition and study sessions",
+            "Optional license inheritance with this plugin"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader",
+      "paragraphs": [
+        "Open EPUB and related formats inside your vault, excerpt while reading, and deep-link book locations to notes and incremental reading points."
+      ],
+      "listGroups": [
+        {
+          "heading": "With this plugin",
+          "items": [
+            "Import EPUB chapters as reading points",
+            "Create located reading points from reader selections",
+            "Resume from the calendar into the reader at the original spot"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "How to combine them",
+      "listGroups": [
+        {
+          "items": [
+            "Queue only: install this plugin alone.",
+            "Also read/resume EPUB chapters: this plugin + Weave EPUB Reader.",
+            "Also create cards and review: this plugin + Weave main plugin.",
+            "Full loop (read → capture → schedule → review): install all three."
+          ]
+        }
+      ]
+    }
+  ]
+}

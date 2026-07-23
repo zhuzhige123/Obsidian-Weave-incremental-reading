@@ -67,6 +67,14 @@ export interface IRCalendarMaterialListProps {
 	getReadingPointTypeIndicator: (
 		material: ScheduleItem,
 	) => { icon: string; label: string } | null;
+	isSourceMissing: (materialId: string) => boolean;
+	getParentProgressForMaterial: (
+		materialId: string,
+	) => {
+		totalChildren: number;
+		completedChildren: number;
+		percent: number;
+	} | null;
 	handleMaterialClick: (material: ScheduleItem, event?: MouseEvent) => void;
 	openMaterial: (material: ScheduleItem) => Promise<void>;
 	toggleMaterialExpand: (material: ScheduleItem) => Promise<void> | void;

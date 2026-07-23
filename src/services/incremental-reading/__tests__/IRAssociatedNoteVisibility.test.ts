@@ -8,6 +8,7 @@ import {
 	getVisibleAssociatedNotePath,
 	hasPointAssociatedNote,
 	hasVisibleAssociatedNote,
+	resolveAssociatedNoteMenuOffer,
 } from "../IRAssociatedNoteVisibility";
 
 describe("IRAssociatedNoteVisibility", () => {
@@ -26,7 +27,7 @@ describe("IRAssociatedNoteVisibility", () => {
 		expect(hasPointAssociatedNote(material)).toBe(true);
 	});
 
-	it("Markdown/Canvas 阅读点不显示关联笔记入口", () => {
+	it("Markdown/Canvas 阅读点不走精选关联徽章路径", () => {
 		const material = {
 			sourceType: "chunk",
 			associatedNotePath: "Folder/Legacy.md",
@@ -88,5 +89,43 @@ describe("IRAssociatedNoteVisibility", () => {
 
 		expect(hasVisibleAssociatedNote(material)).toBe(true);
 		expect(hasPointAssociatedNote(material)).toBe(true);
+	});
+
+	describe("resolveAssociatedNoteMenuOffer", () => {
+		it("MD/网页走 derived，PDF/EPUB 走 curated，不支持类型隐藏", () => {
+			expect(
+				resolveAssociatedNoteMenuOffer(
+					{ sourceType: "chunk", sourceFile: "Notes/a.md" },
+					{ canUseFeature: true, shouldShowFeatureEntry: true },
+				),
+			).toEqual({ kind: "manage-derived" });
+			expect(
+				resolveAssociatedNoteMenuOffer(
+					{ sourceType: "pdf", sourceFile: "Books/a.pdf" },
+					{ canUseFeature: true, shouldShowFeatureEntry: true },
+				),
+			).toEqual({ kind: "manage-curated" });
+			expect(
+				resolveAssociatedNoteMenuOffer(
+					{ id: "unknown", sourceFile: "Books/audio.mp3" },
+					{ canUseFeature: true, shouldShowFeatureEntry: true },
+				),
+			).toEqual({ kind: "hidden" });
+		});
+
+		it("PDF/EPUB 在仅预览时进入高级功能门闸", () => {
+			expect(
+				resolveAssociatedNoteMenuOffer(
+					{ id: "epubbm-1", sourceFile: "Books/a.epub" },
+					{ canUseFeature: false, shouldShowFeatureEntry: true },
+				),
+			).toEqual({ kind: "premium-gate" });
+			expect(
+				resolveAssociatedNoteMenuOffer(
+					{ sourceType: "epub", sourceFile: "Books/a.epub" },
+					{ canUseFeature: false, shouldShowFeatureEntry: false },
+				),
+			).toEqual({ kind: "hidden" });
+		});
 	});
 });

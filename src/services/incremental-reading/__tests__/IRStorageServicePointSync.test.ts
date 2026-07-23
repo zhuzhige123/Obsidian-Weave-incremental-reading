@@ -363,7 +363,7 @@ describe("IRStorageService point sync", () => {
 
 	it("does not fall back to legacy topics.json when no .irdeck files exist", async () => {
 		const { app } = createMemoryApp({
-			"weave/incremental-reading/topics.json": JSON.stringify({
+			"weave Incremental reading/topics.json": JSON.stringify({
 				version: "2.0.0",
 				topics: {
 					"legacy-topic-1": {
@@ -381,7 +381,7 @@ describe("IRStorageService point sync", () => {
 		expect(decks).toEqual({});
 		expect(pointStorageSpies.listPointDecks).toHaveBeenCalled();
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/topics.json",
+			"weave Incremental reading/topics.json",
 		);
 	});
 
@@ -389,8 +389,8 @@ describe("IRStorageService point sync", () => {
 		const legacyChunks = JSON.stringify({ version: "1.0.0", chunks: {} });
 		const legacySources = JSON.stringify({ version: "1.0.0", sources: {} });
 		const { app, files } = createMemoryApp({
-			"weave/incremental-reading/chunks.json": legacyChunks,
-			"weave/incremental-reading/sources.json": legacySources,
+			"weave Incremental reading/chunks.json": legacyChunks,
+			"weave Incremental reading/sources.json": legacySources,
 		});
 		const service = new IRStorageService(app);
 
@@ -421,7 +421,7 @@ describe("IRStorageService point sync", () => {
 			tagGroup: "group-a",
 		});
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/sources.json",
+			"weave Incremental reading/sources.json",
 		);
 
 		await service.saveChunkData({
@@ -463,17 +463,17 @@ describe("IRStorageService point sync", () => {
 			"chunk-1",
 		);
 		expect(await service.getSource("source-1")).toBeNull();
-		expect(files.get("weave/incremental-reading/chunks.json")).toBe(
+		expect(files.get("weave Incremental reading/chunks.json")).toBe(
 			legacyChunks,
 		);
-		expect(files.get("weave/incremental-reading/sources.json")).toBe(
+		expect(files.get("weave Incremental reading/sources.json")).toBe(
 			legacySources,
 		);
 	});
 
 	it("ignores legacy chunks.json and sources.json for runtime reads once points exist", async () => {
 		const { app } = createMemoryApp({
-			"weave/incremental-reading/chunks.json": JSON.stringify({
+			"weave Incremental reading/chunks.json": JSON.stringify({
 				version: "1.0.0",
 				chunks: {
 					"legacy-chunk-only": {
@@ -488,7 +488,7 @@ describe("IRStorageService point sync", () => {
 					},
 				},
 			}),
-			"weave/incremental-reading/sources.json": JSON.stringify({
+			"weave Incremental reading/sources.json": JSON.stringify({
 				version: "1.0.0",
 				sources: {
 					"legacy-source-only": {
@@ -620,10 +620,10 @@ describe("IRStorageService point sync", () => {
 		});
 		expect(chunks["legacy-chunk-only"]).toBeUndefined();
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/sources.json",
+			"weave Incremental reading/sources.json",
 		);
 		expect(app.vault.adapter.read).not.toHaveBeenCalledWith(
-			"weave/incremental-reading/chunks.json",
+			"weave Incremental reading/chunks.json",
 		);
 	});
 
@@ -661,8 +661,8 @@ describe("IRStorageService point sync", () => {
 			expect.objectContaining({ chunkId: "chunk-point-only" }),
 			expect.anything(),
 		);
-		expect(files.has("weave/incremental-reading/chunks.json")).toBe(false);
-		expect(files.has("weave/incremental-reading/sources.json")).toBe(false);
+		expect(files.has("weave Incremental reading/chunks.json")).toBe(false);
+		expect(files.has("weave Incremental reading/sources.json")).toBe(false);
 	});
 
 	it("reads legacy blocks from migrated point snapshots and writes back into point storage", async () => {
@@ -803,6 +803,6 @@ describe("IRStorageService point sync", () => {
 		expect(pointStorageSpies.deletePointByLegacyId).toHaveBeenCalledWith(
 			"legacy-block-1",
 		);
-		expect(files.has("weave/incremental-reading/blocks.json")).toBe(false);
+		expect(files.has("weave Incremental reading/blocks.json")).toBe(false);
 	});
 });

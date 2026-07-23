@@ -1,0 +1,397 @@
+{
+  "basics": [
+    {
+      "title": "이 플러그인은 무엇인가",
+      "paragraphs": [
+        "Weave Incremental Reading은 「나중에 읽기」를 지속 가능한 큐로 바꿉니다. Markdown, PDF, Canvas, 웹 페이지, EPUB 등의 자료를 스케줄 가능한 읽기 포인트로 만들어 이어 읽고 원문으로 돌아갈 수 있습니다.",
+        "독립형 증분 읽기 컨트롤러입니다. Weave 메인 플러그인 및 Weave EPUB Reader와 함께 사용할 수 있으며, 단독으로도 동작합니다."
+      ]
+    },
+    {
+      "title": "세 가지 핵심 개념",
+      "listGroups": [
+        {
+          "items": [
+            "읽기 포인트: 원문 위치로 돌아갈 수 있도록 출처 추적이 포함된 하나의 대기 읽기 작업입니다.",
+            "토픽 (.irdeck): 읽기 포인트를 담는 컨테이너로, Vault에 토픽 파일로 저장됩니다.",
+            "증분 읽기 캘린더: 메인 화면입니다. 날짜별로 기한 도래·예정·연체 포인트를 확인하고 매일의 리듬을 유지합니다."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "핵심 기능",
+      "listGroups": [
+        {
+          "items": [
+            "통합 「링크 추가」 진입점: 웹 URL, 위키링크, 블록 참조, PDF++, Canvas 노드, EPUB 위치 링크를 붙여넣습니다.",
+            "자료 가져오기 및 폴더 구독: Markdown 분할 또는 PDF/EPUB 장 가져오기; 폴더를 구독해 새 노트를 토픽에 자동 추가할 수도 있습니다(프리미엄).",
+            "스케줄링 및 이어 읽기: 가공 모드 vs 읽기 목록 모드, 일일 상한 및 부하 완화; 이어 읽기 포인트로 원문으로 돌아갑니다.",
+            "연속 읽기: 같은 출처 문서의 관련 포인트를 펼쳐 하나의 노트/책을 순서대로 진행합니다.",
+            "연관 노트: PDF / EPUB 읽기 포인트에 Markdown 등 노트를 연결합니다(프리미엄).",
+            "출처 추적: Markdown, PDF++, Canvas, 웹, EPUB에서 안정적인 이어 읽기 링크를 유지합니다."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "캘린더 사용법",
+      "paragraphs": [
+        "증분 읽기 캘린더를 열면 위쪽에 월간 히트맵, 아래쪽에 선택한 날짜의 읽기 포인트가 표시됩니다."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "상단 「+」: 읽기 대상 추가 열기(일상적인 주 경로).",
+            "상단 「더 보기」 메뉴: 자료 가져오기, 구독 폴더 업데이트, 데이터 관리, 보기 모드 등.",
+            "날짜를 선택해 해당 날의 큐를 확인합니다. 읽은 후 스케줄링으로 다음 등장 시점이 결정됩니다.",
+            "읽기 포인트 우클릭 / 길게 누르기: 스케줄링, 우선순위, 연속 읽기, 연관 노트, 태그 그룹 등."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "연속 읽기",
+      "paragraphs": [
+        "하나의 출처 문서가 여러 읽기 포인트로 나뉘었을 때 유용합니다. 목록에서 다음 조각을 찾아다니지 않고 출처별로 순서대로 진행할 수 있습니다."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "진입: 읽기 포인트 컨텍스트 메뉴 → 더 많은 작업 → 연속 읽기.",
+            "활성화하면 펼치기 컨트롤이 나타나 같은 출처 문서의 다른 읽기 포인트를 표시할 수 있습니다.",
+            "기본 스케줄링 보조 기능의 일부이며 프리미엄 라이선스가 필요하지 않습니다."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "연관 노트",
+      "paragraphs": [
+        "PDF / EPUB 읽기 포인트에 보조 노트를 연결해 읽으면서 메모하고, 나중에 돌아가 확인하며, 더 명확한 추적을 유지할 수 있습니다."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "진입: 읽기 포인트 컨텍스트 메뉴 → 연관 노트(열기, 추가, 만들기, 기본 설정, 제거 등).",
+            "연결되면 목록 항목에 노트 배지가 표시될 수 있으며, 클릭하면 기본 연관 노트를 엽니다.",
+            "현재 지원은 PDF / EPUB 읽기 포인트에 집중합니다. Markdown 읽기 포인트는 이미 노트이므로 보통 이 진입점을 사용하지 않습니다.",
+            "연관 노트는 프리미엄 기능입니다. 활성화하지 않으면 진입점이 숨겨지거나, 「고급 기능 미리보기」가 켜져 있으면 잠금 표시로 나타날 수 있습니다."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "태그 그룹",
+      "paragraphs": [
+        "태그 그룹을 사용하면 자료마다 별도의 스케줄링 기본 설정과 간격 계수를 적용할 수 있으며, 여러 그룹이 일치할 때 우선순위로 적용 그룹이 결정됩니다.",
+        "참고: 태그 그룹은 아직 개선 중이며 현재 버전에서는 안정적으로 동작하지 않을 수 있습니다. 이번 릴리스에서는 일상 워크플로에 의존하지 마세요. 이후 버전에서 계속 보강될 예정입니다."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "설정: 설정 → Weave Incremental Reading → 고급 스케줄링 → 태그 그룹 관리자.",
+            "캘린더: 읽기 포인트 컨텍스트 메뉴 → 태그 그룹(보기 또는 전환).",
+            "태그 그룹은 프리미엄 기능입니다. 기능이 안정화될 때까지는 토픽, 우선순위, 기본 스케줄링을 사용해 읽기를 계속 진행하는 것을 권장합니다."
+          ]
+        }
+      ]
+    }
+  ],
+  "add": [
+    {
+      "title": "권장 진입점",
+      "paragraphs": [
+        "읽기 포인트 하나를 추가할 때는 자료 가져오기가 아니라 읽기 대상 추가 모달을 사용하세요.",
+        "가져오기는 전체 문서나 책을 여러 포인트로 만드는 용도입니다. 추가는 링크 하나, 선택 영역 하나, Canvas 노드 하나를 위한 것입니다."
+      ],
+      "buttons": [
+        {
+          "icon": "plus",
+          "label": "링크 추가",
+          "description": "캘린더 도구 모음의 주요 컨트롤"
+        },
+        {
+          "icon": "command",
+          "label": "명령 팔레트",
+          "description": "「Add reading target to incremental reading」"
+        }
+      ]
+    },
+    {
+      "title": "모달의 다섯 단계",
+      "listGroups": [
+        {
+          "items": [
+            "링크를 붙여넣거나 「현재 위치」로 Markdown 블록 / 줄 앵커를 캡처합니다.",
+            "읽기 포인트 이름을 확인합니다.",
+            "토픽 (.irdeck)을 선택합니다.",
+            "첫 읽기 날짜를 선택합니다(수동 또는 권장).",
+            "선택적으로 읽기 노트를 만들거나 출처 마커를 추가한 뒤 확인하여 큐에 넣고 스케줄합니다."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "붙여넣을 수 있는 유형",
+      "listGroups": [
+        {
+          "items": [
+            "웹: https://…",
+            "Vault 링크 / 블록 참조: [[Note]], [[Note#^blockId]]",
+            "PDF++ 선택 영역 또는 북마크 링크(PDF 콜아웃 내부 링크 포함)",
+            "Canvas 노드: [[board.canvas#^nodeId]]",
+            "EPUB 위치 링크(Weave EPUB Reader 필요)"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "기타 단축 경로",
+      "buttons": [
+        {
+          "icon": "text-select",
+          "label": "Markdown 선택",
+          "description": "명령 「Create incremental reading point from selection」"
+        },
+        {
+          "icon": "globe",
+          "label": "Obsidian 브라우저",
+          "description": "웹 뷰어 메뉴 / 선택 → Add to incremental reading"
+        },
+        {
+          "icon": "layout-dashboard",
+          "label": "Canvas 노드",
+          "description": "노드 메뉴 → Add to incremental reading"
+        }
+      ]
+    }
+  ],
+  "import": [
+    {
+      "title": "자료를 가져올 때",
+      "paragraphs": [
+        "전체 Markdown 파일, PDF 목차, EPUB 목차를 여러 읽기 포인트로 만들려면 Import reading materials를 사용하세요.",
+        "진입: 캘린더 「더 보기」 → Import reading materials."
+      ]
+    },
+    {
+      "title": "가져오기 단계",
+      "listGroups": [
+        {
+          "items": [
+            "파일 선택(한 배치 = 한 유형만: md / pdf / epub).",
+            "PDF / EPUB는 먼저 목차 단계가 표시되어 장을 선택할 수 있습니다.",
+            "분할 모드를 선택하고 옵션을 구성합니다.",
+            "생성된 읽기 포인트를 미리 보고 확인합니다."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "형식 및 제한",
+      "listGroups": [
+        {
+          "heading": "Markdown",
+          "items": [
+            "제목, 빈 줄 등 규칙으로 분할; 전체 파일 모드는 참조 또는 복사 가능.",
+            "호환 가져오기 폴더 기본값은 「plugin data folder / IR」입니다."
+          ]
+        },
+        {
+          "heading": "PDF / EPUB (premium)",
+          "items": [
+            "목차에서 이어 읽기 정보가 포함된 북마크형 읽기 포인트를 만듭니다.",
+            "EPUB 목차 파싱은 Weave EPUB Reader에 의존합니다."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "폴더 구독",
+      "paragraphs": [
+        "폴더 구독은 받은편지함 / 클리핑 워크플로에 적합합니다. Vault의 Markdown 폴더를 선택하면 플러그인이 스캔하여 일치하는 새 자료를 연결된 토픽에 자동 추가하고 증분 읽기 큐에 스케줄합니다.",
+        "일회성 Import reading materials와 다릅니다. 가져오기는 수동 파일 분할 작업이고, 구독은 폴더를 계속 감시하며 자동으로 보충합니다."
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "구성: 설정 → Weave Incremental Reading → Basic → Subscribe clipping folders(규칙 추가, 폴더 선택, 토픽 연결, 초기 스케줄 모드, 일괄 확인 임계값).",
+            "수동 동기화: 캘린더 더 보기 → Update subscribed folders, 또는 명령 「Update subscribed folders」.",
+            "플러그인 시작 및 관련 Vault 파일 변경 시 백그라운드 동기화도 실행됩니다.",
+            "폴더 구독은 프리미엄 기능입니다. 활성화하지 않으면 진입점이 숨겨지거나, 「Show advanced feature preview」가 켜져 있으면 잠금 표시로 나타날 수 있습니다."
+          ]
+        }
+      ]
+    }
+  ],
+  "trace": [
+    {
+      "title": "추적 원칙",
+      "paragraphs": [
+        "각 읽기 포인트는 안정적인 이어 읽기 링크와 출처 종류를 저장합니다. 캘린더에서 열면 유형별로 라우팅하고 가능한 경우 원래 위치로 이동합니다."
+      ]
+    },
+    {
+      "title": "Canvas 노드",
+      "paragraphs": [
+        "추가: Canvas 노드 메뉴, 또는 [[board.canvas#^nodeId]] 붙여넣기.",
+        "이어 읽기: Canvas를 열고 ID로 노드를 강조 표시합니다(필요 시 텍스트 후보도 사용).",
+        "필요: Obsidian 내장 Canvas."
+      ]
+    },
+    {
+      "title": "Obsidian 브라우저 (웹)",
+      "paragraphs": [
+        "추가: Web Viewer 「Add to incremental reading」, 또는 https URL 붙여넣기; 웹 포인트는 보통 읽기 노트를 만듭니다.",
+        "이어 읽기: Obsidian 브라우저에서 URL을 엽니다.",
+        "필요: Obsidian 내장 웹 뷰어."
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader 선택",
+      "paragraphs": [
+        "추가: 리더 선택 영역에서 「Add to incremental reading」, 또는 EPUB 위치 링크 붙여넣기. 하이라이트만으로는 읽기 포인트가 되지 않습니다.",
+        "이어 읽기: obsidian://weave-epub-reader 프로토콜로 열고 CFI / 장으로 위치를 찾습니다.",
+        "필요: Weave EPUB Reader."
+      ]
+    },
+    {
+      "title": "Obsidian Markdown",
+      "paragraphs": [
+        "추가: 블록 참조 [[Note#^blockId]], 줄 앵커, 「Current location」, 또는 선택 영역 빠른 만들기.",
+        "이어 읽기: 노트를 열고 블록 또는 줄로 스크롤하며, 가능하면 위치 강조 표시를 표시합니다.",
+        "필요: Obsidian 기본 Markdown."
+      ]
+    },
+    {
+      "title": "PDF (PDF++)",
+      "paragraphs": [
+        "추가: PDF++ 선택 / 북마크 링크 붙여넣기, 또는 목차에서 장 가져오기.",
+        "이어 읽기: PDF를 열고 페이지 / 선택 앵커를 해석합니다.",
+        "필요: Obsidian PDF 지원; 정밀한 선택은 PDF++와 함께 사용하는 것이 가장 좋습니다."
+      ]
+    }
+  ],
+  "data": [
+    {
+      "title": "두 저장 계층",
+      "listGroups": [
+        {
+          "items": [
+            "Vault 데이터: 토픽과 읽기 포인트의 원본(백업 및 동기화 대상).",
+            "플러그인 폴더: 설정, 캐시, 런타임 상태(대부분 재구성 가능; Vault 백업을 우선하세요)."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Vault 데이터 루트",
+      "paragraphs": [
+        "기본 폴더 이름은 「weave Incremental reading」(설정에서 변경 가능)입니다. points, materials, registry 및 관련 파일이 그 아래에 직접 위치하며, 다른 Weave 플러그인이 사용하는 공유 weave/ 루트와 분리됩니다."
+      ],
+      "code": "weave Incremental reading/\n  points/                 # .irdeck topic files\n  materials/\n  registry/\n  pdf-bookmark-tasks.json\n  epub-bookmark-tasks.json\n  IR/                     # compatibility import folder"
+    },
+    {
+      "title": ".irdeck 토픽 파일",
+      "paragraphs": [
+        "각 토픽은 하나의 .irdeck 파일입니다. 토픽 메타데이터와 points 배열(스케줄, 추적, 관계 등)을 포함합니다. 플러그인 간 워크플로에서는 .irdeck 레코드를 L0 원본으로 취급해야 합니다."
+      ]
+    },
+    {
+      "title": "플러그인 폴더 및 백업 팁",
+      "listGroups": [
+        {
+          "items": [
+            "설정은 .obsidian/plugins/weave-incremental-reading/data.json에 있습니다.",
+            "cache/ 및 state/는 로컬 사용 속도를 높입니다. 기기 간에 완벽히 일치할 필요는 없습니다.",
+            "전체 플러그인 데이터 폴더(모든 .irdeck 포함)를 백업하세요. 데이터 루트를 변경하기 전에 기존 폴더가 준비되었는지 확인하세요."
+          ]
+        }
+      ]
+    }
+  ],
+  "family": [
+    {
+      "title": "Weave란",
+      "paragraphs": [
+        "Weave는 읽기 → 캡처 → 스케줄 → 복습을 중심으로 구성된 Obsidian 플러그인 모음입니다.",
+        "Weave EPUB Reader는 Vault 내 읽기와 발췌를 담당하고, Weave 메인 플러그인은 덱, 퀴즈, 카드 생성을 담당하며, Weave Incremental Reading(이 플러그인)은 읽기 큐와 캘린더를 담당합니다."
+      ],
+      "listGroups": [
+        {
+          "heading": "역할 분담",
+          "items": [
+            "Weave EPUB Reader: Obsidian에서 책 읽기, 하이라이트/발췌 관리, 노트·Canvas·덱과 연결.",
+            "Weave 메인 플러그인: 모든 출처 발췌를 추적 가능한 기억 카드로 변환, 여러 보기에서 관리, FSRS로 복습.",
+            "Weave Incremental Reading: 「나중에 읽기」를 토픽과 월간 캘린더로 스케줄되는 읽기 포인트 큐로 전환."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave Incremental Reading (이 플러그인)",
+      "paragraphs": [
+        "「너무 많이 모았고, 너무 많은 책을 열었지만, 끝까지 읽은 것은 적다」는 상황을 위해 설계되었습니다. 의지만으로 버티지 않고 캘린더에서 읽기 포인트를 진행합니다."
+      ],
+      "listGroups": [
+        {
+          "heading": "핵심 기능",
+          "items": [
+            "읽기 포인트 및 토픽 (.irdeck)",
+            "증분 읽기 캘린더, 연속 읽기, 부하 스케줄링",
+            "통합 링크 추가 흐름, 자료 가져오기, 폴더 구독",
+            "연관 노트 (PDF / EPUB) 및 태그 그룹(개선 중)",
+            "Markdown / PDF / Canvas / 웹 / EPUB 출처 이어 읽기"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave 메인 플러그인",
+      "paragraphs": [
+        "Obsidian 지식 카드 시스템: Vault의 모든 발췌에서 추적 가능한 기억 카드를 만들고, 테이블/칸반/그리드 보기에서 탐색하며, 퀴즈로 연습합니다."
+      ],
+      "listGroups": [
+        {
+          "heading": "핵심 기능",
+          "items": [
+            "발췌→카드 생성 및 다중 보기 관리",
+            "퀴즈 뱅크, 오답 세트, 시험 통계",
+            "FSRS 간격 반복 및 학습 세션",
+            "이 플러그인과 선택적 라이선스 상속"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader",
+      "paragraphs": [
+        "Vault 안에서 EPUB 및 관련 형식을 열고, 읽으면서 발췌하며, 책 위치를 노트 및 증분 읽기 포인트에 딥 링크합니다."
+      ],
+      "listGroups": [
+        {
+          "heading": "이 플러그인과 함께",
+          "items": [
+            "EPUB 장을 읽기 포인트로 가져오기",
+            "리더 선택 영역에서 위치가 지정된 읽기 포인트 만들기",
+            "캘린더에서 리더의 원래 위치로 이어 읽기"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "조합 방법",
+      "listGroups": [
+        {
+          "items": [
+            "큐만: 이 플러그인만 설치.",
+            "EPUB 장 읽기/이어 읽기도: 이 플러그인 + Weave EPUB Reader.",
+            "카드 생성 및 복습도: 이 플러그인 + Weave 메인 플러그인.",
+            "전체 루프(읽기 → 캡처 → 스케줄 → 복습): 세 플러그인 모두 설치."
+          ]
+        }
+      ]
+    }
+  ]
+}

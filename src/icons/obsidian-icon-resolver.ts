@@ -60,6 +60,8 @@ const ICON_ALIAS_MAP: Record<string, string> = {
 	markdown: "file-text",
 	"markdown-toolbar": "file-text",
 	"file-text": "file-text",
+	"file-warning": "file-warning",
+	"file-x": "file-x",
 	"id-card": "badge",
 	"id-card-alt": "badge",
 	"layer-group": "layers",

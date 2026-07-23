@@ -24,9 +24,15 @@
   import IRAutoSubscribeSettingsSection from './IRAutoSubscribeSettingsSection.svelte';
   import IRCoreSchedulingSettingsSection from './IRCoreSchedulingSettingsSection.svelte';
   import IRInterleaveSettingsSection from './IRInterleaveSettingsSection.svelte';
+  import IRReadingTargetSettingsSection from './IRReadingTargetSettingsSection.svelte';
   import IRStrategySettingsSection from './IRStrategySettingsSection.svelte';
   import SettingsHelpModal from '../components/SettingsHelpModal.svelte';
   import { PremiumFeatureGuard, PREMIUM_FEATURES } from '../../../services/premium/PremiumFeatureGuard';
+  import { Notice } from 'obsidian';
+  import {
+    DEFAULT_MARKDOWN_TAGS_YAML_KEY,
+    normalizeIRTagSourcePolicy,
+  } from '../../../services/incremental-reading/ir-tag-source-policy';
   import type { IRPremiumFeatureId } from '../../../services/premium/ir-premium-features';
   import { ensureIRPremiumFeature } from '../../../services/premium/ir-premium';
 
@@ -215,11 +221,10 @@
     await saveSettings();
   }
 
-  async function handleFolderSubscriptionEnabledChange(ruleId: string, event: Event) {
+  async function handleFolderSubscriptionEnabledChange(ruleId: string, enabled: boolean) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)) {
       return;
     }
-    const enabled = (event.target as HTMLInputElement).checked;
     updateFolderSubscriptionSettings((current) => ({
       ...current,
       rules: (current.rules || []).map((rule) =>
@@ -258,14 +263,11 @@
     await saveSettings(true);
   }
 
-  function handleFolderSubscriptionImportConfirmThresholdChange(event: Event) {
+  function handleFolderSubscriptionImportConfirmThresholdChange(value: number) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)) {
       return;
     }
-    const importConfirmThreshold = Math.max(
-      0,
-      Math.min(200, parseInt((event.target as HTMLInputElement).value || '0', 10) || 0)
-    );
+    const importConfirmThreshold = Math.max(0, Math.min(200, Math.round(value) || 0));
     updateFolderSubscriptionSettings((current) => ({
       ...current,
       importConfirmThreshold
@@ -306,9 +308,8 @@
   }
 
   // 处理默认间隔因子变更
-  function handleIntervalFactorChange(event: Event) {
-    const value = parseFloat((event.target as HTMLInputElement).value);
-    if (!isNaN(value) && value >= 1.0 && value <= 3.0) {
+  function handleIntervalFactorChange(value: number) {
+    if (!Number.isNaN(value) && value >= 1.0 && value <= 3.0) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.defaultIntervalFactor = value;
       });
@@ -317,9 +318,8 @@
   }
 
   // 处理每日新块上限变更
-  function handleDailyNewLimitChange(event: Event) {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 0 && value <= 50) {
+  function handleDailyNewLimitChange(value: number) {
+    if (!Number.isNaN(value) && value >= 0 && value <= 50) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.dailyNewLimit = value;
       });
@@ -328,9 +328,8 @@
   }
 
   // 处理每日复习上限变更
-  function handleDailyReviewLimitChange(event: Event) {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 0 && value <= 200) {
+  function handleDailyReviewLimitChange(value: number) {
+    if (!Number.isNaN(value) && value >= 0 && value <= 200) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.dailyReviewLimit = value;
       });
@@ -339,23 +338,22 @@
   }
 
   // 处理交错学习模式变更
-  function handleInterleaveModeChange(event: Event) {
+  function handleInterleaveModeChange(enabled: boolean) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.INTERLEAVE_LEARNING_SETTINGS)) {
       return;
     }
     settingsEditor.updateIncrementalReading((incrementalReading) => {
-      incrementalReading.interleaveMode = (event.target as HTMLInputElement).checked;
+      incrementalReading.interleaveMode = enabled;
     });
     saveSettings();
   }
 
   // 处理最大连续同主题块数变更
-  function handleMaxConsecutiveChange(event: Event) {
+  function handleMaxConsecutiveChange(value: number) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.INTERLEAVE_LEARNING_SETTINGS)) {
       return;
     }
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 1 && value <= 10) {
+    if (!Number.isNaN(value) && value >= 1 && value <= 10) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.maxConsecutiveSameTopic = value;
       });
@@ -364,9 +362,8 @@
   }
 
   // 处理复习阈值变更
-  function handleReviewThresholdChange(event: Event) {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 3 && value <= 14) {
+  function handleReviewThresholdChange(value: number) {
+    if (!Number.isNaN(value) && value >= 3 && value <= 14) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.reviewThreshold = value;
       });
@@ -375,9 +372,8 @@
   }
 
   // 处理最大间隔变更
-  function handleMaxIntervalChange(event: Event) {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 30 && value <= 365) {
+  function handleMaxIntervalChange(value: number) {
+    if (!Number.isNaN(value) && value >= 30 && value <= 365) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.maxInterval = value;
       });
@@ -400,12 +396,11 @@
   }
 
   // 处理每日时间预算变更
-  function handleTimeBudgetChange(event: Event) {
+  function handleTimeBudgetChange(value: number) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
       return;
     }
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 10 && value <= 120) {
+    if (!Number.isNaN(value) && value >= 10 && value <= 120) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.dailyTimeBudgetMinutes = value;
       });
@@ -413,12 +408,11 @@
     }
   }
 
-  function handleFlowStretchChange(event: Event) {
+  function handleFlowStretchChange(value: number) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
       return;
     }
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 0 && value <= 40) {
+    if (!Number.isNaN(value) && value >= 0 && value <= 40) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.flowStretchPercent = value;
       });
@@ -426,22 +420,35 @@
     }
   }
 
-  function handleLoadBasedDeferChange(event: Event) {
+  function handleLoadBasedDeferChange(enabled: boolean) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
       return;
     }
     settingsEditor.updateIncrementalReading((incrementalReading) => {
-      incrementalReading.enableLoadBasedDefer = (event.target as HTMLInputElement).checked;
+      incrementalReading.enableLoadBasedDefer = enabled;
     });
     saveSettings();
   }
 
-  function handleDailyReadingPointCapChange(event: Event) {
+  function handleReadingTargetInboxDeckChange(deckId: string) {
+    settingsEditor.updateIncrementalReading((incrementalReading) => {
+      incrementalReading.readingTargetInboxDeckId = String(deckId || '').trim();
+    });
+    void saveSettings();
+  }
+
+  function handleReadingTargetDefaultNoteBackedChange(enabled: boolean) {
+    settingsEditor.updateIncrementalReading((incrementalReading) => {
+      incrementalReading.readingTargetDefaultNoteBacked = enabled === true;
+    });
+    void saveSettings();
+  }
+
+  function handleDailyReadingPointCapChange(value: number) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
       return;
     }
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 5 && value <= 40) {
+    if (!Number.isNaN(value) && value >= 5 && value <= 40) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.dailyReadingPointCap = value;
       });
@@ -449,22 +456,21 @@
     }
   }
 
-  function handleHorizonSmoothingChange(event: Event) {
+  function handleHorizonSmoothingChange(enabled: boolean) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
       return;
     }
     settingsEditor.updateIncrementalReading((incrementalReading) => {
-      incrementalReading.enableHorizonSmoothing = (event.target as HTMLInputElement).checked;
+      incrementalReading.enableHorizonSmoothing = enabled;
     });
     saveSettings();
   }
 
-  function handleHorizonSpreadDaysChange(event: Event) {
+  function handleHorizonSpreadDaysChange(value: number) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
       return;
     }
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 5 && value <= 14) {
+    if (!Number.isNaN(value) && value >= 5 && value <= 14) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.horizonSpreadDays = value;
       });
@@ -473,12 +479,11 @@
   }
 
   // 处理每日出现上限变更
-  function handleMaxAppearancesChange(event: Event) {
+  function handleMaxAppearancesChange(value: number) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
       return;
     }
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 1 && value <= 5) {
+    if (!Number.isNaN(value) && value >= 1 && value <= 5) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.maxAppearancesPerDay = value;
       });
@@ -487,12 +492,12 @@
   }
 
   // 处理 TagGroup 先验开关
-  function handleTagGroupPriorChange(event: Event) {
+  function handleTagGroupPriorChange(enabled: boolean) {
     if (!ensurePremiumFeature(PREMIUM_FEATURES.TAG_GROUPS)) {
       return;
     }
     settingsEditor.updateIncrementalReading((incrementalReading) => {
-      incrementalReading.enableTagGroupPrior = (event.target as HTMLInputElement).checked;
+      incrementalReading.enableTagGroupPrior = enabled;
     });
     saveSettings();
   }
@@ -504,6 +509,23 @@
     settingsEditor.updateIncrementalReading((incrementalReading) => {
       incrementalReading.tagGroupFollowMode = value as 'off' | 'ask' | 'auto';
     });
+    void saveSettings();
+  }
+
+  function handleMarkdownTagsYamlKeyChange(value: string) {
+    const previousKey = String(
+      settings.incrementalReading?.tagSource?.markdownYamlKey || ''
+    ).trim();
+    const nextPolicy = normalizeIRTagSourcePolicy({ markdownYamlKey: value });
+    settingsEditor.updateIncrementalReading((incrementalReading) => {
+      incrementalReading.tagSource = nextPolicy;
+    });
+    if (
+      nextPolicy.markdownYamlKey === DEFAULT_MARKDOWN_TAGS_YAML_KEY &&
+      previousKey !== DEFAULT_MARKDOWN_TAGS_YAML_KEY
+    ) {
+      new Notice(t('irSettings.tagSourceSwitchToTagsWarning'), 8000);
+    }
     void saveSettings();
   }
 
@@ -522,9 +544,8 @@
   }
 
   // 处理优先级半衰期变更
-  function handlePriorityHalfLifeChange(event: Event) {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 3 && value <= 30) {
+  function handlePriorityHalfLifeChange(value: number) {
+    if (!Number.isNaN(value) && value >= 3 && value <= 30) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.priorityHalfLifeDays = value;
       });
@@ -533,9 +554,8 @@
   }
 
   // 处理待读天数变更（统一用于统计和提前阅读范围）
-  function handleLearnAheadDaysChange(event: Event) {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 1 && value <= 14) {
+  function handleLearnAheadDaysChange(value: number) {
+    if (!Number.isNaN(value) && value >= 1 && value <= 14) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.learnAheadDays = value;
       });
@@ -567,6 +587,13 @@
           {handleIntervalFactorChange}
           {handleReviewThresholdChange}
           {handleMaxIntervalChange}
+        />
+
+        <IRReadingTargetSettingsSection
+          {settings}
+          deckOptions={subscriptionDeckOptions}
+          onInboxDeckChange={handleReadingTargetInboxDeckChange}
+          onDefaultNoteBackedChange={handleReadingTargetDefaultNoteBackedChange}
         />
 
         <IRStrategySettingsSection
@@ -641,6 +668,7 @@
             postponeOptions={POSTPONE_OPTIONS}
             {handleTagGroupPriorChange}
             {handleTagGroupFollowModeChange}
+            {handleMarkdownTagsYamlKeyChange}
             handleAgingStrengthChange={handleAgingStrengthDropdownChange}
             handlePostponeStrategyChange={handlePostponeStrategyDropdownChange}
             {handlePriorityHalfLifeChange}
@@ -834,11 +862,11 @@
   }
 
   /* v3.0 玫瑰色强调条（高级调度） */
-  :global(.accent-rose) {
+  :global(.weave-settings .accent-rose) {
     --accent-color: #f43f5e;
   }
 
-  :global(.with-accent-bar.accent-rose::before) {
+  :global(.weave-settings .with-accent-bar.accent-rose::before) {
     background: linear-gradient(180deg, #f43f5e, #e11d48);
   }
 

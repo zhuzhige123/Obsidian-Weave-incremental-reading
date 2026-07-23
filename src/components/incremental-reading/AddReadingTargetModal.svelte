@@ -3,12 +3,12 @@
 -->
 <script lang="ts">
   import { Menu, Notice } from 'obsidian';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { WeavePlugin } from '../../main';
   import ObsidianIcon from '../ui/ObsidianIcon.svelte';
   import MarkdownRenderer from '../atoms/MarkdownRenderer.svelte';
   import { IRStorageService } from '../../services/incremental-reading/IRStorageService';
-  import { parseReadingTargetInput } from '../../services/incremental-reading/reading-target/IRReadingTargetParser';
+  import { parseReadingTargetInput, refineParsedReadingTargetValidation } from '../../services/incremental-reading/reading-target/IRReadingTargetParser';
   import {
     getReadingTargetKindLabel,
     resolveReadingTargetTitleDraft
@@ -19,7 +19,10 @@
     buildReadingTargetPreviewMarkdown,
     getCurrentEditorReadingTargetContext
   } from '../../services/incremental-reading/reading-target/IRReadingTargetCurrentLocation';
-  import type { ParsedReadingTarget } from '../../services/incremental-reading/reading-target/IRReadingTargetTypes';
+  import {
+    supportsReadingTargetCreateNote,
+    type ParsedReadingTarget
+  } from '../../services/incremental-reading/reading-target/IRReadingTargetTypes';
   import {
     getScheduleToday,
     loadReadingTargetDayLoadAssessment,
@@ -31,19 +34,47 @@
     type ReadingTargetScheduleMode,
     type ReadingTargetScheduleRecommendation
   } from '../../services/incremental-reading/reading-target/IRReadingTargetScheduleDate';
+  import { openCreateIRTopicModal } from '../../modals/CreateIRTopicModal';
+  import { IRPointSuggestModal } from '../../modals/IRPointSuggestModal';
+  import {
+    listParentPickerItems,
+    loadParentRelationRuntime
+  } from '../../services/incremental-reading/IRPointParentRelationRuntime';
   import { logger } from '../../utils/logger';
   import { tr } from '../../utils/i18n';
+  import type { IRDeck } from '../../types/ir-types';
+
+  const READING_TARGET_ERROR_NOTICE_KEYS: Record<string, string> = {
+    'reading-target-epub-unresolved': 'irAddTarget.notices.epubUnresolved',
+    'reading-target-epub-missing-cfi': 'irAddTarget.notices.epubMissingCfi',
+    'reading-target-epub-invalid': 'irAddTarget.notices.epubInvalid',
+    'reading-target-missing-title': 'irAddTarget.notices.missingTitle',
+    'reading-target-missing-deck': 'irAddTarget.notices.missingDeck',
+    'reading-target-deck-missing': 'irAddTarget.notices.deckMissing',
+    'reading-target-canvas-invalid': 'irAddTarget.notices.canvasInvalid',
+    'reading-target-missing-source': 'irAddTarget.notices.missingSource',
+    'reading-target-schedule-pin-failed': 'irAddTarget.notices.schedulePinFailed',
+    'reading-target-pdf-batch-failed': 'irAddTarget.notices.pdfBatchFailed',
+    'reading-target-invalid-folder': 'irAddTarget.notices.invalidFolder'
+  };
 
   interface Props {
     plugin: WeavePlugin;
     initialLink?: string;
     initialTitle?: string;
     initialDeckId?: string;
+    initialCanvasTextCandidates?: string[];
     initialScheduleDate?: Date;
     defaultScheduleMode?: ReadingTargetScheduleMode;
+    /** Obsidian 原生标题栏右侧操作区（关闭按钮左侧），与 Weave 新建卡片 headerActions 对齐 */
+    headerActionsEl: HTMLElement;
     footerEl: HTMLElement;
     onClose: () => void;
-    onAdded?: () => void;
+    onAdded?: (result: {
+      pinDateKey: string;
+      createdIds: string[];
+      deckName: string;
+    }) => void;
   }
 
   function portalToTarget(node: HTMLElement, target: HTMLElement) {
@@ -62,8 +93,10 @@
     initialLink = '',
     initialTitle = '',
     initialDeckId = '',
+    initialCanvasTextCandidates = [],
     initialScheduleDate = new Date(),
     defaultScheduleMode = 'auto',
+    headerActionsEl,
     footerEl,
     onClose,
     onAdded
@@ -71,10 +104,10 @@
 
   let t = $derived($tr);
 
-  let linkInput = $state(initialLink);
-  let linkInputTouched = $state(Boolean(initialLink.trim()));
-  let title = $state(initialTitle);
-  let titleDetected = $state(Boolean(initialTitle.trim()));
+  let linkInput = $state(untrack(() => initialLink));
+  let linkInputTouched = $state(untrack(() => Boolean(initialLink.trim())));
+  let title = $state(untrack(() => initialTitle));
+  let titleDetected = $state(untrack(() => Boolean(initialTitle.trim())));
   let selectedDeckId = $state('');
   let deckOptions = $state<Array<{ id: string; name: string }>>([]);
   let parsedTarget = $state<ParsedReadingTarget | null>(null);
@@ -84,12 +117,23 @@
   let appendSourceBacklink = $state(false);
   let submitting = $state(false);
   let schedulePlanningTimer: ReturnType<typeof setTimeout> | undefined;
-  let scheduleMode = $state<ReadingTargetScheduleMode>(defaultScheduleMode);
-  let customScheduleDate = $state(normalizeScheduleDate(initialScheduleDate));
+  let schedulePlanningRequestId = 0;
+  let scheduleMode = $state<ReadingTargetScheduleMode>(
+    untrack(() => defaultScheduleMode),
+  );
+  let customScheduleDate = $state(
+    untrack(() => normalizeScheduleDate(initialScheduleDate)),
+  );
   let customDayLoad = $state<ReadingTargetDayLoadAssessment | null>(null);
   let scheduleRecommendation = $state<ReadingTargetScheduleRecommendation | null>(null);
   let schedulePlanningLoading = $state(false);
   let scheduleDateInputEl = $state<HTMLInputElement | null>(null);
+  let currentLocationTick = $state(0);
+  let selectedParentPointId = $state<string | null>(null);
+  let selectedParentTitle = $state('');
+  const canOfferCreateNote = $derived(
+    Boolean(parsedTarget && supportsReadingTargetCreateNote(parsedTarget.kind))
+  );
 
   const customScheduleDateLabel = $derived(
     customScheduleDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -113,7 +157,10 @@
       : ''
   );
 
-  const canUseCurrentLocation = $derived(Boolean(getCurrentEditorReadingTargetContext(plugin.app)));
+  const canUseCurrentLocation = $derived.by(() => {
+    currentLocationTick;
+    return Boolean(getCurrentEditorReadingTargetContext(plugin.app));
+  });
   const kindLabel = $derived(parsedTarget ? getReadingTargetKindLabel(parsedTarget.kind) : '');
   const validationMessage = $derived(parsedTarget?.validationError || '');
   const canSubmit = $derived(
@@ -132,13 +179,17 @@
     return `${target?.kind ?? 'unknown'}:${target?.pdfPoints?.length ?? 0}`;
   }
 
-  async function loadDecks(): Promise<void> {
+  async function reloadDeckOptions(): Promise<void> {
     const storage = new IRStorageService(plugin.app);
     await storage.initialize();
     deckOptions = Object.values(await storage.getAllDecks())
       .filter((deck) => !deck.archivedAt)
       .sort((left, right) => left.name.localeCompare(right.name))
       .map((deck) => ({ id: deck.id, name: deck.name }));
+  }
+
+  async function loadDecks(): Promise<void> {
+    await reloadDeckOptions();
 
     const settings = plugin.getIncrementalReadingSettings();
     selectedDeckId = resolveInitialReadingTargetDeckId({
@@ -158,8 +209,23 @@
     const skipScheduleQueue = options?.skipScheduleQueue === true;
     const previousEstimateSignature = getEstimateSignature(parsedTarget);
     const contextPath = plugin.app.workspace.getActiveFile()?.path ?? '';
-    parsedTarget = parseReadingTargetInput(plugin.app, linkInput, contextPath);
-    createNote = parsedTarget.kind === 'web' || plugin.getIncrementalReadingSettings().readingTargetDefaultNoteBacked === true;
+    let nextTarget = parseReadingTargetInput(plugin.app, linkInput, contextPath);
+    nextTarget = await refineParsedReadingTargetValidation(plugin.app, nextTarget);
+    if (
+      nextTarget.kind === 'canvas' &&
+      initialCanvasTextCandidates.length > 0 &&
+      (!nextTarget.canvasTextCandidates ||
+        nextTarget.canvasTextCandidates.length === 0)
+    ) {
+      nextTarget = {
+        ...nextTarget,
+        canvasTextCandidates: [...initialCanvasTextCandidates]
+      };
+    }
+    parsedTarget = nextTarget;
+    createNote =
+      supportsReadingTargetCreateNote(parsedTarget.kind) &&
+      plugin.getIncrementalReadingSettings().readingTargetDefaultNoteBacked === true;
 
     if (allowTitleOverride && (!title.trim() || !titleDetected)) {
       const draft = await resolveReadingTargetTitleDraft(plugin.app, parsedTarget);
@@ -169,7 +235,12 @@
       }
     }
 
-    previewMarkdown = parsedTarget ? buildReadingTargetPreviewMarkdown(parsedTarget, title.trim() || t('irAddTarget.previewFallback')) : '';
+    previewMarkdown = parsedTarget
+      ? buildReadingTargetPreviewMarkdown(
+          parsedTarget,
+          title.trim() || t('irAddTarget.previewFallback')
+        )
+      : '';
     previewSourcePath = parsedTarget?.sourceFilePath || contextPath;
 
     if (
@@ -190,7 +261,10 @@
   function handleTitleInputChange(): void {
     titleDetected = false;
     if (parsedTarget) {
-      previewMarkdown = buildReadingTargetPreviewMarkdown(parsedTarget, title.trim() || t('irAddTarget.previewFallback'));
+      previewMarkdown = buildReadingTargetPreviewMarkdown(
+        parsedTarget,
+        title.trim() || t('irAddTarget.previewFallback')
+      );
     }
   }
 
@@ -215,8 +289,26 @@
     void refreshParsedTarget();
   }
 
-  function showDeckMenu(event: MouseEvent): void {
+  function openCreateTopicModal(): void {
+    openCreateIRTopicModal({
+      app: plugin.app,
+      onCreated: async (deck: IRDeck) => {
+        await reloadDeckOptions();
+        selectedDeckId = deck.id;
+        new Notice(t('irAddTarget.notices.topicCreated', { name: deck.name }), 3000);
+        void refreshSchedulePlanning();
+      }
+    });
+  }
+
+  function showDeckMenu(event: MouseEvent | KeyboardEvent): void {
     const menu = new Menu();
+    if (deckOptions.length === 0) {
+      menu.addItem((item) => {
+        item.setTitle(t('irModals.common.noTopicsYet')).setDisabled(true);
+      });
+    }
+
     for (const deck of deckOptions) {
       menu.addItem((item) => {
         item
@@ -228,12 +320,36 @@
           });
       });
     }
-    menu.showAtMouseEvent(event);
+
+    if (deckOptions.length > 0) {
+      menu.addSeparator();
+    }
+
+    menu.addItem((item) => {
+      item
+        .setTitle(t('irAddTarget.deck.createTopicMenu'))
+        .setIcon('plus')
+        .onClick(() => {
+          openCreateTopicModal();
+        });
+    });
+
+    if (event instanceof MouseEvent) {
+      menu.showAtMouseEvent(event);
+      return;
+    }
+
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement) {
+      const rect = target.getBoundingClientRect();
+      menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
+    }
   }
 
   function getDeckButtonLabel(): string {
     const deck = deckOptions.find((entry) => entry.id === selectedDeckId);
-    return deck ? t('irAddTarget.deck.label', { name: deck.name }) : t('irAddTarget.deck.selectTopic');
+    // 顶栏与 Weave 新建卡片一致：只显示专题名，不带「专题：」前缀
+    return deck?.name || t('irAddTarget.deck.selectTopic');
   }
 
   function setScheduleMode(mode: ReadingTargetScheduleMode): void {
@@ -246,6 +362,41 @@
     if (scheduleMode === 'custom') {
       void refreshCustomDayLoad();
     }
+  }
+
+  async function openParentPointPicker(): Promise<void> {
+    try {
+      const runtime = await loadParentRelationRuntime(plugin.app);
+      const items = listParentPickerItems(runtime, {
+        preferTopicId: selectedDeckId
+      });
+      const picker = new IRPointSuggestModal(plugin.app, {
+        items,
+        allowClear: true,
+        placeholder: t('irModals.pointSuggest.placeholder'),
+        clearLabel: t('irModals.pointSuggest.clearLabel'),
+        clearDescription: t('irModals.pointSuggest.clearDescription')
+      });
+      const choice = await picker.waitForChoice();
+      if (choice.kind === 'cancel') {
+        return;
+      }
+      if (choice.kind === 'clear') {
+        selectedParentPointId = null;
+        selectedParentTitle = '';
+        return;
+      }
+      selectedParentPointId = choice.item.id;
+      selectedParentTitle = choice.item.title || choice.item.id;
+    } catch (error) {
+      logger.error('[AddReadingTargetModal] parent picker failed', error);
+      new Notice(t('irServiceNotices.quickEdit.openSelectParentFailed'), 3000);
+    }
+  }
+
+  function clearSelectedParent(): void {
+    selectedParentPointId = null;
+    selectedParentTitle = '';
   }
 
   async function refreshCustomDayLoad(): Promise<void> {
@@ -269,14 +420,16 @@
 
   async function refreshAutoRecommendation(): Promise<void> {
     if (!selectedDeckId || scheduleMode !== 'auto') {
+      schedulePlanningRequestId += 1;
       scheduleRecommendation = null;
       schedulePlanningLoading = false;
       return;
     }
 
+    const requestId = ++schedulePlanningRequestId;
     schedulePlanningLoading = true;
     try {
-      scheduleRecommendation = await recommendReadingTargetScheduleDate(
+      const recommendation = await recommendReadingTargetScheduleDate(
         plugin.app,
         selectedDeckId,
         dailyBudgetMinutes,
@@ -285,11 +438,20 @@
           estimatedMinutesForNewItem: estimateNewItemMinutes()
         }
       );
+      if (requestId !== schedulePlanningRequestId) {
+        return;
+      }
+      scheduleRecommendation = recommendation;
     } catch (error) {
+      if (requestId !== schedulePlanningRequestId) {
+        return;
+      }
       logger.warn('[AddReadingTargetModal] 推荐排期失败', error);
       scheduleRecommendation = null;
     } finally {
-      schedulePlanningLoading = false;
+      if (requestId === schedulePlanningRequestId) {
+        schedulePlanningLoading = false;
+      }
     }
   }
 
@@ -361,7 +523,8 @@
         scheduleDate: effectiveScheduleDate,
         createNote,
         appendSourceBacklink,
-        noteFolderPath: plugin.getIncrementalReadingSettings().selectionQuickCreateLastFolder
+        noteFolderPath: plugin.getIncrementalReadingSettings().selectionQuickCreateLastFolder,
+        parentPointId: selectedParentPointId
       });
 
       plugin.settings.incrementalReading = {
@@ -371,35 +534,127 @@
       };
       await plugin.saveSettings();
 
-      const count = result.createdIds.length;
-      new Notice(t('irAddTarget.notices.added', { count, deckName: result.deckName }), 3500);
-      onAdded?.();
+      if (result.outcome === 'updated') {
+        new Notice(
+          t('irAddTarget.notices.updated', { deckName: result.deckName }),
+          3500
+        );
+      } else if (result.outcome !== 'existing') {
+        const count = result.createdIds.length;
+        new Notice(
+          t('irAddTarget.notices.added', { count, deckName: result.deckName }),
+          3500
+        );
+      }
+      onAdded?.({
+        pinDateKey: result.pinDateKey,
+        createdIds: result.createdIds,
+        deckName: result.deckName
+      });
       onClose();
     } catch (error) {
       logger.error('[AddReadingTargetModal] 添加失败', error);
-      const message =
-        error instanceof Error && error.message === 'reading-target-epub-unresolved'
-          ? t('irAddTarget.notices.epubUnresolved')
-          : error instanceof Error && error.message === 'reading-target-epub-missing-cfi'
-            ? t('irAddTarget.notices.epubMissingCfi')
-            : t('irAddTarget.notices.addFailed');
-      new Notice(message, 3500);
+      const code = error instanceof Error ? error.message : '';
+      const noticeKey = READING_TARGET_ERROR_NOTICE_KEYS[code];
+      new Notice(noticeKey ? t(noticeKey) : t('irAddTarget.notices.addFailed'), 3500);
     } finally {
       submitting = false;
     }
   }
 
   onMount(() => {
+    const refreshCurrentLocationAffordances = () => {
+      currentLocationTick += 1;
+    };
+    const leafRef = plugin.app.workspace.on(
+      'active-leaf-change',
+      refreshCurrentLocationAffordances
+    );
+    const fileRef = plugin.app.workspace.on(
+      'file-open',
+      refreshCurrentLocationAffordances
+    );
+
     void (async () => {
       await loadDecks();
       await refreshParsedTarget({ allowTitleOverride: true, skipScheduleQueue: true });
       await refreshSchedulePlanning();
     })();
+
+    return () => {
+      plugin.app.workspace.offref(leafRef);
+      plugin.app.workspace.offref(fileRef);
+    };
   });
 </script>
 
+<button
+  class="clickable-icon weave-toolbar-tab deck-selector-btn"
+  type="button"
+  title={t('irAddTarget.deck.selectTopic')}
+  aria-label={t('irAddTarget.deck.selectTopic')}
+  use:portalToTarget={headerActionsEl}
+  onclick={(event) => {
+    event.preventDefault();
+    showDeckMenu(event);
+  }}
+  onkeydown={(event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      showDeckMenu(event);
+    }
+  }}
+>
+  <span class="deck-name">{getDeckButtonLabel()}</span>
+  <ObsidianIcon name="chevron-down" size={12} />
+</button>
+
 <div class="add-reading-target-modal">
   <div class="add-reading-target-body">
+  <div class="add-reading-target-panel">
+    <label class="field-row">
+      <span class="panel-title">{t('irAddTarget.panels.readingPointName')}</span>
+      <input class="title-input" type="text" bind:value={title} oninput={handleTitleInputChange} placeholder={t('irAddTarget.placeholders.titleInput')} />
+    </label>
+  </div>
+
+  <div class="add-reading-target-panel">
+    <span class="panel-title">{t('irAddTarget.panels.parentReadingPoint')}</span>
+    <p class="field-hint">{t('irAddTarget.hints.parentIntro')}</p>
+    <div class="parent-picker-row">
+      <button
+        class="clickable-icon weave-toolbar-tab parent-picker-btn"
+        type="button"
+        title={selectedParentPointId ? t('irAddTarget.actions.changeParent') : t('irAddTarget.actions.pickParent')}
+        onclick={() => { void openParentPointPicker(); }}
+      >
+        <ObsidianIcon name="git-branch" size={14} />
+        <span>{selectedParentTitle || t('irAddTarget.placeholders.parentNone')}</span>
+      </button>
+      {#if selectedParentPointId}
+        <button
+          class="clickable-icon weave-toolbar-tab parent-change-btn"
+          type="button"
+          title={t('irAddTarget.actions.changeParent')}
+          aria-label={t('irAddTarget.actions.changeParent')}
+          onclick={() => { void openParentPointPicker(); }}
+        >
+          <ObsidianIcon name="replace" size={14} />
+          <span>{t('irAddTarget.actions.changeParent')}</span>
+        </button>
+        <button
+          class="clickable-icon parent-clear-btn"
+          type="button"
+          title={t('irAddTarget.actions.clearParent')}
+          aria-label={t('irAddTarget.actions.clearParent')}
+          onclick={clearSelectedParent}
+        >
+          <ObsidianIcon name="x" size={14} />
+        </button>
+      {/if}
+    </div>
+  </div>
+
   <div class="add-reading-target-panel">
     <div class="panel-heading">
       <span class="panel-title">{t('irAddTarget.panels.linkOrReference')}</span>
@@ -429,8 +684,6 @@
     {/if}
     {#if validationMessage && linkInputTouched}
       <p class="field-error">{validationMessage}</p>
-    {:else if !linkInput.trim()}
-      <p class="field-hint">{t('irAddTarget.hints.supportedFormats')}</p>
     {/if}
   </div>
 
@@ -442,25 +695,6 @@
       </div>
     </div>
   {/if}
-
-  <div class="add-reading-target-panel">
-    <label class="field-row">
-      <span class="panel-title">{t('irAddTarget.panels.readingPointName')}</span>
-      <input class="title-input" type="text" bind:value={title} oninput={handleTitleInputChange} placeholder={t('irAddTarget.placeholders.titleInput')} />
-    </label>
-    <p class="field-hint">
-      {titleDetected ? t('irAddTarget.hints.titleDetected') : t('irAddTarget.hints.titleConfirm')}
-    </p>
-  </div>
-
-  <div class="add-reading-target-panel">
-    <span class="panel-title">{t('irAddTarget.panels.topic')}</span>
-    <p class="field-hint panel-intro">{t('irAddTarget.hints.topicIntro')}</p>
-    <button class="picker-button deck-picker-button" type="button" onclick={(event) => showDeckMenu(event)}>
-      {getDeckButtonLabel()}
-      <ObsidianIcon name="chevron-down" size={14} />
-    </button>
-  </div>
 
   <div class="add-reading-target-panel schedule-panel">
     <div class="schedule-header">
@@ -495,7 +729,7 @@
       {#if scheduleMode === 'custom'}
         <div class="schedule-date-block">
           <button
-            class="schedule-chip schedule-chip-button"
+            class="clickable-icon weave-toolbar-tab schedule-date-btn"
             type="button"
             title={t('irAddTarget.schedule.pickDateTitle')}
             onclick={openScheduleDatePicker}
@@ -536,9 +770,9 @@
     </div>
   </div>
 
-  {#if parsedTarget && (parsedTarget.kind !== 'web' && parsedTarget.kind !== 'epub' || parsedTarget.sourceFilePath)}
+  {#if parsedTarget && (canOfferCreateNote || parsedTarget.sourceFilePath)}
     <div class="add-reading-target-panel options-panel">
-      {#if parsedTarget.kind !== 'web' && parsedTarget.kind !== 'epub'}
+      {#if canOfferCreateNote}
         <label class="option-row">
           <input type="checkbox" bind:checked={createNote} />
           <span>{t('irAddTarget.options.createNote')}</span>
@@ -616,13 +850,50 @@
     color: var(--text-normal);
   }
 
-  .panel-intro {
-    margin: 0;
-  }
-
   .panel-actions {
     display: inline-flex;
     gap: 6px;
+  }
+
+  /* 顶栏专题选择器：与 Weave CreateCardModal headerActions 同构 */
+  .deck-selector-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    max-width: min(36vw, 200px);
+    min-width: 0;
+    padding: 0.35rem 0.65rem;
+    border: none;
+    box-shadow: none;
+    border-radius: var(--clickable-icon-radius, var(--radius-s));
+    background: transparent;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .deck-selector-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .deck-selector-btn:active {
+    background: var(--background-modifier-active-hover);
+  }
+
+  .deck-selector-btn .deck-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .deck-selector-btn :global(svg) {
+    flex-shrink: 0;
   }
 
   .panel-action-btn {
@@ -676,6 +947,43 @@
     overflow-wrap: anywhere;
   }
 
+  .parent-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .parent-picker-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    padding: 4px 8px;
+    border-radius: var(--radius-s);
+  }
+
+  .parent-picker-btn span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parent-change-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    height: auto;
+    padding: 4px 8px;
+  }
+
+  .parent-clear-btn {
+    flex-shrink: 0;
+  }
+
   .field-error {
     color: var(--text-error);
   }
@@ -688,8 +996,7 @@
   }
 
   .target-kind,
-  .target-count,
-  .schedule-chip {
+  .target-count {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -785,16 +1092,47 @@
     align-items: flex-start;
   }
 
-  .schedule-chip-button {
+  /* 扁平功能键：无边框、无凸起，对齐 Obsidian clickable-icon */
+  .add-reading-target-modal button.schedule-date-btn {
+    appearance: none;
     align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    box-sizing: border-box;
+    min-height: var(--clickable-icon-size, 28px);
+    padding: 0.35rem 0.65rem;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    border-radius: var(--clickable-icon-radius, var(--radius-s));
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-interface);
+    font-size: var(--font-ui-small);
+    font-weight: 500;
     cursor: pointer;
-    border: 1px solid var(--background-modifier-border);
-    background: color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 
-  .schedule-chip-button:hover {
-    color: var(--text-normal);
+  .add-reading-target-modal button.schedule-date-btn:hover {
+    border: none;
+    box-shadow: none;
     background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .add-reading-target-modal button.schedule-date-btn:active {
+    border: none;
+    box-shadow: none;
+    background: var(--background-modifier-active-hover);
+    color: var(--text-normal);
+  }
+
+  .add-reading-target-modal button.schedule-date-btn:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
   }
 
   .schedule-date-input {
@@ -816,30 +1154,6 @@
   .custom-day-load-hint,
   .schedule-fallback-hint {
     margin: 0;
-  }
-
-  .picker-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: 6px 10px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-s);
-    background: var(--background-secondary);
-    color: var(--text-normal);
-    cursor: pointer;
-  }
-
-  .deck-picker-button {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .deck-picker-button :global(svg) {
-    flex-shrink: 0;
   }
 
   .options-panel {

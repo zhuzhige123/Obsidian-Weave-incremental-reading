@@ -1,5 +1,6 @@
 import type { App, TFile } from "obsidian";
-import { normalizePath } from "obsidian";
+import { getAllTags, normalizePath } from "obsidian";
+import { getPluginDirById } from "../../config/paths";
 import type {
 	IncrementalReadingFolderSubscriptionRule,
 	IncrementalReadingFolderSubscriptionSettings,
@@ -18,7 +19,10 @@ import {
 	evaluateFolderSubscriptionSyncState,
 	isFolderSubscriptionPendingNewEntry,
 } from "./folder-subscription-sync-state";
-import { collectMarkdownFilesForFolderSubscriptionRules } from "./folder-subscription-vault-scan";
+import {
+	collectMarkdownFilesForFolderSubscriptionRules,
+	isFolderSubscriptionMarkdownExtension,
+} from "./folder-subscription-vault-scan";
 import { IR_RUNTIME } from "./ir-runtime";
 
 export type {
@@ -95,7 +99,7 @@ async function readWeaveType(app: App, file: TFile): Promise<string> {
 		}
 	} catch { /* ignored */ }
 
-	if (file.extension !== "md") {
+	if (!isFolderSubscriptionMarkdownExtension(file.extension)) {
 		return "";
 	}
 
@@ -108,12 +112,13 @@ async function readWeaveType(app: App, file: TFile): Promise<string> {
 	}
 }
 
-/** 跳过插件内部 IR 系统文件；普通剪藏 md 即使带有 weave-reading-id 仍应参与订阅补齐。 */
+/** 跳过非 Markdown 与插件内部 IR 系统文件；普通剪藏 md 即使带有 weave-reading-id 仍应参与订阅补齐。 */
 async function shouldSkipFolderSubscriptionFile(
 	app: App,
 	file: TFile,
 ): Promise<boolean> {
-	if (file.extension === "irdeck") {
+	// 防御层：扫描侧已过滤，这里再拦一次避免未来入口漏放图片等附件。
+	if (!isFolderSubscriptionMarkdownExtension(file.extension)) {
 		return true;
 	}
 
@@ -125,10 +130,8 @@ async function shouldSkipFolderSubscriptionFile(
 		return true;
 	}
 
-	const pluginConfigPath = normalizePath(
-		`${app.vault.configDir}/plugins/${IR_RUNTIME.pluginId}/`,
-	);
-	if (normalizePath(file.path).startsWith(pluginConfigPath)) {
+	const pluginConfigPath = `${getPluginDirById(app, IR_RUNTIME.pluginId)}/`;
+	if (normalizePath(file.path).startsWith(normalizePath(pluginConfigPath))) {
 		return true;
 	}
 
@@ -151,10 +154,17 @@ async function hasFolderSubscriptionExcludedTag(
 	app: App,
 	file: TFile,
 ): Promise<boolean> {
-	if (file.extension !== "md") {
+	if (!isFolderSubscriptionMarkdownExtension(file.extension)) {
 		return false;
 	}
 	try {
+		const cache = app.metadataCache?.getFileCache?.(file);
+		if (cache) {
+			// Prefer Obsidian metadataCache；空数组表示「无标签」，不是 cache miss。
+			const cachedTags = getAllTags(cache) || [];
+			return cachedTags.some((tag) => isFolderSubscriptionDeletedTag(tag));
+		}
+		// metadataCache 尚未就绪时回退读盘（仅 md，且仅订阅扫描路径）。
 		const content = await app.vault.read(file);
 		return extractAllTags(content).some((tag) =>
 			isFolderSubscriptionDeletedTag(tag),
@@ -403,6 +413,9 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 
 	for (const candidate of candidates) {
 		if (!candidate.needsSync) {
+			continue;
+		}
+		if (!isFolderSubscriptionMarkdownExtension(candidate.file.extension)) {
 			continue;
 		}
 

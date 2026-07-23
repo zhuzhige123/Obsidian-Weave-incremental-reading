@@ -1,4 +1,4 @@
-import type { SupportedLanguage, TranslationKey } from "../types";
+import type { AuthoringLanguage, TranslationKey } from "../types";
 
 const zhIrSidebar = {
 	associatedNote: {
@@ -26,6 +26,14 @@ const zhIrSidebar = {
 		primary: "主笔记",
 		removeLinkedNote: "移除关联笔记",
 		clearLinkedNotes: "清空关联笔记",
+		openSourceNote: "打开来源笔记",
+		relatedNotes: "相关笔记（出链）",
+		noOutlinks: "来源笔记尚无出链",
+		openWebPage: "在浏览器打开网页",
+		carrierMissingHint: "缺少摘录笔记载体（可能已删除）",
+		createCarrierNote: "创建摘录笔记",
+		carrierCreated: "已创建摘录笔记：{name}",
+		carrierCreateFailed: "创建摘录笔记失败",
 	},
 	header: {
 		analyticsAriaLabel: "统计",
@@ -57,6 +65,7 @@ const zhIrSidebar = {
 		expandSiblings: "展开同源内容",
 		loading: "加载中...",
 		newBadge: "新",
+		missingSourceIndicator: "源文件未找到",
 		readingPointType: {
 			canvas: "Canvas",
 			epub: "EPUB",
@@ -72,6 +81,12 @@ const zhIrSidebar = {
 		resumeTimer: "继续计时（已记录 {duration}）",
 		schedule: "安排",
 		siblingNone: "没有其他同源书签",
+		parentProgress: "{percent}%",
+		parentProgressTitle: "子阅读点完成度 {completed}/{total}（{percent}%）",
+		parentOf: "父：{title}",
+		parentMissing: "父阅读点已失效",
+		changeParent: "更换父阅读点",
+		changeParentTitle: "更换父阅读点（当前：{title}）",
 		startReadingTimer: "开始阅读计时",
 		startTimer: "开始计时",
 		timerHoursShort: "时",
@@ -97,7 +112,7 @@ const zhIrSidebar = {
 	loadingCalendar: "正在加载增量阅读日历...",
 	preparingDayList: "正在准备今日阅读列表…",
 	loadStage: {
-		heatmap: "正在加载月历热力图…",
+		heatmap: "正在恢复月历缓存…",
 		tier0_cache: "正在读取本地缓存…",
 		index_shell: "正在恢复日索引…",
 		workspace_query: "正在加载阅读数据…",
@@ -129,17 +144,28 @@ const zhIrSidebar = {
 		remove: "移除",
 		renameReadingPoint: "重命名",
 		selectReadingPointTopic: "选择所属专题",
+		selectParentReadingPoint: "选择父阅读点",
+		changeParentReadingPoint: "更换父阅读点",
+		currentParentReadingPoint: "当前父阅读点",
 		setNextReviewTime: "设置下次复习时间",
 		setPriority: "设置优先级",
 		pullBackToToday: "拉回今天",
 		setTagGroup: "设置标签组",
 		showRealtimePreview: "显示实时预览",
 		showReadingPointTypeLabels: "显示阅读点类型",
+		showMissingSourceIndicators: "显示源文件缺失提示",
+		hideTodayCompletedReadingPoints: "隐藏今日已完成阅读点",
+		cleanupMissingSources: "清理无法找到源文件的阅读点",
 		suspend: "暂停",
 		view: "查看",
 	},
 	batch: {
 		clearSelection: "清除选择",
+		confirmCleanupMissingSources:
+			"将移除 {count} 个无法找到源文件的阅读点。\n仅清理增量阅读调度数据，不会删除库中其它文件。\n此操作不可撤销，确定继续？",
+		cleanupMissingSourcesTitle: "清理缺失源文件的阅读点",
+		cleanupMissingSourcesNone: "未发现无法找到源文件的阅读点",
+		cleanupMissingSourcesScanning: "正在检查源文件…",
 		confirmDelete:
 			"确定删除 {count} 个阅读点？\n删除会同时清理拆分 chunk 文件（如有），不会删除原始源文档。",
 		confirmRemove:
@@ -213,6 +239,7 @@ const zhIrSidebar = {
 		scanTopics: "扫描阅读专题",
 		searchMaterials: "搜索增量阅读材料",
 		moreActions: "更多月历功能",
+		openTutorial: "打开增量阅读教程",
 		openContinueReading: "打开继续阅读建议",
 		suggestionsShort: "建议",
 		performanceGuardTitle:
@@ -247,6 +274,10 @@ const zhIrSidebar = {
 			"如果源文档已经不存在，可继续移除该阅读点并清理相关增量阅读调度数据。",
 		upcoming: "后续安排",
 		suspended: "已搁置",
+		viewModeMenu: "月历视图",
+		viewModeOneRow: "单行月历视图",
+		viewModeTwoRow: "双行月历视图",
+		viewModeFullMonth: "完整月历视图",
 		switchFullMonth: "切换为完整月历视图",
 		switchTwoRowMonth: "切换为双行月历视图",
 		scanConflictSuffix: "；{count} 个专题存在多份 .irdeck（同专题 ID）",
@@ -347,6 +378,14 @@ const enIrSidebar = {
 		primary: "Primary",
 		removeLinkedNote: "Remove linked note",
 		clearLinkedNotes: "Clear linked notes",
+		openSourceNote: "Open source note",
+		relatedNotes: "Related notes (outlinks)",
+		noOutlinks: "Source note has no outbound links yet",
+		openWebPage: "Open web page in browser",
+		carrierMissingHint: "Excerpt note carrier is missing (it may have been deleted)",
+		createCarrierNote: "Create excerpt note",
+		carrierCreated: "Created excerpt note: {name}",
+		carrierCreateFailed: "Failed to create excerpt note",
 	},
 	header: {
 		analyticsAriaLabel: "Analytics",
@@ -380,6 +419,7 @@ const enIrSidebar = {
 		expandSiblings: "Expand source items",
 		loading: "Loading...",
 		newBadge: "New",
+		missingSourceIndicator: "Source file not found",
 		readingPointType: {
 			canvas: "Canvas",
 			epub: "EPUB",
@@ -395,6 +435,12 @@ const enIrSidebar = {
 		resumeTimer: "Resume timer (recorded {duration})",
 		schedule: "Schedule",
 		siblingNone: "No other same-source bookmarks",
+		parentProgress: "{percent}%",
+		parentProgressTitle: "Child progress {completed}/{total} ({percent}%)",
+		parentOf: "Parent: {title}",
+		parentMissing: "Parent reading point missing",
+		changeParent: "Change parent",
+		changeParentTitle: "Change parent (current: {title})",
 		startReadingTimer: "Start reading timer",
 		startTimer: "Start timer",
 		timerHoursShort: "h",
@@ -420,7 +466,7 @@ const enIrSidebar = {
 	loadingCalendar: "Loading incremental-reading calendar...",
 	preparingDayList: "Preparing today's reading list…",
 	loadStage: {
-		heatmap: "Loading calendar heatmap…",
+		heatmap: "Restoring calendar cache…",
 		tier0_cache: "Reading local cache…",
 		index_shell: "Restoring day index…",
 		workspace_query: "Loading reading data…",
@@ -454,17 +500,28 @@ const enIrSidebar = {
 		remove: "Remove",
 		renameReadingPoint: "Rename",
 		selectReadingPointTopic: "Select topic",
+		selectParentReadingPoint: "Select parent reading point",
+		changeParentReadingPoint: "Change parent reading point",
+		currentParentReadingPoint: "Current parent",
 		setNextReviewTime: "Set next review time",
 		setPriority: "Set priority",
 		pullBackToToday: "Pull back to today",
 		setTagGroup: "Set tag group",
 		showRealtimePreview: "Show realtime preview",
 		showReadingPointTypeLabels: "Show reading point type",
+		showMissingSourceIndicators: "Show missing source indicators",
+		hideTodayCompletedReadingPoints: "Hide today's completed reading points",
+		cleanupMissingSources: "Clean up reading points with missing sources",
 		suspend: "Suspend",
 		view: "View",
 	},
 	batch: {
 		clearSelection: "Clear selection",
+		confirmCleanupMissingSources:
+			"Remove {count} reading points whose source files cannot be found.\nThis only clears incremental-reading schedule data and does not delete other vault files.\nThis cannot be undone. Continue?",
+		cleanupMissingSourcesTitle: "Clean up missing-source reading points",
+		cleanupMissingSourcesNone: "No reading points with missing source files were found",
+		cleanupMissingSourcesScanning: "Checking source files…",
 		confirmDelete:
 			"Delete {count} reading points?\nThis also removes split chunk files when present, but not the original source documents.",
 		confirmRemove:
@@ -540,6 +597,7 @@ const enIrSidebar = {
 		scanTopics: "Scan reading topics",
 		searchMaterials: "Search incremental reading materials",
 		moreActions: "More calendar actions",
+		openTutorial: "Open incremental reading tutorial",
 		openContinueReading: "Open continue reading suggestions",
 		suggestionsShort: "More",
 		performanceGuardTitle:
@@ -576,6 +634,10 @@ const enIrSidebar = {
 			"If the source file no longer exists, remove this reading point and clean up its incremental reading scheduling data.",
 		upcoming: "Upcoming",
 		suspended: "Suspended",
+		viewModeMenu: "Calendar view",
+		viewModeOneRow: "Single-row calendar view",
+		viewModeTwoRow: "Two-row calendar view",
+		viewModeFullMonth: "Full month calendar view",
 		switchFullMonth: "Switch to full month view",
 		switchTwoRowMonth: "Switch to two-row month view",
 		scanConflictSuffix:
@@ -688,7 +750,10 @@ const enEpubExport = {
 const zhIrParagraphWorkbench = {
 	title: "增量阅读段落工作台",
 	empty: "暂无可显示的段落内容",
-	selectIrTopic: "选择 IR 专题",
+	selectIrTopic: "选择所属专题",
+	selectDocumentTopicHint: "为当前文档选择所属增量阅读专题",
+	addCurrentBlock: "添加到增量阅读",
+	addCurrentBlockHint: "将当前内容块写入块 ID，并以 Obsidian 块引用加入专题",
 	prevSegment: "上一则",
 	nextSegment: "下一则",
 	pushNextParagraph: "推进下一段",
@@ -706,7 +771,7 @@ const zhIrParagraphWorkbench = {
 	archiveNotice: "已归档当前阅读点",
 	prioritySaved: "优先级已更新",
 	scheduleSaved: "调度已更新",
-	addToTopicFailed: "添加到专题失败，请重试",
+	addToTopicFailed: "添加到增量阅读失败，请重试",
 	excerptRequiresSelection: "请先选中要摘录的文本",
 	excerptCreatedAndOpened: "摘录已创建，并已打开摘录笔记",
 	viewModeEdit: "编辑",
@@ -739,12 +804,21 @@ const zhIrParagraphWorkbench = {
 	scheduleTimeMorning: "上午",
 	scheduleIntervalLabel: "间隔",
 	scheduleIntervalDays: "{days} 天",
+	experimentalBadge: "实验设计",
+	experimentalBannerTitle: "实验设计 · 暂不可正常使用",
+	experimentalBannerBody:
+		"段落阅读工作台仍在试验阶段，流程与数据行为可能变化；请继续使用月历侧边栏作为日常阅读路径。",
 };
 
 const enIrParagraphWorkbench = {
 	title: "Incremental reading paragraph workbench",
 	empty: "No paragraph content to display",
-	selectIrTopic: "Select IR topic",
+	selectIrTopic: "Select document topic",
+	selectDocumentTopicHint:
+		"Choose the incremental reading topic this document belongs to",
+	addCurrentBlock: "Add to incremental reading",
+	addCurrentBlockHint:
+		"Write a block ID on the current paragraph and add it via an Obsidian block embed",
 	prevSegment: "Previous",
 	nextSegment: "Next",
 	pushNextParagraph: "Next paragraph",
@@ -762,7 +836,7 @@ const enIrParagraphWorkbench = {
 	archiveNotice: "Current reading point archived",
 	prioritySaved: "Priority updated",
 	scheduleSaved: "Schedule updated",
-	addToTopicFailed: "Failed to add to topic",
+	addToTopicFailed: "Failed to add to incremental reading",
 	excerptRequiresSelection: "Select text to excerpt first",
 	excerptCreatedAndOpened: "Excerpt created and opened",
 	viewModeEdit: "Edit",
@@ -795,10 +869,14 @@ const enIrParagraphWorkbench = {
 	scheduleTimeMorning: "Morning",
 	scheduleIntervalLabel: "Interval",
 	scheduleIntervalDays: "{days}d",
+	experimentalBadge: "Experimental",
+	experimentalBannerTitle: "Experimental · not ready for normal use",
+	experimentalBannerBody:
+		"The paragraph reading workbench is still experimental. Flows and data behavior may change; keep using the calendar sidebar for daily reading.",
 };
 
 export const incrementalReadingTranslations: Record<
-	SupportedLanguage,
+	AuthoringLanguage,
 	TranslationKey
 > = {
 	"zh-CN": {},
@@ -806,7 +884,7 @@ export const incrementalReadingTranslations: Record<
 };
 
 export const incrementalReadingTranslationOverrides: Record<
-	SupportedLanguage,
+	AuthoringLanguage,
 	TranslationKey
 > = {
 	"zh-CN": {
@@ -821,13 +899,18 @@ export const incrementalReadingTranslationOverrides: Record<
 			colTags: "标签",
 			createBtn: "新建标签组",
 			created: "标签组“{name}”已创建",
-			defaultGroupHint: "未命中任何标签组的内容会继续使用默认分组参数。",
+			defaultBadge: "默认",
+			defaultGroupName: "默认（通用算法）",
+			defaultGroupHint:
+				"未命中任何自定义标签组的阅读点，会使用默认组的通用调度参数。",
+			defaultTagsLabel: "无标签 · 通用",
 			deleteConfirm: "确定删除标签组“{name}”吗？",
 			deleteFailed: "删除标签组失败",
 			deleted: "标签组“{name}”已删除",
 			loadFailed: "加载标签组失败：",
 			loading: "正在加载标签组...",
-			managerDesc: "为不同标签内容设置独立的调度偏好与学习参数。",
+			managerDesc:
+				"默认组提供通用调度基线；自定义标签组按阅读点标签自动匹配并覆盖参数。参数会自动同步到全部专题。",
 			managerTitle: "标签组管理",
 			nameRequired: "请输入标签组名称",
 			retryBtn: "重试",
@@ -842,42 +925,39 @@ export const incrementalReadingTranslationOverrides: Record<
 			moreActions: "更多操作",
 			editor: {
 				algorithmNoteContent:
-					"系统会综合匹配标签来源与优先级来判断归属；当同一篇笔记命中多个分组时，会优先采用优先级更高的分组。",
+					"标签组根据阅读点上的标签自动匹配；命中任一匹配标签即归入该组。同一阅读点命中多组时，优先级更高的分组优先生效。未命中任何自定义组时使用默认组。Markdown 标签来源在高级调度的「标签同步」中配置。",
 				algorithmNoteTitle: "匹配规则说明",
 				cancelBtn: "取消",
 				createBtn: "创建",
 				createTitle: "新建标签组",
 				editTitle: "编辑标签组",
-				customYaml: "自定义 YAML 属性",
-				customYamlTags: "YAML tags 属性",
-				inlineTags: "正文内联标签",
-				matchSourceHint: "选择从哪些位置提取标签参与匹配。",
-				matchSourceLabel: "匹配来源",
+				editDefaultTitle: "编辑默认标签组",
+				defaultNameHint: "仅用于显示；默认组不参与标签匹配，始终作为兜底算法。",
+				defaultRoleLabel: "角色",
+				defaultRoleHint:
+					"这是插件增量阅读的通用算法参数。无匹配标签的阅读点都会使用本组。",
 				nameHint: "仅用于管理和识别，不会直接写回笔记内容。",
 				nameLabel: "标签组名称",
 				namePlaceholder: "例如：论文、技术文档、小说...",
 				priorityHint: "多个标签组同时命中时，优先级更高的分组会优先生效。",
 				priorityLabel: "匹配优先级",
 				saveBtn: "保存",
-				scopeRequired: "请至少选择一个要写回的增量阅读专题文件",
 				tagsHint: "命中任一标签即可归入该组，支持从现有标签中快速选择。",
 				tagsLabel: "匹配标签",
 				tagsPlaceholder: "输入标签后按回车添加",
-				customPropertyPlaceholder: "输入属性名后按回车（如：关键词）",
 				schedulingTitle: "调度参数",
 				schedulingHint:
-					"这里的参数会作为标签组正式参数，写回选中的 `.irdeck` 专题文件。",
+					"这些参数会作为标签组正式参数，自动同步到全部增量阅读专题 `.irdeck` 文件。",
 				intervalFactorBase: "间隔因子基线",
 				coldStartMultiplier: "冷启动乘子",
 				loadHalfLifeDays: "负载半衰期(天)",
 				optionalPlaceholder: "可选",
-				scopeTitle: "写回范围",
-				scopeHint:
-					"设置界面负责统一管理，但真源仍然在对应的增量阅读专题 `.irdeck` 文件里。",
-				scopeEmpty: "当前还没有可写入的 `.irdeck` 专题文件。",
-				scopeSelectAll: "全选",
-				scopeClear: "清空",
-				scopeCount: "已选 {selected} / {total}",
+				matchedTopicsTitle: "自动匹配专题",
+				matchedTopicsHint:
+					"标签组全局生效，保存时自动写入全部专题。下列为各专题中当前命中该组的阅读点数量（只读）。",
+				matchedTopicsEmpty: "当前还没有可显示的专题文件。",
+				matchedTopicsSummary: "共 {topics} 个专题，命中 {points} 个阅读点",
+				matchedTopicCount: "{count} 个阅读点",
 			},
 			stats: {
 				closeBtn: "关闭",
@@ -996,6 +1076,14 @@ export const incrementalReadingTranslationOverrides: Record<
 			reviewThresholdDesc: "内容进入聚焦复习前的参考阈值。",
 			reviewThresholdLabel: "复习阈值",
 			scheduleTitle: "核心调度",
+			readingTargetTitle: "添加阅读目标",
+			readingTargetInboxLabel: "默认收件箱专题",
+			readingTargetInboxDesc:
+				"打开「添加阅读目标」时优先选中的专题；留空则使用上次选择或当前筛选专题。",
+			readingTargetInboxEmpty: "不指定（使用上次 / 当前专题）",
+			readingTargetDefaultNoteBackedLabel: "Vault 链接默认创建阅读笔记",
+			readingTargetDefaultNoteBackedDesc:
+				"添加笔记/标题/块引用时默认勾选「创建阅读笔记」（另建包装笔记）。关闭时仍会创建可调度的阅读点，只是不新建笔记。网页链接始终会创建笔记。",
 			strategyDesc: "选择增量阅读内容的排序方式。",
 			strategyHintProcessing: "处理流模式会优先推进你正在处理的内容。",
 			strategyHintReadingList:
@@ -1010,6 +1098,15 @@ export const incrementalReadingTranslationOverrides: Record<
 			tagGroupFollowLabel: "跟随标签组设置",
 			tagGroupPriorDesc: "允许不同标签组使用独立调度偏好，并按优先级解决冲突。",
 			tagGroupPriorLabel: "启用标签组优先级",
+			tagSourceTitle: "标签同步",
+			tagSourceMarkdownYamlKeyLabel: "Markdown 标签 YAML 属性",
+			tagSourceMarkdownYamlKeyDesc:
+				"Markdown 阅读点从该 frontmatter 属性读写标签，并双向同步到阅读点。默认 weave_tags（兼容现有数据）；若希望与图谱/搜索共用，可改为 Obsidian 原生 tags。切换到 tags 时请确认笔记不会把无关图谱标签当作 IR 调度标签。PDF / EPUB / 网页等类型始终使用阅读点自身的标签。",
+			tagSourceMarkdownYamlKeyPlaceholder: "例如 tags 或 weave_tags",
+			tagSourcePresetTags: "tags",
+			tagSourcePresetWeaveTags: "weave_tags",
+			tagSourceSwitchToTagsWarning:
+				"已切换为 Obsidian tags。若笔记同时有 weave_tags，IR 会优先读取 tags；请确认不会把无关图谱标签用于调度。",
 			timeBudgetDesc: "估算你每天愿意投入在增量阅读上的时间。",
 			timeBudgetLabel: "每日时间预算",
 			flowStretchLabel: "心流 stretch",
@@ -1113,7 +1210,7 @@ export const incrementalReadingTranslationOverrides: Record<
 					"associated-notes": {
 						title: "关联笔记",
 						description:
-							"为阅读点关联（或创建）Markdown 笔记，便于持续回跳与统计。",
+							"PDF/EPUB 精选关联笔记；Markdown/网页用来源笔记出链做相关笔记统计与打开。",
 					},
 				},
 			},
@@ -1136,15 +1233,18 @@ export const incrementalReadingTranslationOverrides: Record<
 			colTags: "Tags",
 			createBtn: "Create tag group",
 			created: 'Tag group "{name}" created',
+			defaultBadge: "Default",
+			defaultGroupName: "Default (general algorithm)",
 			defaultGroupHint:
-				"Content that matches no tag group continues to use the default group profile.",
+				"Reading points that match no custom tag group use the default group's general scheduling parameters.",
+			defaultTagsLabel: "No tags · general",
 			deleteConfirm: 'Delete tag group "{name}"?',
 			deleteFailed: "Failed to delete tag group",
 			deleted: 'Tag group "{name}" deleted',
 			loadFailed: "Failed to load tag groups: ",
 			loading: "Loading tag groups...",
 			managerDesc:
-				"Set independent scheduling preferences and learning parameters for different tagged content.",
+				"The default group is the general scheduling baseline. Custom tag groups auto-match reading-point tags and override parameters. Changes sync to every topic automatically.",
 			managerTitle: "Tag group manager",
 			nameRequired: "Please enter a tag group name",
 			retryBtn: "Retry",
@@ -1159,18 +1259,18 @@ export const incrementalReadingTranslationOverrides: Record<
 			moreActions: "More actions",
 			editor: {
 				algorithmNoteContent:
-					"The system combines match sources and priority to determine ownership. When one note matches multiple groups, the higher-priority group wins.",
+					"Tag groups auto-match reading-point tags. Matching any configured tag assigns the point to the group. When multiple groups match, the higher-priority group wins. Unmatched points use the default group. Configure Markdown tag sync under Advanced scheduling → Tag sync.",
 				algorithmNoteTitle: "Matching rule note",
 				cancelBtn: "Cancel",
 				createBtn: "Create",
 				createTitle: "Create tag group",
 				editTitle: "Edit tag group",
-				customYaml: "Custom YAML properties",
-				customYamlTags: "YAML tags property",
-				inlineTags: "Inline tags",
-				matchSourceHint:
-					"Choose which locations should provide tags for matching.",
-				matchSourceLabel: "Match sources",
+				editDefaultTitle: "Edit default tag group",
+				defaultNameHint:
+					"Display only. The default group does not match tags; it is always the fallback algorithm.",
+				defaultRoleLabel: "Role",
+				defaultRoleHint:
+					"This is the plugin's general incremental-reading algorithm. Reading points with no matching tags use this group.",
 				nameHint:
 					"Used only for management and identification. It will not be written back into note content.",
 				nameLabel: "Tag group name",
@@ -1179,28 +1279,23 @@ export const incrementalReadingTranslationOverrides: Record<
 					"When multiple groups match, the higher-priority group takes effect first.",
 				priorityLabel: "Match priority",
 				saveBtn: "Save",
-				scopeRequired:
-					"Please select at least one incremental-reading topic file to write back to",
 				tagsHint:
 					"Matching any one tag is enough to enter this group. Existing tags can be selected quickly.",
 				tagsLabel: "Matching tags",
 				tagsPlaceholder: "Type a tag and press Enter to add it",
-				customPropertyPlaceholder:
-					"Type a property name and press Enter (for example: keywords)",
 				schedulingTitle: "Scheduling parameters",
 				schedulingHint:
-					"These parameters will be written back to the selected `.irdeck` topic files as the formal tag-group profile.",
+					"These parameters are the formal tag-group profile and sync automatically to every incremental-reading `.irdeck` topic file.",
 				intervalFactorBase: "Interval factor baseline",
 				coldStartMultiplier: "Cold-start multiplier",
 				loadHalfLifeDays: "Load half-life (days)",
 				optionalPlaceholder: "Optional",
-				scopeTitle: "Write-back scope",
-				scopeHint:
-					"This settings panel manages them centrally, but the source of truth remains in the corresponding incremental-reading `.irdeck` topic files.",
-				scopeEmpty: "There are currently no writable `.irdeck` topic files.",
-				scopeSelectAll: "Select all",
-				scopeClear: "Clear",
-				scopeCount: "Selected {selected} / {total}",
+				matchedTopicsTitle: "Auto-matched topics",
+				matchedTopicsHint:
+					"Tag groups apply globally and sync to every topic on save. Below is a read-only count of reading points currently matched to this group in each topic.",
+				matchedTopicsEmpty: "There are currently no topic files to show.",
+				matchedTopicsSummary: "{topics} topics, {points} matched reading points",
+				matchedTopicCount: "{count} reading points",
 			},
 			stats: {
 				closeBtn: "Close",
@@ -1330,6 +1425,14 @@ export const incrementalReadingTranslationOverrides: Record<
 				"Reference threshold for when content should enter focused review.",
 			reviewThresholdLabel: "Review threshold",
 			scheduleTitle: "Core scheduling",
+			readingTargetTitle: "Add reading target",
+			readingTargetInboxLabel: "Default inbox topic",
+			readingTargetInboxDesc:
+				"Preferred topic when opening Add reading target. Leave empty to use the last choice or the current filter.",
+			readingTargetInboxEmpty: "None (use last / current topic)",
+			readingTargetDefaultNoteBackedLabel: "Create reading notes by default for vault links",
+			readingTargetDefaultNoteBackedDesc:
+				"Pre-check “Create reading note” (wrapper note) when adding notes/headings/block refs. When off, vault targets still create a schedulable reading point without a new note. Web links always create a note.",
 			strategyDesc: "Choose how incremental-reading content should be ordered.",
 			strategyHintProcessing:
 				"Processing-flow mode prioritizes finishing material you are actively working through.",
@@ -1349,6 +1452,15 @@ export const incrementalReadingTranslationOverrides: Record<
 			tagGroupPriorDesc:
 				"Allows different tag groups to use separate scheduling preferences and resolve conflicts by priority.",
 			tagGroupPriorLabel: "Enable tag-group priority",
+			tagSourceTitle: "Tag sync",
+			tagSourceMarkdownYamlKeyLabel: "Markdown tags YAML property",
+			tagSourceMarkdownYamlKeyDesc:
+				"Markdown reading points read and write tags from this frontmatter property, synced both ways with the reading point. Default is weave_tags for existing data; switch to Obsidian-native tags to share with graph/search. When switching to tags, make sure unrelated graph tags will not drive IR scheduling. PDF / EPUB / web links always use reading-point tags.",
+			tagSourceMarkdownYamlKeyPlaceholder: "e.g. tags or weave_tags",
+			tagSourcePresetTags: "tags",
+			tagSourcePresetWeaveTags: "weave_tags",
+			tagSourceSwitchToTagsWarning:
+				"Switched to Obsidian tags. If notes also have weave_tags, IR prefers tags — confirm unrelated graph tags will not drive scheduling.",
 			timeBudgetDesc:
 				"Estimate how much time you want to spend on incremental reading each day.",
 			timeBudgetLabel: "Daily time budget",
@@ -1459,7 +1571,7 @@ export const incrementalReadingTranslationOverrides: Record<
 					"associated-notes": {
 						title: "Associated notes",
 						description:
-							"Link or create Markdown notes for reading points to support return visits and stats.",
+							"Curated linked notes for PDF/EPUB; outbound-link related notes for Markdown/web carriers.",
 					},
 				},
 			},

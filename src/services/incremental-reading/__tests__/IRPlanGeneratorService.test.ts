@@ -32,18 +32,18 @@ vi.mock("../../../config/paths", () => ({
 	normalizeWeaveParentFolder: (path?: string) => String(path || "").trim(),
 	getV2Paths: () => ({
 		ir: {
-			root: "weave/incremental-reading",
-			epub: "weave/incremental-reading/epub-reading",
+			root: "weave Incremental reading",
+			epub: "weave Incremental reading/epub-reading",
 		},
 	}),
 	getV2PathsFromApp: () => ({
 		ir: {
-			root: "weave/incremental-reading",
-			epub: "weave/incremental-reading/epub-reading",
+			root: "weave Incremental reading",
+			epub: "weave Incremental reading/epub-reading",
 		},
 	}),
 	resolveIRImportFolder: (chunkRoot?: string) =>
-		String(chunkRoot || "weave/incremental-reading/chunks"),
+		String(chunkRoot || "weave Incremental reading/chunks"),
 	getPluginPaths: () => ({
 		cache: {
 			incrementalReading: {
@@ -54,7 +54,7 @@ vi.mock("../../../config/paths", () => ({
 	getPluginPathsById: () => ({
 		state: {
 			incrementalReading: {
-				epubReaderData: "weave/incremental-reading/epub-reader-data.json",
+				epubReaderData: "weave Incremental reading/epub-reader-data.json",
 			},
 		},
 	}),

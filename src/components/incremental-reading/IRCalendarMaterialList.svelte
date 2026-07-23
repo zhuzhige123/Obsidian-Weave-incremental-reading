@@ -1,5 +1,6 @@
 <script lang="ts">
   import ObsidianIcon from '../ui/ObsidianIcon.svelte';
+  import { getIRPriorityStyle } from '../../services/incremental-reading/IRPriorityDisplay';
   import type { IRCalendarMaterialListProps } from './ir-calendar-sidebar-types';
 
   let {
@@ -17,6 +18,8 @@
     getScheduleItemDeckName,
     getMaterialExpandButtonLabel,
     getReadingPointTypeIndicator,
+    isSourceMissing,
+    getParentProgressForMaterial,
     handleMaterialClick,
     openMaterial,
     toggleMaterialExpand,
@@ -69,11 +72,19 @@
       ? t('irSidebar.calendar.historyScheduleCompleted')
       : t('irSidebar.calendar.historySchedulePending');
   }
+
+  function formatParentProgressBadge(progress: {
+    percent: number;
+  }): string {
+    return t('irSidebar.controls.parentProgress', {
+      percent: progress.percent
+    });
+  }
 </script>
 
 {#each displayedMaterials as material, index}
   {@const priority = material.priority || 0}
-  {@const priorityClass = priority >= 8 ? 'high' : priority >= 4 ? 'medium' : 'low'}
+  {@const priorityClass = getIRPriorityStyle(priority).className}
   {@const isExpanded = expandedMaterialIds.has(material.id)}
   {@const isLoadingSibling = loadingSiblings.has(material.id)}
   {@const siblings = siblingCache.get(material.id) || []}
@@ -81,6 +92,7 @@
   {@const searchDeckLabel = hasActiveSearch ? getScheduleItemDeckName(material) : ''}
   {@const isBatchSelectedItem = isBatchSelected(material.id)}
   {@const typeIndicator = getReadingPointTypeIndicator(material)}
+  {@const parentProgress = getParentProgressForMaterial(material.id)}
   <div class="reading-item-wrapper">
     <div class="reading-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelectedItem} class:history-readonly={readOnlyHistoryMode}>
       {#if batchSelectionMode && !readOnlyHistoryMode}
@@ -126,9 +138,30 @@
               <span class="item-title" class:processed={processedChunkIds.has(material.id)}>
                 <span class="item-title-text">{material.displayName || material.title || t('irSidebar.controls.untitled')}</span>
               </span>
+              {#if parentProgress && parentProgress.totalChildren > 0}
+                <span
+                  class="item-parent-progress"
+                  title={t('irSidebar.controls.parentProgressTitle', {
+                    completed: parentProgress.completedChildren,
+                    total: parentProgress.totalChildren,
+                    percent: parentProgress.percent
+                  })}
+                >
+                  {formatParentProgressBadge(parentProgress)}
+                </span>
+              {/if}
               {#if typeIndicator}
                 <span class="reading-point-type-icon" title={typeIndicator.label} aria-label={typeIndicator.label}>
                   <ObsidianIcon name={typeIndicator.icon} size={12} />
+                </span>
+              {/if}
+              {#if isSourceMissing(material.id)}
+                <span
+                  class="reading-point-missing-source-icon"
+                  title={t('irSidebar.controls.missingSourceIndicator')}
+                  aria-label={t('irSidebar.controls.missingSourceIndicator')}
+                >
+                  <ObsidianIcon name="file-warning" size={12} />
                 </span>
               {/if}
               {#if isAutoSubscribedNew(material)}
@@ -218,7 +251,7 @@
       <div class="sibling-list">
         {#each siblings as sibling}
           {@const siblingPriority = sibling.priority || 0}
-          {@const siblingPriorityClass = siblingPriority >= 8 ? 'high' : siblingPriority >= 4 ? 'medium' : 'low'}
+          {@const siblingPriorityClass = getIRPriorityStyle(siblingPriority).className}
           {@const dueText = sibling.nextRepDate > 0 ? formatSiblingDueDate(sibling.nextRepDate) : t('irSidebar.controls.unscheduled')}
           {@const siblingTypeIndicator = getReadingPointTypeIndicator(sibling)}
           <div class="sibling-item" class:batch-selection-mode={batchSelectionMode} class:batch-selected={isBatchSelected(sibling.id)} class:history-readonly={readOnlyHistoryMode}>
@@ -251,6 +284,15 @@
                   {#if siblingTypeIndicator}
                     <span class="reading-point-type-icon" title={siblingTypeIndicator.label} aria-label={siblingTypeIndicator.label}>
                       <ObsidianIcon name={siblingTypeIndicator.icon} size={11} />
+                    </span>
+                  {/if}
+                  {#if isSourceMissing(sibling.id)}
+                    <span
+                      class="reading-point-missing-source-icon"
+                      title={t('irSidebar.controls.missingSourceIndicator')}
+                      aria-label={t('irSidebar.controls.missingSourceIndicator')}
+                    >
+                      <ObsidianIcon name="file-warning" size={11} />
                     </span>
                   {/if}
                   {#if isAutoSubscribedNew(sibling)}
@@ -440,13 +482,18 @@
     width: 100%;
   }
 
-  .reading-point-type-icon {
+  .item-parent-progress {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     flex-shrink: 0;
-    color: var(--text-faint);
-    opacity: 0.88;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1.4;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
   .item-search-meta {
@@ -696,6 +743,19 @@
     flex-shrink: 0;
   }
 
+  .reading-point-type-icon,
+  .reading-point-missing-source-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .reading-point-missing-source-icon {
+    color: var(--text-warning);
+  }
+
   .priority-badge {
     padding: 2px 6px;
     font-size: 10px;
@@ -704,19 +764,24 @@
     flex-shrink: 0;
   }
 
+  .priority-badge.urgent {
+    background: #FCE8EC;
+    color: #C6284A;
+  }
+
   .priority-badge.high {
-    background: rgba(var(--color-red-rgb), 0.15);
-    color: var(--color-red);
+    background: #FFF3E0;
+    color: #C2760A;
   }
 
   .priority-badge.medium {
-    background: rgba(var(--color-yellow-rgb), 0.15);
-    color: var(--color-yellow);
+    background: #EEF6E8;
+    color: #4A7C2C;
   }
 
   .priority-badge.low {
-    background: rgba(var(--color-green-rgb), 0.15);
-    color: var(--color-green);
+    background: #E8EEF6;
+    color: #4A6FA5;
   }
 
   .expand-btn {

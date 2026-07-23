@@ -233,7 +233,7 @@ describe("IRPointStorageService", () => {
 			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		expect(pointIndex.files[0]?.file).toBe(
-			"weave/incremental-reading/points/Readable Topic.irdeck",
+			"weave Incremental reading/points/Readable Topic.irdeck",
 		);
 
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
@@ -281,7 +281,7 @@ describe("IRPointStorageService", () => {
 				updatedAt: "2026-04-16T10:00:00.000Z",
 				files: [
 					{
-						file: "weave/incremental-reading/points/Stale Topic.irdeck",
+						file: "weave Incremental reading/points/Stale Topic.irdeck",
 						topicId: "stale-topic",
 						topicName: "Stale Topic",
 						pointCount: 1,
@@ -301,7 +301,7 @@ describe("IRPointStorageService", () => {
 		expect(pointIndex.files).toHaveLength(1);
 		expect(pointIndex.files).toHaveLength(1);
 		expect(pointIndex.files[0]).toMatchObject({
-			file: "weave/incremental-reading/points/Existing Topic.irdeck",
+			file: "weave Incremental reading/points/Existing Topic.irdeck",
 			topicId: "topic-existing",
 			topicName: "Existing Topic",
 			pointCount: 1,
@@ -345,14 +345,14 @@ describe("IRPointStorageService", () => {
 				updatedAt: "2026-04-16T10:00:00.000Z",
 				files: [
 					{
-						file: "weave/incremental-reading/points/Stale Topic.irdeck",
+						file: "weave Incremental reading/points/Stale Topic.irdeck",
 						topicId: "stale-topic",
 						topicName: "Stale Topic",
 						pointCount: 1,
 						updatedAt: "2026-04-16T10:00:00.000Z",
 					},
 					{
-						file: "weave/incremental-reading/points/Other Topic.irdeck",
+						file: "weave Incremental reading/points/Other Topic.irdeck",
 						topicId: "topic-other",
 						topicName: "Other Topic",
 						pointCount: 0,
@@ -364,8 +364,8 @@ describe("IRPointStorageService", () => {
 		const service = new IRPointStorageService(app);
 
 		const result = await service.refreshPointFilesIndexForVaultPaths(
-			["weave/incremental-reading/points/Existing Topic.irdeck"],
-			{ removedPaths: ["weave/incremental-reading/points/Stale Topic.irdeck"] },
+			["weave Incremental reading/points/Existing Topic.irdeck"],
+			{ removedPaths: ["weave Incremental reading/points/Stale Topic.irdeck"] },
 		);
 		const pointIndex = JSON.parse(
 			files.get(getPointFilesIndexPath(app)) || "{}",
@@ -382,8 +382,8 @@ describe("IRPointStorageService", () => {
 			pointIndex.files.map((entry: { file: string }) => entry.file),
 		).toEqual(
 			expect.arrayContaining([
-				"weave/incremental-reading/points/Existing Topic.irdeck",
-				"weave/incremental-reading/points/Other Topic.irdeck",
+				"weave Incremental reading/points/Existing Topic.irdeck",
+				"weave Incremental reading/points/Other Topic.irdeck",
 			]),
 		);
 	});
@@ -551,7 +551,7 @@ describe("IRPointStorageService", () => {
 		expect(pointIndex.files).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
-					file: "weave/incremental-reading/points/历史专题.irdeck",
+					file: "weave Incremental reading/points/历史专题.irdeck",
 					topicId: "topic-history",
 					topicName: "历史专题",
 					pointCount: 1,
@@ -600,9 +600,11 @@ describe("IRPointStorageService", () => {
 		const v2Paths = getV2Paths("");
 		const { app, files } = createMemoryApp({
 			"IR/Chunks/01_Chunk.md": `---
-tags:
+weave_tags:
   - alpha
   - Beta
+tags:
+  - should-not-import
 ---
 chunk body`,
 		});
@@ -708,6 +710,59 @@ chunk body`,
 		expect(files.has(normalizeTestPath(v2Paths.ir.materialsIndex))).toBe(false);
 	});
 
+	it("prefers chunk.meta.tagGroup over source.tagGroup when syncing chunk points", async () => {
+		const v2Paths = getV2Paths("");
+		const { app, files } = createMemoryApp({
+			"IR/Chunks/02_Chunk.md": `---
+weave_tags:
+  - paper
+---
+body`,
+		});
+		const service = new IRPointStorageService(app);
+
+		await service.syncChunkPoint(
+			{
+				chunkId: "chunk-meta-taggroup",
+				sourceId: "source-1",
+				filePath: "IR/Chunks/02_Chunk.md",
+				topicIds: ["topic-1"],
+				deckIds: ["topic-1"],
+				priorityUi: 2,
+				priorityEff: 2,
+				intervalDays: 1,
+				nextRepDate: 1713261600000,
+				scheduleStatus: "queued",
+				meta: {
+					tagGroup: "from-chunk-meta",
+				},
+				createdAt: 1713261600000,
+				updatedAt: 1713261600000,
+			} as any,
+			{
+				source: {
+					sourceId: "source-1",
+					originalPath: "Docs/Source.md",
+					rawFilePath: "weave/IR/raw/Source.md",
+					indexFilePath: "weave/IR/Source.index.md",
+					chunkIds: ["chunk-meta-taggroup"],
+					title: "Source Title",
+					tagGroup: "from-source",
+					createdAt: 1713261600000,
+					updatedAt: 1713261600000,
+				},
+				topicNamesById: new Map([["topic-1", "Topic One"]]),
+			},
+		);
+
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
+		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
+		expect(pointFile.points[0].metadata.tagGroupId).toBe("from-chunk-meta");
+	});
+
 	it("renames the topic shard file when the topic name changes", async () => {
 		const v2Paths = getV2Paths("");
 		const { app, files } = createMemoryApp();
@@ -756,7 +811,7 @@ chunk body`,
 			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		expect(pointIndex.files[0]?.file).toBe(
-			"weave/incremental-reading/points/New Topic.irdeck",
+			"weave Incremental reading/points/New Topic.irdeck",
 		);
 	});
 
@@ -934,7 +989,7 @@ chunk body`,
 			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		expect(pointIndex.files[0]?.file).toBe(
-			"weave/incremental-reading/points/Topic One.irdeck",
+			"weave Incremental reading/points/Topic One.irdeck",
 		);
 	});
 
@@ -971,7 +1026,7 @@ chunk body`,
 		expect(entry).toEqual({
 			topicId: "topic-1",
 			topicName: "Topic One",
-			relativePath: "weave/incremental-reading/points/Topic One.irdeck",
+			relativePath: "weave Incremental reading/points/Topic One.irdeck",
 			absolutePath: `${v2Paths.ir.root}/points/Topic One.irdeck`,
 		});
 	});
@@ -1478,7 +1533,7 @@ chunk body`,
 			files.get(getPointFilesIndexPath(app)) || "{}",
 		);
 		expect(pointIndex.files[0]?.file).toBe(
-			"weave/incremental-reading/points/Mixed Topic.irdeck",
+			"weave Incremental reading/points/Mixed Topic.irdeck",
 		);
 		const pointFile = JSON.parse(
 			files.get(
@@ -1822,5 +1877,92 @@ chunk body`,
 			"[[Notes/Target.md#^new-block]]",
 		);
 		expect(snapshot?.point.trace?.traceState).toBe("verified");
+	});
+
+	it("applies explicit tags under preserveExisting so edit-tags is not a no-op", async () => {
+		const { app, files } = createMemoryApp();
+		const service = new IRPointStorageService(app);
+		const v2Paths = getV2Paths("");
+
+		await service.syncLegacyPoint({
+			id: "chunk-tags-1",
+			topicId: "topic-tags",
+			topicName: "Tags Topic",
+			title: "Tagged Point",
+			status: "new",
+			tags: [],
+			sourceType: "ir-chunk",
+			sourcePath: "Notes/Tagged.md",
+			locatorType: "markdown-chunk",
+			locator: { chunkId: "chunk-tags-1", sourcePath: "Notes/Tagged.md" },
+		});
+
+		await service.syncLegacyPoint(
+			{
+				id: "chunk-tags-1",
+				topicId: "topic-tags",
+				title: "Tagged Point",
+				status: "new",
+				tags: ["#Research", "deep-work"],
+				sourceType: "ir-chunk",
+				sourcePath: "Notes/Tagged.md",
+				locatorType: "markdown-chunk",
+				locator: { chunkId: "chunk-tags-1", sourcePath: "Notes/Tagged.md" },
+			},
+			{ preserveExisting: true },
+		);
+
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
+		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
+		expect(pointFile.points[0].userData.tags).toEqual([
+			"Research",
+			"deep-work",
+		]);
+	});
+
+	it("prefers in-memory chunk.tags over weave_tags when syncing chunk points", async () => {
+		const v2Paths = getV2Paths("");
+		const { app, files } = createMemoryApp({
+			"IR/Chunks/02_Chunk.md": `---
+weave_tags:
+  - from-yaml
+---
+body`,
+		});
+		const service = new IRPointStorageService(app);
+
+		await service.syncChunkPoint(
+			{
+				chunkId: "chunk-prefer-tags",
+				sourceId: "source-prefer",
+				filePath: "IR/Chunks/02_Chunk.md",
+				topicIds: ["topic-prefer"],
+				deckIds: ["topic-prefer"],
+				tags: ["from-chunk"],
+				priorityUi: 5,
+				priorityEff: 5,
+				intervalDays: 1,
+				nextRepDate: 1713261600000,
+				scheduleStatus: "new",
+				favorite: false,
+				createdAt: 1713261600000,
+				updatedAt: 1713261600000,
+				meta: {},
+				stats: {},
+			} as any,
+			{
+				topicNamesById: new Map([["topic-prefer", "Prefer Topic"]]),
+			},
+		);
+
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
+		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
+		expect(pointFile.points[0].userData.tags).toEqual(["from-chunk"]);
 	});
 });

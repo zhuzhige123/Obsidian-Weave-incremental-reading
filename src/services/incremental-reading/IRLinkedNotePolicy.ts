@@ -13,6 +13,8 @@ export interface PointLinkedNotesScheduleCarrier {
 	id?: string;
 	sourceType?: string | null;
 	sourceFile?: string | null;
+	/** Used to detect web reading points when the MD carrier path is missing. */
+	resumeLink?: string | null;
 }
 
 function normalizeSourceType(sourceType?: string | null): string {
@@ -54,6 +56,67 @@ export function supportsPointLinkedNotesForScheduleItem(
 	}
 
 	return supportsPointLinkedNotesForSourcePath(item.sourceFile);
+}
+
+/** How associated notes are resolved for a reading point. */
+export type AssociatedNoteRelationMode =
+	| "curated"
+	| "derived-outlinks"
+	| "unavailable";
+
+/**
+ * Vault note carriers (Markdown / Canvas) derive related notes from Obsidian
+ * outbound links instead of writing curated `linkedNotePaths`.
+ */
+export function isVaultNoteCarrierSourcePath(
+	sourcePath?: string | null,
+): boolean {
+	const normalized = normalizePath(
+		String(sourcePath || "").trim(),
+	).toLowerCase();
+	if (!normalized) {
+		return false;
+	}
+	return (
+		normalized.endsWith(".md") ||
+		normalized.endsWith(".markdown") ||
+		normalized.endsWith(".canvas")
+	);
+}
+
+export function supportsDerivedOutlinkNotesForScheduleItem(
+	item?: PointLinkedNotesScheduleCarrier | null,
+): boolean {
+	if (!item) {
+		return false;
+	}
+	// Curated PDF/EPUB always wins over derived outlinks.
+	if (supportsPointLinkedNotesForScheduleItem(item)) {
+		return false;
+	}
+
+	// Vault note carriers (including deleted paths that still look like notes).
+	if (isVaultNoteCarrierSourcePath(item.sourceFile)) {
+		return true;
+	}
+
+	// Web reading point with missing carrier path: still offer recover via URL.
+	const resumeLink = String(item.resumeLink || "")
+		.trim()
+		.toLowerCase();
+	return resumeLink.startsWith("http://") || resumeLink.startsWith("https://");
+}
+
+export function resolveAssociatedNoteRelationMode(
+	item?: PointLinkedNotesScheduleCarrier | null,
+): AssociatedNoteRelationMode {
+	if (supportsPointLinkedNotesForScheduleItem(item)) {
+		return "curated";
+	}
+	if (supportsDerivedOutlinkNotesForScheduleItem(item)) {
+		return "derived-outlinks";
+	}
+	return "unavailable";
 }
 
 export function resolveExternalBookmarkTaskKind(

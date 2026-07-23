@@ -42,6 +42,14 @@ export interface ParagraphWorkbenchOpenInput {
 	epubCfi?: string;
 }
 
+/** Prefill payload for AddReadingTargetModal from the current workbench segment. */
+export interface ParagraphWorkbenchReadingTargetDraft {
+	link: string;
+	title: string;
+	deckId?: string;
+	canvasTextCandidates?: string[];
+}
+
 export interface ParagraphWorkbenchDisplay {
 	bookPercent: number;
 	segmentIndex: number;

@@ -10,91 +10,97 @@
   import { tr } from '../../../utils/i18n';
   import { logger } from '../../../utils/logger';
   import type { IncrementalReadingSettingsHost } from '../types/incremental-reading-settings-host';
-  import type { IRTagGroup, IRTagGroupMatchSource, IRTagGroupProfile } from '../../../types/ir-types';
-  import { DEFAULT_TAG_GROUP_PROFILE } from '../../../types/ir-types';
+  import type { IRTagGroup, IRTagGroupProfile } from '../../../types/ir-types';
+  import { DEFAULT_TAG_GROUP, DEFAULT_TAG_GROUP_PROFILE } from '../../../types/ir-types';
   import EnhancedIcon from '../../ui/EnhancedIcon.svelte';
+  import ObsidianSettingSlider from '../components/ObsidianSettingSlider.svelte';
+  import ObsidianSettingText from '../components/ObsidianSettingText.svelte';
 
   let t = $derived($tr);
+
+  export type TagGroupMatchedTopic = {
+    topicId: string;
+    topicName: string;
+    matchedPointCount: number;
+  };
 
   interface Props {
     plugin: IncrementalReadingSettingsHost;
     group: IRTagGroup | null;
     profile: IRTagGroupProfile | null;
-    availableScopes: Array<{ topicId: string; topicName: string }>;
-    selectedScopeTopicIds: string[];
+    matchedTopics?: TagGroupMatchedTopic[];
     onSave: (payload: {
       group: IRTagGroup;
       profile: IRTagGroupProfile;
-      targetTopicIds: string[];
     }) => void | Promise<void>;
     onCancel: () => void;
   }
 
-  let { plugin, group, profile, availableScopes, selectedScopeTopicIds, onSave, onCancel }: Props = $props();
+  let {
+    plugin,
+    group,
+    profile,
+    matchedTopics = [],
+    onSave,
+    onCancel
+  }: Props = $props();
+
+  const isDefaultGroup = $derived(group?.id === DEFAULT_TAG_GROUP.id);
 
   // 表单状态
-  let name = $state(untrack(() => group?.name || ''));
-  let matchPriority = $state(untrack(() => group?.matchPriority || 100));
-  let tags = $state<string[]>(untrack(() => group?.matchAnyTags ? [...group.matchAnyTags] : []));
+  let name = $state(
+    untrack(() =>
+      group?.id === DEFAULT_TAG_GROUP.id
+        ? group?.name || DEFAULT_TAG_GROUP.name
+        : group?.name || ''
+    )
+  );
+  let matchPriority = $state(
+    untrack(() =>
+      group?.id === DEFAULT_TAG_GROUP.id
+        ? DEFAULT_TAG_GROUP.matchPriority
+        : group?.matchPriority || 100
+    )
+  );
+  let tags = $state<string[]>(
+    untrack(() =>
+      group?.id === DEFAULT_TAG_GROUP.id
+        ? []
+        : group?.matchAnyTags
+          ? [...group.matchAnyTags]
+          : []
+    )
+  );
   let tagInput = $state('');
   let showTagSuggestions = $state(false);
   let intervalFactorBase = $state(
-    untrack(() => profile?.intervalFactorBase ?? DEFAULT_TAG_GROUP_PROFILE.intervalFactorBase)
+    untrack(() => String(profile?.intervalFactorBase ?? DEFAULT_TAG_GROUP_PROFILE.intervalFactorBase))
   );
   let initialIntervalMultiplier = $state(
-    untrack(() => profile?.initialIntervalMultiplier ?? DEFAULT_TAG_GROUP_PROFILE.initialIntervalMultiplier)
+    untrack(() =>
+      String(profile?.initialIntervalMultiplier ?? DEFAULT_TAG_GROUP_PROFILE.initialIntervalMultiplier)
+    )
   );
   let loadHalfLifeDays = $state<string>(
     untrack(() => Number.isFinite(profile?.loadHalfLifeDays) ? String(profile?.loadHalfLifeDays) : '')
   );
-  let targetTopicIds = $state<string[]>(
-    untrack(() => {
-      const base = selectedScopeTopicIds.length > 0
-        ? selectedScopeTopicIds
-        : availableScopes.map((scope) => scope.topicId);
-      return Array.from(new Set(base.map((value) => String(value || '').trim()).filter(Boolean)));
-    })
-  );
-
-  // 匹配源配置
-  let useYamlTags = $state(untrack(() => group?.matchSource?.yamlTags ?? true));
-  let useInlineTags = $state(untrack(() => group?.matchSource?.inlineTags ?? true));
-  let customProperties = $state<string[]>(
-    untrack(() => group?.matchSource?.customProperties ? [...group.matchSource.customProperties] : [])
-  );
-  let customPropInput = $state('');
-  let showCustomProps = $state(untrack(() => (group?.matchSource?.customProperties?.length ?? 0) > 0));
 
   // 从库中收集已有标签
   let existingTags = $state<string[]>([]);
 
   $effect(() => {
-    loadExistingTags();
+    if (!isDefaultGroup) {
+      loadExistingTags();
+    }
   });
 
   async function loadExistingTags() {
     try {
-      const files = plugin.app.vault.getMarkdownFiles();
-      const tagSet = new Set<string>();
-
-      for (const file of files) {
-        const cache = plugin.app.metadataCache.getFileCache(file);
-        
-        // frontmatter tags
-        const fmTags = cache?.frontmatter?.tags;
-        if (Array.isArray(fmTags)) {
-          fmTags.forEach(t => tagSet.add(String(t).toLowerCase()));
-        } else if (typeof fmTags === 'string') {
-          fmTags.split(',').forEach(t => tagSet.add(t.trim().toLowerCase()));
-        }
-
-        // inline #tags
-        cache?.tags?.forEach(t => {
-          tagSet.add(t.tag.replace(/^#/, '').toLowerCase());
-        });
-      }
-
-      existingTags = Array.from(tagSet).sort();
+      const { IRPointTagService } = await import(
+        '../../../services/incremental-reading/IRPointTagService'
+      );
+      const tagService = new IRPointTagService(plugin.app);
+      existingTags = await tagService.getAllKnownTags();
     } catch (error) {
       logger.warn('[IRTagGroupEditor] 加载标签失败:', error);
     }
@@ -105,9 +111,13 @@
     if (!tagInput.trim()) return [];
     const lower = tagInput.toLowerCase();
     return existingTags
-      .filter(t => t.includes(lower) && !tags.includes(t))
+      .filter(tag => tag.includes(lower) && !tags.includes(tag))
       .slice(0, 8);
   });
+
+  const matchedTopicTotal = $derived(
+    matchedTopics.reduce((sum, topic) => sum + (topic.matchedPointCount || 0), 0)
+  );
 
   // 添加标签
   function addTag(tag: string) {
@@ -147,32 +157,31 @@
       new Notice(t('irTagGroup.nameRequired'));
       return;
     }
-    if (tags.length === 0) {
+    if (!isDefaultGroup && tags.length === 0) {
       new Notice(t('irTagGroup.tagRequired'));
-      return;
-    }
-    if (targetTopicIds.length === 0) {
-      new Notice(t('irTagGroup.editor.scopeRequired'));
       return;
     }
 
     const now = new Date().toISOString();
-    const matchSource: IRTagGroupMatchSource = {
-      yamlTags: useYamlTags,
-      inlineTags: useInlineTags,
-      customProperties: customProperties.length > 0 ? customProperties : []
-    };
-
-    const savedGroup: IRTagGroup = {
-      id: group?.id || `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name: name.trim(),
-      description: '',
-      matchAnyTags: tags,
-      matchPriority,
-      matchSource,
-      createdAt: group?.createdAt || now,
-      updatedAt: now
-    };
+    const savedGroup: IRTagGroup = isDefaultGroup
+      ? {
+          id: DEFAULT_TAG_GROUP.id,
+          name: name.trim() || DEFAULT_TAG_GROUP.name,
+          description: group?.description || DEFAULT_TAG_GROUP.description,
+          matchAnyTags: [],
+          matchPriority: DEFAULT_TAG_GROUP.matchPriority,
+          createdAt: group?.createdAt || DEFAULT_TAG_GROUP.createdAt,
+          updatedAt: now
+        }
+      : {
+          id: group?.id || `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: name.trim(),
+          description: '',
+          matchAnyTags: tags,
+          matchPriority,
+          createdAt: group?.createdAt || now,
+          updatedAt: now
+        };
 
     const savedProfile: IRTagGroupProfile = {
       ...(profile || DEFAULT_TAG_GROUP_PROFILE),
@@ -198,27 +207,8 @@
 
     await onSave({
       group: savedGroup,
-      profile: savedProfile,
-      targetTopicIds
+      profile: savedProfile
     });
-  }
-
-  function toggleScope(topicId: string) {
-    const normalized = String(topicId || '').trim();
-    if (!normalized) return;
-    if (targetTopicIds.includes(normalized)) {
-      targetTopicIds = targetTopicIds.filter((value) => value !== normalized);
-      return;
-    }
-    targetTopicIds = [...targetTopicIds, normalized];
-  }
-
-  function selectAllScopes() {
-    targetTopicIds = availableScopes.map((scope) => scope.topicId);
-  }
-
-  function clearScopes() {
-    targetTopicIds = [];
   }
 
   // 点击背景关闭
@@ -237,7 +227,15 @@
   <div class="editor-dialog" role="dialog" aria-modal="true" tabindex="-1">
     <!-- 头部 -->
     <div class="dialog-header">
-      <h3>{group ? t('irTagGroup.editor.editTitle') : t('irTagGroup.editor.createTitle')}</h3>
+      <h3>
+        {#if isDefaultGroup}
+          {t('irTagGroup.editor.editDefaultTitle')}
+        {:else if group}
+          {t('irTagGroup.editor.editTitle')}
+        {:else}
+          {t('irTagGroup.editor.createTitle')}
+        {/if}
+      </h3>
       <button class="close-btn" onclick={onCancel}>
         <EnhancedIcon name="x" size={20} />
       </button>
@@ -256,177 +254,145 @@
           placeholder={t('irTagGroup.editor.namePlaceholder')}
           bind:value={name}
         />
-        <p class="form-hint">{t('irTagGroup.editor.nameHint')}</p>
+        <p class="form-hint">
+          {isDefaultGroup
+            ? t('irTagGroup.editor.defaultNameHint')
+            : t('irTagGroup.editor.nameHint')}
+        </p>
       </div>
 
-      <!-- 匹配标签 -->
-      <div class="form-group">
-        <div class="form-label">
-          {t('irTagGroup.editor.tagsLabel')} <span class="required">*</span>
+      {#if isDefaultGroup}
+        <div class="form-group">
+          <div class="form-label">{t('irTagGroup.editor.defaultRoleLabel')}</div>
+          <p class="form-hint">{t('irTagGroup.editor.defaultRoleHint')}</p>
         </div>
-        <p class="form-hint">{t('irTagGroup.editor.tagsHint')}</p>
-        
-        <div class="tags-container">
-          {#if tags.length > 0}
-            <div class="tags-list">
-              {#each tags as tag, i}
-                <div class="tag-chip">
-                  <span>{tag}</span>
-                  <button class="tag-remove" onclick={() => removeTag(i)}>
-                    <EnhancedIcon name="x" size={12} />
-                  </button>
-                </div>
-              {/each}
-            </div>
-          {/if}
-
-          <div class="tag-input-wrapper">
-            <input
-              type="text"
-              class="tag-input"
-              placeholder={t('irTagGroup.editor.tagsPlaceholder')}
-              bind:value={tagInput}
-              onkeydown={handleTagKeydown}
-              onfocus={() => showTagSuggestions = true}
-              onblur={() => window.setTimeout(() => showTagSuggestions = false, 200)}
-            />
-
-            {#if showTagSuggestions && filteredSuggestions.length > 0}
-              <div class="tag-suggestions">
-                {#each filteredSuggestions as suggestion}
-                  <button
-                    type="button"
-                    class="suggestion-item"
-                    onclick={() => addTag(suggestion)}
-                  >
-                    {suggestion}
-                  </button>
-                {/each}
-              </div>
-            {/if}
+      {:else}
+        <!-- 匹配标签 -->
+        <div class="form-group">
+          <div class="form-label">
+            {t('irTagGroup.editor.tagsLabel')} <span class="required">*</span>
           </div>
-        </div>
-      </div>
-
-      <!-- 匹配源配置 -->
-      <div class="form-group">
-        <div class="form-label">{t('irTagGroup.editor.matchSourceLabel')}</div>
-        <p class="form-hint">{t('irTagGroup.editor.matchSourceHint')}</p>
-        <div class="match-source-options">
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={useYamlTags} />
-            <span>{t('irTagGroup.editor.customYamlTags')}</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={useInlineTags} />
-            <span>{t('irTagGroup.editor.inlineTags')}</span>
-          </label>
-          <label class="checkbox-label">
-            <input
-              type="checkbox"
-              checked={showCustomProps}
-              onchange={(e) => {
-                showCustomProps = (e.target as HTMLInputElement).checked;
-                if (!showCustomProps) customProperties = [];
-              }}
-            />
-            <span>{t('irTagGroup.editor.customYaml')}</span>
-          </label>
-        </div>
-
-        {#if showCustomProps}
-          <div class="custom-props-container">
-            {#if customProperties.length > 0}
+          <p class="form-hint">{t('irTagGroup.editor.tagsHint')}</p>
+          
+          <div class="tags-container">
+            {#if tags.length > 0}
               <div class="tags-list">
-                {#each customProperties as prop, i}
-                  <div class="tag-chip prop-chip">
-                    <span>{prop}</span>
-                    <button class="tag-remove" onclick={() => { customProperties = customProperties.filter((_, idx) => idx !== i); }}>
+                {#each tags as tag, i}
+                  <div class="tag-chip">
+                    <span>{tag}</span>
+                    <button class="tag-remove" onclick={() => removeTag(i)}>
                       <EnhancedIcon name="x" size={12} />
                     </button>
                   </div>
                 {/each}
               </div>
             {/if}
-            <input
-              type="text"
-              class="tag-input"
-              placeholder={t('irTagGroup.editor.customPropertyPlaceholder')}
-              bind:value={customPropInput}
-              onkeydown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  const trimmed = customPropInput.trim();
-                  if (trimmed && !customProperties.includes(trimmed)) {
-                    customProperties = [...customProperties, trimmed];
-                  }
-                  customPropInput = '';
-                }
-              }}
-            />
-          </div>
-        {/if}
-      </div>
 
-      <!-- 匹配优先级 -->
-      <div class="form-group">
-        <div class="form-label">{t('irTagGroup.editor.priorityLabel')}</div>
-        <div class="priority-input">
-          <input
-            type="range"
-            min="1"
-            max="200"
-            step="1"
-            bind:value={matchPriority}
-            class="priority-slider"
-          />
-          <span class="priority-value">{matchPriority}</span>
+            <div class="tag-input-wrapper">
+              <input
+                type="text"
+                class="tag-input"
+                placeholder={t('irTagGroup.editor.tagsPlaceholder')}
+                bind:value={tagInput}
+                onkeydown={handleTagKeydown}
+                onfocus={() => showTagSuggestions = true}
+                onblur={() => window.setTimeout(() => showTagSuggestions = false, 200)}
+              />
+
+              {#if showTagSuggestions && filteredSuggestions.length > 0}
+                <div class="tag-suggestions">
+                  {#each filteredSuggestions as suggestion}
+                    <button
+                      type="button"
+                      class="suggestion-item"
+                      onclick={() => addTag(suggestion)}
+                    >
+                      {suggestion}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </div>
         </div>
-        <p class="form-hint">
-          {t('irTagGroup.editor.priorityHint')}
-        </p>
-      </div>
+
+        <!-- 匹配优先级 -->
+        <ObsidianSettingSlider
+          name={t('irTagGroup.editor.priorityLabel')}
+          desc={t('irTagGroup.editor.priorityHint')}
+          min={1}
+          max={200}
+          step={1}
+          value={matchPriority}
+          onChange={(value) => {
+            matchPriority = value;
+          }}
+          formatValue={(value) => String(value)}
+        />
+      {/if}
 
       <div class="form-group">
         <div class="form-label">{t('irTagGroup.editor.schedulingTitle')}</div>
         <p class="form-hint">{t('irTagGroup.editor.schedulingHint')}</p>
-        <div class="profile-grid">
-          <label class="profile-field">
-            <span>{t('irTagGroup.editor.intervalFactorBase')}</span>
-            <input type="number" min="1.1" max="3" step="0.05" bind:value={intervalFactorBase} />
-          </label>
-          <label class="profile-field">
-            <span>{t('irTagGroup.editor.coldStartMultiplier')}</span>
-            <input type="number" min="0.7" max="1.5" step="0.05" bind:value={initialIntervalMultiplier} />
-          </label>
-          <label class="profile-field">
-            <span>{t('irTagGroup.editor.loadHalfLifeDays')}</span>
-            <input type="number" min="1" step="1" bind:value={loadHalfLifeDays} placeholder={t('irTagGroup.editor.optionalPlaceholder')} />
-          </label>
+        <div class="profile-settings">
+          <ObsidianSettingText
+            name={t('irTagGroup.editor.intervalFactorBase')}
+            value={intervalFactorBase}
+            inputType="number"
+            min={1.1}
+            max={3}
+            step={0.05}
+            onChange={(value) => {
+              intervalFactorBase = value;
+            }}
+          />
+          <ObsidianSettingText
+            name={t('irTagGroup.editor.coldStartMultiplier')}
+            value={initialIntervalMultiplier}
+            inputType="number"
+            min={0.7}
+            max={1.5}
+            step={0.05}
+            onChange={(value) => {
+              initialIntervalMultiplier = value;
+            }}
+          />
+          <ObsidianSettingText
+            name={t('irTagGroup.editor.loadHalfLifeDays')}
+            value={loadHalfLifeDays}
+            inputType="number"
+            min={1}
+            step={1}
+            placeholder={t('irTagGroup.editor.optionalPlaceholder')}
+            onChange={(value) => {
+              loadHalfLifeDays = value;
+            }}
+          />
         </div>
       </div>
 
       <div class="form-group">
-        <div class="form-label">{t('irTagGroup.editor.scopeTitle')}</div>
-        <p class="form-hint">{t('irTagGroup.editor.scopeHint')}</p>
-        {#if availableScopes.length === 0}
-          <div class="scope-empty">{t('irTagGroup.editor.scopeEmpty')}</div>
+        <div class="form-label">{t('irTagGroup.editor.matchedTopicsTitle')}</div>
+        <p class="form-hint">{t('irTagGroup.editor.matchedTopicsHint')}</p>
+        {#if matchedTopics.length === 0}
+          <div class="matched-empty">{t('irTagGroup.editor.matchedTopicsEmpty')}</div>
         {:else}
-          <div class="scope-toolbar">
-            <button type="button" class="scope-btn" onclick={selectAllScopes}>{t('irTagGroup.editor.scopeSelectAll')}</button>
-            <button type="button" class="scope-btn" onclick={clearScopes}>{t('irTagGroup.editor.scopeClear')}</button>
-            <span class="scope-count">{t('irTagGroup.editor.scopeCount', { selected: String(targetTopicIds.length), total: String(availableScopes.length) })}</span>
+          <div class="matched-summary">
+            {t('irTagGroup.editor.matchedTopicsSummary', {
+              topics: String(matchedTopics.length),
+              points: String(matchedTopicTotal)
+            })}
           </div>
-          <div class="scope-list">
-            {#each availableScopes as scope}
-              <label class="scope-item">
-                <input
-                  type="checkbox"
-                  checked={targetTopicIds.includes(scope.topicId)}
-                  onchange={() => toggleScope(scope.topicId)}
-                />
-                <span>{scope.topicName}</span>
-              </label>
+          <div class="matched-list">
+            {#each matchedTopics as topic (topic.topicId)}
+              <div class="matched-item">
+                <span class="matched-name">{topic.topicName}</span>
+                <span class="matched-count">
+                  {t('irTagGroup.editor.matchedTopicCount', {
+                    count: String(topic.matchedPointCount)
+                  })}
+                </span>
+              </div>
             {/each}
           </div>
         {/if}
@@ -487,7 +453,6 @@
     overflow: hidden;
   }
 
-  /* 头部 */
   .dialog-header {
     display: flex;
     justify-content: space-between;
@@ -515,269 +480,122 @@
     background: transparent;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.15s ease;
   }
 
   .close-btn:hover {
-    background: var(--background-secondary);
+    background: var(--background-modifier-hover);
     color: var(--text-normal);
   }
 
-  /* 表单内容 */
   .dialog-body {
-    flex: 1;
     padding: var(--size-4-5);
     overflow-y: auto;
+    flex: 1;
   }
 
   .form-group {
-    margin-bottom: 20px;
-  }
-
-  .form-group:last-child {
-    margin-bottom: 0;
+    margin-bottom: var(--size-4-4);
   }
 
   .form-label {
-    display: block;
     font-size: var(--font-ui-small);
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-normal);
-    margin-bottom: 6px;
+    margin-bottom: var(--size-4-1);
   }
 
   .required {
-    color: #ef4444;
+    color: var(--text-error);
   }
 
   .form-hint {
+    margin: var(--size-4-1) 0 0;
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
-    margin: 6px 0 0;
+    line-height: 1.4;
   }
 
-  .form-input {
+  .form-input,
+  .tag-input {
     width: 100%;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-m);
+    border-radius: var(--radius-s);
     background: var(--background-primary);
     color: var(--text-normal);
-    font-size: var(--font-ui-small);
-    transition: border-color 0.15s ease;
   }
 
-  .form-input:focus {
-    outline: none;
-    border-color: var(--interactive-accent);
-  }
-
-  .form-input::placeholder {
-    color: var(--text-faint);
-  }
-
-  /* 标签输入 */
   .tags-container {
-    background: var(--background-secondary);
-    border-radius: var(--radius-m);
-    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .tags-list {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 10px;
   }
 
   .tag-chip {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-radius: var(--radius-s);
+    padding: 2px 8px;
+    background: var(--background-secondary);
+    border-radius: 999px;
     font-size: var(--font-ui-smaller);
   }
 
   .tag-remove {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    padding: 0;
+    display: inline-flex;
     border: none;
-    border-radius: var(--radius-s);
     background: transparent;
-    color: var(--text-on-accent);
+    color: var(--text-muted);
     cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.15s ease;
-  }
-
-  .tag-remove:hover {
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.2);
+    padding: 0;
   }
 
   .tag-input-wrapper {
     position: relative;
   }
 
-  .tag-input {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-s);
-    background: var(--background-primary);
-    color: var(--text-normal);
-    font-size: var(--font-ui-smaller);
-  }
-
-  .tag-input:focus {
-    outline: none;
-    border-color: var(--interactive-accent);
-  }
-
-  .tag-input::placeholder {
-    color: var(--text-faint);
-  }
-
   .tag-suggestions {
     position: absolute;
-    top: 100%;
     left: 0;
     right: 0;
-    margin-top: 4px;
+    top: calc(100% + 4px);
+    z-index: 5;
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-s);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    max-height: 200px;
+    max-height: 180px;
     overflow-y: auto;
-    z-index: 10;
   }
 
   .suggestion-item {
     display: block;
     width: 100%;
+    text-align: left;
     border: none;
     background: transparent;
-    text-align: left;
     padding: 8px 12px;
-    font-size: var(--font-ui-smaller);
     color: var(--text-normal);
     cursor: pointer;
-    transition: background 0.1s ease;
   }
 
   .suggestion-item:hover {
-    background: var(--background-secondary);
+    background: var(--background-modifier-hover);
   }
 
-  /* 匹配源配置 */
-  .match-source-options {
+  .profile-settings {
     display: flex;
     flex-direction: column;
     gap: 8px;
     margin-top: 8px;
   }
 
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-normal);
-    cursor: pointer;
-  }
-
-  .checkbox-label input[type="checkbox"] {
-    margin: 0;
-  }
-
-  .custom-props-container {
-    margin-top: 8px;
-    padding: 10px;
-    background: var(--background-secondary);
-    border-radius: var(--radius-s);
-  }
-
-  .prop-chip {
-    background: var(--text-accent) !important;
-  }
-
-  /* 优先级输入 */
-  .priority-input {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .priority-slider {
-    flex: 1;
-    height: 6px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: var(--background-modifier-border);
-    border-radius: var(--radius-s);
-    cursor: pointer;
-  }
-
-  .priority-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
-    background: var(--interactive-accent);
-    border-radius: 50%;
-    cursor: pointer;
-  }
-
-  .priority-value {
-    min-width: 40px;
-    font-size: var(--font-ui-small);
-    font-weight: 600;
-    color: var(--text-normal);
-    text-align: right;
-  }
-
-  .profile-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
-    margin-top: 8px;
-  }
-
-  .profile-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 10px;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-m);
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-  }
-
-  .profile-field input {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-s);
-    background: var(--background-primary);
-    color: var(--text-normal);
-    font-size: var(--font-ui-smaller);
-  }
-
-  .profile-field input:focus {
-    outline: none;
-    border-color: var(--interactive-accent);
-  }
-
-  .scope-empty {
+  .matched-empty {
     padding: 12px;
     background: var(--background-secondary);
     border: 1px dashed var(--background-modifier-border);
@@ -786,65 +604,45 @@
     font-size: var(--font-ui-smaller);
   }
 
-  .scope-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-    margin-bottom: 10px;
-  }
-
-  .scope-btn {
-    padding: 6px 10px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 999px;
-    background: var(--background-secondary);
-    color: var(--text-normal);
-    font-size: var(--font-ui-smaller);
-    cursor: pointer;
-  }
-
-  .scope-btn:hover {
-    background: var(--background-secondary-alt);
-    border-color: var(--interactive-accent);
-  }
-
-  .scope-count {
-    margin-left: auto;
+  .matched-summary {
+    margin-bottom: 8px;
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
   }
 
-  .scope-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 8px;
+  .matched-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
   }
 
-  .scope-item {
+  .matched-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
     background: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
     font-size: var(--font-ui-smaller);
+  }
+
+  .matched-name {
     color: var(--text-normal);
-    cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .scope-item:hover {
-    border-color: var(--interactive-accent);
-    background: var(--background-secondary-alt);
+  .matched-count {
+    flex-shrink: 0;
+    color: var(--text-muted);
   }
 
-  .scope-item input[type="checkbox"] {
-    margin: 0;
-  }
-
-  /* 算法说明 */
   .algorithm-note {
     margin-top: 16px;
     padding: 12px;
@@ -857,7 +655,7 @@
     align-items: center;
     gap: 6px;
     font-size: var(--font-ui-smaller);
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-normal);
     margin-bottom: 6px;
   }
@@ -865,43 +663,33 @@
   .note-content {
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
-    line-height: 1.5;
+    line-height: 1.45;
   }
 
-  /* 底部按钮 */
   .dialog-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
     padding: var(--size-4-4) var(--size-4-5);
     border-top: 1px solid var(--background-modifier-border);
   }
 
   .btn {
-    padding: 8px 18px;
-    border: none;
+    padding: 8px 14px;
     border-radius: var(--radius-s);
-    font-size: var(--font-ui-small);
-    font-weight: 500;
+    border: 1px solid transparent;
     cursor: pointer;
-    transition: all 0.15s ease;
+    font-size: var(--font-ui-small);
   }
 
   .btn.secondary {
     background: var(--background-secondary);
+    border-color: var(--background-modifier-border);
     color: var(--text-normal);
-  }
-
-  .btn.secondary:hover {
-    background: var(--background-modifier-hover);
   }
 
   .btn.primary {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
-  }
-
-  .btn.primary:hover {
-    background: var(--interactive-accent-hover);
   }
 </style>

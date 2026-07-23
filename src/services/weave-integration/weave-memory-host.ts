@@ -7,11 +7,21 @@ export interface WeaveCreateCardModalInput {
 	cardMetadata?: {
 		sourceFile?: string;
 		sourceBlock?: string;
+		/** IR reading point id; Weave should echo this when reporting outcomes. */
+		irPointId?: string;
 		[key: string]: unknown;
 	};
 	onSuccess?: (card: { id?: string }) => void;
 	onCancel?: () => void;
 }
+
+/**
+ * After Weave creates a real card, call IR:
+ * `app.plugins.plugins["weave-incremental-reading"]?.recordIRLearningOutcome?.({
+ *   pointId, kind: "memory-card" | "extract", artifactId: card.id
+ * })`
+ * See `.codex/skills/incremental-reading-dev/references/ir-outcome-contract.md`.
+ */
 
 export interface WeaveMemoryHostCapabilities {
 	openCreateCardModal?: (input: WeaveCreateCardModalInput) => Promise<void>;

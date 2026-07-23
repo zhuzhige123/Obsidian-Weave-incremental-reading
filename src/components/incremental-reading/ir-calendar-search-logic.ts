@@ -9,7 +9,11 @@ import { compareScheduleItemsForDailyQueue } from "../../services/incremental-re
 import type { ReadingMaterial } from "../../types/incremental-reading-types";
 import type { IRDeck } from "../../types/ir-types";
 import type { SearchQuery } from "../../utils/search-parser";
-import { isSameCalendarDay, parseCalendarDateKey } from "./ir-calendar-date";
+import {
+	isSameCalendarDay,
+	parseCalendarDateKey,
+	toCalendarDateKey,
+} from "./ir-calendar-date";
 import type { IRCalendarSearchResultEntry } from "./ir-calendar-sidebar-types";
 
 export interface IRCalendarSearchContext {
@@ -17,6 +21,8 @@ export interface IRCalendarSearchContext {
 	readingMaterials: ReadingMaterial[];
 	irDecks: IRDeck[];
 	materialTagLabelsById: Record<string, string[]>;
+	/** Child point id → parent reading-point title (for free-text search). */
+	parentTitleByMaterialId?: Record<string, string>;
 	resolveCanonicalDeckId: (deckId: string) => string;
 }
 
@@ -90,6 +96,106 @@ export function excludesAllTokens(value: string, tokens: string[]): boolean {
 	);
 }
 
+const PRIORITY_MATCH_EPSILON = 1e-6;
+
+export function matchesPriorityValues(
+	priority: number,
+	targets: number[],
+): boolean {
+	if (targets.length === 0) {
+		return true;
+	}
+
+	const value = Number(priority);
+	if (!Number.isFinite(value)) {
+		return false;
+	}
+
+	return targets.some(
+		(target) =>
+			Number.isFinite(target) &&
+			Math.abs(value - target) <= PRIORITY_MATCH_EPSILON,
+	);
+}
+
+export function normalizeFolderFilterPath(folder: string): string {
+	return normalizePath(String(folder || "").trim())
+		.replace(/\/+$/, "")
+		.toLowerCase();
+}
+
+export function matchesFolderFilters(
+	sourceFile: string,
+	folders: string[],
+): boolean {
+	if (folders.length === 0) {
+		return true;
+	}
+
+	const pathKey = normalizeSourcePathKey(sourceFile);
+	if (!pathKey) {
+		return false;
+	}
+
+	return folders.some((folder) => {
+		const folderKey = normalizeFolderFilterPath(folder);
+		if (!folderKey) {
+			return false;
+		}
+		return pathKey === folderKey || pathKey.startsWith(`${folderKey}/`);
+	});
+}
+
+export function excludesFolderFilters(
+	sourceFile: string,
+	folders: string[],
+): boolean {
+	if (folders.length === 0) {
+		return true;
+	}
+
+	return !matchesFolderFilters(sourceFile, folders);
+}
+
+export function matchesTagFilters(tags: string[], tokens: string[]): boolean {
+	if (tokens.length === 0) {
+		return true;
+	}
+
+	const normalizedTags = tags
+		.map((tag) =>
+			String(tag || "")
+				.trim()
+				.replace(/^#+/, "")
+				.toLowerCase(),
+		)
+		.filter(Boolean);
+	if (normalizedTags.length === 0) {
+		return false;
+	}
+
+	return tokens.some((token) => {
+		const needle = String(token || "")
+			.trim()
+			.toLowerCase()
+			.replace(/^#+/, "");
+		if (!needle) {
+			return false;
+		}
+		return normalizedTags.some(
+			(tag) => tag === needle || tag.endsWith(`/${needle}`),
+		);
+	});
+}
+
+export function excludesTagFilters(tags: string[], tokens: string[]): boolean {
+	if (tokens.length === 0) {
+		return true;
+	}
+
+	return !matchesTagFilters(tags, tokens);
+}
+
 export function getScheduleItemDeckName(
 	material: ScheduleItem,
 	ctx: IRCalendarSearchContext,
@@ -135,47 +241,24 @@ export function getReadingMaterialByPath(
 	filePath: string,
 	readingMaterials: ReadingMaterial[],
 ): ReadingMaterial | undefined {
-	const normalizedPath = normalizePath(String(filePath || "").trim());
+	const normalizedPath = normalizeSourcePathKey(filePath);
 	if (!normalizedPath) {
 		return undefined;
 	}
 
 	return readingMaterials.find(
-		(material) =>
-			normalizePath(String(material.filePath || "").trim()) === normalizedPath,
+		(material) => normalizeSourcePathKey(material.filePath) === normalizedPath,
 	);
 }
 
-export function getScheduleItemCreatedDate(
-	material: ScheduleItem,
-	ctx: IRCalendarSearchContext,
-): string {
-	const readingMaterial = getReadingMaterialByPath(
-		material.sourceFile,
-		ctx.readingMaterials,
-	);
-	if (readingMaterial?.created) {
-		return String(readingMaterial.created).slice(0, 10);
-	}
-
-	const file = getScheduleItemSourceTFile(material, ctx.app);
-	return file ? new Date(file.stat.ctime).toISOString().slice(0, 10) : "";
+export function getScheduleItemCreatedDate(material: ScheduleItem): string {
+	// Prefer reading-point creation time. Material/file ctime is shared across
+	// all points on a source and does not mean "when this point was added".
+	return toCalendarDateKey(material.createdAt);
 }
 
-export function getScheduleItemModifiedDate(
-	material: ScheduleItem,
-	ctx: IRCalendarSearchContext,
-): string {
-	const readingMaterial = getReadingMaterialByPath(
-		material.sourceFile,
-		ctx.readingMaterials,
-	);
-	if (readingMaterial?.modified) {
-		return String(readingMaterial.modified).slice(0, 10);
-	}
-
-	const file = getScheduleItemSourceTFile(material, ctx.app);
-	return file ? new Date(file.stat.mtime).toISOString().slice(0, 10) : "";
+export function getScheduleItemModifiedDate(material: ScheduleItem): string {
+	return toCalendarDateKey(material.updatedAt);
 }
 
 export function getScheduleItemDueDate(material: ScheduleItem): string {
@@ -183,11 +266,11 @@ export function getScheduleItemDueDate(material: ScheduleItem): string {
 		material.nextReviewDate instanceof Date &&
 		!Number.isNaN(material.nextReviewDate.getTime())
 	) {
-		return material.nextReviewDate.toISOString().slice(0, 10);
+		return toCalendarDateKey(material.nextReviewDate);
 	}
 
 	if (material.nextRepDate > 0) {
-		return new Date(material.nextRepDate).toISOString().slice(0, 10);
+		return toCalendarDateKey(material.nextRepDate);
 	}
 
 	return "";
@@ -221,6 +304,7 @@ export function getScheduleItemSearchText(
 		material.resumeLink,
 		getVisibleAssociatedNotePath(material),
 		getScheduleItemDeckName(material, ctx),
+		ctx.parentTitleByMaterialId?.[material.id],
 		...getMaterialTagLabels(material.id, ctx.materialTagLabelsById),
 	]
 		.filter(
@@ -243,25 +327,19 @@ export function matchesSearchQueryForMaterial(
 	const deckName = getScheduleItemDeckName(material, ctx);
 	const sourceFile = String(material.sourceFile || "");
 	const tags = getMaterialTagLabels(material.id, ctx.materialTagLabelsById);
-	const tagText = tags.join(" ").toLowerCase();
 	const stateText = String(material.scheduleStatus || "").toLowerCase();
+	const statusTokens = [...query.statuses, ...query.states];
 	const searchText = getScheduleItemSearchText(material, ctx);
 
 	if (query.decks.length > 0 && !matchesAnyTokens(deckName, query.decks)) {
 		return false;
 	}
 
-	if (
-		query.tags.length > 0 &&
-		!query.tags.some((tag) => tagText.includes(tag.toLowerCase()))
-	) {
+	if (!matchesTagFilters(tags, query.tags)) {
 		return false;
 	}
 
-	if (
-		query.priorities.length > 0 &&
-		!query.priorities.includes(Number(material.priority || 0))
-	) {
+	if (!matchesPriorityValues(Number(material.priority || 0), query.priorities)) {
 		return false;
 	}
 
@@ -272,16 +350,13 @@ export function matchesSearchQueryForMaterial(
 		return false;
 	}
 
-	if (
-		query.statuses.length > 0 &&
-		!query.statuses.some((status) => stateText.includes(status.toLowerCase()))
-	) {
+	if (!matchesFolderFilters(sourceFile, query.folders)) {
 		return false;
 	}
 
 	if (
-		query.states.length > 0 &&
-		!query.states.some((state) => stateText.includes(state.toLowerCase()))
+		statusTokens.length > 0 &&
+		!statusTokens.some((status) => stateText.includes(status.toLowerCase()))
 	) {
 		return false;
 	}
@@ -298,17 +373,14 @@ export function matchesSearchQueryForMaterial(
 	}
 
 	if (
-		!matchesDateRanges(
-			getScheduleItemCreatedDate(material, ctx),
-			query.dateRanges,
-		)
+		!matchesDateRanges(getScheduleItemCreatedDate(material), query.dateRanges)
 	) {
 		return false;
 	}
 
 	if (
 		!matchesDateRanges(
-			getScheduleItemModifiedDate(material, ctx),
+			getScheduleItemModifiedDate(material),
 			query.modifiedRanges,
 		)
 	) {
@@ -339,14 +411,15 @@ export function matchesSearchQueryForMaterial(
 		return false;
 	}
 
-	if (
-		query.excludeTags.length > 0 &&
-		query.excludeTags.some((tag) => tagText.includes(tag.toLowerCase()))
-	) {
+	if (!excludesTagFilters(tags, query.excludeTags)) {
 		return false;
 	}
 
 	if (!excludesAllTokens(sourceFile, query.excludeSources)) {
+		return false;
+	}
+
+	if (!excludesFolderFilters(sourceFile, query.excludeFolders)) {
 		return false;
 	}
 
@@ -525,6 +598,7 @@ export function buildIRCalendarSearchContext(params: {
 	readingMaterials: ReadingMaterial[];
 	irDecks: IRDeck[];
 	materialTagLabelsById: Record<string, string[]>;
+	parentTitleByMaterialId?: Record<string, string>;
 	resolveCanonicalDeckId: (deckId: string) => string;
 }): IRCalendarSearchContext {
 	return {
@@ -532,6 +606,7 @@ export function buildIRCalendarSearchContext(params: {
 		readingMaterials: params.readingMaterials,
 		irDecks: params.irDecks,
 		materialTagLabelsById: params.materialTagLabelsById,
+		parentTitleByMaterialId: params.parentTitleByMaterialId,
 		resolveCanonicalDeckId: params.resolveCanonicalDeckId,
 	};
 }

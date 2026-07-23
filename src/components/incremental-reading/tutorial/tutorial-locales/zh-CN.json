@@ -1,0 +1,399 @@
+{
+  "basics": [
+    {
+      "title": "插件是什么",
+      "paragraphs": [
+        "Weave Incremental Reading 把「以后再看」变成可持续推进的阅读队列：把散落在 Markdown、PDF、Canvas、网页、EPUB 等处的材料，整理成可排期、可续读、可回跳的阅读点。",
+        "本插件是独立的增量阅读主控；可与 Weave 主插件、Weave EPUB Reader 协同，不依赖主插件也能单独使用。"
+      ]
+    },
+    {
+      "title": "三个核心概念",
+      "listGroups": [
+        {
+          "items": [
+            "阅读点：一条待阅读任务，带来源溯源，可从队列一键回跳原文。",
+            "专题（.irdeck）：阅读点的容器，以专题文件保存在知识库中。",
+            "增量阅读日历：主界面。按日期查看待处理、已排期与逾期的阅读点，并安排每日推进节奏。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "核心能力一览",
+      "listGroups": [
+        {
+          "items": [
+            "统一「添加链接」入口：粘贴网页、双链、块引用、PDF++、Canvas 节点、EPUB 定位链接。",
+            "材料导入与订阅文件夹：批量拆分 Markdown / 导入 PDF·EPUB 章节；也可订阅文件夹自动补齐到专题（高级功能）。",
+            "调度与续读：加工流 / 阅读清单、每日上限与负载平滑；标记后续读点可回到原文位置。",
+            "连续阅读：按同一来源展开相关阅读点，便于顺着一篇文档连续推进。",
+            "关联笔记：PDF / EPUB 精选关联；Markdown / 网页用出来源笔记出链（高级功能）。",
+            "来源回跳：Markdown、PDF++、Canvas、网页、EPUB 等类型保留稳定续读链接。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "日历怎么用",
+      "paragraphs": [
+        "打开增量阅读日历后，上方是月历热力，下方是选中日期的阅读点列表。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "顶部「+」：打开添加阅读点（日常主路径）。",
+            "顶部「更多」菜单：导入材料、更新订阅文件夹、数据管理、视图模式等。",
+            "点选日期可查看当天队列；完成阅读后按调度策略决定下次出现时间。",
+            "阅读点右键 / 长按：排期、优先级、连续阅读、关联笔记、标签组等更多操作。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "连续阅读",
+      "paragraphs": [
+        "适合同一文档被拆成多个阅读点时，按来源连续推进，而不是在列表里到处找下一块。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "入口：阅读点右键 / 长按 →「更多操作」→「连续阅读」。",
+            "开启后，阅读点旁会出现展开按钮，可展开同一来源文档下的其它阅读点。",
+            "该能力属于基础调度辅助，无需高级授权。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "关联笔记",
+      "paragraphs": [
+        "关联笔记按阅读点类型分流：PDF / EPUB 用手写精选关联；Markdown / 网页（摘录笔记载体）用 Obsidian 出链做相关笔记统计与打开。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "入口：阅读点右键 / 长按 →「关联笔记」。",
+            "PDF / EPUB：打开、追加、新建、设主笔记、移除等精选关联操作。",
+            "Markdown / 网页：打开来源笔记，并浏览来源笔记的出链相关笔记；网页还可在浏览器打开原链接。",
+            "网页阅读点创建时已落成摘录 MD 载体；仅当载体丢失时，菜单会提示并允许重新创建摘录笔记。",
+            "已关联（或存在出链）时，列表项上可出现「笔记」徽章。",
+            "关联笔记为高级功能：未激活时入口可能隐藏，或在开启「高级功能预览」后显示为带锁项。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "标签组",
+      "paragraphs": [
+        "标签组用于按标签为不同材料配置独立的调度偏好与间隔因子，多组同时命中时按优先级匹配。",
+        "请注意：标签组当前仍在完善中，暂时可能无法正常使用；请勿把它当作当前版本的日常主流程依赖，后续版本会继续修好。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "设置入口：设置 → Weave Incremental Reading →「高级调度」→ 标签组管理。",
+            "日历入口：阅读点右键 / 长按 →「标签组」（查看或切换）。",
+            "标签组为高级功能；完善完成前，建议先用专题、优先级与基础调度推进阅读。"
+          ]
+        }
+      ]
+    }
+  ],
+  "add": [
+    {
+      "title": "推荐入口",
+      "paragraphs": [
+        "日常新增一条阅读点，请用「添加阅读目标」模态窗，而不是材料导入。",
+        "导入适合把整份文档或整本书拆成大量阅读点；添加适合一条链接、一个选区、一个 Canvas 节点。"
+      ],
+      "buttons": [
+        {
+          "icon": "plus",
+          "label": "添加链接",
+          "description": "日历顶部工具栏主入口"
+        },
+        {
+          "icon": "command",
+          "label": "命令面板",
+          "description": "「添加阅读目标到增量阅读」"
+        }
+      ]
+    },
+    {
+      "title": "模态窗五步",
+      "listGroups": [
+        {
+          "items": [
+            "粘贴链接，或点击「当前位置」捕获 Markdown 编辑器中的块 / 行锚点。",
+            "确认阅读点名称。",
+            "选择归属专题（.irdeck）。",
+            "安排首次阅读日（自选日期或系统推荐）。",
+            "可选：创建阅读笔记、在源笔记追加标记；确认后写入队列并排期。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "支持粘贴的类型",
+      "listGroups": [
+        {
+          "items": [
+            "网页：https://…",
+            "Vault 链接 / 块引用：[[笔记]]、[[笔记#^块ID]]",
+            "PDF++ 选区或书签链接（callout 内的 PDF 链接亦可）",
+            "Canvas 节点：[[画布.canvas#^nodeId]]",
+            "EPUB 定位链接（需安装并启用 Weave EPUB Reader）"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "其它快捷入口",
+      "buttons": [
+        {
+          "icon": "text-select",
+          "label": "Markdown 选区",
+          "description": "命令「从当前选区创建增量阅读点」"
+        },
+        {
+          "icon": "globe",
+          "label": "Obsidian 浏览器",
+          "description": "网页菜单 / 选区右键 → 添加到增量阅读"
+        },
+        {
+          "icon": "layout-dashboard",
+          "label": "Canvas 节点",
+          "description": "节点菜单 → 添加到增量阅读"
+        }
+      ]
+    }
+  ],
+  "import": [
+    {
+      "title": "何时用材料导入",
+      "paragraphs": [
+        "当你要把整份 Markdown、PDF 目录或 EPUB 目录批量变成阅读点时，使用「导入阅读材料」。",
+        "入口：日历顶部「更多」→ 导入阅读材料。"
+      ]
+    },
+    {
+      "title": "导入步骤",
+      "listGroups": [
+        {
+          "items": [
+            "选择文件（同批只能是同一类：md / pdf / epub，不可混合同批）。",
+            "PDF / EPUB 会先进入目录（outline）步骤，勾选要导入的章节。",
+            "选择拆分模式并配置参数。",
+            "预览生成的阅读点后确认导入。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "格式与能力边界",
+      "listGroups": [
+        {
+          "heading": "Markdown",
+          "items": [
+            "可按标题、空行等规则拆分；整文件可选择「引用」或「复制」。",
+            "兼容导入目录默认为「插件数据文件夹 / IR」。"
+          ]
+        },
+        {
+          "heading": "PDF / EPUB（高级功能）",
+          "items": [
+            "按目录生成书签式阅读点，保留章节续读信息。",
+            "EPUB 目录解析依赖 Weave EPUB Reader 提供的能力。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "订阅文件夹",
+      "paragraphs": [
+        "订阅文件夹适合「剪藏 / 收件箱」场景：指定 Vault 中的 Markdown 文件夹后，系统会扫描并自动把符合条件的新材料补齐到对应专题，再按调度进入增量阅读队列。",
+        "这与一次性「导入阅读材料」不同：导入是你主动选文件拆分；订阅是持续监听文件夹并自动补齐。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "配置入口：设置 → Weave Incremental Reading →「基础」→「订阅剪藏文件夹」（添加规则、选文件夹、绑定专题、初次排期方式、批量确认阈值）。",
+            "手动同步：日历顶部「更多」→「更新订阅文件夹」，或命令面板「更新订阅文件夹」。",
+            "日常也会在插件启动或相关文件变更时后台自动同步。",
+            "订阅文件夹为高级功能：未激活时入口可能隐藏，或在开启「高级功能预览」后显示为带锁项。"
+          ]
+        }
+      ]
+    }
+  ],
+  "trace": [
+    {
+      "title": "溯源原则",
+      "paragraphs": [
+        "每个阅读点保存稳定的续读链接与来源类型。从日历打开时，插件按类型路由回原文，并尽可能定位到创建时的位置。"
+      ]
+    },
+    {
+      "title": "Canvas 节点",
+      "paragraphs": [
+        "加入：Canvas 节点菜单，或粘贴 [[画布.canvas#^nodeId]]。",
+        "回跳：打开对应 Canvas，并按节点 ID（必要时辅以文本候选）定位高亮。",
+        "依赖：Obsidian 内置 Canvas。"
+      ]
+    },
+    {
+      "title": "Obsidian 浏览器（网页）",
+      "paragraphs": [
+        "加入：内置 Web Viewer 的「添加到增量阅读」，或粘贴 https 链接；网页型阅读点通常会创建阅读笔记。",
+        "回跳：用 Obsidian 浏览器打开该 URL。",
+        "依赖：Obsidian 内置网页查看器。"
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader 选中文本",
+      "paragraphs": [
+        "加入：在阅读器中选中文本后走「添加到增量阅读」/ 粘贴 EPUB 定位链接；高亮本身不会自动变成阅读点。",
+        "回跳：通过 obsidian://weave-epub-reader 协议打开书籍并定位到 CFI / 章节。",
+        "依赖：Weave EPUB Reader。"
+      ]
+    },
+    {
+      "title": "Obsidian Markdown",
+      "paragraphs": [
+        "加入：块引用 [[笔记#^块ID]]、行锚点，或编辑器「当前位置」/ 选区快速创建。",
+        "回跳：打开笔记并滚动到块或行，必要时显示溯源定位高亮。",
+        "依赖：Obsidian 原生 Markdown。"
+      ]
+    },
+    {
+      "title": "PDF（PDF++）",
+      "paragraphs": [
+        "加入：粘贴 PDF++ 选区 / 书签链接，或用导入按目录批量创建。",
+        "回跳：打开 PDF 并解析页码与选区锚点。",
+        "依赖：Obsidian PDF 能力；精确选区定位建议配合 PDF++。"
+      ]
+    }
+  ],
+  "data": [
+    {
+      "title": "两层存储",
+      "listGroups": [
+        {
+          "items": [
+            "Vault 数据：专题与阅读点的真相来源（应纳入备份与同步）。",
+            "插件目录：设置、缓存与运行时状态（多数可重建，备份优先 Vault）。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Vault 数据根",
+      "paragraphs": [
+        "默认文件夹名为「weave Incremental reading」，可在设置中修改。其下直接存放 points、materials、registry 等，与 Weave 系列其它插件常用的 weave/ 目录隔离。"
+      ],
+      "code": "weave Incremental reading/\n  points/                 # .irdeck topic files\n  materials/\n  registry/\n  pdf-bookmark-tasks.json\n  epub-bookmark-tasks.json\n  IR/                     # compatibility import folder"
+    },
+    {
+      "title": ".irdeck 专题文件",
+      "paragraphs": [
+        "每个专题是一份 .irdeck 文件：包含专题元数据与 points 数组（调度、溯源、关联等）。跨插件协作时，阅读点应以 .irdeck 中的记录为唯一真相。"
+      ]
+    },
+    {
+      "title": "插件目录与备份建议",
+      "listGroups": [
+        {
+          "items": [
+            "设置保存在 .obsidian/plugins/weave-incremental-reading/data.json。",
+            "cache/ 与 state/ 为本地加速与运行态，迁移机器时可不必强求一致。",
+            "备份请优先完整复制插件数据文件夹（含全部 .irdeck）；更改数据根路径前先确认旧目录内容已就绪。"
+          ]
+        }
+      ]
+    }
+  ],
+  "family": [
+    {
+      "title": "Weave 是什么",
+      "paragraphs": [
+        "Weave 是一组面向 Obsidian 的知识工作流插件，围绕「读 → 记 → 排 → 复习」组织长期学习。",
+        "Weave EPUB Reader 负责在库内读书与摘录；Weave 主插件负责记忆牌组、题库与智能制卡；Weave Incremental Reading（本插件）负责增量阅读队列与日历排期。"
+      ],
+      "listGroups": [
+        {
+          "heading": "三者分工",
+          "items": [
+            "Weave EPUB Reader：在 Obsidian 内阅读书籍，管理摘录与高亮，并与笔记、Canvas、牌组联动。",
+            "Weave 主插件：从任意来源段落生成带溯源链接的记忆卡片，并以多视图管理与 FSRS 复习。",
+            "Weave Incremental Reading：把「以后再看」整理成阅读点队列，用专题与月历调度推进节奏。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave Incremental Reading（当前插件）",
+      "paragraphs": [
+        "解决「收藏很多、同时开很多本书却都读不深」的问题：用月历推进阅读点，而不是靠意志力硬啃。"
+      ],
+      "listGroups": [
+        {
+          "heading": "核心功能",
+          "items": [
+            "阅读点与专题（.irdeck）",
+            "增量阅读月历、连续阅读与负载调度",
+            "统一添加链接、材料导入与订阅文件夹",
+            "关联笔记（PDF / EPUB 精选；Markdown / 网页出链）、标签组（完善中）",
+            "Markdown / PDF / Canvas / 网页 / EPUB 来源回跳"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave 主插件",
+      "paragraphs": [
+        "基于 Obsidian 的知识卡片系统：从库内任意文件的段落摘录生成带溯源链接的记忆卡片，支持表格、看板、网格等视图与题库练习。"
+      ],
+      "listGroups": [
+        {
+          "heading": "核心功能",
+          "items": [
+            "摘录制卡与多视图管理",
+            "题库、错题本与考试统计",
+            "FSRS 间隔复习与学习会话",
+            "可与本插件共享授权继承关系"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader",
+      "paragraphs": [
+        "在 Vault 内打开 EPUB 等书籍，边读边摘录；通过深链接把书中位置与笔记、增量阅读点连在一起。"
+      ],
+      "listGroups": [
+        {
+          "heading": "与本插件的关系",
+          "items": [
+            "EPUB 章节可导入为增量阅读点",
+            "阅读器选中文本可创建带定位信息的阅读点",
+            "从日历回跳时打开阅读器并定位到原文"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "怎么组合使用",
+      "listGroups": [
+        {
+          "items": [
+            "只做增量阅读队列：只装本插件即可。",
+            "还要读 EPUB 并回跳章节：本插件 + Weave EPUB Reader。",
+            "还要制卡与复习：本插件 + Weave 主插件。",
+            "完整闭环（读 → 记 → 排 → 复习）：三款都装。"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import {
 	buildMonthSummariesFromDayCounts,
 	toCalendarMonthKey,
 } from "./IRCalendarProjectionUtils";
+import { mergeMaterialsByDateMaps } from "./IRCalendarDayQueueMerge";
 import type { ScheduleItem } from "./IRCalendarScheduleItem";
 
 export const IR_CALENDAR_DAY_INDEX_VERSION = "2.1.0";
@@ -187,25 +188,36 @@ export class IRCalendarDayIndexService {
 
 	/**
 	 * 仅恢复指定月份的热力计数，不加载日列表切片。
+	 * scheduleFingerprint 必填且须与 scope 一致，避免冷启动用过期热力卡住日列表就绪判定。
 	 */
 	async tryHydrateMonthHeatmap(input: {
 		cacheKey: string;
 		settingsFingerprint: string;
 		monthKeys: string[];
+		scheduleFingerprint: string;
 	}): Promise<Map<string, Record<string, number>> | null> {
 		const cacheKey = String(input.cacheKey || "").trim();
 		const settingsFingerprint = String(input.settingsFingerprint || "").trim();
+		const scheduleFingerprint = String(input.scheduleFingerprint || "").trim();
 		const monthKeys = Array.from(
 			new Set(
 				input.monthKeys.map((key) => String(key || "").trim()).filter(Boolean),
 			),
 		);
-		if (!cacheKey || !settingsFingerprint || monthKeys.length === 0) {
+		if (
+			!cacheKey ||
+			!settingsFingerprint ||
+			!scheduleFingerprint ||
+			monthKeys.length === 0
+		) {
 			return null;
 		}
 
 		const scope = await this.readScope(cacheKey);
 		if (!scope || scope.settingsFingerprint !== settingsFingerprint) {
+			return null;
+		}
+		if (scope.scheduleFingerprint !== scheduleFingerprint) {
 			return null;
 		}
 
@@ -288,6 +300,8 @@ export class IRCalendarDayIndexService {
 
 	/**
 	 * 合并写入：更新全日摘要计数，仅替换 priorityDateKeys 对应的列表切片。
+	 * L2 committed-due 同步不得用空切片/缩减切片冲掉 L1 已写入的全日队列；
+	 * 权威缩减只走 patchDaySlices。
 	 */
 	async syncFromMaterialsByDate(input: {
 		cacheKey: string;
@@ -303,26 +317,53 @@ export class IRCalendarDayIndexService {
 
 		const existing =
 			(await this.readScope(cacheKey)) || this.createEmptyScope(input);
+		const sliceDateKeys =
+			input.priorityDateKeys && input.priorityDateKeys.length > 0
+				? input.priorityDateKeys
+				: Array.from(input.materialsByDate.keys());
+
+		const existingMaterials = new Map<string, ScheduleItem[]>();
+		const incomingMaterials = new Map<string, ScheduleItem[]>();
+		for (const dateKey of sliceDateKeys) {
+			const normalizedDateKey = String(dateKey || "").trim();
+			if (!normalizedDateKey) {
+				continue;
+			}
+			const existingSlice = existing.slices[normalizedDateKey];
+			existingMaterials.set(
+				normalizedDateKey,
+				Array.isArray(existingSlice)
+					? existingSlice.map((item) => this.hydrateScheduleItem(item))
+					: [],
+			);
+			incomingMaterials.set(
+				normalizedDateKey,
+				input.materialsByDate.get(normalizedDateKey) || [],
+			);
+		}
+		const protectedMaterials = mergeMaterialsByDateMaps(
+			existingMaterials,
+			incomingMaterials,
+			{ protectAgainstShrink: true },
+		);
+
 		const mergedDaySummaries = { ...existing.daySummaries };
 		for (const [dateKey, items] of input.materialsByDate.entries()) {
 			const normalizedDateKey = String(dateKey || "").trim();
-			if (!normalizedDateKey) {
+			if (!normalizedDateKey || protectedMaterials.has(normalizedDateKey)) {
 				continue;
 			}
 			mergedDaySummaries[normalizedDateKey] = { totalCount: items.length };
 		}
 
-		const sliceDateKeys =
-			input.priorityDateKeys && input.priorityDateKeys.length > 0
-				? input.priorityDateKeys
-				: Array.from(input.materialsByDate.keys());
 		const mergedSlices = { ...existing.slices };
 		for (const dateKey of sliceDateKeys) {
 			const normalizedDateKey = String(dateKey || "").trim();
 			if (!normalizedDateKey) {
 				continue;
 			}
-			const items = input.materialsByDate.get(normalizedDateKey) || [];
+			const items = protectedMaterials.get(normalizedDateKey) || [];
+			mergedDaySummaries[normalizedDateKey] = { totalCount: items.length };
 			mergedSlices[normalizedDateKey] = items.map((item) =>
 				this.serializeScheduleItem(item),
 			);

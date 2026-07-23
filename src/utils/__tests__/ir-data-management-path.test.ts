@@ -4,17 +4,17 @@ import { formatIRDataManagementPathLabel } from "../ir-data-management-path";
 describe("formatIRDataManagementPathLabel", () => {
 	it("shows path relative to canonical dir when under base", () => {
 		const result = formatIRDataManagementPathLabel(
-			"weave/incremental-reading/points/Topic.irdeck",
-			"weave/incremental-reading/points",
+			"weave Incremental reading/points/Topic.irdeck",
+			"weave Incremental reading/points",
 		);
 		expect(result.display).toBe("Topic.irdeck");
-		expect(result.full).toBe("weave/incremental-reading/points/Topic.irdeck");
+		expect(result.full).toBe("weave Incremental reading/points/Topic.irdeck");
 	});
 
 	it("truncates long paths outside base dir", () => {
 		const result = formatIRDataManagementPathLabel(
-			"INBOX/Clippings/weave/incremental-reading/points/Topic.irdeck",
-			"weave/incremental-reading/points",
+			"INBOX/Clippings/weave Incremental reading/points/Topic.irdeck",
+			"weave Incremental reading/points",
 		);
 		expect(result.display).toBe("…/points/Topic.irdeck");
 	});

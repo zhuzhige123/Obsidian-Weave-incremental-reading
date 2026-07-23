@@ -73,7 +73,19 @@ describe("IRCalendarQueryService cache title normalization", () => {
 			id: "irdeck-1",
 			title: "pdf.irdeck",
 			displayName: "pdf.irdeck",
-			sourceFile: "weave/incremental-reading/points/pdf.irdeck",
+			sourceFile: "weave Incremental reading/points/pdf.irdeck",
+			priority: 5,
+			intervalDays: 1,
+			scheduleStatus: "new",
+			nextRepDate: 0,
+			nextReviewDate: null,
+			sourceType: "chunk",
+		} as any;
+		const titleOnlyGhost = {
+			id: "irdeck-title-ghost",
+			title: "五月份的书籍阅读.irdeck",
+			displayName: "五月份的书籍阅读.irdeck",
+			sourceFile: "",
 			priority: 5,
 			intervalDays: 1,
 			scheduleStatus: "new",
@@ -97,7 +109,9 @@ describe("IRCalendarQueryService cache title normalization", () => {
 			{
 				workspaceData: { generatedAt: 1 } as any,
 				readingMaterials: [],
-				materialsByDate: new Map([["2026-05-01", [irdeckItem, validItem]]]),
+				materialsByDate: new Map([
+					["2026-05-01", [irdeckItem, titleOnlyGhost, validItem]],
+				]),
 				continueReadingSuspendedItemsPool: [irdeckItem],
 				schedule: { generatedAt: 2, version: 1, deckIds: [], days: [] },
 				scope: {

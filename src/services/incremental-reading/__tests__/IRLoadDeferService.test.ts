@@ -97,13 +97,14 @@ describe("IRLoadDeferService", () => {
 			[createDeferral("chunk-1")],
 			{
 				reason: "load_defer",
+				persistDeferrals: true,
 			},
 		);
 		expect(applied).toBe(0);
 		expect(mockUpdateChunkSchedule).not.toHaveBeenCalled();
 	});
 
-	test("ui_refresh 会持久化 chunk 顺延并清除手动 pin", async () => {
+	test("默认不持久化顺延，保护完成时写入的 nextRepDate", async () => {
 		const { applyLoadDeferralsFromPlan } = await import(
 			"../IRLoadDeferService"
 		);
@@ -113,6 +114,23 @@ describe("IRLoadDeferService", () => {
 			[createDeferral("chunk-1")],
 			{
 				reason: "ui_refresh",
+			},
+		);
+		expect(applied).toBe(0);
+		expect(mockUpdateChunkSchedule).not.toHaveBeenCalled();
+	});
+
+	test("显式 persistDeferrals 才会持久化 chunk 顺延并清除手动 pin", async () => {
+		const { applyLoadDeferralsFromPlan } = await import(
+			"../IRLoadDeferService"
+		);
+		const app = { vault: {} } as any;
+		const applied = await applyLoadDeferralsFromPlan(
+			app,
+			[createDeferral("chunk-1")],
+			{
+				reason: "ui_refresh",
+				persistDeferrals: true,
 			},
 		);
 		expect(applied).toBe(1);

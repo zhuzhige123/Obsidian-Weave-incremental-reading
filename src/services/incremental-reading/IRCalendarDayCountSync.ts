@@ -2,11 +2,14 @@ import type { ScheduleItem } from "./IRCalendarScheduleItem";
 
 /**
  * 从已加载的当日队列材料构建热力图计数（与列表同一投影源）。
+ *
+ * @param shouldIncludePinnedDate 返回 false 时该日不把 pinned 计入（活跃日全日队列只在 materials）。
  */
 export function buildVisibleDayCountsByDate(
 	materialsByDate: Map<string, ScheduleItem[]>,
 	pinnedByDate: Map<string, ScheduleItem[]>,
 	shouldIncludeItem: (item: ScheduleItem) => boolean,
+	shouldIncludePinnedDate?: (dateKey: string) => boolean,
 ): Map<string, number> {
 	const counts = new Map<string, number>();
 	const dateKeys = new Set<string>([
@@ -21,9 +24,13 @@ export function buildVisibleDayCountsByDate(
 				ids.add(item.id);
 			}
 		}
-		for (const item of pinnedByDate.get(dateKey) || []) {
-			if (shouldIncludeItem(item)) {
-				ids.add(item.id);
+		const includePinned =
+			!shouldIncludePinnedDate || shouldIncludePinnedDate(dateKey);
+		if (includePinned) {
+			for (const item of pinnedByDate.get(dateKey) || []) {
+				if (shouldIncludeItem(item)) {
+					ids.add(item.id);
+				}
 			}
 		}
 		counts.set(dateKey, ids.size);

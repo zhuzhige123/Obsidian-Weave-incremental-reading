@@ -14,6 +14,7 @@
 @import './data-management.css';         /* 数据管理 */
 @import './ir-calendar-search-portal.css'; /* 月历阅读材料搜索下拉（portal 到 body） */
 @import './ir-paragraph-workbench.css';  /* 增量阅读段落工作台 */
+@import './weave-tutorial-panel.css';    /* Weave 教程浮窗（与 Reader / 主插件同款） */
 
 /* Off-screen anchor used to trigger obsidian:// protocol handling. */
 .weave-protocol-open-anchor {

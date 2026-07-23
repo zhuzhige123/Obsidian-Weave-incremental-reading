@@ -16,12 +16,10 @@ import {
 	buildScheduleItemFromChunkData,
 	buildScheduleItemFromEpubTask,
 	buildScheduleItemFromPdfTask,
-	buildScheduleItemFromProjectedItem,
 } from "./IRCalendarScheduleItem";
-import {
-	buildProjectedDayLoadMap,
-	getProjectedScheduleSummary,
-} from "./IRProjectedScheduleSummary";
+import { buildCalendarMaterialsByCommittedDue } from "./IRCalendarCommittedDueMaterials";
+import { scheduleIRDeckGhostPointCleanup } from "./IRDeckGhostPointCleanup";
+import { getProjectedScheduleSummary } from "./IRProjectedScheduleSummary";
 import { extractReadingPointDisplayName } from "./IRReadingPointTitle";
 import {
 	buildScheduleFingerprintFromWorkspace,
@@ -777,17 +775,31 @@ export class IRCalendarQueryService {
 		readingMaterials: ReadingMaterial[],
 		scope: Pick<IRCalendarQueryScope, "deckIds" | "horizonDays" | "cacheKey">,
 	): IRCalendarQueryResult {
+		const ghostPointIds: string[] = [];
+		const keepItem = (item: ScheduleItem): boolean => {
+			if (!shouldExcludeScheduleItemBySource(item)) {
+				return true;
+			}
+			const id = String(item.id || "").trim();
+			if (id) {
+				ghostPointIds.push(id);
+			}
+			return false;
+		};
 		const normalizedMaterialsByDate = new Map(
 			Array.from(result.materialsByDate.entries(), ([dateKey, items]) => [
 				dateKey,
 				items
-					.filter((item) => !shouldExcludeScheduleItemBySource(item))
+					.filter(keepItem)
 					.map((item) => this.normalizeScheduleItemDisplayName(item)),
 			]),
 		);
 		const normalizedSuspendedItems = result.continueReadingSuspendedItemsPool
-			.filter((item) => !shouldExcludeScheduleItemBySource(item))
+			.filter(keepItem)
 			.map((item) => this.normalizeScheduleItemDisplayName(item));
+		if (ghostPointIds.length > 0) {
+			scheduleIRDeckGhostPointCleanup(this.app, ghostPointIds);
+		}
 		return {
 			...result,
 			workspaceData,
@@ -822,15 +834,14 @@ export class IRCalendarQueryService {
 				history: workspaceData.history,
 			},
 		});
-		const projectedDayLoadMap = buildProjectedDayLoadMap(projectedSummary);
-		const materialsByDate = new Map<string, ScheduleItem[]>();
-		for (const [dateKey, dayLoad] of projectedDayLoadMap.entries()) {
-			materialsByDate.set(
-				dateKey,
-				dayLoad.items
-					.map((item) => buildScheduleItemFromProjectedItem(item))
-					.filter((item) => !shouldExcludeScheduleItemBySource(item)),
-			);
+		// 月历材料按承诺 due 分桶；不使用 PlanGenerator 改写后的计划槽日。
+		const ghostPointIds: string[] = [];
+		const materialsByDate = buildCalendarMaterialsByCommittedDue(
+			projectedSummary,
+			{ ghostPointIds },
+		);
+		if (ghostPointIds.length > 0) {
+			scheduleIRDeckGhostPointCleanup(this.app, ghostPointIds);
 		}
 
 		const continueReadingSuspendedItemsPool =

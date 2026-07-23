@@ -1,7 +1,7 @@
-import type { SupportedLanguage, TranslationKey } from "../types";
+import type { AuthoringLanguage, TranslationKey } from "../types";
 
 export const standaloneBaseTranslations: Record<
-	SupportedLanguage,
+	AuthoringLanguage,
 	TranslationKey
 > = {
 	"zh-CN": {

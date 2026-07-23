@@ -44,6 +44,7 @@ describe("IRCalendarSearchInput", () => {
 		expect(t("management.cardSearch.options.readingPointType")).toBe(
 			"type: 搜索阅读点类型",
 		);
+		expect(t("management.cardSearch.menuSections.tag")).toBe("标签");
 	});
 
 	it("portals the search panel to body so sidebar overflow cannot clip it", async () => {
@@ -70,5 +71,63 @@ describe("IRCalendarSearchInput", () => {
 		expect(
 			container.querySelector(".weave-card-search-dropdown-panel"),
 		).not.toBeInTheDocument();
+	});
+
+	it("opens a tag list like topics and filters it from the main search input", async () => {
+		const { container } = render(IRCalendarSearchInput, {
+			props: {
+				app: {} as any,
+				availableTags: [
+					{ name: "alpha", count: 3 },
+					{ name: "beta", count: 1 },
+					{ name: "gamma", count: 2 },
+				],
+			},
+		});
+
+		const input = container.querySelector("input") as HTMLInputElement;
+		await fireEvent.focus(input);
+
+		await waitFor(() => {
+			expect(
+				document.body.querySelector(".floating-menu.card-search-floating-menu"),
+			).toBeInTheDocument();
+		});
+
+		const tagOption = Array.from(
+			document.body.querySelectorAll(".dropdown-item"),
+		).find((element) =>
+			element.textContent?.includes(t("management.cardSearch.options.tag")),
+		);
+		expect(tagOption).toBeTruthy();
+		await fireEvent.mouseDown(tagOption!);
+
+		await waitFor(() => {
+			const panel = document.body.querySelector(
+				".floating-menu.card-search-floating-menu .search-suggestion-panel",
+			);
+			expect(panel).toBeInTheDocument();
+			expect(panel?.textContent).toContain(
+				t("management.cardSearch.menuSections.tag"),
+			);
+			expect(panel?.textContent).toContain("alpha");
+			expect(panel?.textContent).toContain("beta");
+			expect(panel?.textContent).toContain("gamma");
+			// 标签列表不使用独立搜索框；过滤在主搜索框完成
+			expect(panel?.querySelector(".suggestion-search-input")).toBeNull();
+		});
+
+		expect(input.value).toContain("tag:");
+
+		await fireEvent.input(input, { target: { value: "tag:be" } });
+
+		await waitFor(() => {
+			const panel = document.body.querySelector(
+				".floating-menu.card-search-floating-menu .search-suggestion-panel",
+			);
+			expect(panel?.textContent).toContain("beta");
+			expect(panel?.textContent).not.toContain("alpha");
+			expect(panel?.textContent).not.toContain("gamma");
+		});
 	});
 });

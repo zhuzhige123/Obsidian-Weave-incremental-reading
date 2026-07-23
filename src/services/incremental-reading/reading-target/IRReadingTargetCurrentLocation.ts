@@ -6,7 +6,6 @@ import {
 	normalizePath,
 } from "obsidian";
 import {
-	buildObsidianBlockWikiLink,
 	buildObsidianEmbedBlockWikiLink,
 	extractObsidianBlockIdFromText,
 } from "../paragraph-workbench/paragraph-block-reference";
@@ -68,22 +67,24 @@ export function getCurrentEditorReadingTargetContext(
 	if (blockId) {
 		sourceLink = buildObsidianEmbedBlockWikiLink(sourcePath, blockId);
 		target = parseReadingTargetInput(app, sourceLink, sourcePath);
-	} else if (selection) {
-		sourceLink = buildObsidianBlockWikiLink(
-			sourcePath,
-			"pending",
-			selection.slice(0, 40),
-		);
-		target = {
-			kind: "vault-link",
-			rawInput: selection,
-			resumeLink: `${sourcePath}#${cursor.line + 1}`,
-			sourceFilePath: sourcePath,
-			titleHint: selection.split("\n")[0]?.trim().slice(0, 80),
-		};
 	} else {
-		sourceLink = `[[${sourcePath}#${cursor.line + 1}]]`;
+		const lineAlias = (selection || lineText).slice(0, 40).replace(/[[\]]/g, "");
+		const lineResume = `${sourcePath}#${cursor.line + 1}`;
+		sourceLink = lineAlias
+			? `[[${lineResume}|${lineAlias}]]`
+			: `[[${lineResume}]]`;
 		target = parseReadingTargetInput(app, sourceLink, sourcePath);
+		const titleHint = (selection || lineText)
+			.split("\n")[0]
+			?.trim()
+			.slice(0, 80);
+		if (titleHint && !target.validationError) {
+			target = {
+				...target,
+				titleHint: target.titleHint || titleHint,
+				alias: target.alias || titleHint,
+			};
+		}
 	}
 
 	return {
@@ -116,6 +117,9 @@ export function buildReadingTargetPreviewMarkdown(
 	if (target.kind === "epub") {
 		const link = target.epubResumeLink || target.resumeLink;
 		return link ? `[${title}](${link})` : title;
+	}
+	if (target.kind === "canvas") {
+		return target.displayLink || target.resumeLink || title;
 	}
 	if (target.displayLink) {
 		return target.displayLink.startsWith("!")

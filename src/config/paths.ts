@@ -1,12 +1,30 @@
 /**
  * Standalone incremental-reading plugin path configuration.
  *
- * Vault data lives under `weave/incremental-reading/`; plugin-local cache/state
- * lives under `.obsidian/plugins/weave-incremental-reading/`.
+ * Vault IR data lives under a dedicated parent folder (default:
+ * `weave Incremental reading/`), with `points/` / `materials/` / etc. directly
+ * beneath it — not under a shared `weave/` series root.
+ *
+ * Plugin-local cache/state lives under
+ * `.obsidian/plugins/{pluginId}/` (see {@link getActivePluginId}).
  */
 import { type App, normalizePath } from "obsidian";
+import { CURRENT_PLUGIN_ID } from "./plugin-runtime";
 
 declare const __WEAVE_IR_STANDALONE__: boolean;
+
+/** Compatibility: embedded Weave main plugin id (non-standalone builds). */
+const EMBEDDED_WEAVE_PLUGIN_ID = "weave";
+
+/**
+ * Active Obsidian plugin folder id for this build.
+ * Standalone IR → manifest id; embedded → main Weave plugin.
+ */
+export function getActivePluginId(): string {
+	return typeof __WEAVE_IR_STANDALONE__ !== "undefined" && __WEAVE_IR_STANDALONE__
+		? CURRENT_PLUGIN_ID
+		: EMBEDDED_WEAVE_PLUGIN_ID;
+}
 
 type PluginFolderSettings = {
 	settings?: {
@@ -23,17 +41,31 @@ type AppWithPluginAccess = {
 	};
 };
 
-/** Vault 数据根目录 */
+/**
+ * Compatibility note: 旧 Weave 系列共用 Vault 数据根（`weave/`）。
+ * 独立 IR 默认根已改为 {@link DEFAULT_IR_DATA_ROOT}；本常量仅用于旧路径检测/迁移。
+ */
 export const WEAVE_DATA = "weave";
+
+/**
+ * IR Vault 数据父文件夹默认名。
+ * 其下直接存放 points / materials / registry 等，不再套一层 `weave/` 或 `incremental-reading/`。
+ */
+export const DEFAULT_IR_DATA_ROOT = "weave Incremental reading";
+
+/**
+ * 拆分前默认 IR 根：`weave/incremental-reading/`（仅只读兼容 / 迁移源）。
+ */
+export const LEGACY_IR_DATA_ROOT = `${WEAVE_DATA}/incremental-reading`;
 
 /** Compatibility note: legacy：旧的 Vault 隐藏数据根目录（历史版本机读数据） */
 export const LEGACY_DOT_TUANKI = ".tuanki";
 
-/** Compatibility note: v2.x 旧的机读数据子目录名（已废弃，数据现在直接在 weave/ 下） */
+/** Compatibility note: v2.x 旧的机读数据子目录名（已废弃） */
 export const LEGACY_MACHINE_DATA_SUBDIR = "_data";
 
 /** 旧增量阅读正文/文件化块兼容目录（新正文默认路径已不再写入这里） */
-export const DEFAULT_IR_IMPORT_FOLDER = `${WEAVE_DATA}/incremental-reading/IR`;
+export const DEFAULT_IR_IMPORT_FOLDER = `${DEFAULT_IR_DATA_ROOT}/IR`;
 const DEFAULT_OBSIDIAN_CONFIG_DIR = [".", "obsidian"].join("");
 const DEFAULT_CONFIG_DIR_PATH_MARKER = `/${DEFAULT_OBSIDIAN_CONFIG_DIR}`;
 const DEFAULT_CONFIG_DIR_PATH_SEGMENT = `${DEFAULT_CONFIG_DIR_PATH_MARKER}/`;
@@ -86,65 +118,90 @@ export function toVaultAdapterPath(
 	return normalized;
 }
 
+/**
+ * 规范化用户配置的 IR 数据父文件夹。
+ * 空值表示使用 {@link DEFAULT_IR_DATA_ROOT}；非空值即数据根本身（不再追加 weave）。
+ */
 export function normalizeWeaveParentFolder(parentFolder?: string): string {
 	const raw = (parentFolder || "").trim();
 	if (!raw || raw === "." || raw === "/") return "";
 	const normalized = normalizePath(raw);
 	if (!normalized || normalized === "." || normalized === "/") return "";
-	if (normalized === WEAVE_DATA) return "";
+	// 与默认根相同则视为未自定义，避免设置里重复写出默认名造成歧义
+	if (normalized === DEFAULT_IR_DATA_ROOT) return "";
 	return normalized;
 }
 
+/**
+ * IR Vault 数据根（父文件夹）。
+ * - 未自定义：`weave Incremental reading`
+ * - 已自定义：用户路径本身（其下直接放 points 等）
+ */
 export function getReadableWeaveRoot(parentFolder?: string): string {
 	const parent = normalizeWeaveParentFolder(parentFolder);
-	return parent ? normalizePath(`${parent}/${WEAVE_DATA}`) : WEAVE_DATA;
+	return parent || DEFAULT_IR_DATA_ROOT;
 }
 
 /**
- * Compatibility note: v2.x 旧的机读数据根（weave/_data/），现在直接使用 getReadableWeaveRoot()
- * 保留仅用于启动迁移检测
+ * Compatibility note: v2.x 旧的机读数据根（weave/_data/），仅用于启动迁移检测。
  */
-export function getMachineWeaveRoot(parentFolder?: string): string {
-	return normalizePath(
-		`${getReadableWeaveRoot(parentFolder)}/${LEGACY_MACHINE_DATA_SUBDIR}`,
-	);
+export function getMachineWeaveRoot(_parentFolder?: string): string {
+	return normalizePath(`${WEAVE_DATA}/${LEGACY_MACHINE_DATA_SUBDIR}`);
+}
+
+/** 拆分前 IR 数据根，供双读 / 迁移使用。 */
+export function getLegacyIRDataRoot(parentFolder?: string): string {
+	const parent = normalizeWeaveParentFolder(parentFolder);
+	if (!parent) {
+		return LEGACY_IR_DATA_ROOT;
+	}
+	// 设置迁移后可能已直接指向旧 IR 根，避免再次拼接
+	if (
+		parent === LEGACY_IR_DATA_ROOT ||
+		parent.endsWith(`/${LEGACY_IR_DATA_ROOT}`)
+	) {
+		return parent;
+	}
+	// 旧模型：{parent}/weave/incremental-reading
+	return normalizePath(`${parent}/${LEGACY_IR_DATA_ROOT}`);
 }
 
 export function getV2Paths(parentFolder?: string) {
 	const root = getReadableWeaveRoot(parentFolder);
 
 	return {
-		/** 数据根目录 */
+		/** 数据根目录（= IR 父文件夹） */
 		root,
 		/** Schema 版本文件（无点前缀，确保同步兼容） */
 		schemaVersion: `${root}/schema-version.json`,
 
-		/** 增量阅读模块 */ ir: {
-			root: `${root}/incremental-reading`,
-			epub: `${root}/incremental-reading/epub-reading`,
-			registry: `${root}/incremental-reading/registry`,
-			pointsDir: `${root}/incremental-reading/points`,
-			materialRecordsDir: `${root}/incremental-reading/materials`,
-			legacyTopics: `${root}/incremental-reading/topics.json`,
-			legacyDecks: `${root}/incremental-reading/decks.json`,
-			blocks: `${root}/incremental-reading/blocks.json`,
-			history: `${root}/incremental-reading/history.json`,
-			chunks: `${root}/incremental-reading/chunks.json`,
-			sources: `${root}/incremental-reading/sources.json`,
-			studySessions: `${root}/incremental-reading/study-sessions.json`,
-			calendarProgress: `${root}/incremental-reading/calendar-progress.json`,
-			tagGroups: `${root}/incremental-reading/tag-groups.json`,
-			tagGroupProfiles: `${root}/incremental-reading/tag-group-profiles.json`,
-			documentGroupMap: `${root}/incremental-reading/document-group-map.json`,
-			pdfBookmarkTasks: `${root}/incremental-reading/pdf-bookmark-tasks.json`,
-			epubBookmarkTasks: `${root}/incremental-reading/epub-bookmark-tasks.json`,
-			materialsIndex: `${root}/incremental-reading/registry/materials-index.json`,
-			pointFilesIndex: `${root}/incremental-reading/registry/point-files-index.json`,
-			scheduleProfiles: `${root}/incremental-reading/registry/schedule-profiles.json`,
+		/** 增量阅读模块：直接挂在父文件夹下 */ ir: {
+			root,
+			epub: `${root}/epub-reading`,
+			epubBookmarks: `${root}/epub-bookmarks`,
+			registry: `${root}/registry`,
+			pointsDir: `${root}/points`,
+			materialRecordsDir: `${root}/materials`,
+			legacyTopics: `${root}/topics.json`,
+			legacyDecks: `${root}/decks.json`,
+			blocks: `${root}/blocks.json`,
+			history: `${root}/history.json`,
+			chunks: `${root}/chunks.json`,
+			sources: `${root}/sources.json`,
+			studySessions: `${root}/study-sessions.json`,
+			calendarProgress: `${root}/calendar-progress.json`,
+			tagGroups: `${root}/tag-groups.json`,
+			tagGroupProfiles: `${root}/tag-group-profiles.json`,
+			documentGroupMap: `${root}/document-group-map.json`,
+			pdfBookmarkTasks: `${root}/pdf-bookmark-tasks.json`,
+			epubBookmarkTasks: `${root}/epub-bookmark-tasks.json`,
+			materialsIndex: `${root}/registry/materials-index.json`,
+			pointFilesIndex: `${root}/registry/point-files-index.json`,
+			scheduleProfiles: `${root}/registry/schedule-profiles.json`,
 			materials: {
-				root: `${root}/incremental-reading/materials`,
-				index: `${root}/incremental-reading/materials/materials.json`,
-				sessions: `${root}/incremental-reading/materials/sessions`,
+				root: `${root}/materials`,
+				index: `${root}/materials/materials.json`,
+				sessions: `${root}/materials/sessions`,
 			},
 		},
 	} as const;
@@ -153,13 +210,10 @@ export function getV2Paths(parentFolder?: string) {
 export function getV2PathsFromApp(app?: App | AppWithPluginAccess) {
 	try {
 		const pluginHost = app as AppWithPluginAccess | undefined;
-		const pluginId =
-			typeof __WEAVE_IR_STANDALONE__ !== "undefined" && __WEAVE_IR_STANDALONE__
-				? "weave-incremental-reading"
-				: "weave";
+		const pluginId = getActivePluginId();
 		const plugin =
 			pluginHost?.plugins?.getPlugin?.(pluginId) ??
-			pluginHost?.plugins?.getPlugin?.("weave");
+			pluginHost?.plugins?.getPlugin?.(EMBEDDED_WEAVE_PLUGIN_ID);
 		const parentFolder = plugin?.settings?.weaveParentFolder;
 		return getV2Paths(parentFolder);
 	} catch {
@@ -168,9 +222,7 @@ export function getV2PathsFromApp(app?: App | AppWithPluginAccess) {
 }
 
 export function getLegacyIRImportFolder(parentFolder?: string): string {
-	return normalizePath(
-		`${getReadableWeaveRoot(parentFolder)}/incremental-reading/IR`,
-	);
+	return normalizePath(`${getReadableWeaveRoot(parentFolder)}/IR`);
 }
 
 export function resolveIRImportFolder(
@@ -183,21 +235,30 @@ export function resolveIRImportFolder(
 	if (!raw) return dynamicDefault;
 
 	const normalized = normalizePath(raw);
-	// 旧路径自动回退到新默认值
+	// 旧路径 / 系列共用根自动回退到当前默认 IR 目录
 	if (normalized === ".weave" || normalized.startsWith(".weave/"))
 		return dynamicDefault;
-	if (normalized === "weave" || normalized.startsWith("weave/"))
+	if (normalized === WEAVE_DATA || normalized.startsWith(`${WEAVE_DATA}/`))
 		return dynamicDefault;
+	if (
+		normalized === DEFAULT_IR_DATA_ROOT ||
+		normalized === LEGACY_IR_DATA_ROOT
+	) {
+		return dynamicDefault;
+	}
 	const machineRoot = getMachineWeaveRoot(parentFolder);
 	if (normalized === machineRoot || normalized.startsWith(`${machineRoot}/`))
 		return dynamicDefault;
+	const legacyDataRoot = getLegacyIRDataRoot(parentFolder);
 	if (
-		normalized === `${WEAVE_DATA}/${LEGACY_MACHINE_DATA_SUBDIR}` ||
-		normalized.startsWith(`${WEAVE_DATA}/${LEGACY_MACHINE_DATA_SUBDIR}/`)
-	)
+		normalized === legacyDataRoot ||
+		normalized === `${legacyDataRoot}/IR` ||
+		normalized.startsWith(`${legacyDataRoot}/IR/`)
+	) {
 		return dynamicDefault;
-	const legacyIR = normalizePath(`${getReadableWeaveRoot(parentFolder)}/IR`);
-	if (normalized === legacyIR) return dynamicDefault;
+	}
+	const bareIR = normalizePath(`${getReadableWeaveRoot(parentFolder)}/IR`);
+	if (normalized === bareIR) return dynamicDefault;
 	return normalized;
 }
 
@@ -212,11 +273,7 @@ export function getPluginDirById(
 
 /** 插件目录根路径（动态获取，兼容自定义 configDir） */
 export function getPluginDir(app?: { vault: { configDir: string } }): string {
-	const pluginId =
-		typeof __WEAVE_IR_STANDALONE__ !== "undefined" && __WEAVE_IR_STANDALONE__
-			? "weave-incremental-reading"
-			: "weave";
-	return getPluginDirById(app, pluginId);
+	return getPluginDirById(app, getActivePluginId());
 }
 
 /** Schema 版本号 */
@@ -281,11 +338,7 @@ export function getPluginPathsById(
 
 /** 动态获取插件目录路径（支持自定义 configDir） */
 export function getPluginPaths(app?: { vault: { configDir: string } }) {
-	const pluginId =
-		typeof __WEAVE_IR_STANDALONE__ !== "undefined" && __WEAVE_IR_STANDALONE__
-			? "weave-incremental-reading"
-			: "weave";
-	return getPluginPathsById(app, pluginId);
+	return getPluginPathsById(app, getActivePluginId());
 }
 
 export function getLegacyPluginPaths(app?: { vault: { configDir: string } }) {
@@ -332,7 +385,7 @@ export const LEGACY_PATHS = {
 	/** 增量阅读旧路径 */
 	readingMaterials: `${WEAVE_DATA}/reading-materials`,
 	ir: `${WEAVE_DATA}/IR`,
-	incrementalReading: `${WEAVE_DATA}/incremental-reading`,
+	incrementalReading: LEGACY_IR_DATA_ROOT,
 	epubReading: `${WEAVE_DATA}/epub-reading`,
 
 	/** 题库旧路径 */
@@ -357,20 +410,20 @@ export const LEGACY_PATHS = {
  */
 export const PATHS = {
 	/** 数据根目录 */
-	root: WEAVE_DATA,
+	root: DEFAULT_IR_DATA_ROOT,
 	/** 临时文件夹 */
-	temp: `${WEAVE_DATA}/temp`,
-	/** 增量阅读数据文件夹 */
-	incrementalReading: `${WEAVE_DATA}/incremental-reading`,
+	temp: `${DEFAULT_IR_DATA_ROOT}/temp`,
+	/** 增量阅读数据文件夹（现与数据根相同） */
+	incrementalReading: DEFAULT_IR_DATA_ROOT,
 
-	/** 增量阅读：人类可读内容文件夹（现在在 incremental-reading/IR 下） */
-	irBase: `${WEAVE_DATA}/incremental-reading/IR`,
+	/** 增量阅读：人类可读内容文件夹 */
+	irBase: `${DEFAULT_IR_DATA_ROOT}/IR`,
 	/** 增量阅读：源材料文件夹 */
-	irRaw: `${WEAVE_DATA}/incremental-reading/IR/raw`,
+	irRaw: `${DEFAULT_IR_DATA_ROOT}/IR/raw`,
 	/** 增量阅读：索引文件夹 */
-	irSources: `${WEAVE_DATA}/incremental-reading/IR/sources`,
+	irSources: `${DEFAULT_IR_DATA_ROOT}/IR/sources`,
 	/** 增量阅读：块文件夹 */
-	irChunks: `${WEAVE_DATA}/incremental-reading/IR/chunks`,
+	irChunks: `${DEFAULT_IR_DATA_ROOT}/IR/chunks`,
 } as const;
 
 /**

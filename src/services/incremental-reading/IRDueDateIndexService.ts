@@ -2,7 +2,10 @@ import type { App } from "obsidian";
 import { getPluginPaths } from "../../config/paths";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
-import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
+import {
+	type IRScheduleIndexSources,
+	getSharedIRScheduleIndexService,
+} from "./IRScheduleIndexService";
 
 const DUE_DATE_INDEX_VERSION = "1.0.0";
 
@@ -12,6 +15,11 @@ export interface IRDueDateIndexStore {
 	byDate: Record<string, string[]>;
 	byPointId: Record<string, string>;
 }
+
+type DueDateIndexSourceSlice = Pick<
+	IRScheduleIndexSources,
+	"chunks" | "pdfTasks" | "epubTasks"
+>;
 
 export function formatDueDateKeyFromTimestamp(
 	timestamp: number | undefined | null,
@@ -62,6 +70,52 @@ export class IRDueDateIndexService {
 		this.pendingWrite = false;
 	}
 
+	/**
+	 * 冷启动预读：仅将磁盘 due 索引载入内存。
+	 * 禁止调用 getScheduleSources / rebuildFromScheduleIndex（避免完整 freshness 扫库）。
+	 */
+	async warmDiskCache(): Promise<boolean> {
+		if (this.memoryStore) {
+			return true;
+		}
+		const disk = await this.readDiskStore();
+		if (!disk) {
+			return false;
+		}
+		this.memoryStore = disk;
+		logger.debug("[IRDueDateIndexService] due-date index warmed from disk", {
+			dateCount: Object.keys(disk.byDate || {}).length,
+			pointCount: Object.keys(disk.byPointId || {}).length,
+		});
+		return true;
+	}
+
+	/**
+	 * 用已 warm 的 schedule 源在内存重建 due 倒排（不触发 getScheduleSources）。
+	 * 供冷启动：schedule 命中而 due 磁盘缺失时补齐。
+	 */
+	async rebuildFromWarmScheduleSources(
+		sources: DueDateIndexSourceSlice,
+	): Promise<void> {
+		this.applySourcesToMemoryStore(sources);
+		this.pendingWrite = true;
+		await this.flushPendingWrites();
+		logger.info(
+			"[IRDueDateIndexService] rebuilt due-date index from warm schedule sources",
+			{
+				dateCount: Object.keys(this.memoryStore?.byDate || {}).length,
+				pointCount: Object.keys(this.memoryStore?.byPointId || {}).length,
+			},
+		);
+	}
+
+	isMemoryStoreEmpty(): boolean {
+		if (!this.memoryStore) {
+			return true;
+		}
+		return Object.keys(this.memoryStore.byPointId || {}).length === 0;
+	}
+
 	async getPointIdsForDate(dateKey: string): Promise<string[]> {
 		const normalizedKey = String(dateKey || "").trim();
 		if (!normalizedKey) {
@@ -69,6 +123,51 @@ export class IRDueDateIndexService {
 		}
 		const store = await this.ensureStore();
 		return [...(store.byDate[normalizedKey] || [])];
+	}
+
+	/**
+	 * 某日应出现在日列表的 due 集合 = 当日 due ∪（若为目标「今天」则全部逾期日上的 pointIds）。
+	 * 逾期点仍保存在过去 dateKey；月历「今天」队列需要把它们滚进来。
+	 */
+	async getCalendarDuePointIdsForDate(
+		dateKey: string,
+		options?: { rollOverdueIntoToday?: boolean; todayKey?: string },
+	): Promise<string[]> {
+		const normalizedKey = String(dateKey || "").trim();
+		if (!normalizedKey) {
+			return [];
+		}
+		const todayKey =
+			String(options?.todayKey || "").trim() || this.getLocalTodayDateKey();
+		const dueToday = await this.getPointIdsForDate(normalizedKey);
+		const shouldRoll =
+			options?.rollOverdueIntoToday !== false && normalizedKey === todayKey;
+		if (!shouldRoll) {
+			return dueToday;
+		}
+
+		const store = await this.ensureStore();
+		const ids = new Set(dueToday);
+		for (const [pastKey, list] of Object.entries(store.byDate || {})) {
+			if (!pastKey || pastKey >= todayKey) {
+				continue;
+			}
+			for (const id of list || []) {
+				const normalizedId = String(id || "").trim();
+				if (normalizedId) {
+					ids.add(normalizedId);
+				}
+			}
+		}
+		return Array.from(ids);
+	}
+
+	private getLocalTodayDateKey(): string {
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, "0");
+		const day = String(now.getDate()).padStart(2, "0");
+		return `${year}-${month}-${day}`;
 	}
 
 	async updatePointDueDate(
@@ -118,6 +217,16 @@ export class IRDueDateIndexService {
 		const index = await getSharedIRScheduleIndexService(
 			this.app,
 		).getScheduleSources();
+		this.applySourcesToMemoryStore(index);
+		this.pendingWrite = true;
+		await this.flushPendingWrites();
+		logger.info("[IRDueDateIndexService] rebuilt due-date index", {
+			dateCount: Object.keys(this.memoryStore?.byDate || {}).length,
+			pointCount: Object.keys(this.memoryStore?.byPointId || {}).length,
+		});
+	}
+
+	private applySourcesToMemoryStore(sources: DueDateIndexSourceSlice): void {
 		const byDate: Record<string, string[]> = {};
 		const byPointId: Record<string, string> = {};
 
@@ -135,16 +244,16 @@ export class IRDueDateIndexService {
 			byPointId[normalizedId] = dateKey;
 		};
 
-		for (const chunk of index.chunks || []) {
+		for (const chunk of sources.chunks || []) {
 			ingest(
 				String(chunk.chunkId || "").trim(),
 				Number(chunk.nextRepDate || 0),
 			);
 		}
-		for (const task of index.pdfTasks || []) {
+		for (const task of sources.pdfTasks || []) {
 			ingest(String(task.id || "").trim(), Number(task.nextRepDate || 0));
 		}
-		for (const task of index.epubTasks || []) {
+		for (const task of sources.epubTasks || []) {
 			ingest(String(task.id || "").trim(), Number(task.nextRepDate || 0));
 		}
 
@@ -154,11 +263,6 @@ export class IRDueDateIndexService {
 			byDate,
 			byPointId,
 		};
-		await this.flushPendingWrites();
-		logger.info("[IRDueDateIndexService] rebuilt due-date index", {
-			dateCount: Object.keys(byDate).length,
-			pointCount: Object.keys(byPointId).length,
-		});
 	}
 
 	async flushPendingWrites(): Promise<void> {
@@ -227,8 +331,10 @@ export class IRDueDateIndexService {
 			this.memoryStore = disk;
 			return disk;
 		}
-		await this.rebuildFromScheduleIndex();
-		return this.memoryStore || createEmptyDueDateIndexStore();
+		// 禁止在 getPointIds 热路径触发 getScheduleSources 全量重建。
+		// 空壳由 preload rebuildFromWarmScheduleSources / 显式 rebuildFromScheduleIndex 补齐。
+		this.memoryStore = createEmptyDueDateIndexStore();
+		return this.memoryStore;
 	}
 }
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import ObsidianIcon from '../../ui/ObsidianIcon.svelte';
+  import { obsidianIcon } from '../../../utils/obsidian-icon-action';
   import type { IRCalendarSelectedDayLoadStats } from '../ir-calendar-sidebar-types';
 
   interface Props {
@@ -13,6 +14,7 @@
     calendarToolsTriggerEl?: HTMLButtonElement | null;
     onAddReadingTarget: () => void;
     onScanTopics: () => void;
+    onOpenTutorial: () => void;
     onToggleDayLoadPopover: (event: MouseEvent) => void;
     onToggleSearchPanel: () => void;
     onShowMonthCalendarToolsMenu: (event: MouseEvent) => void;
@@ -29,6 +31,7 @@
     calendarToolsTriggerEl = $bindable(null),
     onAddReadingTarget,
     onScanTopics,
+    onOpenTutorial,
     onToggleDayLoadPopover,
     onToggleSearchPanel,
     onShowMonthCalendarToolsMenu,
@@ -62,36 +65,38 @@
       todayCompleteHintPinned = false;
     }
 
-    document.addEventListener('pointerdown', handlePointerDown, true);
+    activeDocument.addEventListener('pointerdown', handlePointerDown, true);
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown, true);
+      activeDocument.removeEventListener('pointerdown', handlePointerDown, true);
     };
   });
 </script>
 
+<!--
+  Match Obsidian file-explorer: nav-header > nav-buttons-container > clickable-icon.nav-action-button,
+  with setIcon applied directly on the button (no nested icon span).
+-->
 <div class="calendar-top-tools nav-header" role="toolbar" aria-label={t('irSidebar.calendar.topToolbarAria')}>
-  <div class="calendar-top-actions nav-buttons-container">
+  <div class="nav-buttons-container">
     <button
-      class="calendar-top-action-btn clickable-icon nav-action-button"
+      class="clickable-icon nav-action-button"
       type="button"
       onclick={onAddReadingTarget}
       title={t('irCommands.addReadingTarget')}
       aria-label={t('irCommands.addReadingTarget')}
-    >
-      <ObsidianIcon name="plus" size="var(--icon-size)" />
-    </button>
+      use:obsidianIcon={'plus'}
+    ></button>
     <button
-      class="calendar-top-action-btn clickable-icon nav-action-button"
+      class="clickable-icon nav-action-button"
       type="button"
       onclick={onScanTopics}
       title={t('irSidebar.calendar.scanTopics')}
       aria-label={t('irSidebar.calendar.scanTopics')}
-    >
-      <ObsidianIcon name="scan-search" size="var(--icon-size)" />
-    </button>
+      use:obsidianIcon={'scan-search'}
+    ></button>
     {#if showDayLoadInfoButton}
       <button
-        class="calendar-top-action-btn clickable-icon nav-action-button day-load-trigger-btn"
+        class="clickable-icon nav-action-button day-load-trigger-btn"
         class:day-load-trigger-btn--warning={selectedDayLoadStats?.overloadLevel === 'warning'}
         class:day-load-trigger-btn--overloaded={selectedDayLoadStats?.overloadLevel === 'overloaded'}
         type="button"
@@ -101,30 +106,35 @@
         aria-label={t('irSidebar.calendar.dayLoadInfo')}
         aria-expanded={dayLoadPopoverOpen}
         aria-haspopup="dialog"
-      >
-        <ObsidianIcon name="gauge" size="var(--icon-size)" />
-      </button>
+        use:obsidianIcon={'gauge'}
+      ></button>
     {/if}
     <button
-      class="calendar-top-action-btn clickable-icon nav-action-button"
+      class="clickable-icon nav-action-button"
       type="button"
       class:is-active={showSearchPanel}
       onclick={onToggleSearchPanel}
       title={t('irSidebar.calendar.searchMaterials')}
       aria-label={t('irSidebar.calendar.searchMaterials')}
-    >
-      <ObsidianIcon name="search" size="var(--icon-size)" />
-    </button>
+      use:obsidianIcon={'search'}
+    ></button>
     <button
-      class="calendar-top-action-btn clickable-icon nav-action-button"
+      class="clickable-icon nav-action-button"
+      type="button"
+      onclick={onOpenTutorial}
+      title={t('irSidebar.calendar.openTutorial')}
+      aria-label={t('irSidebar.calendar.openTutorial')}
+      use:obsidianIcon={'circle-help'}
+    ></button>
+    <button
+      class="clickable-icon nav-action-button"
       type="button"
       bind:this={calendarToolsTriggerEl}
       onclick={onShowMonthCalendarToolsMenu}
       title={t('irSidebar.calendar.moreActions')}
       aria-label={t('irSidebar.calendar.moreActions')}
-    >
-      <ObsidianIcon name="settings" size="var(--icon-size)" />
-    </button>
+      use:obsidianIcon={'settings'}
+    ></button>
   </div>
   {#if showTodayAllDoneHeaderChip}
     <button

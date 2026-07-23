@@ -45,6 +45,10 @@ export interface ScheduleItem {
 	scheduleStatus: string;
 	nextRepDate: number;
 	nextReviewDate: Date | null;
+	/** Reading-point creation time (ms epoch). */
+	createdAt?: number;
+	/** Reading-point last update time (ms epoch). */
+	updatedAt?: number;
 	resumeLink?: string;
 	sourceType?: ScheduleItemSourceType;
 	explanation?: IRScheduleExplanation;
@@ -53,6 +57,17 @@ export interface ScheduleItem {
 	sourceSequenceLocked?: boolean;
 	sourceSequenceAnchorDateKey?: string;
 	manualSchedulePinnedDateKey?: string;
+}
+
+function normalizePointTimestampMs(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim()) {
+		const parsed = Date.parse(value);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+	}
+	return undefined;
 }
 
 function extractChunkTitleFromFilePath(
@@ -200,6 +215,8 @@ export function buildScheduleItemFromProjectedItem(
 		sourceSequenceLocked: item.sourceSequenceLocked,
 		sourceSequenceAnchorDateKey: item.sourceSequenceAnchorDateKey,
 		manualSchedulePinnedDateKey: item.manualSchedulePinnedDateKey,
+		createdAt: normalizePointTimestampMs(item.createdAt),
+		updatedAt: normalizePointTimestampMs(item.updatedAt),
 	};
 }
 
@@ -231,6 +248,12 @@ export function buildScheduleItemFromLegacyBlock(block: IRBlock): ScheduleItem {
 		nextReviewDate: migrated.nextRepDate
 			? new Date(migrated.nextRepDate)
 			: null,
+		createdAt: normalizePointTimestampMs(
+			migrated.createdAt ?? block.createdAt,
+		),
+		updatedAt: normalizePointTimestampMs(
+			migrated.updatedAt ?? block.updatedAt,
+		),
 		resumeLink: resolveLegacyBlockResumeLink(block),
 		...getScheduleItemSequenceMeta(legacyBlock.meta),
 		sourceType: "legacy-block",
@@ -281,6 +304,8 @@ export function buildScheduleItemFromChunkData(
 		scheduleStatus: String(chunk?.scheduleStatus || "new"),
 		nextRepDate,
 		nextReviewDate: nextRepDate > 0 ? new Date(nextRepDate) : null,
+		createdAt: normalizePointTimestampMs(chunk?.createdAt),
+		updatedAt: normalizePointTimestampMs(chunk?.updatedAt),
 		resumeLink:
 			typeof chunkMeta.resumeLink === "string"
 				? chunkMeta.resumeLink
@@ -318,6 +343,8 @@ export function buildScheduleItemFromPdfTask(
 		scheduleStatus: String(task?.status || "new"),
 		nextRepDate: Number(task?.nextRepDate || 0),
 		nextReviewDate: task?.nextRepDate ? new Date(task.nextRepDate) : null,
+		createdAt: normalizePointTimestampMs(task?.createdAt),
+		updatedAt: normalizePointTimestampMs(task?.updatedAt),
 		deckId: String(getTaskTopicId(task) || "").trim() || undefined,
 		...getScheduleItemSequenceMeta(task?.meta),
 		sourceType: "pdf",
@@ -370,6 +397,8 @@ export async function buildScheduleItemFromEpubTask(
 		scheduleStatus: String(task?.status || "new"),
 		nextRepDate: Number(task?.nextRepDate || 0),
 		nextReviewDate: task?.nextRepDate ? new Date(task.nextRepDate) : null,
+		createdAt: normalizePointTimestampMs(task?.createdAt),
+		updatedAt: normalizePointTimestampMs(task?.updatedAt),
 		deckId: String(getTaskTopicId(task) || "").trim() || undefined,
 		...getScheduleItemSequenceMeta(task?.meta),
 		sourceType: "epub",

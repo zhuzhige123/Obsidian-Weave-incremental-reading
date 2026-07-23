@@ -21,6 +21,8 @@ export default defineConfig([
 			"src/demo/**",
 			"src/tests/**",
 			"src/services/epub-integration/vendor/**",
+			// Tutorial copy is not Obsidian locale JSON for sentence-case rules.
+			"src/components/incremental-reading/tutorial/tutorial-locales/**",
 		],
 	},
 	...obsidianmd.configs.recommendedWithLocalesEn,

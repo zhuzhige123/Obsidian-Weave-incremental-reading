@@ -16,7 +16,8 @@
   import { createManagedChartRuntime } from '../../utils/chart-runtime';
   import type { EChartsOption } from '../../utils/echarts-loader';
   import { logger } from '../../utils/logger';
-  import { tr } from '../../utils/i18n';
+  // Alias avoids clashing with HTML `<tr>` in the outcome table markup.
+  import { tr as i18nTr } from '../../utils/i18n';
 
   interface Props {
     plugin: AnkiObsidianPlugin;
@@ -39,7 +40,7 @@
   const WHEEL_THROTTLE_MS = 180;
 
   let { plugin }: Props = $props();
-  let t = $derived($tr);
+  let t = $derived($i18nTr);
   let quickRangeOptions = $derived([
     { value: 7, label: t('irAnalytics.range.last7') },
     { value: 14, label: t('irAnalytics.range.last14') },

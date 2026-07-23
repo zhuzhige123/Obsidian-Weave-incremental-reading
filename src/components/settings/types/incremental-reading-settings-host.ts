@@ -13,6 +13,7 @@ export interface IncrementalReadingSettingsHost {
 		incrementalReading?: IncrementalReadingSettings;
 		showPremiumFeaturesPreview?: boolean;
 		uiLanguage?: import("../../../utils/i18n").PluginUiLanguagePreference;
+		calendarTutorialDismissed?: boolean;
 	};
 	irTagGroupService?: IRTagGroupService;
 	getIncrementalReadingSettings(): IncrementalReadingSettings;

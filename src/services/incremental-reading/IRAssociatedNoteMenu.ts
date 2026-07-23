@@ -1,6 +1,7 @@
 import { type App, Menu, TFile, normalizePath } from "obsidian";
 import { i18n } from "../../utils/i18n";
 import { revealLeaf } from "../../utils/workspace-navigation";
+import { buildWebReadingPointMarkdown } from "./ir-web-reading-point";
 import {
 	getLinkableVaultNoteIcon,
 	isLinkableVaultNoteFile,
@@ -159,7 +160,107 @@ export function populateAssociatedNoteMenu(
 	);
 }
 
-function sanitizeAssociatedNoteBaseName(rawName: string): string {
+export interface DerivedAssociatedNoteMenuOptions {
+	menu: Menu;
+	carrierPath: string | null;
+	outlinkPaths: string[];
+	getLabel: (notePath: string) => string;
+	onOpenCarrier: () => void | Promise<void>;
+	onOpenOutlink: (notePath: string) => void | Promise<void>;
+	onOpenWeb?: () => void | Promise<void>;
+	onRecoverCarrier?: () => void | Promise<void>;
+	carrierMissing?: boolean;
+}
+
+/** Read-only menu for MD / web carriers: open source + browse outbound links. */
+export function populateDerivedAssociatedNoteMenu(
+	options: DerivedAssociatedNoteMenuOptions,
+): void {
+	const {
+		menu,
+		carrierPath,
+		outlinkPaths,
+		getLabel,
+		onOpenCarrier,
+		onOpenOutlink,
+		onOpenWeb,
+		onRecoverCarrier,
+		carrierMissing = false,
+	} = options;
+
+	if (carrierMissing) {
+		menu.addItem((item) =>
+			item
+				.setTitle(i18n.t("irSidebar.associatedNote.carrierMissingHint"))
+				.setIcon("circle-alert")
+				.setDisabled(true),
+		);
+		if (onRecoverCarrier) {
+			menu.addItem((item) =>
+				item
+					.setTitle(i18n.t("irSidebar.associatedNote.createCarrierNote"))
+					.setIcon("file-plus")
+					.onClick(() => {
+						void onRecoverCarrier();
+					}),
+			);
+		}
+		return;
+	}
+
+	if (carrierPath) {
+		menu.addItem((item) =>
+			item
+				.setTitle(i18n.t("irSidebar.associatedNote.openSourceNote"))
+				.setIcon("file-text")
+				.onClick(() => {
+					void onOpenCarrier();
+				}),
+		);
+	}
+
+	if (onOpenWeb) {
+		menu.addItem((item) =>
+			item
+				.setTitle(i18n.t("irSidebar.associatedNote.openWebPage"))
+				.setIcon("globe")
+				.onClick(() => {
+					void onOpenWeb();
+				}),
+		);
+	}
+
+	if (outlinkPaths.length === 0) {
+		menu.addItem((item) =>
+			item
+				.setTitle(i18n.t("irSidebar.associatedNote.noOutlinks"))
+				.setIcon("unlink")
+				.setDisabled(true),
+		);
+		return;
+	}
+
+	// Flat items — nested setSubmenu is unreliable on mobile / peer menus.
+	menu.addSeparator();
+	menu.addItem((item) =>
+		item
+			.setTitle(i18n.t("irSidebar.associatedNote.relatedNotes"))
+			.setIcon("files")
+			.setDisabled(true),
+	);
+	for (const notePath of outlinkPaths) {
+		menu.addItem((item) =>
+			item
+				.setTitle(getLabel(notePath))
+				.setIcon(getLinkableVaultNoteIcon(notePath))
+				.onClick(() => {
+					void onOpenOutlink(notePath);
+				}),
+		);
+	}
+}
+
+export function sanitizeAssociatedNoteBaseName(rawName: string): string {
 	const normalized = String(rawName || "")
 		.trim()
 		.replace(/[\\/:*?"<>|#^[\]]+/g, " ");
@@ -169,7 +270,7 @@ function sanitizeAssociatedNoteBaseName(rawName: string): string {
 
 async function ensureFolderExists(app: App, folderPath: string): Promise<void> {
 	const normalized = normalizePath(folderPath || "");
-	if (!normalized) return;
+	if (!normalized || normalized === "/") return;
 
 	const parts = normalized.split("/").filter(Boolean);
 	let currentPath = "";
@@ -243,6 +344,27 @@ export async function createAssociatedMarkdownNote(
 
 	const content = String(options.initialContent || "").replace(/\r\n?/g, "\n");
 	return await app.vault.create(targetPath, content);
+}
+
+/** Recreate a missing web reading-point excerpt carrier in the vault. */
+export async function createWebExcerptCarrierNote(
+	app: App,
+	options: {
+		title: string;
+		webUrl: string;
+		preferredFolderPath?: string;
+	},
+): Promise<TFile> {
+	const webUrl = String(options.webUrl || "").trim();
+	if (!webUrl) {
+		throw new Error("web-url-required");
+	}
+
+	return await createAssociatedMarkdownNote(app, {
+		baseName: options.title,
+		preferredFolderPath: options.preferredFolderPath,
+		initialContent: buildWebReadingPointMarkdown(options.title, webUrl),
+	});
 }
 
 function resolveLinkableVaultNoteFile(

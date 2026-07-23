@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
 import type { ScheduleItem } from "./IRCalendarScheduleItem";
 import { formatDueDateKeyFromTimestamp } from "./IRDueDateIndexService";
+import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import { assembleScheduleItemsForDailyQueue } from "./IRScheduleItemSort";
 import { patchCalendarProjectionDaySlices } from "./IRScheduleRefreshService";
@@ -26,14 +27,18 @@ export async function patchDayQueue(
 	input: PatchDayQueueInput,
 ): Promise<void> {
 	const dateKey = String(input.dateKey || "").trim();
-	if (!dateKey || input.items.length === 0) {
+	if (!dateKey) {
 		return;
 	}
 
-	const assembled = assembleScheduleItemsForDailyQueue(input.items, dateKey, {
-		completedIds: input.completedIds,
-		completedIdOrder: input.completedIdOrder,
-	});
+	// Empty items are allowed: authoritative shrink after remove/cleanup.
+	const assembled =
+		input.items.length === 0
+			? []
+			: assembleScheduleItemsForDailyQueue(input.items, dateKey, {
+					completedIds: input.completedIds,
+					completedIdOrder: input.completedIdOrder,
+				});
 
 	const queryService = getSharedIRCalendarQueryService(app);
 	const scheduleFingerprint =
@@ -51,6 +56,8 @@ export async function patchDayQueue(
 		scheduleFingerprint,
 		dayPatches,
 	});
+	// L1 全日队列已落盘：在 L2/reconcile 窗口内禁止用不完整切片覆盖该日。
+	getSharedIRProjectionRuntime(app).markL1DayQueueFresh([dateKey]);
 	// L1 只写磁盘投影；侧栏已在乐观 UI 中更新。L2 debounced 重算会广播一次 complete_block。
 }
 

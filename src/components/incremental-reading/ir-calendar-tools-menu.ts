@@ -9,6 +9,19 @@ interface CalendarBackgroundWallMenuOptions {
 	onSetFade: () => void;
 }
 
+interface CalendarViewModeMenuOption {
+	mode: string;
+	title: string;
+	icon: string;
+}
+
+interface CalendarViewModeMenuOptions {
+	viewModeTitle: string;
+	currentMode: string;
+	modes: CalendarViewModeMenuOption[];
+	onSelectMode: (mode: string) => void;
+}
+
 interface CalendarPointDeckScanMenuOptions {
 	scanTitle: string;
 	onScan: () => void;
@@ -33,6 +46,7 @@ interface CalendarMenuItemLike {
 	setTitle(title: string): this;
 	setIcon(icon: string): this;
 	setDisabled(disabled: boolean): this;
+	setChecked?(checked: boolean): this;
 	onClick(callback: () => void): this;
 	setSubmenu?(): CalendarMenuLike;
 }
@@ -80,6 +94,32 @@ export function populateCalendarBackgroundWallMenu(
 					options.onSetFade();
 				});
 		});
+	});
+}
+
+export function populateCalendarViewModeMenu(
+	menu: CalendarMenuLike,
+	options: CalendarViewModeMenuOptions,
+): void {
+	menu.addItem((item) => {
+		item.setTitle(options.viewModeTitle).setIcon("calendar");
+		const sub = item.setSubmenu?.();
+
+		if (!sub) {
+			return;
+		}
+
+		for (const mode of options.modes) {
+			sub.addItem((subItem) => {
+				subItem
+					.setTitle(mode.title)
+					.setIcon(mode.icon)
+					.setChecked?.(mode.mode === options.currentMode)
+					.onClick(() => {
+						options.onSelectMode(mode.mode);
+					});
+			});
+		}
 	});
 }
 

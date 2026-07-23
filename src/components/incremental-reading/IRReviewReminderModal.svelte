@@ -57,13 +57,13 @@
       }
     };
 
-    document.addEventListener('keydown', onKeydown, true);
-    document.addEventListener('pointerdown', onPointerDown, true);
+    activeDocument.addEventListener('keydown', onKeydown, true);
+    activeDocument.addEventListener('pointerdown', onPointerDown, true);
     window.addEventListener('resize', updatePosition);
 
     return () => {
-      document.removeEventListener('keydown', onKeydown, true);
-      document.removeEventListener('pointerdown', onPointerDown, true);
+      activeDocument.removeEventListener('keydown', onKeydown, true);
+      activeDocument.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('resize', updatePosition);
     };
   });

@@ -198,20 +198,55 @@ export class IRRefreshScheduler {
 								"[IRRefreshScheduler] bootstrap ready from cold projection cache",
 								{
 									durationMs: Date.now() - startedAt,
+									skipReconcile: true,
 								},
 							);
 							return;
 						}
 
+						logger.info(
+							"[IRRefreshScheduler] cold projection not fresh; checking day-index shell",
+							{
+								durationMs: Date.now() - startedAt,
+								skipReconcile: false,
+							},
+						);
+
+						const calendarQuery = getSharedIRCalendarQueryService(this.app);
+						const dayShell = await calendarQuery.tryGetCalendarShellFromDayIndex({
+							priorityDateKeys: [todayKey],
+						});
+						if (dayShell) {
+							// 日索引壳可用：首屏可立即交互；完整 lean 交给后台 reconcile，不占 heavy-load。
+							this.bootstrapPhase = "ready";
+							this.lastBootstrapAt = Date.now();
+							logger.info(
+								"[IRRefreshScheduler] bootstrap ready from day-index shell (lean deferred)",
+								{
+									durationMs: Date.now() - startedAt,
+									dateCount: dayShell.result.materialsByDate.size,
+								},
+							);
+							this.scheduleCalendarReconcile({
+								priorityDateKeys: [todayKey],
+								reason: "bootstrap-shell-deferred",
+							});
+							return;
+						}
+
 						await coordinator.runHeavyLoad("warmup", async () => {
-							const calendarQuery = getSharedIRCalendarQueryService(this.app);
-
-							await getSharedIRScheduleIndexService(this.app)
-								.getScheduleSources()
-								.catch(() => undefined);
-
 							const tagGroupService = new IRTagGroupService(this.app);
 							await tagGroupService.initialize();
+
+							// 优先 peek warm，避免 bootstrap 强制 getScheduleSources → 全量重建。
+							const warmSources = await getSharedIRScheduleIndexService(this.app)
+								.peekWarmScheduleSources()
+								.catch(() => null);
+							if (!warmSources) {
+								await getSharedIRScheduleIndexService(this.app)
+									.getScheduleSources()
+									.catch(() => undefined);
+							}
 
 							await calendarQuery.tryGetTier0CalendarResult({
 								priorityDateKeys: [todayKey],
@@ -229,7 +264,10 @@ export class IRRefreshScheduler {
 							);
 
 							const kernel = getSharedIRScheduleKernel(this.app);
-							if (!kernel.getCachedSchedule({ leanSchedule: true })) {
+							if (
+								!leanResult &&
+								!kernel.getCachedSchedule({ leanSchedule: true })
+							) {
 								await kernel.recomputeScheduleForDeck("ui_refresh", {
 									leanSchedule: true,
 								});
@@ -379,6 +417,10 @@ export class IRRefreshScheduler {
 			);
 			const includeMaterials = unit.kind === "rebuild-vault";
 			let reconciledMaterialsByDate: Map<string, ScheduleItem[]> | undefined;
+			// L1 刚写入的全日队列不得被 committed-due 子集 / 空切片 force-replace。
+			const replaceableDateKeys = runtime.filterOutL1FreshDateKeys(
+				unit.priorityDateKeys,
+			);
 			await coordinator.runHeavyLoad("sidebar-reconcile", async () => {
 				const queryService = getSharedIRCalendarQueryService(this.app);
 				const queryResult = await queryService.getCalendarQueryResult({
@@ -389,12 +431,15 @@ export class IRRefreshScheduler {
 					preferDiskCache: unit.forceRecompute !== true,
 					priorityDateKeys: unit.priorityDateKeys,
 				});
-				reconciledMaterialsByDate = new Map(
-					unit.priorityDateKeys.map((dateKey) => [
-						dateKey,
-						queryResult.materialsByDate.get(dateKey) || [],
-					]),
-				);
+				reconciledMaterialsByDate = new Map();
+				for (const dateKey of replaceableDateKeys) {
+					const items = queryResult.materialsByDate.get(dateKey);
+					// 查询未给出该日切片时不要写入 []，否则会冲掉侧栏已有队列。
+					if (!items) {
+						continue;
+					}
+					reconciledMaterialsByDate.set(dateKey, items);
+				}
 			});
 			const scheduleFingerprint = String(
 				(await getSharedIRScheduleIndexService(
@@ -409,8 +454,16 @@ export class IRRefreshScheduler {
 				},
 				scheduleFingerprint || undefined,
 			);
+			// 无可安全推送的切片时不要 notify：避免无 materials 的 hydrate 覆盖 L1/已有队列。
+			if (
+				replaceableDateKeys.length === 0 ||
+				!reconciledMaterialsByDate ||
+				reconciledMaterialsByDate.size === 0
+			) {
+				return;
+			}
 			runtime.notify({
-				priorityDateKeys: unit.priorityDateKeys,
+				priorityDateKeys: replaceableDateKeys,
 				deckIds: unit.deckIds,
 				reason: unit.reason || unit.kind,
 				reconciledMaterialsByDate,

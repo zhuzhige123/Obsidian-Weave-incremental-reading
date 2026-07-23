@@ -20,7 +20,7 @@ describe("IRDeckDataManagementService helpers", () => {
 
 	const sampleFiles: IRVaultPointFileEntry[] = [
 		{
-			absolutePath: "weave/incremental-reading/points/A.irdeck",
+			absolutePath: "weave Incremental reading/points/A.irdeck",
 			topicId: "topic-a",
 			topicName: "Topic A",
 			pointCount: 10,
@@ -55,7 +55,7 @@ describe("IRDeckDataManagementService helpers", () => {
 	it("builds move plan only for files outside canonical directory", () => {
 		const plan = service.buildNormalizeMovePlan(
 			sampleFiles,
-			"weave/incremental-reading/points",
+			"weave Incremental reading/points",
 		);
 		expect(plan).toHaveLength(2);
 		expect(plan.map((item) => item.sourcePath)).toEqual(
@@ -63,7 +63,7 @@ describe("IRDeckDataManagementService helpers", () => {
 		);
 		expect(
 			plan.every((item) =>
-				item.targetPath.startsWith("weave/incremental-reading/points/"),
+				item.targetPath.startsWith("weave Incremental reading/points/"),
 			),
 		).toBe(true);
 	});
@@ -89,21 +89,21 @@ describe("IRDeckDataManagementService helpers", () => {
 		];
 		const plan = service.buildNormalizeMovePlan(
 			outsideOnly,
-			"weave/incremental-reading/points",
+			"weave Incremental reading/points",
 		);
 		expect(plan).toHaveLength(2);
 		expect(plan[0]?.targetPath).toBe(
-			"weave/incremental-reading/points/Topic.irdeck",
+			"weave Incremental reading/points/Topic.irdeck",
 		);
 		expect(plan[1]?.targetPath).toBe(
-			"weave/incremental-reading/points/Topic.part2.irdeck",
+			"weave Incremental reading/points/Topic.part2.irdeck",
 		);
 	});
 
 	it("flags legacy schema and empty points in format inspection", async () => {
 		const files = new Map<string, string>([
 			[
-				"weave/incremental-reading/points/Legacy.irdeck",
+				"weave Incremental reading/points/Legacy.irdeck",
 				JSON.stringify({
 					topicId: "topic-legacy",
 					topicName: "Legacy",
@@ -120,7 +120,7 @@ describe("IRDeckDataManagementService helpers", () => {
 		} as any);
 
 		const report = await service.inspectPointFileFormat(
-			"weave/incremental-reading/points/Legacy.irdeck",
+			"weave Incremental reading/points/Legacy.irdeck",
 		);
 		expect(report.isEmpty).toBe(true);
 		expect(report.needsMigration).toBe(true);
@@ -137,7 +137,7 @@ describe("IRDeckDataManagementService helpers", () => {
 
 	it("refuses to recover backup orphan when target path already exists", async () => {
 		const backupPath = "plugins/weave-incremental-reading/backups/Topic.irdeck";
-		const targetDir = "weave/incremental-reading/points";
+		const targetDir = "weave Incremental reading/points";
 		const existingTarget = `${targetDir}/Topic.irdeck`;
 		const files = new Map<string, string>([
 			[

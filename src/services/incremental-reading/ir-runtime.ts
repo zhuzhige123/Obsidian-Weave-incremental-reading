@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { CURRENT_PLUGIN_ID } from "../../config/plugin-runtime";
 import type { IncrementalReadingPluginHost } from "../../types/incremental-reading-plugin-host";
 import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
 
@@ -25,9 +26,11 @@ declare const __WEAVE_IR_STANDALONE__: boolean;
 const isStandalone =
 	typeof __WEAVE_IR_STANDALONE__ !== "undefined" && __WEAVE_IR_STANDALONE__;
 
+const EMBEDDED_WEAVE_PLUGIN_ID = "weave";
+
 export const IR_RUNTIME: IRRuntimeConfig = {
-	pluginId: isStandalone ? "weave-incremental-reading" : "weave",
-	pluginDirName: isStandalone ? "weave-incremental-reading" : "weave",
+	pluginId: isStandalone ? CURRENT_PLUGIN_ID : EMBEDDED_WEAVE_PLUGIN_ID,
+	pluginDirName: isStandalone ? CURRENT_PLUGIN_ID : EMBEDDED_WEAVE_PLUGIN_ID,
 	viewTypes: {
 		calendar: isStandalone
 			? "weave-ir-calendar-view-standalone"

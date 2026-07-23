@@ -110,7 +110,7 @@ export async function openReadingPointTraceLinkPrompt(
 export async function openReadingPointTagsPrompt(
 	app: App,
 	material: ScheduleItem,
-	onSaved?: () => void,
+	onSaved?: (tags: string[]) => void,
 ): Promise<void> {
 	try {
 		const draft = await loadDraftOrNotify(app, material);

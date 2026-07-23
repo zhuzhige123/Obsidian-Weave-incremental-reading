@@ -58,3 +58,55 @@ describe("IRDueDateIndexService invalidateAsync", () => {
 		expect((service as any).memoryStore).toBeNull();
 	});
 });
+
+describe("IRDueDateIndexService warmDiskCache", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("warms from disk without rebuilding from schedule index", async () => {
+		const diskPath =
+			".obsidian/plugins/weave-incremental-reading/cache/incremental-reading/ir-due-date-index.json";
+		const dateKey = "2026-06-20";
+		const { app } = createMemoryApp({
+			[diskPath]: JSON.stringify({
+				version: "1.0.0",
+				updatedAt: new Date().toISOString(),
+				byDate: { [dateKey]: ["point-warm"] },
+				byPointId: { "point-warm": dateKey },
+			}),
+		});
+
+		const service = new IRDueDateIndexService(app);
+		const rebuildSpy = vi.spyOn(service, "rebuildFromScheduleIndex");
+		await expect(service.warmDiskCache()).resolves.toBe(true);
+		expect(await service.getPointIdsForDate(dateKey)).toEqual(["point-warm"]);
+		expect(rebuildSpy).not.toHaveBeenCalled();
+		expect(service.isMemoryStoreEmpty()).toBe(false);
+	});
+
+	it("rebuildFromWarmScheduleSources does not call rebuildFromScheduleIndex", async () => {
+		const { app, store } = createMemoryApp();
+		const service = new IRDueDateIndexService(app);
+		const nextRep = Date.parse("2026-07-16T12:00:00.000Z");
+		const rebuildSpy = vi.spyOn(service, "rebuildFromScheduleIndex");
+
+		await service.rebuildFromWarmScheduleSources({
+			chunks: [
+				{
+					chunkId: "chunk-1",
+					nextRepDate: nextRep,
+				} as any,
+			],
+			pdfTasks: [],
+			epubTasks: [],
+		});
+
+		const dateKey = formatDueDateKeyFromTimestamp(nextRep)!;
+		expect(await service.getPointIdsForDate(dateKey)).toEqual(["chunk-1"]);
+		expect(rebuildSpy).not.toHaveBeenCalled();
+		const diskPath =
+			".obsidian/plugins/weave-incremental-reading/cache/incremental-reading/ir-due-date-index.json";
+		expect(store.has(diskPath)).toBe(true);
+	});
+});

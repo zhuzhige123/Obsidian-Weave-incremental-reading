@@ -243,8 +243,8 @@
     startWidth = currentWidth;
     startHeight = currentHeight;
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    activeDocument.addEventListener('mousemove', handleMouseMove);
+    activeDocument.addEventListener('mouseup', handleMouseUp);
     patchDocumentBodyChrome({
       cursor: getCursorForHandle(handle),
       userSelect: 'none',
@@ -335,8 +335,8 @@
       justFinishedDragging = false;
     }, 100);
 
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+    activeDocument.removeEventListener('mousemove', handleMouseMove);
+    activeDocument.removeEventListener('mouseup', handleMouseUp);
     clearDocumentBodyChrome(['cursor', 'userSelect']);
 
     //  拖拽结束后自动保存尺寸
@@ -408,8 +408,8 @@
       }));
     }
     
-    document.addEventListener('mousemove', handleHeaderDragMove);
-    document.addEventListener('mouseup', handleHeaderDragEnd);
+    activeDocument.addEventListener('mousemove', handleHeaderDragMove);
+    activeDocument.addEventListener('mouseup', handleHeaderDragEnd);
     patchDocumentBodyChrome({ cursor: 'move', userSelect: 'none' });
   }
 
@@ -438,8 +438,8 @@
     
     isDraggingWindow = false;
     
-    document.removeEventListener('mousemove', handleHeaderDragMove);
-    document.removeEventListener('mouseup', handleHeaderDragEnd);
+    activeDocument.removeEventListener('mousemove', handleHeaderDragMove);
+    activeDocument.removeEventListener('mouseup', handleHeaderDragEnd);
     clearDocumentBodyChrome(['cursor', 'userSelect']);
   }
 
@@ -465,11 +465,11 @@
 
 
   function portalToBody(node: HTMLElement) {
-    if (typeof document === 'undefined' || !document.body) {
+    if (typeof activeDocument === 'undefined' || !activeDocument.body) {
       return;
     }
 
-    document.body.appendChild(node);
+    activeDocument.body.appendChild(node);
 
     return {
       destroy() {
@@ -483,8 +483,8 @@
 
   // 清理事件监听器
   onDestroy(() => {
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+    activeDocument.removeEventListener('mousemove', handleMouseMove);
+    activeDocument.removeEventListener('mouseup', handleMouseUp);
     clearDocumentBodyChrome(['cursor', 'userSelect']);
 
     if (mobileBoundsCleanup) {

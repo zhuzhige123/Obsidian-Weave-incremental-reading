@@ -2,7 +2,7 @@
   ReadingPointTraceLinkPromptPanel - 编辑溯源链接（链接输入 + 定位预览）
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { WeavePlugin } from '../../../main';
   import MarkdownRenderer from '../../atoms/MarkdownRenderer.svelte';
   import type { IRReadingPointEditDraft } from '../../../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes';
@@ -23,8 +23,8 @@
 
   let t = $derived($tr);
 
-  let linkInput = $state(draft.linkInput);
-  const originalLinkInput = draft.originalLinkInput;
+  let linkInput = $state(untrack(() => draft.linkInput));
+  const originalLinkInput = untrack(() => draft.originalLinkInput);
   let preserveScheduleOnLinkChange = $state(true);
   let parsedTarget = $state<ParsedReadingTarget | null>(null);
   let previewMarkdown = $state('');

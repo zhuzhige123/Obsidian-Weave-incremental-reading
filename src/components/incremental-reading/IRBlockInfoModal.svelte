@@ -23,6 +23,12 @@
     EWMA_ALPHA,
     PRIORITY_NEUTRAL
   } from '../../services/incremental-reading/IRCoreAlgorithmsV4';
+  import { buildIRBlockInfoScheduleDisplay } from '../../services/incremental-reading/IRBlockInfoScheduleDisplay';
+  import { resolveIRBlockInfoCompletionStats } from '../../services/incremental-reading/IRBlockInfoCompletionStats';
+  import {
+    getIRPriorityTextColor,
+    resolveIRPriorityTier,
+  } from '../../services/incremental-reading/IRPriorityDisplay';
   import { currentLanguage, tr } from '../../utils/i18n';
 
   interface Props {
@@ -46,10 +52,18 @@
   let currentView = $state<ViewMode>('info');
 
   let totalReadingTimeSeconds = $state<number>(untrack(() => (block as any).totalReadingTime ?? 0));
+  let tracedCardCount = $state<number>(
+    untrack(() => Number((block as any).tracedCardCount ?? (block as any).stats?.cardsCreated ?? 0) || 0),
+  );
+  let linkedNoteCount = $state<number>(
+    untrack(() => Number((block as any).linkedNoteCount ?? 0) || 0),
+  );
 
   const formattedJson = $derived(JSON.stringify({
     ...block,
     totalReadingTime: totalReadingTimeSeconds,
+    tracedCardCount,
+    linkedNoteCount,
     stats: (block as any).stats
       ? {
           ...(block as any).stats,
@@ -77,6 +91,39 @@
     }
   }
 
+  async function refreshCompletionStats(): Promise<void> {
+    const fallbackCardCount = Number((block as any).tracedCardCount ?? 0) || 0;
+    const fallbackNoteCount = Number((block as any).linkedNoteCount ?? 0) || 0;
+
+    if (!app) {
+      tracedCardCount = fallbackCardCount;
+      linkedNoteCount = fallbackNoteCount;
+      return;
+    }
+
+    try {
+      const stats = await resolveIRBlockInfoCompletionStats(app, {
+        sourceFilePath: block.filePath,
+        sourceType: (block as any).sourceType,
+        pointId: block.id,
+        linkedNotePath: (block as any).associatedNotePath,
+        linkedNotePaths:
+          (block as any).associatedNotePaths ||
+          (block as any).linkedNotePaths ||
+          (block as any).stats?.linkedNotePaths,
+        linkedCardIds:
+          (block as any).extractedCards ||
+          (block as any).linkedCardIds ||
+          (block as any).stats?.linkedCardIds,
+      });
+      tracedCardCount = stats.cardCount;
+      linkedNoteCount = stats.linkedNoteCount;
+    } catch {
+      tracedCardCount = fallbackCardCount;
+      linkedNoteCount = fallbackNoteCount;
+    }
+  }
+
   function handleKeydown(_e: KeyboardEvent) {
   }
 
@@ -100,6 +147,7 @@
   onMount(() => {
     void updatePosition();
     void refreshReadingTimeFromHistory();
+    void refreshCompletionStats();
 
     const onKeydownDoc = (_e: KeyboardEvent) => {
     };
@@ -121,17 +169,18 @@
 
     const onIRDataUpdated = () => {
       void refreshReadingTimeFromHistory();
+      void refreshCompletionStats();
     };
 
-    document.addEventListener('keydown', onKeydownDoc, true);
-    document.addEventListener('pointerdown', onPointerDownDoc, true);
+    activeDocument.addEventListener('keydown', onKeydownDoc, true);
+    activeDocument.addEventListener('pointerdown', onPointerDownDoc, true);
     window.addEventListener('resize', updatePosition);
     window.addEventListener('Weave:ir-timer-updated', onTimerUpdated as EventListener);
     window.addEventListener('Weave:ir-data-updated', onIRDataUpdated);
 
     return () => {
-      document.removeEventListener('keydown', onKeydownDoc, true);
-      document.removeEventListener('pointerdown', onPointerDownDoc, true);
+      activeDocument.removeEventListener('keydown', onKeydownDoc, true);
+      activeDocument.removeEventListener('pointerdown', onPointerDownDoc, true);
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('Weave:ir-timer-updated', onTimerUpdated as EventListener);
       window.removeEventListener('Weave:ir-data-updated', onIRDataUpdated);
@@ -162,7 +211,7 @@
     calculateNextInterval(currentInterval, mBase, mGroup, effectivePriority)
   );
 
-  // 获取下次复习时间戳（兼容不同数据结构）
+  // 获取磁盘调度到期时间戳（兼容不同数据结构）
   const nextRepTimestamp = $derived(() => {
     if ((block as any).nextRepDate) {
       return (block as any).nextRepDate;
@@ -172,6 +221,19 @@
     }
     return null;
   });
+
+  const scheduleDisplay = $derived(
+    buildIRBlockInfoScheduleDisplay({
+      nextRepDate: nextRepTimestamp(),
+      scheduleStatus: block.state ?? (block as any).scheduleStatus,
+      reviewCount: block.reviewCount,
+      lastReview: block.lastReview,
+      manualSchedulePinnedDateKey: (block as any).manualSchedulePinnedDateKey,
+      sourceSequenceLocked: (block as any).sourceSequenceLocked,
+      sourceSequenceAnchorDateKey: (block as any).sourceSequenceAnchorDateKey,
+      committedNextRepDate: (block as any).committedNextRepDate,
+    }),
+  );
 
   // 格式化时间戳
   function formatTimestamp(ts: number | null): string {
@@ -186,7 +248,19 @@
     });
   }
 
-  // 计算从今天到下次复习的天数
+  function formatDateKey(dateKey: string | null | undefined): string {
+    if (!dateKey) return t('irBlockInfo.values.notSet');
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+    if (!match) return dateKey;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return date.toLocaleDateString(locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  }
+
+  // 计算从今天到磁盘调度到期的天数
   const daysUntilNextReview = $derived(() => {
     const ts = nextRepTimestamp();
     if (!ts) return null;
@@ -239,6 +313,15 @@
     return t('irBlockInfo.values.hoursMinutes', { hours, mins });
   }
 
+  function getDeckDisplayName(): string {
+    return String(
+      (block as any).deckName ||
+        (block as any).deckId ||
+        block.deckPath ||
+        '',
+    ).trim();
+  }
+
   function getStateText(state: string): string {
     const stateMap: Record<string, string> = {
       new: t('irBlockInfo.states.new'),
@@ -255,18 +338,12 @@
 
   function getPriorityText(priority: number | undefined): string {
     if (priority === undefined) return t('irBlockInfo.priority.unset');
-    if (priority <= 3) return t('irBlockInfo.priority.low');
-    if (priority <= 6) return t('irBlockInfo.priority.medium');
-    if (priority <= 8) return t('irBlockInfo.priority.high');
-    return t('irBlockInfo.priority.urgent');
+    const tier = resolveIRPriorityTier(priority);
+    return t(`irBlockInfo.priority.${tier}`);
   }
 
-  // 获取优先级颜色
   function getPriorityColor(priority: number | undefined): string {
-    if (priority === undefined) return 'var(--text-muted)';
-    if (priority <= 3) return 'var(--text-muted)';
-    if (priority <= 6) return 'var(--interactive-accent)';
-    return 'var(--text-warning)';
+    return getIRPriorityTextColor(priority);
   }
 
   function getRatingText(rating: number | undefined): string {
@@ -324,6 +401,30 @@
               {block.filePath?.split('/').pop() || t('irBlockInfo.values.unknownFile')}
             </span>
           </div>
+
+          {#if getDeckDisplayName()}
+          <div class="info-row">
+            <span class="info-label">{t('irBlockInfo.labels.deckName')}</span>
+            <span
+              class="info-value"
+              title={(block as any).deckId || block.deckPath || getDeckDisplayName()}
+            >
+              {getDeckDisplayName()}
+            </span>
+          </div>
+          {/if}
+
+          {#if (block as any).parentPointId}
+          <div class="info-row">
+            <span class="info-label">{t('irBlockInfo.labels.parentReadingPoint')}</span>
+            <span
+              class="info-value"
+              title={(block as any).parentPointId}
+            >
+              {(block as any).parentPointTitle || (block as any).parentPointId}
+            </span>
+          </div>
+          {/if}
           
           <div class="info-row">
             <span class="info-label">{t('irBlockInfo.labels.state')}</span>
@@ -362,6 +463,16 @@
             <span class="info-label">{t('irBlockInfo.labels.reviewCount')}</span>
             <span class="info-value">{t('irBlockInfo.values.reviewCountSuffix', { count: block.reviewCount || 0 })}</span>
           </div>
+
+          <div class="info-row">
+            <span class="info-label">{t('irBlockInfo.labels.cardCount')}</span>
+            <span class="info-value">{t('irBlockInfo.values.reviewCountSuffix', { count: tracedCardCount })}</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">{t('irBlockInfo.labels.linkedNoteCount')}</span>
+            <span class="info-value">{t('irBlockInfo.values.reviewCountSuffix', { count: linkedNoteCount })}</span>
+          </div>
           
           <div class="info-row">
             <span class="info-label">{t('irBlockInfo.labels.totalReadingTime')}</span>
@@ -395,11 +506,56 @@
             <span class="info-label">{t('irBlockInfo.labels.updatedAt')}</span>
             <span class="info-value">{formatDateTime(block.updatedAt)}</span>
           </div>
-          
-          <div class="info-row">
-            <span class="info-label">{t('irBlockInfo.labels.nextReview')}</span>
-            <span class="info-value">{formatDateTime(block.nextReview)}</span>
+
+          <div class="info-row" class:info-row--inline-hint={scheduleDisplay.rolledIntoToday}>
+            <span class="info-label">
+              <span class="info-label-main">{t('irBlockInfo.labels.listAppearDate')}</span>
+              {#if scheduleDisplay.rolledIntoToday && scheduleDisplay.rolledFromDateKey}
+                <span class="info-hint">
+                  {t('irBlockInfo.labels.listAppearRolledHint', {
+                    date: formatDateKey(scheduleDisplay.rolledFromDateKey),
+                  })}
+                </span>
+              {/if}
+            </span>
+            <span class="info-value">{formatDateKey(scheduleDisplay.listAppearDateKey)}</span>
           </div>
+
+          {#if scheduleDisplay.scheduleAnchorDateKey}
+            <div class="info-row">
+              <span class="info-label">{t('irBlockInfo.labels.scheduleAnchorDate')}</span>
+              <span class="info-value">{formatDateKey(scheduleDisplay.scheduleAnchorDateKey)}</span>
+            </div>
+          {/if}
+
+          {#if scheduleDisplay.nextReviewPending}
+            <div class="info-row">
+              <span class="info-label">{t('irBlockInfo.labels.firstSchedule')}</span>
+              <span class="info-value">
+                {scheduleDisplay.firstScheduleTimestamp
+                  ? formatTimestamp(scheduleDisplay.firstScheduleTimestamp)
+                  : t('irBlockInfo.values.notSet')}
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">{t('irBlockInfo.labels.nextReview')}</span>
+              <span class="info-value">{t('irBlockInfo.labels.nextReviewPending')}</span>
+            </div>
+          {:else}
+            <div class="info-row" class:info-row--inline-hint={scheduleDisplay.nextReviewOverdue}>
+              <span class="info-label">
+                <span class="info-label-main">{t('irBlockInfo.labels.nextReview')}</span>
+                {#if scheduleDisplay.nextReviewOverdue}
+                  <span class="info-hint">{t('irBlockInfo.labels.nextReviewOverdueHint')}</span>
+                {/if}
+              </span>
+              <span class="info-value">
+                {scheduleDisplay.nextReviewTimestamp
+                  ? formatTimestamp(scheduleDisplay.nextReviewTimestamp)
+                  : t('irBlockInfo.values.notSet')}
+              </span>
+            </div>
+          {/if}
           
           {#if block.lastReview}
           <div class="info-row">
@@ -817,6 +973,27 @@
   .info-label {
     font-size: 13px;
     color: var(--text-muted);
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 70%;
+  }
+
+  .info-row--inline-hint {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .info-row--inline-hint .info-label {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+    row-gap: 2px;
+    max-width: min(78%, calc(100% - 5.5em));
+  }
+
+  .info-label-main {
     flex-shrink: 0;
   }
 
@@ -824,8 +1001,25 @@
     font-size: 13px;
     color: var(--text-normal);
     text-align: right;
+    overflow-wrap: anywhere;
     word-break: break-word;
-    max-width: 60%;
+    max-width: 58%;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .info-row--inline-hint .info-value {
+    margin-left: auto;
+    max-width: none;
+    flex: 0 0 auto;
+  }
+
+  .info-hint {
+    font-size: 11px;
+    color: var(--text-faint);
+    line-height: 1.35;
+    min-width: 0;
+    flex: 1 1 8em;
   }
 
   .info-value.mono {
@@ -1138,6 +1332,15 @@
   :global(.is-mobile) .info-label,
   :global(.is-mobile) .info-value {
     font-size: 12px;
+  }
+
+  :global(.is-mobile) .info-row--inline-hint .info-label {
+    max-width: min(82%, calc(100% - 5em));
+    column-gap: 4px;
+  }
+
+  :global(.is-mobile) .info-hint {
+    font-size: 10px;
   }
 
 </style>

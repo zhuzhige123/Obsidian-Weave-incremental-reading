@@ -991,10 +991,15 @@ export interface IRTagGroup {
 	/** 匹配优先级：解决多命中冲突，数值越小优先级越高 */
 	matchPriority: number;
 	/**
-	 * 匹配源配置：从文档的哪些位置提取标签进行匹配
-	 * 未设置时默认 { yamlTags: true, inlineTags: true, customProperties: [] }
+	 * @deprecated Group-level match sources are unused. Tag matching consumes
+	 * resolved reading-point tags; Markdown sync uses global `tagSource`.
+	 * Kept optional for loading older persisted groups.
 	 */
-	matchSource?: IRTagGroupMatchSource;
+	matchSource?: {
+		yamlTags: boolean;
+		inlineTags: boolean;
+		customProperties: string[];
+	};
 	/** 创建时间 */
 	createdAt: string;
 	/** 更新时间 */
@@ -1002,7 +1007,8 @@ export interface IRTagGroup {
 }
 
 /**
- * 标签组匹配源配置
+ * @deprecated Prefer global `IRTagSourcePolicy` on incremental-reading settings.
+ * Persisted on old tag groups only; ignored by the matcher.
  */
 export interface IRTagGroupMatchSource {
 	/** 是否匹配 YAML frontmatter 的 tags 属性 */

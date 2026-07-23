@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { App } from "obsidian";
+  import { untrack } from "svelte";
   import { FolderSuggest } from "../../utils/FolderSuggest";
 
   interface Props {
@@ -22,7 +23,7 @@
     onCommit,
   }: Props = $props();
 
-  let draft = $state(value);
+  let draft = $state(untrack(() => value));
   let inputEl = $state<HTMLInputElement | null>(null);
   let suggest: FolderSuggest | null = null;
 

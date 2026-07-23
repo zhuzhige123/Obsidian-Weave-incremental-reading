@@ -174,9 +174,9 @@ describe("ReadingMaterialStorage", () => {
 		};
 
 		const legacyFiles = {
-			"weave/incremental-reading/materials/materials.json":
+			"weave Incremental reading/materials/materials.json":
 				JSON.stringify(legacyIndex),
-			[`weave/incremental-reading/materials/sessions/${legacyMaterial.uuid}.json`]:
+			[`weave Incremental reading/materials/sessions/${legacyMaterial.uuid}.json`]:
 				JSON.stringify({
 					sessions: [legacySession],
 				}),

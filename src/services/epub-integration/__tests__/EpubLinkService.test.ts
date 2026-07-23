@@ -373,14 +373,14 @@ describe("EpubLinkService legacy link compatibility", () => {
 					exists: async (path: string) =>
 						path === "Books/demo.epub" ||
 						path === "weave" ||
-						path === "weave/incremental-reading" ||
-						path === "weave/incremental-reading/epub-reading" ||
+						path === "weave Incremental reading" ||
+						path === "weave Incremental reading/epub-reading" ||
 						path ===
-							"weave/incremental-reading/epub-reading/epub-source-registry.json",
+							"weave Incremental reading/epub-reading/epub-source-registry.json",
 					readBinary: async () => new TextEncoder().encode("demo-binary"),
 					read: async () =>
 						writtenFiles.get(
-							"weave/incremental-reading/epub-reading/epub-source-registry.json",
+							"weave Incremental reading/epub-reading/epub-source-registry.json",
 						) || "[]",
 					write: async (path: string, content: string) => {
 						writtenFiles.set(path, content);
@@ -413,14 +413,14 @@ describe("EpubLinkService legacy link compatibility", () => {
 					exists: async (path: string) =>
 						path === "Books/demo.epub" ||
 						path === "weave" ||
-						path === "weave/incremental-reading" ||
-						path === "weave/incremental-reading/epub-reading" ||
+						path === "weave Incremental reading" ||
+						path === "weave Incremental reading/epub-reading" ||
 						path ===
-							"weave/incremental-reading/epub-reading/epub-source-registry.json",
+							"weave Incremental reading/epub-reading/epub-source-registry.json",
 					readBinary: async () => new TextEncoder().encode("demo-binary"),
 					read: async () =>
 						writtenFiles.get(
-							"weave/incremental-reading/epub-reading/epub-source-registry.json",
+							"weave Incremental reading/epub-reading/epub-source-registry.json",
 						) || "[]",
 					write: async (path: string, content: string) => {
 						writtenFiles.set(path, content);

@@ -132,7 +132,7 @@ describe("IRCalendarView", () => {
 					{
 						focusDeckId: "deck-1",
 						focusDeckName: "专题一",
-						filePath: "weave/incremental-reading/points/topic.irdeck",
+						filePath: "weave Incremental reading/points/topic.irdeck",
 					},
 					{} as any,
 				)

@@ -324,13 +324,13 @@
         
         // 修复失焦问题：延迟恢复焦点到激活码输入框
         window.setTimeout(() => {
-          const activationCodeInput = document.getElementById('activation-code');
+          const activationCodeInput = activeDocument.getElementById('activation-code');
           if (activationCodeInput) {
             activationCodeInput.focus();
           } else {
             // 如果找不到输入框，尝试恢复到当前活动元素
-            document.body.focus();
-            document.body.blur();
+            activeDocument.body.focus();
+            activeDocument.body.blur();
           }
         }, 100);
       } else {

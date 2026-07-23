@@ -46,6 +46,16 @@ describe("IRReadingTargetParser", () => {
 		expect(parsed.webUrl).toBe("https://example.com/article");
 	});
 
+	it("parses markdown http links", () => {
+		const parsed = parseReadingTargetInput(
+			createMockApp(),
+			"[示例文章](https://example.com/article)",
+		);
+		expect(parsed.kind).toBe("web");
+		expect(parsed.webUrl).toBe("https://example.com/article");
+		expect(parsed.titleHint).toBe("示例文章");
+	});
+
 	it("parses vault block references", () => {
 		const app = createMockApp({
 			files: { "Notes/demo.md": true },
@@ -100,6 +110,76 @@ describe("IRReadingTargetParser", () => {
 		const app = createMockApp({ files: { "Books/demo.epub": true } });
 		const parsed = parseReadingTargetInput(app, "[[Books/demo.epub]]");
 		expect(parsed.validationError).toContain("EPUB 阅读器");
+	});
+
+	it("parses canvas node links with query params", () => {
+		const app = createMockApp({ files: { "Boards/Topic.canvas": true } });
+		const parsed = parseReadingTargetInput(
+			app,
+			"[[Boards/Topic.canvas#^node-1?x=10&y=20&w=300&h=180|节点标题]]",
+		);
+		expect(parsed.kind).toBe("canvas");
+		expect(parsed.canvasNodeId).toBe("node-1");
+		expect(parsed.sourceFilePath).toBe("Boards/Topic.canvas");
+		expect(parsed.alias).toBe("节点标题");
+		expect(parsed.resumeLink).toContain("#^node-1?");
+		expect(parsed.validationError).toBeUndefined();
+	});
+
+	it("rejects bare canvas file links without node id", () => {
+		const app = createMockApp({ files: { "Boards/Topic.canvas": true } });
+		const parsed = parseReadingTargetInput(app, "[[Boards/Topic.canvas]]");
+		expect(parsed.kind).toBe("unknown");
+		expect(parsed.validationError).toContain("Canvas");
+	});
+});
+
+describe("markdownContentHasObsidianBlockId", () => {
+	it("detects end-of-line block ids even when metadata cache is empty", async () => {
+		const { markdownContentHasObsidianBlockId } = await import(
+			"../IRReadingTargetParser"
+		);
+		expect(
+			markdownContentHasObsidianBlockId(
+				"在处理语言信息时，意码则变得更为重要。 ^IR-763dnuzp\n\n下一段",
+				"IR-763dnuzp",
+			),
+		).toBe(true);
+		expect(
+			markdownContentHasObsidianBlockId(
+				"在处理语言信息时，意码则变得更为重要。 ^IR-other\n",
+				"IR-763dnuzp",
+			),
+		).toBe(false);
+	});
+
+	it("clears validation error when vault content has the block id", async () => {
+		const { TFile } = await import("obsidian");
+		const { refineParsedReadingTargetValidation } = await import(
+			"../IRReadingTargetParser"
+		);
+		const content =
+			"在处理语言信息时，意码则变得更为重要。 ^IR-763dnuzp\n\n下一段";
+		const file = new TFile("notes/demo.md");
+		const app = {
+			metadataCache: {
+				getCache: () => ({ blocks: {} }),
+			},
+			vault: {
+				getAbstractFileByPath: () => file,
+				cachedRead: async () => content,
+			},
+		} as never;
+
+		const refined = await refineParsedReadingTargetValidation(app, {
+			kind: "vault-block",
+			rawInput: "![[notes/demo.md#^IR-763dnuzp]]",
+			resumeLink: "notes/demo.md#^IR-763dnuzp",
+			sourceFilePath: "notes/demo.md",
+			blockId: "IR-763dnuzp",
+			validationError: "未在「notes/demo.md」中找到块引用 ^IR-763dnuzp",
+		});
+		expect(refined.validationError).toBeUndefined();
 	});
 });
 

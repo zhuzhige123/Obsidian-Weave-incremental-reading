@@ -1,15 +1,17 @@
 import type { App } from "obsidian";
 import { logger } from "../../utils/logger";
+import { buildCalendarMaterialsByCommittedDue } from "./IRCalendarCommittedDueMaterials";
 import { getSharedIRCalendarDayIndexService } from "./IRCalendarDayIndexService";
 import {
 	derivePriorityDateKeysFromSchedule,
 	mergePriorityDateKeys,
 } from "./IRCalendarProjectionUtils";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
-import { buildScheduleItemFromProjectedItem } from "./IRCalendarScheduleItem";
 import type { ScheduleItem } from "./IRCalendarScheduleItem";
+import { scheduleIRDeckGhostPointCleanup } from "./IRDeckGhostPointCleanup";
 import { getSharedIRDueDateIndexService } from "./IRDueDateIndexService";
 import { getSharedIRProjectionRuntime } from "./IRProjectionRuntime";
+import { getProjectedScheduleSummary } from "./IRProjectedScheduleSummary";
 import { buildScheduleFingerprintFromWorkspace } from "./IRScheduleFingerprint";
 import { getSharedIRScheduleIndexService } from "./IRScheduleIndexService";
 import {
@@ -300,11 +302,20 @@ export async function recomputeAndBroadcastIRData(
 		};
 		dispatchIRDataUpdatedEvent(detail);
 		if (scopedRefresh) {
-			notifyProjectionPatch(app, {
-				priorityDateKeys: resolvedPriorityDateKeys,
-				deckIds: schedule.deckIds,
-				reason,
-			});
+			// 与 syncCalendarProjection 一致：L1 已 patch 的日期不得再走 hydrate 覆盖。
+			const notifyDateKeys =
+				projectionDateKeys.length > 0
+					? projectionDateKeys
+					: getSharedIRProjectionRuntime(app).filterOutL1FreshDateKeys(
+							resolvedPriorityDateKeys,
+					  );
+			if (notifyDateKeys.length > 0) {
+				notifyProjectionPatch(app, {
+					priorityDateKeys: notifyDateKeys,
+					deckIds: schedule.deckIds,
+					reason,
+				});
+			}
 		}
 		return detail;
 	} catch (error) {
@@ -342,16 +353,28 @@ async function syncCalendarProjectionFromPlannedSchedule(
 			options.deckIds,
 			undefined,
 		);
+		const projectedSummary = await getProjectedScheduleSummary(app, {
+			schedule,
+			deckIds: options.deckIds,
+		});
+		const ghostPointIds: string[] = [];
+		const committedMaterials = buildCalendarMaterialsByCommittedDue(
+			projectedSummary,
+			{ ghostPointIds },
+		);
+		if (ghostPointIds.length > 0) {
+			scheduleIRDeckGhostPointCleanup(app, ghostPointIds);
+		}
 		const materialsByDate = new Map<string, ScheduleItem[]>();
 		for (const dateKey of options.priorityDateKeys) {
 			const normalizedDateKey = String(dateKey || "").trim();
 			if (!normalizedDateKey) {
 				continue;
 			}
-			const plannedItems = schedule.itemsByDate.get(normalizedDateKey) || [];
+			// 即使为空也写入，清掉该优先日上残留的计划槽污染。
 			materialsByDate.set(
 				normalizedDateKey,
-				plannedItems.map((item) => buildScheduleItemFromProjectedItem(item)),
+				committedMaterials.get(normalizedDateKey) || [],
 			);
 		}
 		if (materialsByDate.size === 0) {

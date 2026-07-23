@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	basenameWithoutExtension,
 	isIRDeckFilePath,
+	isIRDeckGhostLabel,
+	isIRDeckGhostPoint,
 	isIRInternalScheduleSourcePath,
 	isValidUserReadingSourcePathShape,
 	sanitizeUserReadingSourcePath,
@@ -11,7 +13,7 @@ import {
 describe("ir-internal-data-path", () => {
 	it("detects .irdeck paths case-insensitively", () => {
 		expect(
-			isIRDeckFilePath("weave/incremental-reading/points/pdf.irdeck"),
+			isIRDeckFilePath("weave Incremental reading/points/pdf.irdeck"),
 		).toBe(true);
 		expect(isIRDeckFilePath("Topics/游戏化思维.IRDECK")).toBe(true);
 		expect(isIRDeckFilePath("Notes/article.md")).toBe(false);
@@ -25,7 +27,7 @@ describe("ir-internal-data-path", () => {
 	it("sanitizes internal paths to empty", () => {
 		expect(
 			sanitizeUserReadingSourcePath(
-				"weave/incremental-reading/points/pdf.irdeck",
+				"weave Incremental reading/points/pdf.irdeck",
 			),
 		).toBe("");
 		expect(sanitizeUserReadingSourcePath("Docs/Note.md")).toBe("Docs/Note.md");
@@ -53,6 +55,46 @@ describe("ir-internal-data-path", () => {
 		).toBe(true);
 		expect(
 			shouldExcludeScheduleItemBySource({ sourceFile: "Books/demo.pdf" }),
+		).toBe(false);
+	});
+
+	it("flags schedule items whose title still looks like an irdeck filename", () => {
+		expect(
+			shouldExcludeScheduleItemBySource({
+				sourceFile: "",
+				title: "五月份的书籍阅读.irdeck",
+			}),
+		).toBe(true);
+		expect(
+			shouldExcludeScheduleItemBySource({
+				sourceFile: "Books/ok.md",
+				displayName: "topic.IRDECK",
+			}),
+		).toBe(true);
+		expect(isIRDeckGhostLabel("正常阅读点")).toBe(false);
+	});
+
+	it("detects ghost points from path or title after path sanitization", () => {
+		expect(
+			isIRDeckGhostPoint({
+				source: { path: "", title: "五月份的书籍阅读.irdeck" },
+				userData: { title: "五月份的书籍阅读.irdeck" },
+			}),
+		).toBe(true);
+		expect(
+			isIRDeckGhostPoint({
+				source: {
+					path: "Topics/五月份的书籍阅读.irdeck",
+					title: "Book",
+				},
+				userData: { title: "Book" },
+			}),
+		).toBe(true);
+		expect(
+			isIRDeckGhostPoint({
+				source: { path: "Books/novel.md", title: "Novel" },
+				userData: { title: "Novel" },
+			}),
 		).toBe(false);
 	});
 });

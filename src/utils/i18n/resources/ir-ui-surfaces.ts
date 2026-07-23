@@ -1,4 +1,4 @@
-import type { SupportedLanguage, TranslationKey } from "../types";
+import type { AuthoringLanguage, TranslationKey } from "../types";
 
 const zhIrDataMgmt: TranslationKey = {
 	title: "增量阅读数据管理",
@@ -408,18 +408,28 @@ const zhIrBlockInfo: TranslationKey = {
 	labels: {
 		blockId: "内容块ID",
 		file: "所属文件",
+		deckName: "所属专题",
 		state: "内容块状态",
 		priority: "优先级",
 		title: "标题",
+		parentReadingPoint: "父阅读点",
 		currentInterval: "当前间隔",
 		intervalFactor: "间隔因子",
 		reviewCount: "复习次数",
+		cardCount: "制卡数量",
+		linkedNoteCount: "关联md笔记数量",
 		totalReadingTime: "累计阅读时长",
 		lastRating: "上次理解度",
 		effectivePriority: "有效优先级",
 		createdAt: "创建时间",
 		updatedAt: "修改时间",
+		listAppearDate: "列表出现日",
+		firstSchedule: "首次排期",
 		nextReview: "下次复习",
+		nextReviewPending: "未计算（完成阅读后由算法生成）",
+		listAppearRolledHint: "承诺日 {date}，已滚入今日列表",
+		nextReviewOverdueHint: "已逾期，仍出现在今日列表",
+		scheduleAnchorDate: "钉日/序列锚点",
 		lastReview: "上次复习",
 		firstRead: "首次阅读",
 		sourceDoc: "源文档",
@@ -482,9 +492,9 @@ const zhIrBlockInfo: TranslationKey = {
 		stepRaw: "原始计算：{interval} × {mBase} × {mGroup} × {psi}",
 		stepResult: "= {value} 天",
 		stepClamp: "Clamp 到 [{min}, {max}]：{value} 天",
-		nextReviewTime: "下次复习时间",
+		nextReviewTime: "当前调度到期",
 		daysFromToday: "距今天数",
-		predictedInterval: "预测下次间隔",
+		predictedInterval: "预测下次间隔（完成阅读后写入）",
 		ewmaDesc:
 			"EWMA 用于平滑优先级变化，避免单次调整造成过大波动。每次调整只影响 {percent}% 的权重。",
 		labels: {
@@ -517,18 +527,28 @@ const enIrBlockInfo: TranslationKey = {
 	labels: {
 		blockId: "Block ID",
 		file: "File",
+		deckName: "Topic",
 		state: "Block state",
 		priority: "Priority",
 		title: "Title",
+		parentReadingPoint: "Parent reading point",
 		currentInterval: "Current interval",
 		intervalFactor: "Interval factor",
 		reviewCount: "Review count",
+		cardCount: "Cards",
+		linkedNoteCount: "Linked markdown notes",
 		totalReadingTime: "Total reading time",
 		lastRating: "Last comprehension",
 		effectivePriority: "Effective priority",
 		createdAt: "Created",
 		updatedAt: "Modified",
+		listAppearDate: "List appear day",
+		firstSchedule: "First schedule",
 		nextReview: "Next review",
+		nextReviewPending: "Not calculated (set after you finish reading)",
+		listAppearRolledHint: "Committed {date}; rolled into today's list",
+		nextReviewOverdueHint: "Overdue; still shown in today's list",
+		scheduleAnchorDate: "Pin / sequence anchor",
 		lastReview: "Last review",
 		firstRead: "First read",
 		sourceDoc: "Source document",
@@ -591,9 +611,9 @@ const enIrBlockInfo: TranslationKey = {
 		stepRaw: "Raw: {interval} × {mBase} × {mGroup} × {psi}",
 		stepResult: "= {value} days",
 		stepClamp: "Clamp to [{min}, {max}]: {value} days",
-		nextReviewTime: "Next review time",
+		nextReviewTime: "Current scheduled due",
 		daysFromToday: "Days from today",
-		predictedInterval: "Predicted next interval",
+		predictedInterval: "Predicted next interval (written after finish)",
 		ewmaDesc:
 			"EWMA smooths priority changes so a single adjustment does not swing scheduling too far. Each change affects {percent}% of the weight.",
 		labels: {
@@ -622,7 +642,11 @@ const zhIrSettingsStandalone: TranslationKey = {
 			"选择插件界面显示语言。设为「跟随 Obsidian」时将随 Obsidian 语言设置自动切换。",
 		auto: "跟随 Obsidian",
 		zhCN: "简体中文",
+		zhTW: "繁體中文",
 		enUS: "English",
+		jaJP: "日本語",
+		koKR: "한국어",
+		ruRU: "Русский",
 	},
 	premiumPreview: {
 		title: "显示高级功能预览",
@@ -632,17 +656,17 @@ const zhIrSettingsStandalone: TranslationKey = {
 	dataFolders: {
 		title: "数据文件夹配置",
 		description:
-			"集中配置本地数据目录、专题保存路径和阅读点默认位置，确保长期使用中的路径稳定与数据可维护性。",
+			"配置插件数据文件夹与阅读点默认位置。插件机读数据（points、materials、registry 等）统一保存在所选数据文件夹下。",
 		localDataName: "增量阅读本地数据文件夹",
 		localDataDesc:
 			"用于选择增量阅读数据在仓库中的本地目录；建议使用独立子目录，便于后续迁移与备份。",
-		localDataPlaceholder: "例如：weave/incremental-reading/local-data",
+		localDataPlaceholder: "例如：weave Incremental reading/local-data",
 		localDataPicker: "选择增量阅读本地数据文件夹...",
-		saveFolderName: "数据保存文件夹",
+		saveFolderName: "插件数据文件夹",
 		saveFolderDesc:
-			"用于设置专题 `.irdeck` 与关联数据的默认保存根目录；留空将使用默认 Weave 路径。",
-		saveFolderPlaceholder: "例如：weave/incremental-reading",
-		saveFolderPicker: "选择专题默认保存文件夹...",
+			"选择插件数据文件夹。留空使用默认「weave Incremental reading」；points、materials、registry 等会自动保存在该文件夹下，与 Weave 系列其它插件的 weave/ 目录隔离。",
+		saveFolderPlaceholder: "例如：weave Incremental reading",
+		saveFolderPicker: "选择插件数据文件夹...",
 		readingPointFolderName: "阅读点默认保存文件夹",
 		readingPointFolderDesc:
 			"仅用于新建 Markdown 阅读点（MD 阅读点）的默认保存路径；留空则遵循 Obsidian 新建笔记位置。",
@@ -666,11 +690,17 @@ const zhIrSettingsStandalone: TranslationKey = {
 		collaborationValue: "可与 Weave 主插件、EPUB 阅读器协同",
 		capabilitiesSection: "核心能力覆盖",
 		supportScope: "支持范围",
+		openTutorial: "打开完整教程",
+		openTutorialDesc: "查看入门、添加阅读点、材料导入、来源溯源、数据路径与 Weave 系列说明。",
 		contactsTitle: "联系与资源",
 		contacts: {
-			docs: "文档中心",
+			docs: "查看文档",
 			changelog: "更新日志",
-			feedback: "问题反馈",
+			community: "交流反馈",
+			communityMenu: {
+				qqPublic: "QQ公开交流群",
+				otherInDocs: "其它群可在文档中找到",
+			},
 			author: "联系作者",
 		},
 	},
@@ -696,7 +726,11 @@ const enIrSettingsStandalone: TranslationKey = {
 			"Choose the language for plugin UI. With “Follow Obsidian”, the UI tracks your Obsidian language setting.",
 		auto: "Follow Obsidian",
 		zhCN: "简体中文",
+		zhTW: "繁體中文",
 		enUS: "English",
+		jaJP: "日本語",
+		koKR: "한국어",
+		ruRU: "Русский",
 	},
 	premiumPreview: {
 		title: "Show advanced feature preview",
@@ -706,17 +740,17 @@ const enIrSettingsStandalone: TranslationKey = {
 	dataFolders: {
 		title: "Data folder configuration",
 		description:
-			"Configure local data directories, topic save paths, and default reading-point locations for long-term stability.",
+			"Configure the plugin data folder and default reading-point location. Machine-readable IR data (points, materials, registry, etc.) is stored under the selected data folder.",
 		localDataName: "Incremental reading local data folder",
 		localDataDesc:
 			"Vault folder for incremental-reading local data. Use a dedicated subfolder for easier migration and backup.",
-		localDataPlaceholder: "e.g. weave/incremental-reading/local-data",
+		localDataPlaceholder: "e.g. weave Incremental reading/local-data",
 		localDataPicker: "Choose incremental reading local data folder...",
-		saveFolderName: "Data save folder",
+		saveFolderName: "Plugin data folder",
 		saveFolderDesc:
-			"Default root for topic `.irdeck` files and related data. Leave blank to use the default Weave path.",
-		saveFolderPlaceholder: "e.g. weave/incremental-reading",
-		saveFolderPicker: "Choose default topic save folder...",
+			"Choose the plugin data folder. Leave blank for the default “weave Incremental reading”; points, materials, registry, etc. are saved under it automatically, isolated from other Weave-series weave/ folders.",
+		saveFolderPlaceholder: "e.g. weave Incremental reading",
+		saveFolderPicker: "Choose plugin data folder...",
 		readingPointFolderName: "Default reading-point save folder",
 		readingPointFolderDesc:
 			"Default save path for new Markdown reading points only. Leave blank to follow Obsidian’s new-note location.",
@@ -741,11 +775,18 @@ const enIrSettingsStandalone: TranslationKey = {
 		collaborationValue: "Weave main plugin and EPUB reader",
 		capabilitiesSection: "Core capabilities",
 		supportScope: "Supported sources",
+		openTutorial: "Open full tutorial",
+		openTutorialDesc:
+			"Overview, adding reading points, material import, source tracing, data paths, and the Weave family.",
 		contactsTitle: "Links & support",
 		contacts: {
-			docs: "Documentation",
+			docs: "View documentation",
 			changelog: "Changelog",
-			feedback: "Report an issue",
+			community: "Community & feedback",
+			communityMenu: {
+				qqPublic: "QQ community group",
+				otherInDocs: "Other groups (see docs)",
+			},
 			author: "Contact author",
 		},
 	},
@@ -1074,11 +1115,6 @@ const zhIrPriority: TranslationKey = {
 	setTitle: "设置优先级",
 	setAria: "设置优先级",
 	presets: {
-		lowest: {
-			label: "最低",
-			shortHint: "尽量少打扰",
-			description: "仅在整体负载较低时再推进，适合暂不着急的阅读点。",
-		},
 		low: {
 			label: "低",
 			shortHint: "低频出现",
@@ -1113,12 +1149,6 @@ const enIrPriority: TranslationKey = {
 	setTitle: "Set priority",
 	setAria: "Set priority",
 	presets: {
-		lowest: {
-			label: "Lowest",
-			shortHint: "Minimal interruption",
-			description:
-				"Advance only when overall load is low. Good for non-urgent reading points.",
-		},
 		low: {
 			label: "Low",
 			shortHint: "Infrequent",
@@ -1173,13 +1203,13 @@ const zhIrCommands: TranslationKey = {
 	openParagraphWorkbench: "打开增量阅读段落工作台",
 	updateFolderSubscription: "更新订阅文件夹",
 	addReadingTarget: "添加阅读目标到增量阅读",
+	addReadingTargetFromSelection: "将选中文本添加到增量阅读",
+	openTutorial: "打开增量阅读教程",
 	defaultDeckName: "默认专题",
 	defaultIrName: "增量阅读",
-	addToIrDeck: "添加到增量阅读专题",
 	addToIr: "添加到增量阅读",
 	canvasNodeNoContent: "当前节点暂无可用内容",
 	noDecksAvailable: "暂无可用增量阅读专题",
-	loadDecksFailed: "加载增量阅读专题失败",
 	premiumBlockedMessage: "增量阅读是高级功能，请激活许可证后使用",
 };
 
@@ -1191,13 +1221,13 @@ const enIrCommands: TranslationKey = {
 	openParagraphWorkbench: "Open incremental reading paragraph workbench",
 	updateFolderSubscription: "Update subscribed folders",
 	addReadingTarget: "Add reading target to incremental reading",
+	addReadingTargetFromSelection: "Add selected text to incremental reading",
+	openTutorial: "Open incremental reading tutorial",
 	defaultDeckName: "Default topic",
 	defaultIrName: "Incremental reading",
-	addToIrDeck: "Add to incremental reading topic",
 	addToIr: "Add to incremental reading",
 	canvasNodeNoContent: "This node has no usable content",
 	noDecksAvailable: "No incremental reading topics available",
-	loadDecksFailed: "Failed to load incremental reading topics",
 	premiumBlockedMessage:
 		"Incremental reading is a premium feature. Activate your license to use it.",
 };
@@ -1258,10 +1288,6 @@ const zhIrNotices: TranslationKey = {
 	folderSyncAutoAdded: "订阅文件夹已自动同步：新增 {added}",
 	sourceFileNotFound: "未找到对应的源文件，无法创建阅读点",
 	selectTextFirst: "请先选中文本后再创建阅读点",
-	canvasAddedToDeck: "已添加到 Weave 增量阅读专题「{deckName}」",
-	canvasUpdatedInDeck: "已更新到 Weave 增量阅读专题「{deckName}」",
-	canvasAlreadyInDeck: "该节点已存在于 Weave 增量阅读专题「{deckName}」",
-	canvasAddFailed: "添加到 Weave 增量阅读失败",
 	noWebUrl: "未获取到当前网页链接",
 	selectWebTextFirst: "请先选中网页文本后再添加",
 	openAddModalFailed: "打开添加窗口失败，请重试",
@@ -1291,12 +1317,6 @@ const enIrNotices: TranslationKey = {
 	folderSyncAutoAdded: "Folder subscription auto-synced: {added} added",
 	sourceFileNotFound: "Source file not found; cannot create reading point",
 	selectTextFirst: "Select text before creating a reading point",
-	canvasAddedToDeck: 'Added to Weave incremental reading topic "{deckName}"',
-	canvasUpdatedInDeck:
-		'Updated in Weave incremental reading topic "{deckName}"',
-	canvasAlreadyInDeck:
-		'This node already exists in Weave incremental reading topic "{deckName}"',
-	canvasAddFailed: "Failed to add to Weave incremental reading",
 	noWebUrl: "Could not get the current web page URL",
 	selectWebTextFirst: "Select text on the web page before adding",
 	openAddModalFailed: "Failed to open the add dialog. Please try again.",
@@ -1416,7 +1436,8 @@ const zhIrModals: TranslationKey = {
 	},
 	readingPointTags: {
 		title: "编辑标签",
-		intro: "输入 # 标签后按回车添加，点击 × 移除。可从建议列表快速选择。",
+		intro:
+			"输入标签后按回车添加，或直接点保存也会添加当前输入。点击 × 移除；可从建议列表选择。",
 		tagsUpdated: "标签已更新",
 	},
 	readingPointRename: {
@@ -1443,35 +1464,27 @@ const zhIrModals: TranslationKey = {
 		emptySelectionDescription: "不使用文件",
 		placeholder: "选择文件...",
 	},
+	pointSuggest: {
+		placeholder: "搜索并选择父阅读点...",
+		clearLabel: "清除父阅读点",
+		clearDescription: "该阅读点不再挂在任何父阅读点下",
+		clearDescriptionWithCurrent: "当前父阅读点：{title}",
+	},
 	vaultFolderSuggest: {
 		placeholder: "选择保存文件夹...",
 		vaultRoot: "/（Vault 根目录）",
 	},
 	paragraphAddToTopic: {
-		title: "添加到增量阅读专题",
+		title: "添加到增量阅读",
 		deckName: "所属专题",
-		deckDesc: "选择已有专题，或新建一个专题后再添加当前段落。",
+		deckDesc: "选择已有专题，或新建一个专题后再添加当前内容块。",
+		deckDescFixed: "当前内容块将加入文档已绑定的专题。",
 		newTopic: "新建专题",
 		titleDetected: "已从当前段落中自动提取标题，你可以继续修改。",
 		titleFallback: "未检测到明确标题，已先用段落前缀生成标题。",
 		titlePlaceholder: "输入阅读点标题",
-		submit: "添加到专题",
+		submit: "添加到增量阅读",
 		newTopicPlaceholder: "输入新专题名称",
-	},
-	webPageToIr: {
-		title: "添加到增量阅读",
-		webLink: "网页链接",
-		selectionExcerpt: "选区摘录",
-		deckName: "所属专题",
-		deckDesc: "选择该网页阅读点要加入的增量阅读专题。",
-		readingPointName: "阅读点名称",
-		titleFromSelectionDetected: "已从选区自动提取标题，你可以继续修改。",
-		titleFromSelectionFallback:
-			"未检测到明确标题，已根据选区内容生成默认名称。",
-		titleFromPageDetected: "已使用当前网页标题，你可以继续修改。",
-		titleFromPageFallback: "未能读取网页标题，已根据链接生成默认名称。",
-		readingPointNamePlaceholder: "输入阅读点名称",
-		confirmAdd: "确认添加",
 	},
 	selectionToIr: {
 		title: "从选区创建增量阅读点",
@@ -1524,7 +1537,7 @@ const enIrModals: TranslationKey = {
 	readingPointTags: {
 		title: "Edit tags",
 		intro:
-			"Type # tags and press Enter to add; click × to remove. Pick from suggestions.",
+			"Type a tag and press Enter to add, or click Save to add the current input. Click × to remove; pick from suggestions.",
 		tagsUpdated: "Tags updated",
 	},
 	readingPointRename: {
@@ -1552,39 +1565,29 @@ const enIrModals: TranslationKey = {
 		emptySelectionDescription: "No file",
 		placeholder: "Select file...",
 	},
+	pointSuggest: {
+		placeholder: "Search and select a parent reading point...",
+		clearLabel: "Clear parent reading point",
+		clearDescription: "This reading point will not belong to any parent",
+		clearDescriptionWithCurrent: "Current parent: {title}",
+	},
 	vaultFolderSuggest: {
 		placeholder: "Select save folder...",
 		vaultRoot: "/ (Vault root)",
 	},
 	paragraphAddToTopic: {
-		title: "Add to incremental reading topic",
+		title: "Add to incremental reading",
 		deckName: "Topic",
 		deckDesc:
-			"Select an existing topic or create a new one before adding this paragraph.",
+			"Select an existing topic or create a new one before adding this block.",
+		deckDescFixed:
+			"This content block will be added to the document's bound topic.",
 		newTopic: "New topic",
 		titleDetected: "Title auto-extracted from the paragraph. You can edit it.",
 		titleFallback: "No clear title detected. Using paragraph prefix as title.",
 		titlePlaceholder: "Enter reading point title",
-		submit: "Add to topic",
+		submit: "Add to incremental reading",
 		newTopicPlaceholder: "Enter new topic name",
-	},
-	webPageToIr: {
-		title: "Add to incremental reading",
-		webLink: "Web link",
-		selectionExcerpt: "Selection excerpt",
-		deckName: "Topic",
-		deckDesc:
-			"Select the incremental reading topic for this web reading point.",
-		readingPointName: "Reading point name",
-		titleFromSelectionDetected:
-			"Title auto-extracted from selection. You can edit it.",
-		titleFromSelectionFallback:
-			"No clear title. Generated default from selection.",
-		titleFromPageDetected: "Using current page title. You can edit it.",
-		titleFromPageFallback:
-			"Could not read page title. Generated default from URL.",
-		readingPointNamePlaceholder: "Enter reading point name",
-		confirmAdd: "Confirm add",
 	},
 	selectionToIr: {
 		title: "Create incremental reading point from selection",
@@ -1952,6 +1955,7 @@ const zhIrAddTarget: TranslationKey = {
 		locationPreview: "定位预览",
 		readingPointName: "阅读点名称",
 		topic: "所属专题",
+		parentReadingPoint: "父阅读点",
 		firstReadDay: "首次阅读日",
 	},
 	actions: {
@@ -1960,16 +1964,23 @@ const zhIrAddTarget: TranslationKey = {
 		cancel: "取消",
 		confirmAdd: "确认添加",
 		adding: "添加中…",
+		pickParent: "选择父阅读点",
+		changeParent: "更换父阅读点",
+		clearParent: "清除",
 	},
 	placeholders: {
-		linkInput: "粘贴 https://…、[[笔记#^块ID]] 或 ![[笔记#^块ID|标题]]",
+		linkInput:
+			"粘贴 https://…、[[笔记#^块ID]]、EPUB/PDF++/Canvas 链接或 ![[笔记#^块ID|标题]]",
 		titleInput: "用于月历与队列显示",
+		parentNone: "无（顶层阅读点）",
 	},
 	hints: {
-		supportedFormats: "支持网页 URL、Obsidian 双链或块引用。",
+		supportedFormats:
+			"支持网页 URL、Obsidian 双链/块引用、EPUB 定位、PDF++ 与 Canvas 节点。",
 		titleDetected: "已从链接或上下文推断标题，可继续修改。",
 		titleConfirm: "请确认阅读点名称。",
 		topicIntro: "选择该阅读点要加入的增量阅读专题。",
+		parentIntro: "可选：挂到已有父阅读点下，便于按文档拆分与统计完成度。",
 		scheduleExplainer: "只安排第一次何时读；读完后由算法自动排下次复习。",
 		customDayLoad: "已排 {itemCount} 项 · 约 {minutes} 分钟",
 		scheduleLoading: "正在计算推荐日期…",
@@ -1985,6 +1996,16 @@ const zhIrAddTarget: TranslationKey = {
 		pickDateTitle: "选择首次阅读日",
 		dateAriaLabel: "首次阅读日",
 	},
+	scheduleSummaries: {
+		todayNormal:
+			"今天负载适中，加入后约 {loadRatioPercent}% 日预算（{projectedMinutes}/{dailyBudgetMinutes} 分钟），适合排入今天。",
+		futureNormal:
+			"未来 {offset} 天内负载最轻的一天，加入后约 {loadRatioPercent}% 日预算。",
+		warning:
+			"近期日程较满，推荐相对较轻的一天；加入后约 {loadRatioPercent}% 日预算。",
+		overloaded:
+			"近期负载偏高，已选择未来 {offset} 天内相对最轻的一天；加入后约 {loadRatioPercent}% 日预算。",
+	},
 	options: {
 		createNote: "创建阅读笔记（默认仅加入队列，不复制正文）",
 		appendBacklink: "在源笔记末尾追加增量阅读标记",
@@ -1992,13 +2013,30 @@ const zhIrAddTarget: TranslationKey = {
 	deck: {
 		label: "专题：{name}",
 		selectTopic: "选择增量阅读专题",
+		createTopicMenu: "新建专题…",
+		createTopicTitle: "新建专题",
+		nameLabel: "专题名称",
+		namePlaceholder: "输入专题名称",
+		emptyName: "专题名称不能为空",
+		createFailed: "创建专题失败",
 	},
 	notices: {
 		needMarkdownCursor: "请先在 Markdown 笔记中将光标放在目标段落",
 		added: "已添加 {count} 项到专题「{deckName}」",
+		updated: "已更新排期并加入专题「{deckName}」",
+		topicCreated: "已创建专题「{name}」",
 		epubUnresolved:
 			"无法解析 EPUB 来源，请确认 weave-epub-reader 已启用且书籍仍在库中",
 		epubMissingCfi: "EPUB 链接缺少 cfi 定位信息",
+		epubInvalid: "EPUB 链接无效，请检查定位参数",
+		missingTitle: "请填写阅读点名称",
+		missingDeck: "请选择增量阅读专题",
+		deckMissing: "所选专题不存在或已归档",
+		canvasInvalid: "Canvas 链接无效，请包含节点 ID",
+		missingSource: "无法识别源文件路径",
+		schedulePinFailed: "阅读点已创建，但未能写入首次阅读日，请重试或手动调整排期",
+		pdfBatchFailed: "PDF 批量添加失败，已回滚本次已创建的阅读点",
+		invalidFolder: "笔记保存目录无效（路径上存在同名文件）",
 		addFailed: "添加失败，请检查链接与专题设置",
 	},
 	parser: {
@@ -2007,10 +2045,12 @@ const zhIrAddTarget: TranslationKey = {
 		epubMissingFileOrSid: "EPUB 链接缺少有效的 file 或 sid 参数",
 		blockRefNotFound: "未在「{filePath}」中找到块引用 ^{blockId}",
 		pdfParseFailed: "未能解析 PDF++ 链接",
-		unknownFormat: "无法识别链接格式，请粘贴网页 URL 或 Obsidian 双链/块引用",
+		unknownFormat:
+			"无法识别链接格式，请粘贴网页 URL、Obsidian 双链/块引用，或 EPUB/PDF++/Canvas 定位链接",
 		fileNotFound: "未找到文件：{filePath}",
 		epubCfiRequired:
 			"请粘贴 EPUB 阅读器的完整定位链接（含 cfi），例如 [章节名](obsidian://weave-epub-reader?file=...&cfi=...)",
+		canvasNodeRequired: "请粘贴指向具体 Canvas 节点的链接（含 #^节点ID）",
 	},
 	kindLabels: {
 		web: "网页链接",
@@ -2020,6 +2060,7 @@ const zhIrAddTarget: TranslationKey = {
 		pdf: "PDF 定位",
 		pdfBatch: "PDF++ 批量链接",
 		epub: "EPUB 阅读定位",
+		canvas: "Canvas 节点",
 		unknown: "未知类型",
 		readingPoint: "阅读点",
 	},
@@ -2033,6 +2074,7 @@ const enIrAddTarget: TranslationKey = {
 		locationPreview: "Location preview",
 		readingPointName: "Reading point name",
 		topic: "Topic",
+		parentReadingPoint: "Parent reading point",
 		firstReadDay: "First read day",
 	},
 	actions: {
@@ -2041,18 +2083,24 @@ const enIrAddTarget: TranslationKey = {
 		cancel: "Cancel",
 		confirmAdd: "Confirm add",
 		adding: "Adding…",
+		pickParent: "Select parent",
+		changeParent: "Change parent",
+		clearParent: "Clear",
 	},
 	placeholders: {
 		linkInput:
-			"Paste https://…, [[note#^blockId]], or ![[note#^blockId|title]]",
+			"Paste https://…, [[note#^blockId]], EPUB/PDF++/Canvas links, or ![[note#^blockId|title]]",
 		titleInput: "Shown in calendar and queue",
+		parentNone: "None (top-level reading point)",
 	},
 	hints: {
 		supportedFormats:
-			"Supports web URLs, Obsidian wikilinks, and block references.",
+			"Supports web URLs, Obsidian wikilinks/block refs, EPUB locations, PDF++, and Canvas nodes.",
 		titleDetected: "Title inferred from link or context. You can edit it.",
 		titleConfirm: "Confirm the reading point name.",
 		topicIntro: "Choose the incremental reading topic for this reading point.",
+		parentIntro:
+			"Optional: attach under an existing parent for document splits and progress.",
 		scheduleExplainer:
 			"Schedules only the first read; the algorithm plans later reviews after you finish.",
 		customDayLoad: "{itemCount} item(s) scheduled · ~{minutes} min",
@@ -2070,6 +2118,16 @@ const enIrAddTarget: TranslationKey = {
 		pickDateTitle: "Pick first read day",
 		dateAriaLabel: "First read day",
 	},
+	scheduleSummaries: {
+		todayNormal:
+			"Today’s load is moderate — about {loadRatioPercent}% of the daily budget after adding ({projectedMinutes}/{dailyBudgetMinutes} min). Good for today.",
+		futureNormal:
+			"Lightest day within the next {offset} day(s); about {loadRatioPercent}% of the daily budget after adding.",
+		warning:
+			"Upcoming days are busy; recommending a lighter day — about {loadRatioPercent}% of the daily budget after adding.",
+		overloaded:
+			"Load is high; chose the lightest day within {offset} day(s) — about {loadRatioPercent}% of the daily budget after adding.",
+	},
 	options: {
 		createNote: "Create reading note (default: queue only, no body copy)",
 		appendBacklink: "Append incremental reading marker at end of source note",
@@ -2077,14 +2135,34 @@ const enIrAddTarget: TranslationKey = {
 	deck: {
 		label: "Topic: {name}",
 		selectTopic: "Select incremental reading topic",
+		createTopicMenu: "New topic…",
+		createTopicTitle: "New topic",
+		nameLabel: "Topic name",
+		namePlaceholder: "Enter topic name",
+		emptyName: "Topic name cannot be empty",
+		createFailed: "Failed to create topic",
 	},
 	notices: {
 		needMarkdownCursor:
 			"Place the cursor on the target paragraph in a Markdown note first",
 		added: "Added {count} item(s) to topic “{deckName}”",
+		updated: "Updated schedule and added to topic “{deckName}”",
+		topicCreated: "Created topic “{name}”",
 		epubUnresolved:
 			"Could not resolve EPUB source. Ensure weave-epub-reader is enabled and the book is in the vault.",
 		epubMissingCfi: "EPUB link is missing cfi location data",
+		epubInvalid: "EPUB link is invalid. Check the location parameters.",
+		missingTitle: "Enter a reading point name",
+		missingDeck: "Select an incremental reading topic",
+		deckMissing: "The selected topic is missing or archived",
+		canvasInvalid: "Canvas link is invalid. Include a node ID.",
+		missingSource: "Could not resolve the source file path",
+		schedulePinFailed:
+			"Reading point was created, but the first-read date could not be saved. Retry or adjust the schedule manually.",
+		pdfBatchFailed:
+			"PDF batch add failed. Points created in this attempt were rolled back.",
+		invalidFolder:
+			"Note folder path is invalid (a file exists where a folder is expected).",
 		addFailed: "Add failed. Check the link and topic settings.",
 	},
 	parser: {
@@ -2095,10 +2173,12 @@ const enIrAddTarget: TranslationKey = {
 			"Block reference ^{blockId} was not found in “{filePath}”",
 		pdfParseFailed: "Could not parse PDF++ link",
 		unknownFormat:
-			"Unrecognized link format. Paste a web URL or Obsidian wikilink/block reference.",
+			"Unrecognized link format. Paste a web URL, Obsidian wikilink/block ref, or EPUB/PDF++/Canvas location.",
 		fileNotFound: "File not found: {filePath}",
 		epubCfiRequired:
 			"Paste the full EPUB reader location link (with cfi), e.g. [Chapter](obsidian://weave-epub-reader?file=...&cfi=...)",
+		canvasNodeRequired:
+			"Paste a Canvas node link that includes #^nodeId",
 	},
 	kindLabels: {
 		web: "Web link",
@@ -2108,6 +2188,7 @@ const enIrAddTarget: TranslationKey = {
 		pdf: "PDF location",
 		pdfBatch: "PDF++ batch links",
 		epub: "EPUB location",
+		canvas: "Canvas node",
 		unknown: "Unknown type",
 		readingPoint: "Reading point",
 	},
@@ -2221,10 +2302,15 @@ const zhIrServiceNotices: TranslationKey = {
 		openTraceLinkFailed: "打开溯源链接编辑失败，请稍后重试。",
 		tagsUnsupported: "该阅读点暂不支持编辑标签。",
 		openTagsFailed: "打开标签编辑失败，请稍后重试。",
+		openSelectParentFailed: "打开父阅读点选择失败，请稍后重试。",
+		selectParentFailed: "设置父阅读点失败，请检查是否形成循环引用。",
+		parentSet: "已设置父阅读点：{title}",
+		parentCleared: "已清除父阅读点",
 	},
 	topicSubmenu: {
 		pointNotFound: "未找到该阅读点",
 		noTopics: "暂无可用的增量阅读专题",
+		currentTopicLabel: "当前专题",
 		currentTopic: "当前专题：{topic}",
 		movedToTopic: "已移动到专题：{deckName}",
 		loadFailed: "加载专题列表失败",
@@ -2257,11 +2343,17 @@ const zhIrServiceNotices: TranslationKey = {
 	readingTarget: {
 		epubLocationExists: "该 EPUB 定位已在专题「{deckName}」中",
 		blockRefExists: "该块引用已在专题「{deckName}」中",
+		canvasNodeExists: "该 Canvas 节点已在专题「{deckName}」中",
+		backlinkCalloutTitle: "增量阅读",
+		backlinkCalloutBody: "已加入专题「{deckName}」：{title}",
+		defaultFileName: "阅读点-{ts}",
 	},
 	workbench: {
 		openContentFirst: "请先打开段落阅读内容",
 		noParagraph: "当前没有可添加的段落",
 		openDeckSelectFailed: "打开专题选择失败，请重试",
+		selectDocumentTopicFirst: "请先为当前文档选择所属专题",
+		documentTopicBound: "已将当前文档归属到专题「{deckName}」",
 		paragraphAlreadyInDeck: "当前段落已在专题「{deckName}」中",
 		addedToDeck: "已添加到专题「{deckName}」",
 		selectExcerptFirst: "请先选中要摘录的文本",
@@ -2297,10 +2389,17 @@ const enIrServiceNotices: TranslationKey = {
 			"Failed to open trace link editor. Please try again later.",
 		tagsUnsupported: "This reading point does not support editing tags.",
 		openTagsFailed: "Failed to open tag editor. Please try again later.",
+		openSelectParentFailed:
+			"Failed to open parent reading point picker. Please try again later.",
+		selectParentFailed:
+			"Failed to set parent reading point. Check for circular references.",
+		parentSet: "Parent reading point set: {title}",
+		parentCleared: "Parent reading point cleared",
 	},
 	topicSubmenu: {
 		pointNotFound: "Reading point not found",
 		noTopics: "No incremental reading topics available",
+		currentTopicLabel: "Current topic",
 		currentTopic: "Current topic: {topic}",
 		movedToTopic: "Moved to topic: {deckName}",
 		loadFailed: "Failed to load topics",
@@ -2336,11 +2435,18 @@ const enIrServiceNotices: TranslationKey = {
 		epubLocationExists:
 			"This EPUB location already exists in topic “{deckName}”",
 		blockRefExists: "This block reference already exists in topic “{deckName}”",
+		canvasNodeExists: "This Canvas node already exists in topic “{deckName}”",
+		backlinkCalloutTitle: "Incremental reading",
+		backlinkCalloutBody: "Added to topic “{deckName}”: {title}",
+		defaultFileName: "Reading-point-{ts}",
 	},
 	workbench: {
 		openContentFirst: "Open paragraph reading content first",
 		noParagraph: "No paragraph available to add",
 		openDeckSelectFailed: "Failed to open topic picker. Please try again.",
+		selectDocumentTopicFirst:
+			"Select the document’s topic before adding this block",
+		documentTopicBound: 'Document bound to topic “{deckName}”',
 		paragraphAlreadyInDeck:
 			"This paragraph already exists in topic “{deckName}”",
 		addedToDeck: "Added to topic “{deckName}”",
@@ -2372,8 +2478,22 @@ const enIrServiceNotices: TranslationKey = {
 	},
 };
 
+const zhIrTutorial: TranslationKey = {
+	title: "增量阅读教程",
+	close: "关闭教程",
+	dontShowAgain: "不再显示",
+	menuTitle: "教程与说明",
+};
+
+const enIrTutorial: TranslationKey = {
+	title: "Incremental reading tutorial",
+	close: "Close tutorial",
+	dontShowAgain: "Don't show again",
+	menuTitle: "Tutorial & guide",
+};
+
 export const irUiSurfaceTranslations: Record<
-	SupportedLanguage,
+	AuthoringLanguage,
 	TranslationKey
 > = {
 	"zh-CN": {
@@ -2395,6 +2515,7 @@ export const irUiSurfaceTranslations: Record<
 		irAddReadingPoint: zhIrAddReadingPoint,
 		irReadingPointEdit: zhIrReadingPointEdit,
 		irServiceNotices: zhIrServiceNotices,
+		irTutorial: zhIrTutorial,
 	},
 	"en-US": {
 		irDataMgmt: enIrDataMgmt,
@@ -2415,5 +2536,6 @@ export const irUiSurfaceTranslations: Record<
 		irAddReadingPoint: enIrAddReadingPoint,
 		irReadingPointEdit: enIrReadingPointEdit,
 		irServiceNotices: enIrServiceNotices,
+		irTutorial: enIrTutorial,
 	},
 };

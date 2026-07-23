@@ -2,7 +2,10 @@
 
 import { App, TFile, TFolder, normalizePath } from "obsidian";
 import {
+	DEFAULT_IR_DATA_ROOT,
 	PATHS,
+	WEAVE_DATA,
+	getLegacyIRDataRoot,
 	getPluginPaths,
 	getReadableWeaveRoot,
 	getV2PathsFromApp,
@@ -70,6 +73,8 @@ const DEFAULT_IR_TOPIC_ID = "ungrouped-ir";
 type IRRuntimePointProjection = {
 	snapshotCacheVersion: number;
 	chunks: Record<string, import("../../types/ir-types").IRChunkFileData>;
+	/** Normalized markdown/chunk filePath → chunkIds for O(1) vault-sync lookups. */
+	chunkIdsByFilePath: Record<string, string[]>;
 	sources: Record<string, IRSourceFileMeta>;
 	blocks: Record<string, IRBlock>;
 };
@@ -153,17 +158,27 @@ export class IRStorageService {
 			string,
 			import("../../types/ir-types").IRChunkFileData
 		> = {};
+		const chunkIdsByFilePath: Record<string, string[]> = {};
 		const sources: Record<string, IRSourceFileMeta> = {};
 		const blocks: Record<string, IRBlock> = {};
 
 		for (const snapshot of snapshots) {
 			if (getStoredPointKind(snapshot) === "chunk") {
 				const { chunk, source } = buildLegacyChunkFromPointSnapshot(snapshot);
-				chunks[chunk.chunkId] = normalizeChunkForRuntime(chunk);
+				const normalizedChunk = normalizeChunkForRuntime(chunk);
+				chunks[normalizedChunk.chunkId] = normalizedChunk;
 				sources[source.sourceId] = this.mergeProjectedSource(
 					sources[source.sourceId],
 					source,
 				);
+				const filePath = normalizePath(
+					String(normalizedChunk.filePath || "").trim(),
+				);
+				if (filePath) {
+					const bucket = chunkIdsByFilePath[filePath] || [];
+					bucket.push(normalizedChunk.chunkId);
+					chunkIdsByFilePath[filePath] = bucket;
+				}
 				continue;
 			}
 
@@ -181,6 +196,7 @@ export class IRStorageService {
 		this.runtimePointProjection = {
 			snapshotCacheVersion,
 			chunks,
+			chunkIdsByFilePath,
 			sources,
 			blocks,
 		};
@@ -227,16 +243,14 @@ export class IRStorageService {
 		candidates.add(`${this.getStorageDir()}/${normalizedFileName}`);
 		candidates.add(`${PATHS.incrementalReading}/${normalizedFileName}`);
 
+		// Dual-read vault roots only (no extra /incremental-reading/ nest —
+		// legacyRoot is already weave/incremental-reading; currentRoot is the IR parent).
 		const roots = this.getReadableRoots();
 		if (roots?.currentRoot) {
-			candidates.add(
-				`${roots.currentRoot}/incremental-reading/${normalizedFileName}`,
-			);
+			candidates.add(`${roots.currentRoot}/${normalizedFileName}`);
 		}
 		if (roots?.legacyRoot) {
-			candidates.add(
-				`${roots.legacyRoot}/incremental-reading/${normalizedFileName}`,
-			);
+			candidates.add(`${roots.legacyRoot}/${normalizedFileName}`);
 		}
 
 		return Array.from(candidates)
@@ -672,12 +686,31 @@ export class IRStorageService {
 
 	private coerceToVaultPath(p: string): string {
 		const normalized = normalizePath(p);
-		if (normalized.startsWith("weave/") || normalized === "weave")
+		if (
+			normalized === DEFAULT_IR_DATA_ROOT ||
+			normalized.startsWith(`${DEFAULT_IR_DATA_ROOT}/`)
+		) {
 			return normalized;
+		}
+		if (
+			normalized.startsWith(`${WEAVE_DATA}/`) ||
+			normalized === WEAVE_DATA
+		) {
+			return normalized;
+		}
 		if (normalized.startsWith(".weave/") || normalized === ".weave")
 			return normalized;
 
-		const weaveIdx = normalized.indexOf("/weave/");
+		const defaultRootMarker = `/${DEFAULT_IR_DATA_ROOT}/`;
+		const defaultRootIdx = normalized.indexOf(defaultRootMarker);
+		if (defaultRootIdx >= 0) {
+			return normalized.slice(defaultRootIdx + 1);
+		}
+		if (normalized.endsWith(`/${DEFAULT_IR_DATA_ROOT}`)) {
+			return DEFAULT_IR_DATA_ROOT;
+		}
+
+		const weaveIdx = normalized.indexOf(`/${WEAVE_DATA}/`);
 		if (weaveIdx >= 0) {
 			return normalized.slice(weaveIdx + 1);
 		}
@@ -699,22 +732,9 @@ export class IRStorageService {
 			const parentFolder = normalizeWeaveParentFolder(
 				plugin?.settings?.weaveParentFolder,
 			);
-			let currentRoot = normalizePath(getReadableWeaveRoot(parentFolder));
-
-			if (!parentFolder) {
-				const importFolder = plugin?.settings?.incrementalReading?.importFolder;
-				if (typeof importFolder === "string" && importFolder.trim()) {
-					const normalizedImport = normalizePath(importFolder);
-					if (normalizedImport.endsWith("/IR")) {
-						const inferred = normalizePath(normalizedImport.slice(0, -3));
-						if (inferred.endsWith("/weave") || inferred === "weave") {
-							currentRoot = inferred;
-						}
-					}
-				}
-			}
-
-			const legacyRoot = normalizePath(getReadableWeaveRoot(undefined));
+			const currentRoot = normalizePath(getReadableWeaveRoot(parentFolder));
+			// 双读旧布局：weave/incremental-reading（或 {旧父}/weave/incremental-reading）
+			const legacyRoot = normalizePath(getLegacyIRDataRoot(parentFolder));
 			if (!currentRoot || !legacyRoot || currentRoot === legacyRoot)
 				return null;
 			return { legacyRoot, currentRoot };
@@ -2450,6 +2470,44 @@ export class IRStorageService {
 	> {
 		await this.initialize();
 		return (await this.projectRuntimeChunkStoresFromPoints()).chunks;
+	}
+
+	/**
+	 * Chunks whose `filePath` equals the given markdown path.
+	 * Uses the runtime projection index (O(1) after warm cache).
+	 */
+	async getChunksByFilePath(
+		filePath: string,
+	): Promise<import("../../types/ir-types").IRChunkFileData[]> {
+		await this.initialize();
+		const normalizedPath = normalizePath(String(filePath || "").trim());
+		if (!normalizedPath) {
+			return [];
+		}
+		const projection = await this.getRuntimePointProjection();
+		const chunkIds = projection.chunkIdsByFilePath[normalizedPath] || [];
+		if (chunkIds.length === 0) {
+			return [];
+		}
+		return chunkIds
+			.map((chunkId) => projection.chunks[chunkId])
+			.filter(
+				(
+					chunk,
+				): chunk is import("../../types/ir-types").IRChunkFileData =>
+					Boolean(chunk),
+			);
+	}
+
+	/** True when any IR chunk is backed by this markdown path. */
+	async hasChunksForFilePath(filePath: string): Promise<boolean> {
+		await this.initialize();
+		const normalizedPath = normalizePath(String(filePath || "").trim());
+		if (!normalizedPath) {
+			return false;
+		}
+		const projection = await this.getRuntimePointProjection();
+		return (projection.chunkIdsByFilePath[normalizedPath] || []).length > 0;
 	}
 
 	/** 获取单个块文件的调度数据（O(1) 点索引，不扫描全库）。 */

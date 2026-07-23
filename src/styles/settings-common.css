@@ -317,201 +317,6 @@
   box-shadow: 0 0 0 2px var(--interactive-accent-hover);
 }
 
-/* 现代开关样式 - 统一所有开关 */
-.weave-settings .modern-switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.weave-settings .modern-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.weave-settings .switch-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--background-modifier-border);
-  transition: 0.3s;
-  border-radius: 24px;
-}
-
-.weave-settings .switch-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.3s;
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.weave-settings input:checked + .switch-slider {
-  background-color: var(--interactive-accent);
-}
-
-.weave-settings input:checked + .switch-slider:before {
-  transform: translateX(20px);
-}
-
-/* Toggle开关样式别名（与modern-switch相同） */
-.weave-settings .toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.weave-settings .toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.weave-settings .toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--background-modifier-border);
-  transition: 0.3s;
-  border-radius: 24px;
-}
-
-.weave-settings .toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.3s;
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.weave-settings .toggle-switch input:checked + .toggle-slider {
-  background-color: var(--interactive-accent);
-}
-
-.weave-settings .toggle-switch input:checked + .toggle-slider:before {
-  transform: translateX(20px);
-}
-
-.weave-settings .toggle-switch input:disabled + .toggle-slider {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.weave-settings .toggle-switch input:focus + .toggle-slider {
-  box-shadow: 0 0 0 2px var(--interactive-accent-hover);
-}
-
-/* 滑块样式 - 统一所有滑块 */
-.weave-settings .slider-container {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex: 1;
-  max-width: 300px;
-}
-
-.weave-settings .modern-slider {
-  flex: 1;
-  height: 18px; /* 与thumb高度一致，确保垂直居中 */
-  border-radius: 3px;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  outline: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-/* Webkit 滑块轨道样式 - 球心与轨道中心对齐 */
-.weave-settings .modern-slider::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--background-modifier-border);
-  border: none;
-}
-
-/* 🌙 深色模式 - 增强滑块轨道可见性 */
-:global(body.theme-dark) .weave-settings .modern-slider::-webkit-slider-runnable-track,
-body.theme-dark .weave-settings .modern-slider::-webkit-slider-runnable-track,
-.theme-dark .weave-settings .modern-slider::-webkit-slider-runnable-track {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* ☀️ 浅色模式 - 增强滑块轨道可见性 */
-:global(body.theme-light) .weave-settings .modern-slider::-webkit-slider-runnable-track,
-body.theme-light .weave-settings .modern-slider::-webkit-slider-runnable-track,
-.theme-light .weave-settings .modern-slider::-webkit-slider-runnable-track {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.weave-settings .modern-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--interactive-accent);
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-  margin-top: 0; /* 容器高度=thumb高度，无需偏移 */
-}
-
-.weave-settings .modern-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-/* Firefox滑块轨道增强 */
-/* ✅ 移除 !important：通过多个选择器组合提高优先级 */
-:global(body.theme-dark) .weave-settings .modern-slider::-moz-range-track,
-body.theme-dark .weave-settings .modern-slider::-moz-range-track,
-body.theme-dark .weave-view-content .modern-slider::-moz-range-track,
-.theme-dark .weave-settings .modern-slider::-moz-range-track,
-.theme-dark .weave-view-content .modern-slider::-moz-range-track {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-:global(body.theme-light) .weave-settings .modern-slider::-moz-range-track,
-body.theme-light .weave-settings .modern-slider::-moz-range-track,
-body.theme-light .weave-view-content .modern-slider::-moz-range-track,
-.theme-light .weave-settings .modern-slider::-moz-range-track,
-.theme-light .weave-view-content .modern-slider::-moz-range-track {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.weave-settings .slider-value {
-  min-width: 60px;
-  text-align: right;
-  font-weight: 500;
-  color: var(--text-normal);
-  font-size: var(--weave-settings-font-label);
-}
-
 /* 操作按钮行 - 统一所有操作按钮 */
 .weave-settings .action-row {
   display: flex;
@@ -618,120 +423,8 @@ body.theme-light .weave-view-content .modern-slider::-moz-range-track,
   padding-right: 2.5rem;
 }
 
-/* 现代开关样式 */
-.modern-switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.modern-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-  position: absolute;
-}
-
-.switch-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--background-modifier-border);
-  transition: all 0.2s ease;
-  border-radius: 24px;
-  border: 1px solid var(--background-modifier-border);
-}
-
-.switch-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--background-primary);
-  transition: all 0.2s ease;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.modern-switch input:checked + .switch-slider {
-  background-color: var(--interactive-accent);
-  border-color: var(--interactive-accent);
-}
-
-.modern-switch input:checked + .switch-slider:before {
-  transform: translateX(20px);
-}
-
-.modern-switch input:disabled + .switch-slider {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.modern-switch input:focus + .switch-slider {
-  box-shadow: 0 0 0 2px var(--interactive-accent-hover);
-}
-
-/* 状态指示器样式 */
-.weave-status-indicator,
-.weave-settings .status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-s);
-  font-size: var(--weave-settings-font-label);
-  font-weight: 500;
-  background: var(--background-modifier-border);
-  color: var(--text-muted);
-  border: 1px solid var(--background-modifier-border);
-  transition: all 0.2s ease;
-}
-
-.weave-status-indicator:before,
-.weave-settings .status-indicator:before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.7;
-}
-
-.weave-status-indicator.connected,
-.weave-settings .status-indicator.connected {
-  background: color-mix(in srgb, var(--color-green) 10%, var(--background-primary));
-  color: var(--color-green);
-  border-color: var(--color-green);
-}
-
-.weave-status-indicator.failed,
-.weave-settings .status-indicator.failed {
-  background: color-mix(in srgb, var(--color-red) 10%, var(--background-primary));
-  color: var(--color-red);
-  border-color: var(--color-red);
-}
-
-.weave-status-indicator.connecting,
-.weave-settings .status-indicator.connecting {
-  background: color-mix(in srgb, var(--color-orange) 10%, var(--background-primary));
-  color: var(--color-orange);
-  border-color: var(--color-orange);
-}
-
-.weave-status-indicator.connecting:before,
-.weave-settings .status-indicator.connecting:before {
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-/* 连接状态容器 */
-.connection-status {
+/* 连接状态容器 — must stay under .weave-settings */
+.weave-settings .connection-status {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -739,7 +432,7 @@ body.theme-light .weave-view-content .modern-slider::-moz-range-track,
 }
 
 /* 同步状态面板 */
-.sync-status-panel {
+.weave-settings .sync-status-panel {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
@@ -747,7 +440,7 @@ body.theme-light .weave-view-content .modern-slider::-moz-range-track,
   margin: 1rem 0;
 }
 
-.status-row {
+.weave-settings .status-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -755,44 +448,44 @@ body.theme-light .weave-view-content .modern-slider::-moz-range-track,
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.status-row:last-child {
+.weave-settings .status-row:last-child {
   border-bottom: none;
 }
 
-.status-row .label {
+.weave-settings .status-row .label {
   font-weight: 500;
   color: var(--text-normal);
 }
 
-.status-row .value {
+.weave-settings .status-row .value {
   color: var(--text-muted);
   font-family: var(--font-monospace);
   font-size: var(--weave-settings-font-label);
 }
 
-.status-row .value.success {
+.weave-settings .status-row .value.success {
   color: var(--color-green);
 }
 
-.status-row .value.error {
+.weave-settings .status-row .value.error {
   color: var(--color-red);
 }
 
 /* 操作按钮组 */
-.action-buttons {
+.weave-settings .action-buttons {
   display: flex;
   gap: 0.75rem;
   margin-top: 1rem;
   flex-wrap: wrap;
 }
 
-.action-buttons .enhanced-button {
+.weave-settings .action-buttons .enhanced-button {
   flex: 1;
   min-width: 120px;
 }
 
-/* 错误提示样式 */
-.error-message {
+/* 错误提示样式 — never bare .error-message (collides elsewhere) */
+.weave-settings .error-message {
   color: var(--text-error);
   font-size: var(--weave-settings-font-caption);
   margin-top: 0.25rem;
@@ -801,11 +494,10 @@ body.theme-light .weave-view-content .modern-slider::-moz-range-track,
   gap: 0.25rem;
 }
 
-.error-message:before {
+.weave-settings .error-message:before {
   content: "⚠️";
   font-size: var(--weave-settings-font-label);
 }
-
 /* 动画 */
 @keyframes pulse {
   0%, 100% {
@@ -866,8 +558,7 @@ body.theme-light .weave-view-content .modern-slider::-moz-range-track,
   }
 
   .weave-settings .row select,
-  .weave-settings .row input,
-  .weave-settings .row .modern-switch {
+  .weave-settings .row input {
     width: auto;
     align-self: flex-start;
   }
@@ -894,48 +585,43 @@ body.theme-light .weave-view-content .modern-slider::-moz-range-track,
     overflow-wrap: break-word;
   }
 
-  .connection-status {
+  .weave-settings .connection-status {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .action-buttons {
+  .weave-settings .action-buttons {
     flex-direction: column;
   }
 
-  .action-buttons .enhanced-button {
+  .weave-settings .action-buttons .enhanced-button {
     flex: none;
     min-width: auto;
   }
 
-  .group-header,
-  .group-content {
+  .weave-settings .group-header,
+  .weave-settings .group-content {
     padding: 1rem;
   }
 }
 
 @media (max-width: 480px) {
-  .settings-group {
+  .weave-settings .settings-group {
     margin-bottom: 1rem;
   }
 
-  .group-header,
-  .group-content {
+  .weave-settings .group-header,
+  .weave-settings .group-content {
     padding: 0.75rem;
   }
 
-  .settings-row {
+  .weave-settings .settings-row {
     padding: 0.5rem 0;
   }
 }
 
 /* 深色模式适配 */
 @media (prefers-color-scheme: dark) {
-  .switch-slider:before {
-    background-color: var(--background-primary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  }
-  
   .weave-settings-select,
   .weave-settings .settings-select {
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23999' d='M4.427 9.573L8 13.146l3.573-3.573a1 1 0 0 1 1.414 1.414l-4.28 4.28a1 1 0 0 1-1.414 0l-4.28-4.28a1 1 0 0 1 1.414-1.414z'/%3E%3C/svg%3E");

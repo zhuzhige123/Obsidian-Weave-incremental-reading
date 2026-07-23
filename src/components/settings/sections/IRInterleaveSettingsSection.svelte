@@ -2,12 +2,14 @@
   import { tr } from '../../../utils/i18n';
   import type { IncrementalReadingSettings } from '../../../types/plugin-settings.d';
   import SettingsHelpTriggerButton from '../components/SettingsHelpTriggerButton.svelte';
+  import ObsidianSettingToggle from '../components/ObsidianSettingToggle.svelte';
+  import ObsidianSettingSlider from '../components/ObsidianSettingSlider.svelte';
 
   interface Props {
     settings: { incrementalReading?: IncrementalReadingSettings };
     onOpenHelp: () => void;
-    handleInterleaveModeChange: (event: Event) => void;
-    handleMaxConsecutiveChange: (event: Event) => void;
+    handleInterleaveModeChange: (enabled: boolean) => void;
+    handleMaxConsecutiveChange: (value: number) => void;
     showSection?: boolean;
     interleaveTitle?: string;
     interleaveModeLabel?: string;
@@ -39,42 +41,24 @@
   </div>
 
   <div class="group-content">
-    <div class="row">
-      <div class="label-with-desc">
-        <label for="irInterleaveMode">{interleaveModeLabel ?? t('irSettings.interleaveModeLabel')}</label>
-        <p class="desc">{t('irSettings.interleaveModeDesc')}</p>
-      </div>
-      <label class="modern-switch">
-        <input
-          id="irInterleaveMode"
-          type="checkbox"
-          checked={settings.incrementalReading?.interleaveMode ?? true}
-          onchange={handleInterleaveModeChange}
-        />
-        <span class="switch-slider"></span>
-      </label>
-    </div>
+    <ObsidianSettingToggle
+      name={interleaveModeLabel ?? t('irSettings.interleaveModeLabel')}
+      desc={t('irSettings.interleaveModeDesc')}
+      value={settings.incrementalReading?.interleaveMode ?? true}
+      onChange={handleInterleaveModeChange}
+    />
 
     {#if settings.incrementalReading?.interleaveMode !== false}
-      <div class="row">
-        <div class="label-with-desc">
-          <label for="irMaxConsecutive">{maxConsecutiveLabel ?? t('irSettings.maxConsecutiveLabel')}</label>
-          <p class="desc">{t('irSettings.maxConsecutiveDesc')}</p>
-        </div>
-        <div class="slider-container">
-          <input
-            id="irMaxConsecutive"
-            type="range"
-            min="1"
-            max="10"
-            step="1"
-            value={settings.incrementalReading?.maxConsecutiveSameTopic ?? 3}
-            class="modern-slider"
-            oninput={handleMaxConsecutiveChange}
-          />
-          <span class="slider-value">{settings.incrementalReading?.maxConsecutiveSameTopic ?? 3}{t('irSettings.unitBlocks')}</span>
-        </div>
-      </div>
+      <ObsidianSettingSlider
+        name={maxConsecutiveLabel ?? t('irSettings.maxConsecutiveLabel')}
+        desc={t('irSettings.maxConsecutiveDesc')}
+        min={1}
+        max={10}
+        step={1}
+        value={settings.incrementalReading?.maxConsecutiveSameTopic ?? 3}
+        onChange={handleMaxConsecutiveChange}
+        formatValue={(value) => `${value}${t('irSettings.unitBlocks')}`}
+      />
     {/if}
   </div>
 </div>
@@ -101,33 +85,11 @@
     align-self: center;
   }
 
-  .label-with-desc {
-    display: flex;
-    flex-direction: column;
-    gap: var(--size-4-1);
-    min-width: 0;
-  }
-
-  .label-with-desc > label {
-    margin: 0;
-    font-size: var(--ir-font-label, var(--font-ui-small));
-    font-weight: 600;
-    line-height: var(--line-height-tight);
-    color: var(--text-normal);
-  }
-
-  .label-with-desc > .desc {
-    margin: 0;
-    font-size: var(--ir-font-desc, var(--font-ui-smaller));
-    line-height: var(--line-height-normal);
-    color: var(--text-muted);
-  }
-
-  :global(.accent-green) {
+  :global(.weave-settings .accent-green) {
     --accent-color: #10b981;
   }
 
-  :global(.with-accent-bar.accent-green::before) {
+  :global(.weave-settings .with-accent-bar.accent-green::before) {
     background: linear-gradient(180deg, #10b981, #059669);
   }
 </style>

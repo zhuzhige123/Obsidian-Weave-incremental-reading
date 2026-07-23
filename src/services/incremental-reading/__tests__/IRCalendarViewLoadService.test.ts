@@ -7,17 +7,11 @@ const getCalendarQueryResultMock = vi.fn();
 const tryGetTier0Mock = vi.fn();
 const runHeavyLoadMock = vi.fn();
 
+const ensureReadyMock = vi.fn();
+
 vi.mock("../IRProjectionRuntime", () => ({
 	getSharedIRProjectionRuntime: () => ({
-		ensureReady: vi.fn(async () => ({
-			level: "R2_month",
-			monthHeatmap: new Map([["2026-06", { "2026-06-19": 3 }]]),
-			projection: {
-				materialsByDate: new Map([["2026-06-19", [{ id: "p1" } as never]]]),
-				daySummaries: new Map([["2026-06-19", { totalCount: 1 }]]),
-				source: "day_index",
-			},
-		})),
+		ensureReady: ensureReadyMock,
 		hydrateMonthHeatmapFromProjection: hydrateMonthMock,
 		hydratePriorityDatesFromProjection: hydratePriorityMock,
 		shouldSkipBackgroundReconcile: shouldSkipMock,
@@ -49,6 +43,15 @@ describe("IRCalendarViewLoadService", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		ensureReadyMock.mockResolvedValue({
+			level: "R2_month",
+			monthHeatmap: new Map([["2026-06", { "2026-06-19": 3 }]]),
+			projection: {
+				materialsByDate: new Map([["2026-06-19", [{ id: "p1" } as never]]]),
+				daySummaries: new Map([["2026-06-19", { totalCount: 1 }]]),
+				source: "day_index",
+			},
+		});
 		hydrateMonthMock.mockResolvedValue(
 			new Map([["2026-06", { "2026-06-19": 3 }]]),
 		);
@@ -99,5 +102,24 @@ describe("IRCalendarViewLoadService", () => {
 		]);
 		expect(heatmap?.get("2026-06")).toEqual({ "2026-06-19": 3 });
 		expect(hydrateMonthMock).toHaveBeenCalledWith(undefined, ["2026-06"]);
+	});
+
+	it("does not return shell_only with null projection when only skip gate is true", async () => {
+		ensureReadyMock.mockResolvedValue({
+			level: "R0_shell",
+			monthHeatmap: new Map([["2026-06", { "2026-06-19": 3 }]]),
+			projection: null,
+		});
+		shouldSkipMock.mockResolvedValue(true);
+		tryGetTier0Mock.mockResolvedValue(null);
+
+		const result = await loadIRCalendarView(app, {
+			priorityDateKeys: ["2026-06-19"],
+			monthKeys: ["2026-06"],
+		});
+
+		expect(result.phase).toBe("empty");
+		expect(result.projectionHydrate).toBeNull();
+		expect(tryGetTier0Mock).toHaveBeenCalled();
 	});
 });

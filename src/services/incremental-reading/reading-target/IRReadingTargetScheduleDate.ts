@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { i18n } from "../../../utils/i18n";
 import {
 	type IRProjectedDayLoad,
 	getProjectedDayLoad,
@@ -173,16 +174,22 @@ function buildScheduleRecommendationSummary(
 	projectedMinutes: number,
 	dailyBudgetMinutes: number,
 ): string {
+	const params = {
+		loadRatioPercent,
+		projectedMinutes,
+		dailyBudgetMinutes,
+		offset,
+	};
 	if (offset === 0 && level === "normal") {
-		return `今天负载适中，加入后约 ${loadRatioPercent}% 日预算（${projectedMinutes}/${dailyBudgetMinutes} 分钟），适合排入今天。`;
+		return i18n.t("irAddTarget.scheduleSummaries.todayNormal", params);
 	}
 	if (level === "normal") {
-		return `未来 ${offset} 天内负载最轻的一天，加入后约 ${loadRatioPercent}% 日预算。`;
+		return i18n.t("irAddTarget.scheduleSummaries.futureNormal", params);
 	}
 	if (level === "warning") {
-		return `近期日程较满，推荐相对较轻的一天；加入后约 ${loadRatioPercent}% 日预算。`;
+		return i18n.t("irAddTarget.scheduleSummaries.warning", params);
 	}
-	return `近期负载偏高，已选择未来 ${offset} 天内相对最轻的一天；加入后约 ${loadRatioPercent}% 日预算。`;
+	return i18n.t("irAddTarget.scheduleSummaries.overloaded", params);
 }
 
 /**

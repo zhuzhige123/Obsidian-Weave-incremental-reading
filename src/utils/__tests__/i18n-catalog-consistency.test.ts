@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { i18n } from "../i18n";
+import { SUPPORTED_LANGUAGES } from "../i18n/locale-registry";
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_ROOT = path.resolve(TEST_FILE_DIR, "..", "..");
@@ -31,6 +32,7 @@ const GUARDED_PREFIXES = [
 	"irReadingPointEdit.",
 	"irServiceNotices.",
 	"irSidebar.",
+	"irTutorial.",
 ];
 
 function collectSourceFiles(dirPath: string): string[] {
@@ -94,7 +96,7 @@ function collectLiteralTranslationKeys(filePath: string): string[] {
 }
 
 describe("i18n runtime key coverage", () => {
-	it("keeps shared high-impact translation keys used in source resolvable in both languages", () => {
+	it("keeps shared high-impact translation keys used in source resolvable in all languages", () => {
 		const files = collectSourceFiles(SOURCE_ROOT);
 		const keys = new Set<string>();
 
@@ -108,16 +110,16 @@ describe("i18n runtime key coverage", () => {
 
 		const missingByLanguage: Record<string, string[]> = {};
 
-		for (const language of ["zh-CN", "en-US"] as const) {
+		for (const language of SUPPORTED_LANGUAGES) {
 			i18n.setLanguage(language);
 			missingByLanguage[language] = [...keys]
 				.filter((key) => !i18n.hasTranslation(key))
 				.sort();
 		}
 
-		expect(missingByLanguage).toEqual({
-			"zh-CN": [],
-			"en-US": [],
-		});
+		const expected = Object.fromEntries(
+			SUPPORTED_LANGUAGES.map((language) => [language, []]),
+		);
+		expect(missingByLanguage).toEqual(expected);
 	});
 });

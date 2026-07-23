@@ -49,9 +49,9 @@ export class IRContinueReadingSuggestionsModalObsidian {
 
 		this.isOpen = true;
 		IRContinueReadingSuggestionsModalObsidian.activeInstance = this;
-		this.containerEl = activeDocument.createElement("div");
-		this.containerEl.className = "weave-ir-continue-reading-floating-root";
-		activeDocument.body.append(this.containerEl);
+		this.containerEl = activeDocument.body.createDiv({
+			cls: "weave-ir-continue-reading-floating-root",
+		});
 		this.render();
 	}
 

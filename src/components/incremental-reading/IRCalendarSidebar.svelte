@@ -1,21 +1,21 @@
 <script lang="ts">
   /** IR calendar sidebar state and interactions. */
-  import { onDestroy, onMount, tick } from 'svelte';
-  import { Menu, Notice, Platform, TFile, normalizePath } from 'obsidian';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import { Menu, Notice, Platform, TAbstractFile, TFile, normalizePath } from 'obsidian';
   import { mount, unmount } from 'svelte';
   import type AnkiObsidianPlugin from '../../main';
   import type { IRDeck, IRBlock, IRBlockV4, IRSession, IRTagGroup } from '../../types/ir-types';
   import { createDefaultIRBlockV4, migrateToIRBlockV4 } from '../../types/ir-types';
   import type { ReadingMaterial } from '../../types/incremental-reading-types';
   import { IRStorageService } from '../../services/incremental-reading/IRStorageService';
-  import { IRPointStorageService } from '../../services/incremental-reading/IRPointStorageService';
+  import { getSharedIRPointStorageService } from '../../services/incremental-reading/IRPointStorageService';
   import { IRChunkScheduleAdapter } from '../../services/incremental-reading/IRChunkScheduleAdapter';
   import { IRPdfBookmarkTaskService, isPdfBookmarkTaskId } from '../../services/incremental-reading/IRPdfBookmarkTaskService';
   import { IREpubBookmarkTaskService, isEpubBookmarkTaskId } from '../../services/incremental-reading/IREpubBookmarkTaskService';
   import { getIrEpubStorageService } from '../../services/epub-integration/ir-epub-storage-access';
   import type { IrEpubStorageLike } from '../../services/epub-integration/ir-epub-storage-types';
   import { IRPointWriteService } from '../../services/incremental-reading/IRPointWriteService';
-  import { IRPointTagService, normalizeReadingPointTags } from '../../services/incremental-reading/IRPointTagService';
+  import { IRPointTagService, normalizeReadingPointTags, resolveReadingPointTags } from '../../services/incremental-reading/IRPointTagService';
   import { IRV4SchedulerService } from '../../services/incremental-reading/IRV4SchedulerService';
 import {
   computeAllScheduleMenuBlocks,
@@ -30,6 +30,13 @@ import {
 import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incremental-reading/IRScheduleImpactPreviewCoordinator';
   import { getSharedIRCalendarQueryService } from '../../services/incremental-reading/IRCalendarQueryService';
   import { getSharedIRProjectionRuntime, type IRProjectionPriorityHydrateResult } from '../../services/incremental-reading/IRProjectionRuntime';
+  import { mergeMaterialsByDateMaps } from '../../services/incremental-reading/IRCalendarDayQueueMerge';
+  import {
+    resolveDayQueueForDisplay,
+    resolveDayQueueFromDateMaps,
+    resolvePinnedRoleForDateKey,
+    type DayQueuePinnedRole,
+  } from '../../services/incremental-reading/IRCalendarDayQueueResolve';
   import { getSharedIRRefreshScheduler } from '../../services/incremental-reading/IRRefreshScheduler';
   import { loadIRCalendarView, hydrateIRCalendarMonthHeatmap } from '../../services/incremental-reading/IRCalendarViewLoadService';
   import { getSharedIRCalendarBackgroundLoadCoordinator } from '../../services/incremental-reading/IRCalendarBackgroundLoadCoordinator';
@@ -37,7 +44,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     buildVisibleDayCountsByDate,
     mergeCalendarDayCountMaps,
   } from '../../services/incremental-reading/IRCalendarDayCountSync';
+  import { patchCalendarProjectionDaySlices } from '../../services/incremental-reading/IRScheduleRefreshService';
+  import { getSharedIRScheduleIndexService } from '../../services/incremental-reading/IRScheduleIndexService';
   import { toCalendarMonthKey } from '../../services/incremental-reading/IRCalendarProjectionUtils';
+  import { mergeDueIndexIntoPriorityProjection } from '../../services/incremental-reading/IRDueDateDayHydrateService';
   import {
     buildHistoryDaySummaries,
     isPastCalendarDate,
@@ -52,7 +62,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     buildScheduleItemFromPdfTask,
     type ScheduleItem
   } from '../../services/incremental-reading/IRCalendarScheduleItem';
-  import { compareScheduleItemsForDailyQueue, assembleScheduleItemsForDailyQueue, collectScheduleItemDateKeys } from '../../services/incremental-reading/IRScheduleItemSort';
+  import { compareScheduleItemsForDailyQueue, collectScheduleItemDateKeys } from '../../services/incremental-reading/IRScheduleItemSort';
   import {
     capItemLoadMinutes,
     computeDayOverloadLevel,
@@ -93,7 +103,15 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     openReadingPointTraceLinkPrompt,
     promptRenameReadingPoint
   } from '../../services/incremental-reading/reading-point-edit/readingPointQuickEdit';
+  import { promptSelectParentReadingPoint } from '../../services/incremental-reading/reading-point-edit/readingPointParentPrompt';
   import { populateReadingPointTopicSubmenu } from '../../services/incremental-reading/reading-point-edit/readingPointTopicSubmenu';
+  import {
+    getContinuousReadingRelatedIds,
+    loadParentRelationRuntime,
+    type IRPointParentRelationRuntime,
+  } from '../../services/incremental-reading/IRPointParentRelationRuntime';
+  import type { IRPointParentProgress } from '../../services/incremental-reading/IRPointParentRelation';
+  import { buildLegacyChunkFromPointSnapshot } from '../../services/incremental-reading/IRLegacyTaskCompatAdapter';
   import { IRReadingPointBatchService } from '../../services/incremental-reading/reading-point-batch/IRReadingPointBatchService';
   import { populateReadingPointBatchSubmenu } from '../../services/incremental-reading/reading-point-batch/readingPointBatchSubmenu';
   import { resolveScheduleItemWriteTarget } from '../../services/incremental-reading/reading-point-batch/resolveScheduleItemWriteTarget';
@@ -108,19 +126,25 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { VaultFileSuggestModal } from '../../modals/VaultFileSuggestModal';
   import {
     createAssociatedMarkdownNote,
+    createWebExcerptCarrierNote,
     getLinkedVaultNoteLabel,
     openLinkedVaultNote,
     pickLinkableVaultNoteFile,
     populateAssociatedNoteMenu,
+    populateDerivedAssociatedNoteMenu,
     resolvePreferredAssociatedNoteFolder
   } from '../../services/incremental-reading/IRAssociatedNoteMenu';
   import { resolveAssociatedNotePaths } from '../../services/incremental-reading/IRAssociatedNoteSignals';
   import {
+    hasDerivedOutlinkNotes,
+    resolveDerivedOutlinkNotePaths
+  } from '../../services/incremental-reading/IRAssociatedNoteOutlinks';
+  import {
     canUsePointLinkedNotes,
-    getPointAssociatedNotePath,
+    getAssociatedNoteRelationMode,
     getVisibleAssociatedNotePath,
-    hasPointAssociatedNote,
-    hasVisibleAssociatedNote as hasVisibleAssociatedNoteBase
+    hasVisibleAssociatedNote as hasVisibleAssociatedNoteBase,
+    resolveAssociatedNoteMenuOffer
   } from '../../services/incremental-reading/IRAssociatedNoteVisibility';
   import type { BatchImportResult } from '../../services/incremental-reading/ReadingMaterialManager';
   import { logger } from '../../utils/logger';
@@ -131,7 +155,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { showMissingSourceDocumentModal } from './MissingSourceDocumentModal';
   import { IRMonitoringService } from '../../services/incremental-reading/IRMonitoringService';
   import { resolveScheduleItemWebUrl } from '../../services/incremental-reading/ir-web-reading-point';
+  import { resolveIRReadableMarkdownTargetFolder } from '../../services/incremental-reading/IRReadableMarkdownPathResolver';
+  import { openObsidianWebUrl } from '../../services/obsidian/obsidian-open-web-url';
   import { resolveScheduleItemTypeBadge, resolveScheduleItemTypeIcon } from '../../services/incremental-reading/IRCalendarScheduleItemTypeBadge';
+  import { evaluateScheduleItemSourceMissing } from '../../services/incremental-reading/ir-calendar-source-existence';
+  import { remapVaultPath } from '../../utils/ir-vault-path-remap';
   import type { IRCalendarSidebarSettings } from '../../types/plugin-settings.d';
   import type { IRCalendarDayVisualState, IRCalendarMaterialListProps } from './ir-calendar-sidebar-types';
   import {
@@ -140,7 +168,17 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     type IRCalendarActiveReadingTimerState
   } from '../../stores/ir-calendar-timer-store';
   import { parseSearchQuery, type SearchQuery } from '../../utils/search-parser';
-  import { buildMonthCalendarDays, IR_CALENDAR_WEEKDAY_KEYS, formatCalendarDateKey as formatDateKey, parseCalendarDateKey as parseDateKey, isSameCalendarDay as isSameDay } from './ir-calendar-date';
+  import {
+    buildMonthCalendarDays,
+    getIRCalendarDisplayDays,
+    resolveIRCalendarViewMode,
+    IR_CALENDAR_VIEW_MODES,
+    IR_CALENDAR_WEEKDAY_KEYS,
+    formatCalendarDateKey as formatDateKey,
+    parseCalendarDateKey as parseDateKey,
+    isSameCalendarDay as isSameDay,
+    type IRCalendarViewMode,
+  } from './ir-calendar-date';
   import IRCalendarTopToolbar from './ir-calendar-sidebar/IRCalendarTopToolbar.svelte';
   import IRCalendarMonthHeader from './ir-calendar-sidebar/IRCalendarMonthHeader.svelte';
   import IRCalendarMonthGrid from './ir-calendar-sidebar/IRCalendarMonthGrid.svelte';
@@ -153,6 +191,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import IRCalendarPriorityMenu from './ir-calendar-sidebar/IRCalendarPriorityMenu.svelte';
   import IRCalendarSchedulingMenu from './ir-calendar-sidebar/IRCalendarSchedulingMenu.svelte';
   import IRCalendarAddReadingPointHost from './ir-calendar-sidebar/IRCalendarAddReadingPointHost.svelte';
+  import IRTutorial from './tutorial/IRTutorial.svelte';
+  import {
+    IR_TUTORIAL_DEFAULT_TAB,
+    IR_TUTORIAL_TAB_IDS,
+    type IRTutorialTabId,
+  } from './tutorial/ir-tutorial-content';
+  import {
+    IR_OPEN_TUTORIAL_EVENT,
+    type IROpenTutorialEventDetail,
+  } from './tutorial/ir-tutorial-events';
   import {
     IRCALENDAR_SCHEDULING_MENU_ACTIONS,
     sortSchedulingMenuActionsByDueDate,
@@ -179,6 +227,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     normalizeSourcePathKey,
     type IRCalendarSearchContext
   } from './ir-calendar-search-logic';
+  import { mergeSearchAvailableTags } from './ir-calendar-search-tags';
   import {
     formatCompactTimerDuration as formatCompactTimerDurationText,
     formatTimerDuration as formatTimerDurationText,
@@ -189,7 +238,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import {
     populateCalendarBackgroundWallMenu,
     populateCalendarFolderSubscriptionSyncMenu,
-    populateCalendarMaterialImportMenu
+    populateCalendarMaterialImportMenu,
+    populateCalendarViewModeMenu
   } from './ir-calendar-tools-menu';
   import { IRDataManagementModalObsidian } from './IRDataManagementModalObsidian';
   import { PremiumFeatureGuard, PREMIUM_FEATURES } from '../../services/premium/PremiumFeatureGuard';
@@ -237,9 +287,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     continuousReadingEnabled: false,
     autoStartNextTimerEnabled: false,
     showSchedulingPreview: false,
-    calendarViewMode: 'full',
+    calendarViewMode: 'full' as IRCalendarViewMode,
     showMaterialTimers: true,
     showReadingPointTypeLabels: false,
+    showMissingSourceIndicators: true,
+    hideTodayCompletedReadingPoints: false,
     backgroundWall: {
       imagePath: '',
       fadePercent: DEFAULT_CALENDAR_BACKGROUND_WALL_FADE_PERCENT
@@ -272,7 +324,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     if (!shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.ASSOCIATED_NOTES)) {
       return false;
     }
-    return hasVisibleAssociatedNoteBase(material);
+    if (hasVisibleAssociatedNoteBase(material)) {
+      return true;
+    }
+    if (getAssociatedNoteRelationMode(material) !== 'derived-outlinks') {
+      return false;
+    }
+    return hasDerivedOutlinkNotes(plugin.app, material.sourceFile);
   }
 
   function closeBlockInfoModal() {
@@ -377,7 +435,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let epubStorageService = $state<IrEpubStorageLike | null>(null);
   let pointTagService = $state<IRPointTagService | null>(null);
   let pointWriteService = $state<IRPointWriteService | null>(null);
+  let pointStorageService = $state<ReturnType<typeof getSharedIRPointStorageService> | null>(null);
   let readingPointTagsById = $state<Record<string, string[]>>({});
+  /** 搜索 tag: 建议目录（与编辑标签弹窗同源 getAllKnownTags），不依赖 idle 材料扫描。 */
+  let searchCatalogTags = $state<string[]>([]);
   let activeReadingTagFilter = $state('');
   let showSearchPanel = $state(false);
   let calendarBackgroundWallImagePath = $state('');
@@ -438,6 +499,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let calendarSidebarEl = $state<HTMLDivElement | null>(null);
   let continueReadingTriggerEl = $state<HTMLButtonElement | null>(null);
   let calendarToolsTriggerEl = $state<HTMLButtonElement | null>(null);
+  let tutorialVisible = $state(false);
+  let tutorialInitialTab = $state<IRTutorialTabId | undefined>(undefined);
+  let calendarTutorialDismissed = $state(
+    untrack(() =>
+      Boolean(
+        (plugin.settings as { calendarTutorialDismissed?: boolean } | undefined)
+          ?.calendarTutorialDismissed,
+      ),
+    ),
+  );
 
 
   let showAddReadingPointModal = $state(false);
@@ -446,10 +517,15 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let arpParentTitle = $state('');
 
   let continuousReadingEnabled = $state(false);
+  let parentRelationRuntime = $state<IRPointParentRelationRuntime | null>(null);
+  let parentRelationRuntimeLoading = $state(false);
 
   let showSchedulingPreview = $state(false);
   let showReadingPointTypeLabels = $state(false);
-  let calendarViewMode = $state<'full' | 'two-row'>('full');
+  let showMissingSourceIndicators = $state(true);
+  let hideTodayCompletedReadingPoints = $state(false);
+  let missingSourcePointIds = $state(new Set<string>());
+  let calendarViewMode = $state<IRCalendarViewMode>('full');
   let expandedMaterialIds = $state(new Set<string>());
   let siblingCache = $state(new Map<string, ScheduleItem[]>());
   let loadingSiblings = $state(new Set<string>());
@@ -474,6 +550,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let reconcileFailureStreak = 0;
   let reconcileDegradedUntilMs = 0;
   let searchScopeLoadInFlight = false;
+  let searchScopeLoadQueued = false;
   /** 过期磁盘缓存展示后，后台 reconcile 需 forceRecompute 以重建负载均衡日程 */
   let calendarScheduleNeedsRecompute = $state(false);
   /** 侧栏不可见或 Obsidian 窗口隐藏时暂停后台 reconcile，避免与其它插件抢主线程 */
@@ -482,6 +559,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let pendingLocalRefreshGeneratedAt = 0;
   let lastLocallyHandledBroadcastGeneratedAt = 0;
   let debounceTimer: number | null = null;
+  let missingSourceScanTimer: number | null = null;
+  let missingSourceScanToken = 0;
+  let missingSourceRetryTimer: number | null = null;
+  const missingSourcePathExistsCache = new Map<string, boolean>();
 
   function getWorkspaceSnapshotService() {
     return getSharedIRWorkspaceSnapshotService(plugin.app);
@@ -572,12 +653,26 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       return;
     }
 
+    const affectedDateKeys = new Set<string>();
+    const collectAffectedDates = (input: Map<string, ScheduleItem[]>) => {
+      for (const [dateKey, items] of input.entries()) {
+        if (items.some((item) => normalizedIds.has(item.id))) {
+          affectedDateKeys.add(dateKey);
+        }
+      }
+    };
+    collectAffectedDates(materialsByDate);
+    collectAffectedDates(pinnedByDate);
+
     const filterMapItems = (input: Map<string, ScheduleItem[]>): Map<string, ScheduleItem[]> => {
       const next = new Map<string, ScheduleItem[]>();
       for (const [dateKey, items] of input.entries()) {
         const filtered = items.filter((item) => !normalizedIds.has(item.id));
         if (filtered.length > 0) {
           next.set(dateKey, filtered);
+        } else if (affectedDateKeys.has(dateKey)) {
+          // Keep empty day keys so authoritative projection patch can shrink to [].
+          next.set(dateKey, []);
         }
       }
       return next;
@@ -599,10 +694,50 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     calendarProgressByDate = nextCalendarProgress;
 
     batchSelectedIds = new Set(Array.from(batchSelectedIds).filter((id) => !normalizedIds.has(id)));
+    missingSourcePointIds = new Set(
+      Array.from(missingSourcePointIds).filter((id) => !normalizedIds.has(id))
+    );
 
     const storage = await getStorage();
     for (const materialId of normalizedIds) {
       await storage.removeCalendarCompletion(materialId);
+    }
+
+    await persistAuthoritativeDayQueuesAfterRemoval(Array.from(affectedDateKeys));
+  }
+
+  async function persistAuthoritativeDayQueuesAfterRemoval(dateKeys: string[]): Promise<void> {
+    const uniqueKeys = Array.from(
+      new Set(dateKeys.map((key) => String(key || '').trim()).filter(Boolean))
+    );
+    if (uniqueKeys.length === 0) {
+      return;
+    }
+
+    const dayPatches = new Map<string, ScheduleItem[]>();
+    for (const dateKey of uniqueKeys) {
+      dayPatches.set(dateKey, materialsByDate.get(dateKey) || []);
+    }
+
+    try {
+      const queryService = getCalendarQueryService();
+      const scheduleFingerprint = (
+        await getSharedIRScheduleIndexService(plugin.app).getScheduleSources()
+      ).scheduleFingerprint;
+      await patchCalendarProjectionDaySlices(plugin.app, {
+        cacheKey: queryService.buildQueryCacheKeyForDeckIds(
+          getActiveDeckIdsForQuery(),
+          undefined
+        ),
+        settingsFingerprint: queryService.getSettingsFingerprint(),
+        scheduleFingerprint,
+        dayPatches
+      });
+      getSharedIRProjectionRuntime(plugin.app).markL1DayQueueFresh(uniqueKeys);
+      syncCalendarDayCountsFromLoadedMaterials(uniqueKeys, { allowShrink: true });
+      clearSelectedDateHydrationCompletedKeys(uniqueKeys);
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to patch day queues after removal:', error);
     }
   }
 
@@ -629,13 +764,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     continuousReadingEnabled = settings.continuousReadingEnabled;
     showSchedulingPreview = settings.showSchedulingPreview;
     showReadingPointTypeLabels = settings.showReadingPointTypeLabels === true;
-    calendarViewMode = settings.calendarViewMode;
+    showMissingSourceIndicators = settings.showMissingSourceIndicators !== false;
+    hideTodayCompletedReadingPoints = settings.hideTodayCompletedReadingPoints === true;
+    calendarViewMode = resolveIRCalendarViewMode(settings.calendarViewMode);
     updateCalendarBackgroundWallState(settings.backgroundWall?.imagePath || '');
     calendarBackgroundWallFadePercent = normalizeCalendarBackgroundWallFadePercent(settings.backgroundWall?.fadePercent);
 
     if (!continuousReadingEnabled) {
       expandedMaterialIds = new Set();
     }
+    void ensureParentRelationRuntime();
   }
 
   async function saveCalendarSidebarSettings(patch: Partial<IRCalendarSidebarSettings>): Promise<void> {
@@ -667,6 +805,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     continuousReadingEnabled = enabled;
     if (!enabled) {
       expandedMaterialIds = new Set();
+    } else {
+      void ensureParentRelationRuntime();
     }
 
     try {
@@ -727,11 +867,12 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     await setCalendarBackgroundWallFadePercent(value);
   }
 
-  async function setCalendarViewMode(nextMode: 'full' | 'two-row'): Promise<void> {
-    calendarViewMode = nextMode;
+  async function setCalendarViewMode(nextMode: IRCalendarViewMode): Promise<void> {
+    const resolvedMode = resolveIRCalendarViewMode(nextMode);
+    calendarViewMode = resolvedMode;
 
     try {
-      await saveCalendarSidebarSettings({ calendarViewMode: nextMode });
+      await saveCalendarSidebarSettings({ calendarViewMode: resolvedMode });
     } catch (error) {
       logger.warn('[IRCalendarSidebar] Failed to save calendar view mode:', error);
       new Notice(t('irSidebar.notices.settingsSaveFailed'));
@@ -763,6 +904,47 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       logger.warn('[IRCalendarSidebar] Failed to save reading point type label setting:', error);
       new Notice(t('irSidebar.notices.settingsSaveFailed'));
     }
+  }
+
+  async function setShowMissingSourceIndicatorsEnabled(enabled: boolean): Promise<void> {
+    showMissingSourceIndicators = enabled;
+    if (!enabled) {
+      missingSourcePointIds = new Set();
+      missingSourceScanToken += 1;
+      if (missingSourceScanTimer !== null) {
+        window.clearTimeout(missingSourceScanTimer);
+        missingSourceScanTimer = null;
+      }
+      if (missingSourceRetryTimer !== null) {
+        window.clearTimeout(missingSourceRetryTimer);
+        missingSourceRetryTimer = null;
+      }
+    }
+
+    try {
+      await saveCalendarSidebarSettings({ showMissingSourceIndicators: enabled });
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to save missing source indicator setting:', error);
+      new Notice(t('irSidebar.notices.settingsSaveFailed'));
+    }
+  }
+
+  async function setHideTodayCompletedReadingPointsEnabled(enabled: boolean): Promise<void> {
+    hideTodayCompletedReadingPoints = enabled;
+
+    try {
+      await saveCalendarSidebarSettings({ hideTodayCompletedReadingPoints: enabled });
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to save hide-today-completed setting:', error);
+      new Notice(t('irSidebar.notices.settingsSaveFailed'));
+    }
+  }
+
+  function isSourceMissing(materialId: string): boolean {
+    if (!showMissingSourceIndicators) {
+      return false;
+    }
+    return missingSourcePointIds.has(String(materialId || '').trim());
   }
 
   function getReadingPointTypeIndicator(material: ScheduleItem): { icon: string; label: string } | null {
@@ -899,8 +1081,19 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     );
   }
 
+  async function ensureSearchCatalogTags(): Promise<void> {
+    try {
+      const tagService = await getPointTagService();
+      searchCatalogTags = await tagService.getAllKnownTags();
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] search catalog tags load failed:', error);
+    }
+  }
+
   async function ensureSearchScopeLoaded(): Promise<void> {
     if (searchScopeLoadInFlight) {
+      // 输入 tag: 时会并发触发；排队一次，避免被取消后永不重试。
+      searchScopeLoadQueued = true;
       return;
     }
     const dateKeys = collectVisibleMonthDateKeys();
@@ -911,25 +1104,34 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       const items = materialsByDate.get(dateKey);
       return !items || items.length === 0;
     });
-    if (missingDateKeys.length === 0) {
-      return;
-    }
 
     searchScopeLoadInFlight = true;
     try {
-      const deckIds = getActiveDeckIdsForQuery();
-      const projection = await getSharedIRProjectionRuntime(plugin.app).hydratePriorityDatesFromProjection(
-        deckIds,
-        missingDateKeys
-      );
-      if (projection) {
-        applyProjectionLoadResult(projection, missingDateKeys);
+      // 建议列表优先用全库目录（与编辑标签同源），不依赖 337 项 idle 扫描。
+      await ensureSearchCatalogTags();
+
+      if (missingDateKeys.length > 0) {
+        const deckIds = getActiveDeckIdsForQuery();
+        const projection = await getSharedIRProjectionRuntime(plugin.app).hydratePriorityDatesFromProjection(
+          deckIds,
+          missingDateKeys
+        );
+        if (projection) {
+          applyProjectionLoadResult(projection, missingDateKeys);
+        }
+        scheduleBackgroundCalendarReconcile(missingDateKeys, deckIds, 'search-r3');
       }
-      scheduleBackgroundCalendarReconcile(missingDateKeys, deckIds, 'search-r3');
+
+      // 材料过滤仍需 per-item 标签图；搜索路径不可被交互 pause 取消。
+      await refreshReadingPointTagMap(materialsByDate, undefined, { cancellable: false });
     } catch (error) {
       logger.warn('[IRCalendarSidebar] search scope load failed:', error);
     } finally {
       searchScopeLoadInFlight = false;
+      if (searchScopeLoadQueued) {
+        searchScopeLoadQueued = false;
+        void ensureSearchScopeLoaded();
+      }
     }
   }
 
@@ -946,6 +1148,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
 
     showSearchPanel = true;
+    // 预热可见月材料与阅读点标签，保证点击 tag: 时列表已有数据
+    void ensureSearchScopeLoaded();
   }
 
   function getRequestedDeckFilterId(): string {
@@ -978,6 +1182,24 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     return (pinnedByDate.get(dateKey) || []).filter(matchesActiveDeckFilter);
   }
 
+  /** 活跃日 ignore pinned；历史日 merge（pinned = 已完成 hydrate）。 */
+  function getPinnedRoleForDateKey(dateKey: string): DayQueuePinnedRole {
+    return resolvePinnedRoleForDateKey(dateKey, today, isPastCalendarDateKey);
+  }
+
+  function clearPinnedForActiveDate(dateKey: string): void {
+    const normalized = String(dateKey || '').trim();
+    if (!normalized || getPinnedRoleForDateKey(normalized) === 'merge') {
+      return;
+    }
+    if (!pinnedByDate.has(normalized)) {
+      return;
+    }
+    const next = new Map(pinnedByDate);
+    next.delete(normalized);
+    pinnedByDate = next;
+  }
+
   function matchesActiveTagFilter(material: ScheduleItem): boolean {
     const normalizedFilter = activeReadingTagFilter.trim().toLowerCase();
     if (!normalizedFilter) {
@@ -987,12 +1209,27 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     return getMaterialTagLabels(material.id).some((tag) => tag.toLowerCase() === normalizedFilter);
   }
 
+  const parentTitleByMaterialId = $derived.by(() => {
+    const runtime = parentRelationRuntime;
+    if (!runtime) {
+      return {} as Record<string, string>;
+    }
+    const map: Record<string, string> = {};
+    for (const [childId, parentId] of runtime.index.parentByChildId) {
+      map[childId] =
+        runtime.titleByPointId.get(parentId) ||
+        parentId;
+    }
+    return map;
+  });
+
   const calendarSearchContext = $derived(
     buildIRCalendarSearchContext({
       app: plugin.app,
       readingMaterials,
       irDecks,
       materialTagLabelsById: readingPointTagsById,
+      parentTitleByMaterialId,
       resolveCanonicalDeckId
     })
   );
@@ -1443,10 +1680,98 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
   }
 
+  async function loadScheduleItemsByIds(
+    ids: string[],
+    loadToken: number
+  ): Promise<ScheduleItem[]> {
+    const items: ScheduleItem[] = [];
+    for (const id of ids) {
+      if (loadToken !== doneItemsLoadToken) {
+        return items;
+      }
+
+      if (isPdfBookmarkTaskId(id)) {
+        try {
+          const task = await getWorkspacePdfTaskById(id);
+          if (task) {
+            items.push(buildScheduleItemFromPdfTask(task));
+          }
+        } catch (e) {
+          logger.warn('[IRCalendarSidebar] Failed to load PDF reading material', id, e);
+        }
+        continue;
+      }
+
+      if (isEpubBookmarkTaskId(id)) {
+        try {
+          const task = await getWorkspaceEpubTaskById(id);
+          if (task) {
+            items.push(
+              await buildScheduleItemFromEpubTask(task, { resolveFilePath: resolveEpubTaskFilePath })
+            );
+          }
+        } catch (e) {
+          logger.warn('[IRCalendarSidebar] Failed to load EPUB reading material', id, e);
+        }
+        continue;
+      }
+
+      const chunk = await getWorkspaceChunkById(id);
+      if (chunk) {
+        items.push(buildScheduleItemFromChunkData(chunk, id));
+        continue;
+      }
+
+      const legacyBlock = await getWorkspaceLegacyBlockById(id);
+      if (legacyBlock) {
+        items.push(buildScheduleItemFromLegacyBlock(legacyBlock));
+      }
+    }
+    return items;
+  }
+
+  /**
+   * 历史日：把已完成项 hydrate 进 pinnedByDate。
+   * 活跃日：补齐 materials 全日队列中缺失的已完成实体，并清除并行 pinned。
+   */
   async function ensureDoneItemsVisibleForDate(dateKey: string): Promise<void> {
     const loadToken = ++doneItemsLoadToken;
     try {
       const doneIds = calendarProgressByDate[dateKey] || [];
+      const pinnedRole = getPinnedRoleForDateKey(dateKey);
+
+      if (pinnedRole !== 'merge') {
+        clearPinnedForActiveDate(dateKey);
+        if (!doneIds.length) {
+          markSelectedDateHydrationComplete(dateKey);
+          return;
+        }
+        const materials = materialsByDate.get(dateKey) || [];
+        const materialIds = new Set(materials.map((item) => item.id));
+        const missingIds = doneIds.filter((id) => !materialIds.has(id));
+        if (missingIds.length === 0) {
+          markSelectedDateHydrationComplete(dateKey);
+          return;
+        }
+        const doneItems = await loadScheduleItemsByIds(missingIds, loadToken);
+        if (loadToken !== doneItemsLoadToken) {
+          return;
+        }
+        if (doneItems.length === 0) {
+          markSelectedDateHydrationComplete(dateKey);
+          return;
+        }
+        const assembled = resolveDayQueueForDisplay({
+          dateKey,
+          materials: [...materials, ...doneItems],
+          completedIds: doneIds,
+          pinnedRole: 'ignore',
+        });
+        applyLocalDayQueueProjection(dateKey, assembled);
+        markSelectedDateHydrationComplete(dateKey);
+        return;
+      }
+
       const currentPinned = pinnedByDate.get(dateKey) || [];
       if (!doneIds.length) {
         if (currentPinned.length > 0) {
@@ -1458,51 +1783,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         return;
       }
 
-      const doneItems: ScheduleItem[] = [];
-
-      for (const id of doneIds) {
-        if (loadToken !== doneItemsLoadToken) {
-          return;
-        }
-
-        if (isPdfBookmarkTaskId(id)) {
-          try {
-            const task = await getWorkspacePdfTaskById(id);
-            if (task) {
-              doneItems.push(buildScheduleItemFromPdfTask(task));
-            }
-          } catch (e) {
-            logger.warn('[IRCalendarSidebar] Failed to load PDF reading material', id, e);
-          }
-          continue;
-        }
-
-        if (isEpubBookmarkTaskId(id)) {
-          try {
-            const task = await getWorkspaceEpubTaskById(id);
-            if (task) {
-              doneItems.push(
-                await buildScheduleItemFromEpubTask(task, { resolveFilePath: resolveEpubTaskFilePath })
-              );
-            }
-          } catch (e) {
-            logger.warn('[IRCalendarSidebar] Failed to load EPUB reading material', id, e);
-          }
-          continue;
-        }
-
-        const chunk = await getWorkspaceChunkById(id);
-        if (chunk) {
-          doneItems.push(buildScheduleItemFromChunkData(chunk, id));
-          continue;
-        }
-
-        const legacyBlock = await getWorkspaceLegacyBlockById(id);
-        if (legacyBlock) {
-          doneItems.push(buildScheduleItemFromLegacyBlock(legacyBlock));
-        }
-      }
-
+      const doneItems = await loadScheduleItemsByIds(doneIds, loadToken);
       if (loadToken !== doneItemsLoadToken) {
         return;
       }
@@ -1535,11 +1816,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
 
-  function syncCalendarDayCountsFromLoadedMaterials(dateKeys?: string[]): void {
+  function syncCalendarDayCountsFromLoadedMaterials(
+    dateKeys?: string[],
+    options?: { allowShrink?: boolean }
+  ): void {
+    const allowShrink = options?.allowShrink === true;
     const visibleCounts = buildVisibleDayCountsByDate(
       materialsByDate,
       pinnedByDate,
-      matchesActiveDeckFilter
+      matchesActiveDeckFilter,
+      (dateKey) => getPinnedRoleForDateKey(dateKey) === 'merge'
     );
     if (dateKeys && dateKeys.length > 0) {
       const scoped = new Map<string, number>();
@@ -1548,13 +1834,29 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         if (!normalized) {
           continue;
         }
-        if (visibleCounts.has(normalized)) {
-          scoped.set(normalized, visibleCounts.get(normalized) ?? 0);
-        } else if (materialsByDate.has(normalized) || pinnedByDate.has(normalized)) {
-          scoped.set(normalized, 0);
+        const loaded = visibleCounts.get(normalized) ?? 0;
+        // 空切片不要把既有热力抹成 0，否则 isDateMaterialsLoadComplete 会误判「已完成」。
+        if (loaded <= 0 && !allowShrink) {
+          continue;
+        }
+        if (!allowShrink) {
+          const existing = calendarDayCountsByDate.get(normalized) ?? 0;
+          // 壳层 hydrate 只抬升、不收缩热力，避免部分切片把「热力 N」压成「列表 M」。
+          scoped.set(normalized, Math.max(existing, loaded));
+        } else {
+          scoped.set(normalized, loaded);
         }
       }
       calendarDayCountsByDate = mergeCalendarDayCountMaps(calendarDayCountsByDate, scoped);
+      return;
+    }
+    if (!allowShrink) {
+      const raised = new Map<string, number>();
+      for (const [dateKey, loaded] of visibleCounts.entries()) {
+        const existing = calendarDayCountsByDate.get(dateKey) ?? 0;
+        raised.set(dateKey, Math.max(existing, loaded));
+      }
+      calendarDayCountsByDate = mergeCalendarDayCountMaps(calendarDayCountsByDate, raised);
       return;
     }
     calendarDayCountsByDate = mergeCalendarDayCountMaps(calendarDayCountsByDate, visibleCounts);
@@ -1588,15 +1890,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       const progressIds = calendarProgressByDate[normalized] || [];
       return progressIds.length;
     }
-    if (materialsByDate.has(normalized) || pinnedByDate.has(normalized)) {
-      const ids = new Set<string>();
-      for (const item of getVisibleMaterialsForDate(normalized)) {
-        ids.add(item.id);
-      }
-      for (const item of getVisiblePinnedForDate(normalized)) {
-        ids.add(item.id);
-      }
-      return ids.size;
+    // 活跃日：只认 materials 全日队列，避免 pinned 残片把计数/列表带偏。
+    if (materialsByDate.has(normalized)) {
+      return getVisibleMaterialsForDate(normalized).length;
     }
     const materials = getVisibleMaterialsForDate(normalized);
     if (materials.length > 0) {
@@ -1632,8 +1928,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     for (const item of getVisibleMaterialsForDate(dateKey)) {
       ids.add(item.id);
     }
-    for (const item of getVisiblePinnedForDate(dateKey)) {
-      ids.add(item.id);
+    if (getPinnedRoleForDateKey(dateKey) === 'merge') {
+      for (const item of getVisiblePinnedForDate(dateKey)) {
+        ids.add(item.id);
+      }
     }
     return ids.size;
   }
@@ -1709,19 +2007,18 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   function mergeMaterialsByDate(
     base: Map<string, ScheduleItem[]>,
     updates: Map<string, ScheduleItem[]>,
-    options?: { forceReplaceDateKeys?: string[] }
-  ): Map<string, ScheduleItem[]> {
-    const forceReplace = new Set(
-      (options?.forceReplaceDateKeys || []).map((key) => String(key || '').trim()).filter(Boolean)
-    );
-    const merged = new Map(base);
-    for (const [dateKey, items] of updates) {
-      const existing = merged.get(dateKey) || [];
-      if (existing.length === 0 || items.length > 0 || forceReplace.has(dateKey)) {
-        merged.set(dateKey, items);
-      }
+    options?: {
+      forceReplaceDateKeys?: string[];
+      /** 默认 true：禁止后台/投影用不完整切片冲掉全日队列。fullQuery 整表替换勿走此函数。 */
+      protectAgainstShrink?: boolean;
+      completedIdsByDate?: Record<string, string[]>;
     }
-    return merged;
+  ): Map<string, ScheduleItem[]> {
+    return mergeMaterialsByDateMaps(base, updates, {
+      forceReplaceDateKeys: options?.forceReplaceDateKeys,
+      protectAgainstShrink: options?.protectAgainstShrink !== false,
+      completedIdsByDate: options?.completedIdsByDate ?? calendarProgressByDate,
+    });
   }
 
   function applyCalendarDaySummaries(daySummaries: Map<string, { totalCount: number }>): void {
@@ -1779,9 +2076,17 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     markWarmReadyPhase();
   }
 
-  /** 本地缓存尝试结束后仍无数据时，解除首屏阻塞，后台 reconcile 继续补齐。 */
+  /**
+   * 本地缓存尝试结束后仍无数据时解除首屏阻塞。
+   * 若选中日热力已有点数而列表仍空，则保持 cold/preparing，避免「壳就绪、列表空白」。
+   */
   function markCalendarColdStartResolved(): void {
     if (hasHydratedCalendarData) {
+      return;
+    }
+    const selectedKey = formatDateKey(selectedDate);
+    const heatmapCount = calendarDayCountsByDate.get(selectedKey) ?? 0;
+    if (heatmapCount > 0 && !isDateMaterialsLoadComplete(selectedKey)) {
       return;
     }
     hasHydratedCalendarData = true;
@@ -1805,15 +2110,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     if (shell) {
       materialsByDate = mergeMaterialsByDate(materialsByDate, shell.result.materialsByDate);
       mergeCalendarDaySummaries(shell.daySummaries);
-      for (const dateKey of priorityDateKeys) {
-        if (isPriorityDateLoadSatisfied(dateKey)) {
-          markSelectedDateHydrationComplete(dateKey);
-        }
-      }
-    }
-    if (arePriorityDatesLoadSatisfied(priorityDateKeys)) {
-      syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
-      return true;
     }
 
     const staleDisk = await queryService.tryGetStaleDiskCalendarResult({
@@ -1824,10 +2120,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     if (staleDisk) {
       mergeStaleDiskPriorityDates(staleDisk, priorityDateKeys);
     }
-    if (arePriorityDatesLoadSatisfied(priorityDateKeys)) {
-      syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
-      return true;
-    }
 
     const tier0 = await queryService.tryGetTier0CalendarResult({
       deckIds,
@@ -1836,10 +2128,35 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     if (tier0) {
       materialsByDate = mergeMaterialsByDate(materialsByDate, tier0.result.materialsByDate);
       mergeCalendarDaySummaries(tier0.daySummaries);
-      for (const dateKey of priorityDateKeys) {
-        if (isPriorityDateLoadSatisfied(dateKey)) {
-          markSelectedDateHydrationComplete(dateKey);
-        }
+    }
+
+    // 本地壳路径：due 补洞仅用 warm schedule，禁止 snapshot 扫盘阻塞 UI。
+    // 大量逾期补齐交给后台 calendar-reconcile。
+    const dueMerged = await mergeDueIndexIntoPriorityProjection(plugin.app, {
+      dateKeys: priorityDateKeys,
+      deckIds,
+      materialsByDate,
+      daySummaries: new Map(
+        priorityDateKeys.map((dateKey) => [
+          dateKey,
+          { totalCount: calendarDayCountsByDate.get(dateKey) ?? 0 },
+        ])
+      ),
+      completedIdsByDate: calendarProgressByDate,
+      allowPointSnapshotFallback: false,
+    });
+    if (dueMerged.filledDateKeys.length > 0) {
+      // due 补洞只允许扩大/更新，禁止用更小集合冲掉已有全日队列。
+      materialsByDate = mergeMaterialsByDate(materialsByDate, dueMerged.materialsByDate, {
+        forceReplaceDateKeys: dueMerged.filledDateKeys,
+        protectAgainstShrink: true,
+      });
+      mergeCalendarDaySummaries(dueMerged.daySummaries);
+    }
+
+    for (const dateKey of priorityDateKeys) {
+      if (isPriorityDateLoadSatisfied(dateKey)) {
+        markSelectedDateHydrationComplete(dateKey);
       }
     }
 
@@ -1972,8 +2289,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     syncCalendarDayCountsFromLoadedMaterials(
       Array.from(materialsByDate.keys()).filter((dateKey) => {
         const items = materialsByDate.get(dateKey) || [];
-        const pinned = pinnedByDate.get(dateKey) || [];
-        return items.length > 0 || pinned.length > 0;
+        if (items.length > 0) {
+          return true;
+        }
+        // 仅历史日允许用 pinned hydrate 撑起计数。
+        return (
+          getPinnedRoleForDateKey(dateKey) === 'merge' &&
+          (pinnedByDate.get(dateKey) || []).length > 0
+        );
       })
     );
   }
@@ -1991,16 +2314,28 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         priorityDateKeys
       );
     } else {
-      materialsByDate = mergeMaterialsByDate(materialsByDate, projection.materialsByDate);
+      materialsByDate = mergeMaterialsByDate(materialsByDate, projection.materialsByDate, {
+        protectAgainstShrink: true,
+      });
       mergeCalendarDaySummaries(projection.daySummaries);
     }
+    // 以投影切片抬升热力计数，但禁止向下收缩（否则部分壳会把完整热力压成子集）。
+    syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
     for (const dateKey of priorityDateKeys) {
-      if (isDateMaterialsLoadComplete(dateKey)) {
+      // 仅当列表与热力对齐（或历史日）时标记完成；禁止「有任意材料就算完成」。
+      if (
+        isPastCalendarDateKey(dateKey, today) ||
+        isDateMaterialsLoadComplete(dateKey)
+      ) {
         markSelectedDateHydrationComplete(dateKey);
       }
     }
     if (!hasHydratedCalendarData) {
       hasHydratedCalendarData = true;
+    }
+    const selectedKey = formatDateKey(selectedDate);
+    if (priorityDateKeys.includes(selectedKey)) {
+      void ensureDoneItemsVisibleForDate(selectedKey);
     }
   }
 
@@ -2056,9 +2391,52 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   async function finalizePriorityDatesAfterLoad(
     priorityDateKeys: string[],
-    deckIds?: string[]
+    deckIds?: string[],
+    options?: { deferLeanToBackground?: boolean }
   ): Promise<void> {
     clearStaleSelectedDateHydrationFlags(priorityDateKeys);
+
+    // 投影壳已是 R1 真相：禁止 ensureSelectedDateMaterialsLoaded → 前台 lean（可达数十秒）。
+    // ensureReady 已做过 warm-only due 补洞；此处仅在仍无可见材料时再补一次，避免双 hydrate。
+    if (options?.deferLeanToBackground) {
+      const needsLocalFill = priorityDateKeys.some(
+        (dateKey) =>
+          !isPastCalendarDateKey(dateKey, today) &&
+          countVisibleMaterialsForDate(dateKey) === 0
+      );
+      if (needsLocalFill) {
+        await mergePriorityDatesFromLocalCache(priorityDateKeys, deckIds);
+      }
+      syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
+      for (const dateKey of priorityDateKeys) {
+        if (
+          isPastCalendarDateKey(dateKey, today) ||
+          isDateMaterialsLoadComplete(dateKey)
+        ) {
+          markSelectedDateHydrationComplete(dateKey);
+        }
+      }
+      const stillMissing = priorityDateKeys.filter(
+        (dateKey) =>
+          !isPastCalendarDateKey(dateKey, today) &&
+          !isDateMaterialsLoadComplete(dateKey)
+      );
+      priorityDatesReconcilePending = stillMissing.length > 0;
+      isSelectedDatePreparing = false;
+      maybeClearCalendarLoadStage();
+      scheduleBackgroundCalendarReconcile(
+        priorityDateKeys,
+        deckIds,
+        stillMissing.length > 0 ? 'sidebar-shell-due-gap' : 'sidebar-shell-deferred',
+        stillMissing.length > 0
+      );
+      logger.info('[IRCalendarSidebar] shell authoritative; deferred lean to background', {
+        priorityDateKeys,
+        stillMissing,
+      });
+      return;
+    }
+
     if (!arePriorityDatesLoadSatisfied(priorityDateKeys)) {
       await mergePriorityDatesFromLocalCache(priorityDateKeys, deckIds);
     }
@@ -2148,7 +2526,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function refreshCalendarBackgroundPauseState(): void {
     const documentHidden =
-      typeof document !== 'undefined' && document.visibilityState === 'hidden';
+      typeof activeDocument !== 'undefined' && activeDocument.visibilityState === 'hidden';
     calendarBackgroundPaused = documentHidden || !isIRCalendarLeafActive();
     refreshCalendarPhaseFromRuntime();
   }
@@ -2159,48 +2537,67 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     reconciledMaterialsByDate?: Map<string, ScheduleItem[]>
   ): Promise<void> {
     await ensureIrDeckCatalogLoaded();
+    const runtime = getSharedIRProjectionRuntime(plugin.app);
+    // L1 全日队列保护窗内：跳过该日的 reconcile/hydrate 覆盖（完成阅读点后的典型竞态）。
+    const applyDateKeys = runtime.filterOutL1FreshDateKeys(priorityDateKeys);
+    if (applyDateKeys.length === 0) {
+      return;
+    }
+
     if (reconciledMaterialsByDate) {
-      materialsByDate = mergeMaterialsByDate(materialsByDate, reconciledMaterialsByDate, {
-        forceReplaceDateKeys: priorityDateKeys,
+      const safeReconciled = new Map<string, ScheduleItem[]>();
+      for (const dateKey of applyDateKeys) {
+        if (reconciledMaterialsByDate.has(dateKey)) {
+          safeReconciled.set(dateKey, reconciledMaterialsByDate.get(dateKey) || []);
+        }
+      }
+      if (safeReconciled.size === 0) {
+        return;
+      }
+      materialsByDate = mergeMaterialsByDate(materialsByDate, safeReconciled, {
+        forceReplaceDateKeys: applyDateKeys,
+        protectAgainstShrink: true,
+        completedIdsByDate: calendarProgressByDate,
       });
-      syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
-      for (const dateKey of priorityDateKeys) {
+      syncCalendarDayCountsFromLoadedMaterials(applyDateKeys);
+      for (const dateKey of applyDateKeys) {
         lazyMetadataLoadedDateKeys.delete(dateKey);
         if (isDateMaterialsLoadComplete(dateKey)) {
           markSelectedDateHydrationComplete(dateKey);
         }
       }
-      if (arePriorityDatesLoadSatisfied(priorityDateKeys)) {
+      if (arePriorityDatesLoadSatisfied(applyDateKeys)) {
         priorityDatesReconcilePending = false;
         maybeClearCalendarLoadStage();
       }
       markWarmReadyPhase();
       const selectedKey = formatDateKey(selectedDate);
-      if (priorityDateKeys.includes(selectedKey)) {
+      if (applyDateKeys.includes(selectedKey)) {
+        void ensureDoneItemsVisibleForDate(selectedKey);
         void ensureLazyMetadataForSelectedDate(selectedKey);
       }
       return;
     }
 
-    const projection = await getSharedIRProjectionRuntime(plugin.app).hydratePriorityDatesFromProjection(
+    const projection = await runtime.hydratePriorityDatesFromProjection(
       deckIds,
-      priorityDateKeys
+      applyDateKeys
     );
-    applyProjectionLoadResult(projection, priorityDateKeys);
-    for (const dateKey of priorityDateKeys) {
+    applyProjectionLoadResult(projection, applyDateKeys);
+    for (const dateKey of applyDateKeys) {
       lazyMetadataLoadedDateKeys.delete(dateKey);
       if (isPriorityDateLoadSatisfied(dateKey)) {
         markSelectedDateHydrationComplete(dateKey);
       }
     }
-    if (arePriorityDatesLoadSatisfied(priorityDateKeys)) {
+    if (arePriorityDatesLoadSatisfied(applyDateKeys)) {
       priorityDatesReconcilePending = false;
       maybeClearCalendarLoadStage();
     }
-    syncCalendarDayCountsFromLoadedMaterials(priorityDateKeys);
+    syncCalendarDayCountsFromLoadedMaterials(applyDateKeys);
     markWarmReadyPhase();
     const selectedKey = formatDateKey(selectedDate);
-    if (priorityDateKeys.includes(selectedKey)) {
+    if (applyDateKeys.includes(selectedKey)) {
       void ensureLazyMetadataForSelectedDate(selectedKey);
     }
   }
@@ -2256,6 +2653,24 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       isSelectedDatePreparing = false;
       return;
     }
+    // 投影壳已写出且列表与热力对齐：只后台补齐，绝不前台 lean。
+    // 禁止「有部分材料就算完成」——否则热力 N、列表子集时提前停补洞。
+    if (
+      materialsByDate.has(normalizedDateKey) &&
+      isDateMaterialsLoadComplete(normalizedDateKey)
+    ) {
+      syncCalendarDayCountsFromLoadedMaterials([normalizedDateKey]);
+      markSelectedDateHydrationComplete(normalizedDateKey);
+      priorityDatesReconcilePending = false;
+      isSelectedDatePreparing = false;
+      maybeClearCalendarLoadStage();
+      scheduleBackgroundCalendarReconcile(
+        [normalizedDateKey],
+        getActiveDeckIdsForQuery(),
+        'selected-date-shell-present'
+      );
+      return;
+    }
     const lastAttemptAt = selectedDateHydrationAttemptAtByKey.get(normalizedDateKey) ?? 0;
     if (Date.now() - lastAttemptAt < SELECTED_DATE_HYDRATION_RETRY_MS) {
       return;
@@ -2268,8 +2683,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       await ensureIrDeckCatalogLoaded();
       await mergePriorityDatesFromLocalCache([normalizedDateKey], deckIds);
       if (isPriorityDateLoadSatisfied(normalizedDateKey)) {
+        syncCalendarDayCountsFromLoadedMaterials([normalizedDateKey]);
+        markSelectedDateHydrationComplete(normalizedDateKey);
         priorityDatesReconcilePending = false;
         maybeClearCalendarLoadStage();
+        void ensureDoneItemsVisibleForDate(normalizedDateKey);
         return;
       }
       if (isCalendarSidebarInteractionPaused() || isDegradedReconcileWindow()) {
@@ -2387,24 +2805,15 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function collectDayQueueSourceItems(dateKey: string): ScheduleItem[] {
-    const normalized = String(dateKey || '').trim();
-    if (!normalized) {
-      return [];
-    }
-    const merged = new Map<string, ScheduleItem>();
-    if (!isPastCalendarDateKey(normalized, today)) {
-      for (const item of materialsByDate.get(normalized) || []) {
-        if (matchesActiveDeckFilter(item)) {
-          merged.set(item.id, item);
-        }
-      }
-    }
-    for (const item of pinnedByDate.get(normalized) || []) {
-      if (matchesActiveDeckFilter(item)) {
-        merged.set(item.id, item);
-      }
-    }
-    return [...merged.values()];
+    // 与展示同源：活跃日 materials 全日队列；历史日 materials ∪ pinned。
+    return resolveDayQueueFromDateMaps({
+      dateKey,
+      materialsByDate,
+      pinnedByDate,
+      completedIdsByDate: calendarProgressByDate,
+      itemFilter: matchesActiveDeckFilter,
+      pinnedRole: getPinnedRoleForDateKey(dateKey),
+    });
   }
 
   function buildAssembledDayQueueForDateKey(
@@ -2415,19 +2824,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
   ): ScheduleItem[] {
     const normalized = String(dateKey || '').trim();
-    if (!normalized) {
-      return [];
-    }
-    const merged = new Map<string, ScheduleItem>();
-    for (const item of collectDayQueueSourceItems(normalized)) {
-      merged.set(item.id, options.itemOverrides?.get(item.id) ?? item);
-    }
-    for (const [id, item] of options.itemOverrides || []) {
-      merged.set(id, item);
-    }
-    return assembleScheduleItemsForDailyQueue([...merged.values()], normalized, {
-      completedIds: options.completedIds,
-      completedIdOrder: options.completedIds,
+    return resolveDayQueueFromDateMaps({
+      dateKey: normalized,
+      materialsByDate,
+      pinnedByDate,
+      completedIdsByDate: { [normalized]: options.completedIds },
+      itemOverrides: options.itemOverrides,
+      itemFilter: matchesActiveDeckFilter,
+      pinnedRole: getPinnedRoleForDateKey(normalized),
     });
   }
 
@@ -2440,6 +2844,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     nextMaterialsByDate.set(normalized, assembled);
     materialsByDate = nextMaterialsByDate;
     syncCalendarDayCountsFromLoadedMaterials([normalized]);
+    // 乐观全日队列一写入即进入 L1 保护，不必等到 patchDayQueue 落盘。
+    getSharedIRProjectionRuntime(plugin.app).markL1DayQueueFresh([normalized]);
   }
 
   function markLocalDayQueueRefreshSuppressed(dateKey: string, durationMs = 4000): void {
@@ -2473,31 +2879,15 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function getSelectedMaterialsBase(): ScheduleItem[] {
-    const key = formatDateKey(selectedDate);
-    const merged = new Map<string, ScheduleItem>();
-
-    if (isPastCalendarDate(selectedDate, today)) {
-      for (const item of getVisibleMaterialsForDate(key)) {
-        merged.set(item.id, item);
-      }
-      for (const item of getVisiblePinnedForDate(key)) {
-        merged.set(item.id, item);
-      }
-      const completedIds = calendarProgressByDate[key] || [];
-      return assembleScheduleItemsForDailyQueue([...merged.values()], key, {
-        completedIds,
-        completedIdOrder: completedIds,
-      });
-    }
-
-    const materials = getVisibleMaterialsForDate(key);
-    const pinned = getVisiblePinnedForDate(key);
-    for (const m of materials) merged.set(m.id, m);
-    for (const p of pinned) merged.set(p.id, p);
-    const completedIds = calendarProgressByDate[key] || [];
-    return assembleScheduleItemsForDailyQueue([...merged.values()], key, {
-      completedIds,
-      completedIdOrder: completedIds,
+    // 唯一展示装配：活跃日只读 materials；历史日 merge pinned hydrate。
+    const dateKey = formatDateKey(selectedDate);
+    return resolveDayQueueFromDateMaps({
+      dateKey,
+      materialsByDate,
+      pinnedByDate,
+      completedIdsByDate: calendarProgressByDate,
+      itemFilter: matchesActiveDeckFilter,
+      pinnedRole: getPinnedRoleForDateKey(dateKey),
     });
   }
 
@@ -2690,19 +3080,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   function hasReadableReadingPointsForDate(date: Date): boolean {
     const dateKey = formatDateKey(date);
     const doneIds = new Set(calendarProgressByDate[dateKey] || []);
-    const merged = new Map<string, ScheduleItem>();
+    const queue = resolveDayQueueFromDateMaps({
+      dateKey,
+      materialsByDate,
+      pinnedByDate,
+      completedIdsByDate: calendarProgressByDate,
+      itemFilter: matchesActiveDeckFilter,
+      pinnedRole: getPinnedRoleForDateKey(dateKey),
+    });
 
-    for (const item of getVisibleMaterialsForDate(dateKey)) {
-      merged.set(item.id, item);
-    }
-
-    for (const item of getVisiblePinnedForDate(dateKey)) {
-      if (!merged.has(item.id)) {
-        merged.set(item.id, item);
-      }
-    }
-
-    return Array.from(merged.values()).some((item) => hasActiveContinueReadingStatus(item) && !doneIds.has(item.id));
+    return queue.some((item) => hasActiveContinueReadingStatus(item) && !doneIds.has(item.id));
   }
 
   function shouldOfferContinueReadingSuggestions(): boolean {
@@ -2759,50 +3146,44 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   function getCalendarDisplayDays(
     days: Array<{ date: Date; otherMonth: boolean }>
   ): Array<{ date: Date; otherMonth: boolean }> {
-    if (calendarViewMode !== 'two-row') {
-      return days;
+    return getIRCalendarDisplayDays({
+      days,
+      viewMode: calendarViewMode,
+      currentDate,
+      today,
+      selectedDate,
+      isSameDay,
+    });
+  }
+
+  function openIRTutorial(initialTab?: IRTutorialTabId): void {
+    tutorialInitialTab = initialTab;
+    tutorialVisible = true;
+  }
+
+  function closeIRTutorial(): void {
+    tutorialVisible = false;
+    tutorialInitialTab = undefined;
+  }
+
+  async function dismissIRTutorialPermanently(): Promise<void> {
+    calendarTutorialDismissed = true;
+    tutorialVisible = false;
+    tutorialInitialTab = undefined;
+    try {
+      const settings = plugin.settings as { calendarTutorialDismissed?: boolean };
+      settings.calendarTutorialDismissed = true;
+      await plugin.saveSettings?.();
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to persist tutorial dismiss:', error);
     }
+  }
 
-    const isCurrentDisplayedMonth =
-      currentDate.getFullYear() === today.getFullYear() &&
-      currentDate.getMonth() === today.getMonth();
-    const isSelectedInDisplayedMonth =
-      selectedDate.getFullYear() === currentDate.getFullYear() &&
-      selectedDate.getMonth() === currentDate.getMonth();
-    const anchorDate = isCurrentDisplayedMonth
-      ? today
-      : isSelectedInDisplayedMonth
-        ? selectedDate
-        : new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const anchorIndex = days.findIndex(({ date }) => isSameDay(date, anchorDate));
-
-    if (anchorIndex < 0) {
-      return days.slice(0, 14);
-    }
-
-    const rowStart = Math.floor(anchorIndex / 7) * 7;
-    const visibleDays = days.slice(rowStart, Math.min(rowStart + 14, days.length));
-
-    if (visibleDays.length === 14) {
-      return visibleDays;
-    }
-
-    const lastVisibleDate = visibleDays.length > 0
-      ? visibleDays[visibleDays.length - 1].date
-      : anchorDate;
-    const paddedDays = [...visibleDays];
-    for (let offset = 1; paddedDays.length < 14; offset += 1) {
-      paddedDays.push({
-        date: new Date(
-          lastVisibleDate.getFullYear(),
-          lastVisibleDate.getMonth(),
-          lastVisibleDate.getDate() + offset
-        ),
-        otherMonth: true
-      });
-    }
-
-    return paddedDays;
+  function resolveTutorialTabId(value: unknown): IRTutorialTabId | undefined {
+    const tab = String(value || '').trim();
+    return (IR_TUTORIAL_TAB_IDS as readonly string[]).includes(tab)
+      ? (tab as IRTutorialTabId)
+      : undefined;
   }
 
   function showMonthCalendarToolsMenu(event: MouseEvent) {
@@ -2810,6 +3191,15 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     event.stopPropagation();
 
     const menu = new Menu();
+    menu.addItem((item) => {
+      item
+        .setTitle(t('irTutorial.menuTitle'))
+        .setIcon('circle-help')
+        .onClick(() => {
+          openIRTutorial();
+        });
+    });
+
     if (shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.ANALYTICS_VIEW)) {
       menu.addItem((item) => {
         item
@@ -2887,17 +3277,22 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
     menu.addSeparator();
 
-    menu.addItem((item) => {
-      item
-        .setTitle(
-          calendarViewMode === 'two-row'
-            ? t('irSidebar.calendar.switchFullMonth')
-            : t('irSidebar.calendar.switchTwoRowMonth')
-        )
-        .setIcon('calendar')
-        .onClick(() => {
-          void setCalendarViewMode(calendarViewMode === 'two-row' ? 'full' : 'two-row');
-        });
+    populateCalendarViewModeMenu(menu, {
+      viewModeTitle: t('irSidebar.calendar.viewModeMenu'),
+      currentMode: calendarViewMode,
+      modes: IR_CALENDAR_VIEW_MODES.map((mode) => ({
+        mode,
+        title:
+          mode === 'one-row'
+            ? t('irSidebar.calendar.viewModeOneRow')
+            : mode === 'two-row'
+              ? t('irSidebar.calendar.viewModeTwoRow')
+              : t('irSidebar.calendar.viewModeFullMonth'),
+        icon: mode === 'one-row' ? 'minus' : mode === 'two-row' ? 'list' : 'calendar',
+      })),
+      onSelectMode: (mode) => {
+        void setCalendarViewMode(mode as IRCalendarViewMode);
+      },
     });
 
     const triggerRect = calendarToolsTriggerEl?.getBoundingClientRect();
@@ -2915,7 +3310,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   async function scanVaultIncrementalReadingDeckFiles(): Promise<void> {
     try {
-      const pointStorage = new IRPointStorageService(plugin.app);
+      const pointStorage = getSharedIRPointStorageService(plugin.app);
       const result = await pointStorage.refreshPointFilesIndexFromVault();
       await recomputeAndRefreshSidebar('ui_refresh');
       const conflictSummary =
@@ -3154,8 +3549,18 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       return;
     }
 
+    const hasVisibleQueueForDate = (dateKey: string): boolean => {
+      if (getVisibleMaterialsForDate(dateKey).length > 0) {
+        return true;
+      }
+      return (
+        getPinnedRoleForDateKey(dateKey) === 'merge' &&
+        getVisiblePinnedForDate(dateKey).length > 0
+      );
+    };
+
     const currentKey = formatDateKey(selectedDate);
-    if (getVisibleMaterialsForDate(currentKey).length > 0 || getVisiblePinnedForDate(currentKey).length > 0) {
+    if (hasVisibleQueueForDate(currentKey)) {
       return;
     }
 
@@ -3163,9 +3568,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       ...Array.from(materialsByDate.keys()),
       ...Array.from(pinnedByDate.keys())
     ]))
-      .filter((dateKey) => {
-        return getVisibleMaterialsForDate(dateKey).length > 0 || getVisiblePinnedForDate(dateKey).length > 0;
-      })
+      .filter((dateKey) => hasVisibleQueueForDate(dateKey))
       .sort((left, right) => left.localeCompare(right, 'zh-CN'));
 
     if (candidateKeys.length === 0) {
@@ -3174,7 +3577,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
     const todayKey = formatDateKey(today);
     let targetKey = candidateKeys.find((dateKey) => dateKey >= todayKey) || candidateKeys[0];
-    if (getVisibleMaterialsForDate(todayKey).length > 0 || getVisiblePinnedForDate(todayKey).length > 0) {
+    if (hasVisibleQueueForDate(todayKey)) {
       targetKey = todayKey;
     }
 
@@ -3205,10 +3608,16 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       onClose: () => {
         addReadingTargetModalInstance = null;
       },
-      onAdded: () => {
+      onAdded: (result) => {
+        const pinDateKey = String(result?.pinDateKey || "").trim();
+        const selectedKey = formatDateKey(selectedDate);
+        const priorityDateKeys = Array.from(
+          new Set([pinDateKey, selectedKey].filter(Boolean)),
+        );
         void refreshSidebarAfterDataUpdate({
           includeProgress: false,
-          priorityDateKeys: [formatDateKey(selectedDate)]
+          priorityDateKeys:
+            priorityDateKeys.length > 0 ? priorityDateKeys : [selectedKey],
         });
       }
     });
@@ -3216,14 +3625,33 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function refreshAfterReadingPointPropertyEdit(): void {
+    const selectedKey = formatDateKey(selectedDate);
+    // 允许重新拉取标签缓存，避免编辑后搜索列表仍为空/旧值
+    lazyMetadataLoadedDateKeys.delete(selectedKey);
+    // priorityDateKeys 路径不会 invalidate workspace；标签编辑后 PDF/EPUB
+    // 与 chunk 回退读路径都会命中陈旧 workspace 缓存。
+    getWorkspaceSnapshotService().invalidate();
+    parentRelationRuntime = null;
+    siblingCache = new Map();
+    void ensureSearchCatalogTags();
     void refreshSidebarAfterDataUpdate({
       includeProgress: false,
-      priorityDateKeys: [formatDateKey(selectedDate)]
+      priorityDateKeys: [selectedKey]
     });
+    void refreshReadingPointTagMap(materialsByDate, [selectedKey], {
+      cancellable: false,
+    }).catch((error) => {
+      logger.warn('[IRCalendarSidebar] tag refresh after property edit failed:', error);
+    });
+    void ensureParentRelationRuntime({ force: true });
   }
 
   function openRenameReadingPoint(material: ScheduleItem): void {
     void promptRenameReadingPoint(plugin.app, material, refreshAfterReadingPointPropertyEdit);
+  }
+
+  function openSelectParentReadingPoint(material: ScheduleItem): void {
+    void promptSelectParentReadingPoint(plugin.app, material, refreshAfterReadingPointPropertyEdit);
   }
 
   function openEditReadingPointTraceLink(material: ScheduleItem): void {
@@ -3237,7 +3665,17 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function openEditReadingPointTags(material: ScheduleItem): void {
-    void openReadingPointTagsPrompt(plugin.app, material, refreshAfterReadingPointPropertyEdit);
+    void openReadingPointTagsPrompt(plugin.app, material, (tags) => {
+      // Optimistic: search/tag-suggest see new tags before async remap finishes
+      readingPointTagsById = {
+        ...readingPointTagsById,
+        [material.id]: tags,
+      };
+      searchCatalogTags = Array.from(
+        new Set([...searchCatalogTags, ...tags].map((tag) => String(tag || '').trim()).filter(Boolean))
+      ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+      refreshAfterReadingPointPropertyEdit();
+    });
   }
 
   function openImportModal(): void {
@@ -3598,6 +4036,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
     await pointTagService.initialize();
     return pointTagService;
+  }
+
+  async function getPointStorageService(): Promise<ReturnType<typeof getSharedIRPointStorageService>> {
+    if (!pointStorageService) {
+      pointStorageService = getSharedIRPointStorageService(plugin.app);
+    }
+    return pointStorageService;
   }
 
   async function getPointWriteService(): Promise<IRPointWriteService> {
@@ -4057,6 +4502,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         return;
       }
 
+      // 关联笔记只改元数据：本地 patch 即可，禁止 forceRecompute，
+      // 避免选中日跳到锚点/逾期承诺日，造成「被挪到过去」的体感。
       applyLocalAssociatedNoteUpdate(material.id, normalizedNotePaths);
       new Notice(
         normalizedNotePaths[0]
@@ -4064,7 +4511,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           : t('irSidebar.associatedNote.unlinked'),
         2800
       );
-      await recomputeAndRefreshSidebar('ui_refresh', { forceRecompute: true });
     } catch (error) {
       logger.error('[IRCalendarSidebar] Recovered error message.', error);
       new Notice(t('irSidebar.associatedNote.setFailed'), 3200);
@@ -4120,6 +4566,21 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   async function openAssociatedNoteInSidebar(material: ScheduleItem): Promise<void> {
+    if (getAssociatedNoteRelationMode(material) === 'derived-outlinks') {
+      const carrierPath = resolveCarrierNotePath(material);
+      if (carrierPath) {
+        await openAssociatedNoteByPath(carrierPath);
+        return;
+      }
+      const webUrl = resolveScheduleItemWebUrl(plugin.app, material);
+      if (webUrl) {
+        new Notice(t('irSidebar.associatedNote.carrierMissingHint'), 3200);
+        return;
+      }
+      new Notice(t('irSidebar.associatedNote.notLinked'), 2600);
+      return;
+    }
+
     const notePath = getVisibleAssociatedNotePath(material);
     if (!notePath) {
       new Notice(t('irSidebar.associatedNote.notLinked'), 2600);
@@ -4167,6 +4628,156 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       onRemove: (notePath) => removeAssociatedNoteForMaterial(material, notePath),
       onClear: () => setAssociatedNotePathsForMaterial(material, [])
     });
+  }
+
+  function resolveCarrierNotePath(material: ScheduleItem): string | null {
+    const sourcePath = normalizePath(String(material.sourceFile || '').trim());
+    if (!sourcePath) {
+      return null;
+    }
+    const file = plugin.app.vault.getAbstractFileByPath(sourcePath);
+    return file instanceof TFile ? sourcePath : null;
+  }
+
+  function patchSourceFileInItems(
+    items: ScheduleItem[],
+    blockId: string,
+    sourceFile: string
+  ): ScheduleItem[] {
+    let changed = false;
+    const next = items.map((item) => {
+      if (item.id !== blockId) {
+        return item;
+      }
+      changed = true;
+      return { ...item, sourceFile };
+    });
+    return changed ? next : items;
+  }
+
+  function patchSourceFileInMap(
+    source: Map<string, ScheduleItem[]>,
+    blockId: string,
+    sourceFile: string
+  ): Map<string, ScheduleItem[]> {
+    let changed = false;
+    const next = new Map<string, ScheduleItem[]>();
+    for (const [key, items] of source.entries()) {
+      const patchedItems = patchSourceFileInItems(items, blockId, sourceFile);
+      if (patchedItems !== items) {
+        changed = true;
+      }
+      next.set(key, patchedItems);
+    }
+    return changed ? next : source;
+  }
+
+  function applyLocalSourceFileUpdate(blockId: string, sourceFile: string): void {
+    materialsByDate = patchSourceFileInMap(materialsByDate, blockId, sourceFile);
+    pinnedByDate = patchSourceFileInMap(pinnedByDate, blockId, sourceFile);
+    siblingCache = patchSourceFileInMap(siblingCache, blockId, sourceFile);
+  }
+
+  async function recoverWebCarrierNoteForMaterial(material: ScheduleItem): Promise<void> {
+    const webUrl = resolveScheduleItemWebUrl(plugin.app, material);
+    if (!webUrl) {
+      new Notice(t('irSidebar.associatedNote.carrierCreateFailed'), 3200);
+      return;
+    }
+
+    try {
+      const title =
+        String(material.displayName || material.title || '').trim() ||
+        t('irSidebar.associatedNote.untitled');
+      const folderPath = resolveIRReadableMarkdownTargetFolder(plugin.app, {
+        allowActiveFileFallback: false
+      });
+      const created = await createWebExcerptCarrierNote(plugin.app, {
+        title,
+        webUrl,
+        preferredFolderPath: folderPath
+      });
+
+      const storage = await getStorage();
+      const chunk = await storage.getChunkData(material.id);
+      if (chunk) {
+        chunk.filePath = created.path;
+        const meta = { ...(chunk.meta || {}) };
+        meta.webUrl = webUrl;
+        meta.resumeLink = webUrl;
+        chunk.meta = meta;
+        await storage.saveChunkData(chunk);
+      }
+
+      applyLocalSourceFileUpdate(material.id, created.path);
+      new Notice(
+        t('irSidebar.associatedNote.carrierCreated', {
+          name: formatAssociatedNoteLabel(created.path)
+        }),
+        2800
+      );
+      await openAssociatedNoteByPath(created.path);
+      await recomputeAndRefreshSidebar('ui_refresh', { forceRecompute: true });
+    } catch (error) {
+      logger.error('[IRCalendarSidebar] Failed to recover web carrier note:', error);
+      new Notice(t('irSidebar.associatedNote.carrierCreateFailed'), 3200);
+    }
+  }
+
+  function buildDerivedAssociatedNoteSubmenu(submenu: Menu, material: ScheduleItem) {
+    const carrierPath = resolveCarrierNotePath(material);
+    const webUrl = resolveScheduleItemWebUrl(plugin.app, material);
+    const carrierMissing = !carrierPath;
+    const outlinkPaths = carrierPath
+      ? resolveDerivedOutlinkNotePaths(plugin.app, carrierPath)
+      : [];
+
+    populateDerivedAssociatedNoteMenu({
+      menu: submenu,
+      carrierPath,
+      outlinkPaths,
+      carrierMissing,
+      getLabel: (notePath) =>
+        getLinkedVaultNoteLabel(plugin.app, notePath) || formatAssociatedNoteLabel(notePath),
+      onOpenCarrier: () => {
+        if (carrierPath) {
+          void openAssociatedNoteByPath(carrierPath);
+        }
+      },
+      onOpenOutlink: (notePath) => openAssociatedNoteByPath(notePath),
+      onOpenWeb: webUrl
+        ? () => {
+            void openObsidianWebUrl(plugin.app, webUrl);
+          }
+        : undefined,
+      onRecoverCarrier:
+        carrierMissing && webUrl
+          ? () => recoverWebCarrierNoteForMaterial(material)
+          : undefined
+    });
+  }
+
+  /**
+   * Open associated-note actions as a peer Menu (not a nested submenu).
+   * Nested MenuItem.setSubmenu() is unreliable across desktop/mobile and can
+   * leave the top-level "关联笔记" click with no visible picker modal.
+   */
+  function openAssociatedNoteActionMenu(
+    material: ScheduleItem,
+    position: { x: number; y: number },
+    mode: 'curated' | 'derived' = 'curated'
+  ) {
+    const actionMenu = new Menu();
+    if (mode === 'derived') {
+      buildDerivedAssociatedNoteSubmenu(actionMenu, material);
+    } else {
+      buildAssociatedNoteSubmenu(actionMenu, material);
+    }
+    // Defer until the parent context menu has closed, so Obsidian can show the
+    // follow-up Menu (and subsequent SuggestModal) reliably.
+    window.setTimeout(() => {
+      actionMenu.showAtPosition(position);
+    }, 0);
   }
 
 
@@ -4676,10 +5287,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function getBatchSelectableMaterials(): ScheduleItem[] {
-    if (hasActiveSearch) {
-      return searchMatchedEntries.map((entry) => entry.item);
-    }
-    return selectedMaterials;
+    return displayedMaterials;
   }
 
   function collectBatchSelectableMaterialMap(): Map<string, ScheduleItem> {
@@ -4726,7 +5334,132 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   function applyBatchOperationResult(): void {
     exitBatchSelectionMode();
-    void recomputeAndRefreshSidebar('ui_refresh');
+    void recomputeAndRefreshSidebar('ui_refresh', {
+      forceRecompute: true,
+      priorityDateKeys: [formatDateKey(selectedDate), formatDateKey(today)]
+    });
+  }
+
+  function buildCleanupScheduleItemFromPointSnapshot(snapshot: {
+    point: {
+      id: string;
+      title?: string;
+      pointType?: string;
+      source?: { type?: string; path?: string };
+      schedule?: {
+        priorityUi?: number;
+        intervalDays?: number;
+        status?: string;
+        nextRepDate?: number;
+      };
+      metadata?: Record<string, unknown>;
+      trace?: { locator?: Record<string, unknown> };
+    };
+    topicId: string;
+  }): ScheduleItem {
+    const point = snapshot.point;
+    const locator = (point.trace?.locator || {}) as Record<string, unknown>;
+    const metadata = (point.metadata || {}) as Record<string, unknown>;
+    const resumeLink = String(
+      metadata.resumeLink || locator.resumeLink || locator.link || ''
+    ).trim();
+    const sourcePath = String(point.source?.path || '').trim();
+    let sourceType: ScheduleItem['sourceType'] = 'chunk';
+    if (isPdfBookmarkTaskId(point.id) || point.source?.type === 'pdf') {
+      sourceType = 'pdf';
+    } else if (isEpubBookmarkTaskId(point.id) || point.source?.type === 'epub') {
+      sourceType = 'epub';
+    } else if (
+      point.pointType !== 'chunk-entry' &&
+      point.source?.type === 'markdown'
+    ) {
+      sourceType = 'legacy-block';
+    }
+
+    return {
+      id: point.id,
+      title: String(point.title || point.id),
+      sourceFile: sourcePath,
+      resumeLink: resumeLink || undefined,
+      sourceType,
+      deckId: snapshot.topicId,
+      priority: Number(point.schedule?.priorityUi) || 5,
+      intervalDays: Number(point.schedule?.intervalDays) || 0,
+      scheduleStatus: String(point.schedule?.status || 'new'),
+      nextRepDate: Number(point.schedule?.nextRepDate) || 0,
+      nextReviewDate: null
+    };
+  }
+
+  async function collectMissingSourceReadingPoints(): Promise<ScheduleItem[]> {
+    const pointStorage = await getPointStorageService();
+    await pointStorage.initialize();
+    const snapshots = await pointStorage.listPointSnapshots();
+    const pathCache = new Map<string, boolean>();
+    const missing: ScheduleItem[] = [];
+
+    await runIdleBatchedTasks(
+      snapshots,
+      async (snapshot) => {
+        const item = buildCleanupScheduleItemFromPointSnapshot(snapshot);
+        const result = evaluateScheduleItemSourceMissing(
+          plugin.app,
+          item,
+          pathCache
+        );
+        if (result.checkable && result.missing) {
+          missing.push(item);
+        }
+      },
+      {
+        chunkSize: 24,
+        budgetMs: 10
+      }
+    );
+
+    return missing;
+  }
+
+  async function cleanupMissingSourceReadingPoints(): Promise<void> {
+    const scanningNotice = new Notice(
+      t('irSidebar.batch.cleanupMissingSourcesScanning'),
+      0
+    );
+    try {
+      const missing = await collectMissingSourceReadingPoints();
+      scanningNotice.hide();
+
+      if (missing.length === 0) {
+        new Notice(t('irSidebar.batch.cleanupMissingSourcesNone'));
+        return;
+      }
+
+      const confirmed = await showObsidianConfirm(
+        plugin.app,
+        t('irSidebar.batch.confirmCleanupMissingSources', {
+          count: missing.length
+        }),
+        {
+          title: t('irSidebar.batch.cleanupMissingSourcesTitle'),
+          confirmText: t('irSidebar.calendar.removeConfirm'),
+          confirmClass: 'mod-warning'
+        }
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      const result = await getReadingPointBatchService().batchRemove(missing, {
+        skipConfirm: true
+      });
+      if (result.success > 0) {
+        applyBatchOperationResult();
+      }
+    } catch (error) {
+      scanningNotice.hide();
+      logger.error('[IRCalendarSidebar] Failed to cleanup missing-source reading points:', error);
+      new Notice(t('irSidebar.notices.removeFailed'));
+    }
   }
 
   function getBatchActionTargets(): ScheduleItem[] {
@@ -4932,6 +5665,37 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     try {
       let blockInfoTarget: any;
 
+      const attachScheduleDisplayFields = (
+        target: Record<string, unknown>,
+        meta?: Record<string, unknown> | null,
+      ) => {
+        const pinned =
+          material.manualSchedulePinnedDateKey ||
+          (typeof meta?.manualSchedulePinnedDateKey === 'string'
+            ? meta.manualSchedulePinnedDateKey
+            : undefined);
+        const sequenceLocked =
+          material.sourceSequenceLocked === true || meta?.sourceSequenceLocked === true;
+        const sequenceAnchor =
+          material.sourceSequenceAnchorDateKey ||
+          (typeof meta?.sourceSequenceAnchorDateKey === 'string'
+            ? meta.sourceSequenceAnchorDateKey
+            : undefined);
+        if (pinned) {
+          target.manualSchedulePinnedDateKey = pinned;
+        }
+        if (sequenceLocked) {
+          target.sourceSequenceLocked = true;
+        }
+        if (sequenceAnchor) {
+          target.sourceSequenceAnchorDateKey = sequenceAnchor;
+        }
+        if (Number(material.nextRepDate || 0) > 0) {
+          target.committedNextRepDate = material.nextRepDate;
+        }
+        return target;
+      };
+
       if (isPdfBookmarkTaskId(material.id) || isEpubBookmarkTaskId(material.id)) {
         const isPdf = isPdfBookmarkTaskId(material.id);
         const bookService = isPdf ? await getPdfBookmarkTaskService() : await getEpubBookmarkTaskService();
@@ -4944,7 +5708,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           ? (task as any).pdfPath
           : await resolveEpubTaskFilePath(task as any);
         const totalReadingTime = await getStoredTimerTotalSeconds(material.id);
-        blockInfoTarget = {
+        const taskMeta = ((task as any).meta || {}) as Record<string, unknown>;
+        const taskStats = ((task as any).stats || {}) as Record<string, unknown>;
+        blockInfoTarget = attachScheduleDisplayFields({
           id: task.id,
           filePath: filePath ?? material.sourceFile ?? '',
           state: task.status ?? 'new',
@@ -4955,13 +5721,19 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           intervalFactor: 1.5,
           reviewCount: task.stats?.impressions ?? 0,
           totalReadingTime,
+          stats: {
+            impressions: Number(taskStats.impressions || 0),
+            extracts: Number(taskStats.extracts || 0),
+            cardsCreated: Number(taskStats.cardsCreated || 0),
+            notesWritten: Number(taskStats.notesWritten || 0),
+          },
           createdAt: new Date(task.createdAt ?? Date.now()).toISOString(),
           updatedAt: new Date(task.updatedAt ?? Date.now()).toISOString(),
           nextReview: task.nextRepDate ? new Date(task.nextRepDate).toISOString() : null,
           nextRepDate: task.nextRepDate,
           headingText: material.title || task.title || '',
           tags: task.tags ?? []
-        };
+        }, taskMeta);
       } else {
         const chunk = await getWorkspaceChunkById(material.id);
         const totalReadingTime = await getStoredTimerTotalSeconds(material.id);
@@ -4972,8 +5744,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           const nextRepDate = (chunk as any).nextRepDate as number;
           const priorityUi = (chunk as any).priorityUi as number | undefined;
           const priorityEff = (chunk as any).priorityEff as number;
+          const chunkMeta = ((chunk as any).meta || {}) as Record<string, unknown>;
+          const chunkStats = ((chunk as any).stats || {}) as Record<string, unknown>;
 
-          blockInfoTarget = {
+          blockInfoTarget = attachScheduleDisplayFields({
             id: (chunk as any).chunkId ?? material.id,
             filePath: (chunk as any).filePath ?? material.sourceFile ?? '',
             state: scheduleStatus ?? 'new',
@@ -4984,13 +5758,19 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
             intervalFactor: 1.5,
             reviewCount: (chunk as any).stats?.impressions ?? 0,
             totalReadingTime,
+            stats: {
+              impressions: Number(chunkStats.impressions || 0),
+              extracts: Number(chunkStats.extracts || 0),
+              cardsCreated: Number(chunkStats.cardsCreated || 0),
+              notesWritten: Number(chunkStats.notesWritten || 0),
+            },
             createdAt: new Date((chunk as any).createdAt ?? Date.now()).toISOString(),
             updatedAt: new Date((chunk as any).updatedAt ?? Date.now()).toISOString(),
             nextReview: nextRepDate ? new Date(nextRepDate).toISOString() : null,
             nextRepDate,
             headingText: material.title || (chunk as any).headingText || '',
             tags: (chunk as any).meta?.tags ?? (chunk as any).tags ?? []
-          };
+          }, chunkMeta);
         } else {
           const legacyBlock = await getWorkspaceLegacyBlockById(material.id);
           if (!legacyBlock) {
@@ -5002,8 +5782,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           const nextRepDate = Number(migrated.nextRepDate || 0);
           const priorityUi = (legacyBlock as any).priorityUi as number | undefined;
           const priorityEff = (legacyBlock as any).priorityEff as number | undefined;
+          const legacyMeta = ((legacyBlock as any).meta || {}) as Record<string, unknown>;
+          const migratedStats = ((migrated as any).stats || {}) as Record<string, unknown>;
 
-          blockInfoTarget = {
+          blockInfoTarget = attachScheduleDisplayFields({
             id: legacyBlock.id,
             filePath: legacyBlock.filePath ?? material.sourceFile ?? '',
             state: legacyBlock.state ?? 'new',
@@ -5014,20 +5796,116 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
             intervalFactor: legacyBlock.intervalFactor ?? 1.5,
             reviewCount: legacyBlock.reviewCount ?? migrated.stats?.impressions ?? 0,
             totalReadingTime,
+            stats: {
+              impressions: Number(
+                migratedStats.impressions ?? legacyBlock.reviewCount ?? 0,
+              ),
+              extracts: Number(migratedStats.extracts || 0),
+              cardsCreated: Number(
+                migratedStats.cardsCreated ??
+                  (Array.isArray(legacyBlock.extractedCards)
+                    ? legacyBlock.extractedCards.length
+                    : 0),
+              ),
+              notesWritten: Number(migratedStats.notesWritten || 0),
+            },
             createdAt: legacyBlock.createdAt ?? new Date().toISOString(),
             updatedAt: legacyBlock.updatedAt ?? new Date().toISOString(),
             nextReview: legacyBlock.nextReview ?? (nextRepDate ? new Date(nextRepDate).toISOString() : null),
             nextRepDate,
+            lastReview: legacyBlock.lastReview ?? null,
             headingText: material.title || getLegacyBlockDisplayName(legacyBlock) || '',
             tags: legacyBlock.tags ?? []
-          };
+          }, legacyMeta);
         }
       }
 
+      const deckId = await resolveDeckIdForScheduleItem(material);
+      const deckName =
+        irDecks.find((deck) => resolveCanonicalDeckId(deck.id) === deckId)?.name ||
+        deckId;
+      if (deckId || deckName) {
+        blockInfoTarget.deckId = deckId;
+        blockInfoTarget.deckName = deckName;
+        if (!blockInfoTarget.deckPath) {
+          blockInfoTarget.deckPath = deckId;
+        }
+      }
+
+      if (material.sourceType) {
+        (blockInfoTarget as { sourceType?: string }).sourceType = material.sourceType;
+      }
+
+      try {
+        const pointStorage = await getPointStorageService();
+        const snapshot = await pointStorage.getPointSnapshotById(material.id);
+        const point = snapshot?.point;
+        const pointStats = point?.stats;
+        if (pointStats) {
+          const existingStats = (blockInfoTarget.stats || {}) as Record<string, number>;
+          blockInfoTarget.stats = {
+            ...existingStats,
+            impressions: Number(
+              pointStats.impressionCount ?? existingStats.impressions ?? 0,
+            ),
+            extracts: Number(pointStats.extractCount ?? existingStats.extracts ?? 0),
+            cardsCreated: Number(
+              pointStats.cardCreatedCount ?? existingStats.cardsCreated ?? 0,
+            ),
+            notesWritten: Number(
+              pointStats.noteCreatedCount ?? existingStats.notesWritten ?? 0,
+            ),
+          };
+          if (!(Number(blockInfoTarget.reviewCount) > 0)) {
+            blockInfoTarget.reviewCount = Number(
+              pointStats.reviewCount ??
+                pointStats.impressionCount ??
+                blockInfoTarget.reviewCount ??
+                0,
+            );
+          }
+        }
+        if (point?.relations) {
+          const linkedNotePaths = Array.isArray(point.relations.linkedNotePaths)
+            ? point.relations.linkedNotePaths
+            : [];
+          const linkedCardIds = Array.isArray(point.relations.linkedCardIds)
+            ? point.relations.linkedCardIds
+            : [];
+          blockInfoTarget.associatedNotePaths = linkedNotePaths;
+          blockInfoTarget.associatedNotePath = linkedNotePaths[0];
+          blockInfoTarget.linkedNotePaths = linkedNotePaths;
+          blockInfoTarget.linkedCardIds = linkedCardIds;
+          blockInfoTarget.extractedCards = linkedCardIds;
+
+          const parentPointId = String(point.relations.parentPointId || '').trim();
+          if (parentPointId) {
+            blockInfoTarget.parentPointId = parentPointId;
+            const cachedTitle =
+              parentRelationRuntime?.titleByPointId.get(parentPointId) || '';
+            if (cachedTitle) {
+              blockInfoTarget.parentPointTitle = cachedTitle;
+            } else {
+              try {
+                const parentSnapshot =
+                  await pointStorage.getPointSnapshotById(parentPointId);
+                blockInfoTarget.parentPointTitle =
+                  String(parentSnapshot?.point.userData?.title || '').trim() ||
+                  parentPointId;
+              } catch {
+                blockInfoTarget.parentPointTitle = parentPointId;
+              }
+            }
+          }
+        }
+      } catch {
+        // Point L0 enrichment is best-effort for completion stats display.
+      }
+
       closeBlockInfoModal();
-      blockInfoModalContainer = document.createElement('div');
-      blockInfoModalContainer.className = 'weave-ir-block-info-modal-container';
-      document.body.append(blockInfoModalContainer);
+      blockInfoModalContainer = activeDocument.body.createDiv({
+        cls: 'weave-ir-block-info-modal-container',
+      });
 
       blockInfoModalInstance = mount(IRBlockInfoModal, {
         target: blockInfoModalContainer,
@@ -5153,9 +6031,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     const initialTime = new Date().toTimeString().slice(0, 5);
 
     closeReminderModal();
-    reminderModalContainer = document.createElement('div');
-    reminderModalContainer.className = 'weave-ir-review-reminder-modal-container';
-    document.body.append(reminderModalContainer);
+    reminderModalContainer = activeDocument.body.createDiv({
+      cls: 'weave-ir-review-reminder-modal-container',
+    });
 
     reminderModalInstance = mount(IRReviewReminderModal, {
       target: reminderModalContainer,
@@ -5202,7 +6080,118 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   /**
 
    */
+  async function ensureParentRelationRuntime(options?: {
+    force?: boolean;
+  }): Promise<IRPointParentRelationRuntime | null> {
+    if (parentRelationRuntime && !options?.force) {
+      return parentRelationRuntime;
+    }
+    if (parentRelationRuntimeLoading && !options?.force) {
+      return parentRelationRuntime;
+    }
+    parentRelationRuntimeLoading = true;
+    try {
+      parentRelationRuntime = await loadParentRelationRuntime(plugin.app);
+      return parentRelationRuntime;
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to load parent relation runtime', error);
+      return parentRelationRuntime;
+    } finally {
+      parentRelationRuntimeLoading = false;
+    }
+  }
+
+  function getParentProgressForMaterial(
+    materialId: string,
+  ): IRPointParentProgress | null {
+    return parentRelationRuntime?.progressByParentId.get(materialId) || null;
+  }
+
+  function getParentLinkForMaterial(
+    materialId: string,
+  ): { parentPointId: string; parentTitle: string; missing: boolean } | null {
+    const runtime = parentRelationRuntime;
+    if (!runtime) {
+      return null;
+    }
+    const parentPointId = runtime.index.parentByChildId.get(materialId);
+    if (!parentPointId) {
+      return null;
+    }
+    const missing = !runtime.snapshotsById.has(parentPointId);
+    const parentTitle =
+      runtime.titleByPointId.get(parentPointId) ||
+      (missing ? t('irSidebar.controls.parentMissing') : parentPointId);
+    return { parentPointId, parentTitle, missing };
+  }
+
+  function collectScheduleItemsByIds(ids: string[]): ScheduleItem[] {
+    const wanted = new Set(ids.map((id) => String(id || '').trim()).filter(Boolean));
+    if (wanted.size === 0) {
+      return [];
+    }
+    const found = new Map<string, ScheduleItem>();
+    for (const items of materialsByDate.values()) {
+      for (const item of items) {
+        if (wanted.has(item.id) && !found.has(item.id)) {
+          found.set(item.id, item);
+        }
+      }
+    }
+    for (const items of pinnedByDate.values()) {
+      for (const item of items) {
+        if (wanted.has(item.id) && !found.has(item.id)) {
+          found.set(item.id, item);
+        }
+      }
+    }
+    return ids
+      .map((id) => found.get(id))
+      .filter((item): item is ScheduleItem => Boolean(item));
+  }
+
+  async function resolveScheduleItemsFromParentRelation(
+    relatedIds: string[],
+  ): Promise<ScheduleItem[]> {
+    const fromQueue = collectScheduleItemsByIds(relatedIds);
+    const foundIds = new Set(fromQueue.map((item) => item.id));
+    const missingIds = relatedIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length === 0 || !parentRelationRuntime) {
+      return fromQueue;
+    }
+
+    const extras: ScheduleItem[] = [];
+    for (const pointId of missingIds) {
+      const snapshot = parentRelationRuntime.snapshotsById.get(pointId);
+      if (!snapshot) {
+        continue;
+      }
+      try {
+        const { chunk } = buildLegacyChunkFromPointSnapshot(snapshot);
+        const item = buildScheduleItemFromChunkData(chunk, pointId);
+        if (!matchesActiveDeckFilter(item)) {
+          continue;
+        }
+        extras.push(item);
+      } catch (error) {
+        logger.warn('[IRCalendarSidebar] Failed to project parent-related point', error);
+      }
+    }
+    return [...fromQueue, ...extras];
+  }
+
+  /**
+
+   */
   async function getSiblingMaterials(material: ScheduleItem): Promise<ScheduleItem[]> {
+    const runtime = await ensureParentRelationRuntime();
+    const relatedIds = getContinuousReadingRelatedIds(material.id, runtime);
+    if (relatedIds.length > 0) {
+      const related = await resolveScheduleItemsFromParentRelation(relatedIds);
+      related.sort(compareScheduleItemsByScheduledDay);
+      return related;
+    }
+
     const sourceFile = material.sourceFile;
     if (!sourceFile) return [];
 
@@ -5324,7 +6313,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
   async function refreshReadingPointTagMap(
     byDate: Map<string, ScheduleItem[]>,
-    dateKeys?: string[]
+    dateKeys?: string[],
+    options?: { cancellable?: boolean }
   ): Promise<void> {
     const uniqueItems =
       dateKeys && dateKeys.length > 0
@@ -5352,6 +6342,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
 
     const items = Array.from(uniqueItems.values());
+    const cancellable = options?.cancellable !== false;
     const entries = await runIdleBatchedTasks(
       items,
       async (item) => {
@@ -5365,7 +6356,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       {
         chunkSize: 8,
         budgetMs: 10,
-        shouldCancel: () => isCalendarSidebarInteractionPaused(),
+        // 搜索打开时若允许取消：keydown 输入 tag: 会 pause 后台任务，337 项扫描直接中断，建议列表永久为空。
+        shouldCancel: cancellable
+          ? () => isCalendarSidebarInteractionPaused()
+          : undefined,
       }
     );
 
@@ -5373,6 +6367,143 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       ...readingPointTagsById,
       ...Object.fromEntries(entries),
     };
+  }
+
+  function collectMissingSourceCheckItems(
+    displayed: ScheduleItem[],
+    expandedIds: Set<string>,
+    siblingsByParent: Map<string, ScheduleItem[]>
+  ): ScheduleItem[] {
+    const unique = new Map<string, ScheduleItem>();
+    for (const item of displayed) {
+      const id = String(item.id || '').trim();
+      if (id) {
+        unique.set(id, item);
+      }
+    }
+    for (const parentId of expandedIds) {
+      const siblings = siblingsByParent.get(parentId) || [];
+      for (const sibling of siblings) {
+        const id = String(sibling.id || '').trim();
+        if (id) {
+          unique.set(id, sibling);
+        }
+      }
+    }
+    return Array.from(unique.values());
+  }
+
+  function invalidateMissingSourcePathCache(paths: Array<string | null | undefined>): void {
+    for (const raw of paths) {
+      const normalized = normalizePath(String(raw || '').trim());
+      if (normalized) {
+        missingSourcePathExistsCache.delete(normalized);
+      }
+    }
+  }
+
+  function scheduleMissingSourceIndicatorRefresh(
+    items?: ScheduleItem[],
+    options?: { delayMs?: number }
+  ): void {
+    if (missingSourceScanTimer !== null) {
+      window.clearTimeout(missingSourceScanTimer);
+      missingSourceScanTimer = null;
+    }
+    if (!showMissingSourceIndicators) {
+      missingSourcePointIds = new Set();
+      return;
+    }
+    const delayMs = Math.max(0, Math.floor(options?.delayMs ?? 80));
+    missingSourceScanTimer = window.setTimeout(() => {
+      missingSourceScanTimer = null;
+      const scanItems =
+        items ??
+        collectMissingSourceCheckItems(
+          displayedMaterials,
+          expandedMaterialIds,
+          siblingCache
+        );
+      void refreshMissingSourceIndicators(scanItems);
+    }, delayMs);
+  }
+
+  function scheduleMissingSourceIndicatorRetry(): void {
+    if (missingSourceRetryTimer !== null) {
+      window.clearTimeout(missingSourceRetryTimer);
+    }
+    missingSourceRetryTimer = window.setTimeout(() => {
+      missingSourceRetryTimer = null;
+      if (!showMissingSourceIndicators) {
+        return;
+      }
+      scheduleMissingSourceIndicatorRefresh(undefined, { delayMs: 0 });
+    }, CALENDAR_RECONCILE_INTERACTION_PAUSE_MS + 80);
+  }
+
+  async function refreshMissingSourceIndicators(items: ScheduleItem[]): Promise<void> {
+    if (!showMissingSourceIndicators) {
+      missingSourcePointIds = new Set();
+      return;
+    }
+
+    const scanToken = ++missingSourceScanToken;
+    const visibleIds = new Set(
+      items.map((item) => String(item.id || '').trim()).filter(Boolean)
+    );
+    // Drop ids that left the visible set before merging partial results.
+    const nextMissing = new Set(
+      Array.from(missingSourcePointIds).filter((id) => visibleIds.has(id))
+    );
+
+    const entries = await runIdleBatchedTasks(
+      items,
+      async (item) => {
+        const id = String(item.id || '').trim();
+        if (!id) {
+          return null;
+        }
+        try {
+          const result = evaluateScheduleItemSourceMissing(
+            plugin.app,
+            item,
+            missingSourcePathExistsCache
+          );
+          return { id, result } as const;
+        } catch (error) {
+          logger.warn('[IRCalendarSidebar] Failed to check source existence:', id, error);
+          return { id, result: { checkable: false, missing: false, path: '' } } as const;
+        }
+      },
+      {
+        chunkSize: 16,
+        budgetMs: 8,
+        // Do not cancel on interaction/leaf pause — that permanently drops badges after restart.
+        // Only abort when disabled or superseded by a newer scan.
+        shouldCancel: () =>
+          !showMissingSourceIndicators || scanToken !== missingSourceScanToken
+      }
+    );
+
+    if (scanToken !== missingSourceScanToken || !showMissingSourceIndicators) {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (!entry) continue;
+      if (entry.result.checkable && entry.result.missing) {
+        nextMissing.add(entry.id);
+      } else {
+        nextMissing.delete(entry.id);
+      }
+    }
+
+    missingSourcePointIds = nextMissing;
+
+    const cancelledEarly = entries.length < items.length;
+    if (cancelledEarly && showMissingSourceIndicators) {
+      scheduleMissingSourceIndicatorRetry();
+    }
   }
 
   function applyCalendarQueryResult(
@@ -5396,7 +6527,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     allBlocks = [];
     readingMaterials = queryResult.readingMaterials;
     if (options?.mergeMaterialsByDate) {
-      materialsByDate = mergeMaterialsByDate(materialsByDate, queryResult.materialsByDate);
+      materialsByDate = mergeMaterialsByDate(materialsByDate, queryResult.materialsByDate, {
+        protectAgainstShrink: true,
+      });
       for (const dateKey of queryResult.materialsByDate.keys()) {
         clearSelectedDateHydrationCompletedKeys([dateKey]);
       }
@@ -5433,21 +6566,42 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
     if (isPdfBookmarkTaskId(material.id)) {
       const task = await getWorkspacePdfTaskById(material.id);
-      return normalizeReadingPointTags(task?.tags || []);
+      return resolveReadingPointTags({
+        materialId: material.id,
+        sourceType: material.sourceType,
+        pdfTaskTags: task?.tags,
+      });
     }
 
     if (isEpubBookmarkTaskId(material.id)) {
       const task = await getWorkspaceEpubTaskById(material.id);
-      return normalizeReadingPointTags(task?.tags || []);
+      return resolveReadingPointTags({
+        materialId: material.id,
+        sourceType: material.sourceType,
+        epubTaskTags: task?.tags,
+      });
     }
 
     if (material.sourceType === 'legacy-block') {
       return [];
     }
 
-    const chunk = await getWorkspaceChunkById(material.id);
-    if (!chunk) return [];
-    return await tagService.getChunkTags(chunk);
+    // 与右键「编辑标签」同源：统一阅读点以 point.userData.tags 为准
+    const pointStorage = await getPointStorageService();
+    const snapshot = await pointStorage.getPointSnapshotById(material.id);
+    return resolveReadingPointTags({
+      materialId: material.id,
+      sourceType: material.sourceType,
+      hasPointSnapshot: Boolean(snapshot?.point),
+      pointUserDataTags: snapshot?.point.userData?.tags,
+      getChunkTags: async () => {
+        const chunk = await getWorkspaceChunkById(material.id);
+        if (!chunk) {
+          return [];
+        }
+        return await tagService.getChunkTags(chunk);
+      },
+    });
   }
 
   async function saveMaterialReadingPointTags(material: ScheduleItem, tags: string[]): Promise<boolean> {
@@ -5566,6 +6720,22 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         );
       });
 
+      {
+        const parentLink = getParentLinkForMaterial(material.id);
+        menu.addItem((item) => {
+          item
+            .setTitle(
+              parentLink
+                ? t('irSidebar.menu.changeParentReadingPoint')
+                : t('irSidebar.menu.selectParentReadingPoint'),
+            )
+            .setIcon(parentLink ? 'replace' : 'git-branch')
+            .onClick(() => {
+              openSelectParentReadingPoint(material);
+            });
+        });
+      }
+
       if (canEditReadingPointLink(material)) {
         menu.addItem((item) => {
           item
@@ -5639,29 +6809,49 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         });
       }
 
-      if (
-        canUsePointLinkedNotes(material)
-        || shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.ASSOCIATED_NOTES)
-      ) {
-        menu.addItem((item) => {
-          if (
-            canUsePointLinkedNotes(material)
-            && PremiumFeatureGuard.getInstance().canUseFeature(PREMIUM_FEATURES.ASSOCIATED_NOTES)
-          ) {
+      {
+        const associatedNoteOffer = resolveAssociatedNoteMenuOffer(material, {
+          canUseFeature: PremiumFeatureGuard.getInstance().canUseFeature(
+            PREMIUM_FEATURES.ASSOCIATED_NOTES
+          ),
+          shouldShowFeatureEntry: shouldShowPremiumFeatureEntry(
+            PREMIUM_FEATURES.ASSOCIATED_NOTES
+          )
+        });
+
+        if (associatedNoteOffer.kind === 'manage-curated') {
+          menu.addItem((item) => {
             item
               .setTitle(t('irSidebar.calendar.linkedNoteMenu'))
-              .setIcon('link');
-            const sub = (item as any).setSubmenu();
-            buildAssociatedNoteSubmenu(sub, material);
-            return;
-          }
-          item
-            .setTitle(premiumMenuTitle(t('irSidebar.calendar.linkedNoteMenu'), PREMIUM_FEATURES.ASSOCIATED_NOTES))
-            .setIcon('link')
-            .onClick(() => {
-              ensurePremiumFeature(PREMIUM_FEATURES.ASSOCIATED_NOTES);
-            });
-        });
+              .setIcon('link')
+              .onClick(() => {
+                openAssociatedNoteActionMenu(material, menuPosition, 'curated');
+              });
+          });
+        } else if (associatedNoteOffer.kind === 'manage-derived') {
+          menu.addItem((item) => {
+            item
+              .setTitle(t('irSidebar.calendar.linkedNoteMenu'))
+              .setIcon('link')
+              .onClick(() => {
+                openAssociatedNoteActionMenu(material, menuPosition, 'derived');
+              });
+          });
+        } else if (associatedNoteOffer.kind === 'premium-gate') {
+          menu.addItem((item) => {
+            item
+              .setTitle(
+                premiumMenuTitle(
+                  t('irSidebar.calendar.linkedNoteMenu'),
+                  PREMIUM_FEATURES.ASSOCIATED_NOTES
+                )
+              )
+              .setIcon('link')
+              .onClick(() => {
+                ensurePremiumFeature(PREMIUM_FEATURES.ASSOCIATED_NOTES);
+              });
+          });
+        }
       }
 
       menu.addSeparator();
@@ -5765,6 +6955,35 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
             .setChecked(showReadingPointTypeLabels)
             .onClick(() => {
               void setShowReadingPointTypeLabelsEnabled(!showReadingPointTypeLabels);
+            });
+        });
+
+        sub.addItem((subItem: any) => {
+          subItem
+            .setTitle(t('irSidebar.menu.showMissingSourceIndicators'))
+            .setChecked(showMissingSourceIndicators)
+            .onClick(() => {
+              void setShowMissingSourceIndicatorsEnabled(!showMissingSourceIndicators);
+            });
+        });
+
+        sub.addItem((subItem: any) => {
+          subItem
+            .setTitle(t('irSidebar.menu.hideTodayCompletedReadingPoints'))
+            .setChecked(hideTodayCompletedReadingPoints)
+            .onClick(() => {
+              void setHideTodayCompletedReadingPointsEnabled(!hideTodayCompletedReadingPoints);
+            });
+        });
+
+        sub.addSeparator();
+
+        sub.addItem((subItem: any) => {
+          subItem
+            .setTitle(t('irSidebar.menu.cleanupMissingSources'))
+            .setIcon('file-x')
+            .onClick(() => {
+              void cleanupMissingSourceReadingPoints();
             });
         });
       });
@@ -5982,15 +7201,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       nextReviewDate: nextRepDate > 0 ? new Date(nextRepDate) : null,
     };
 
-    const pinnedList = pinnedByDate.get(pinnedKey) || [];
-    const updatedPinnedSlice = [...pinnedList.filter((p) => p.id !== target.id), updated];
-    pinnedByDate = new Map(pinnedByDate).set(pinnedKey, updatedPinnedSlice);
-
     const nextCompletedIds = [...new Set([...(calendarProgressByDate[pinnedKey] || []), target.id])];
     calendarProgressByDate = {
       ...calendarProgressByDate,
       [pinnedKey]: nextCompletedIds,
     };
+
+    // 活跃日：全日队列写入 materials，清除并行 pinned，避免「只剩已完成」残片路径。
+    clearPinnedForActiveDate(pinnedKey);
 
     const assembledDayQueue = buildAssembledDayQueueForDateKey(pinnedKey, {
       completedIds: nextCompletedIds,
@@ -5999,7 +7217,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     applyLocalDayQueueProjection(pinnedKey, assembledDayQueue);
     markLocalDayQueueRefreshSuppressed(pinnedKey);
 
-    return updatedPinnedSlice;
+    // 返回值仅作 L1 override 源（含刚完成项），不再表示 pinned 切片。
+    return [updated];
   }
 
   async function persistSchedulingActionInBackground(input: {
@@ -6274,7 +7493,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   async function ensureMaterialTagsLoaded(material: ScheduleItem): Promise<void> {
-    if (readingPointTagsById[material.id]) {
+    if (Object.prototype.hasOwnProperty.call(readingPointTagsById, material.id)) {
       return;
     }
     try {
@@ -6308,6 +7527,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       }
       let deckIds: string[] | undefined;
       let priorityDateKeys: string[] = [];
+      let deferLeanToBackground = false;
       try {
         const requestedDeckId = getRequestedDeckFilterId();
         deckIds = requestedDeckId ? [requestedDeckId] : undefined;
@@ -6327,6 +7547,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         if (requestId !== loadDataRequestId) {
           return;
         }
+
+        deferLeanToBackground =
+          loadResult.phase === 'shell_only' ||
+          loadResult.phase === 'tier0' ||
+          Boolean(loadResult.projectionHydrate);
 
         applyMonthHeatmapLoadResult(loadResult.monthHeatmap);
         mergeHistoryHeatmapFromCalendarProgress(monthKey || undefined);
@@ -6371,7 +7596,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           setCalendarLoadStage('day_list_assemble', 82);
           let merged = loadResult.fastQuery.materialsByDate;
           if (loadResult.projectionHydrate) {
-            merged = mergeMaterialsByDate(merged, loadResult.projectionHydrate.materialsByDate);
+            merged = mergeMaterialsByDate(merged, loadResult.projectionHydrate.materialsByDate, {
+              protectAgainstShrink: true,
+            });
           }
           applyCalendarQueryResult({
             ...loadResult.fastQuery,
@@ -6413,7 +7640,9 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           if (shouldShowBlockingLoading) {
             isLoading = false;
           }
-          await finalizePriorityDatesAfterLoad(priorityDateKeys, deckIds);
+          await finalizePriorityDatesAfterLoad(priorityDateKeys, deckIds, {
+            deferLeanToBackground,
+          });
           if (!priorityDatesReconcilePending) {
             maybeClearCalendarLoadStage();
           }
@@ -6478,6 +7707,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
           ),
           reason: 'sidebar-visibility-resume',
         });
+        if (showMissingSourceIndicators) {
+          scheduleMissingSourceIndicatorRefresh(undefined, { delayMs: 120 });
+        }
+        const selectedKey = formatDateKey(selectedDate);
+        if (!isPriorityDateLoadSatisfied(selectedKey)) {
+          clearSelectedDateHydrationCompletedKeys([selectedKey]);
+          void ensureSelectedDateMaterialsLoaded(selectedKey);
+        }
       }
     };
     const handleActiveLeafChange = () => {
@@ -6486,7 +7723,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     const handleUserInteractionPressure = () => {
       markInteractionPressure();
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    activeDocument.addEventListener('visibilitychange', handleVisibilityChange);
     plugin.app.workspace.on('active-leaf-change', handleActiveLeafChange);
     window.addEventListener('pointerdown', handleUserInteractionPressure, { passive: true });
     window.addEventListener('wheel', handleUserInteractionPressure, { passive: true });
@@ -6574,17 +7811,104 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     };
     window.addEventListener('Weave:ir-material-finished', handleMaterialFinished as EventListener);
 
+    const handleOpenTutorialEvent = (event: Event) => {
+      const detail = (event as CustomEvent<IROpenTutorialEventDetail>).detail;
+      openIRTutorial(resolveTutorialTabId(detail?.initialTab));
+    };
+    window.addEventListener(IR_OPEN_TUTORIAL_EVENT, handleOpenTutorialEvent as EventListener);
+
+    const handleVaultCreate = (file: TAbstractFile) => {
+      if (!(file instanceof TFile)) return;
+      invalidateMissingSourcePathCache([file.path]);
+      missingSourcePathExistsCache.set(normalizePath(file.path), true);
+      if (showMissingSourceIndicators) {
+        scheduleMissingSourceIndicatorRefresh(
+          collectMissingSourceCheckItems(displayedMaterials, expandedMaterialIds, siblingCache),
+          { delayMs: 120 }
+        );
+      }
+    };
+    const handleVaultDelete = (file: TAbstractFile) => {
+      invalidateMissingSourcePathCache([file.path]);
+      if (showMissingSourceIndicators) {
+        scheduleMissingSourceIndicatorRefresh(
+          collectMissingSourceCheckItems(displayedMaterials, expandedMaterialIds, siblingCache),
+          { delayMs: 120 }
+        );
+      }
+    };
+    // Optimistic UI path follow. Persistence is owned by IRSourcePathRenameService
+    // (plugin-level vault rename → points / PDF / EPUB / materials + schedule broadcast).
+    const handleVaultRename = (file: TAbstractFile, oldPath: string) => {
+      const normalizedOld = normalizePath(String(oldPath || '').trim());
+      const normalizedNew = normalizePath(String(file.path || '').trim());
+      invalidateMissingSourcePathCache([normalizedOld, normalizedNew]);
+      if (file instanceof TFile) {
+        missingSourcePathExistsCache.set(normalizedNew, true);
+      }
+
+      if (normalizedOld && normalizedNew && normalizedOld !== normalizedNew) {
+        const idsToPatch = new Map<string, string>();
+        const consider = (items: ScheduleItem[]) => {
+          for (const item of items) {
+            const remapped = remapVaultPath(item.sourceFile, normalizedOld, normalizedNew);
+            if (remapped && remapped !== item.sourceFile) {
+              idsToPatch.set(item.id, remapped);
+            }
+          }
+        };
+        for (const items of materialsByDate.values()) consider(items);
+        for (const items of pinnedByDate.values()) consider(items);
+        for (const items of siblingCache.values()) consider(items);
+        for (const [id, nextPath] of idsToPatch) {
+          applyLocalMaterialSourcePathUpdate(id, nextPath);
+        }
+      }
+
+      if (showMissingSourceIndicators) {
+        scheduleMissingSourceIndicatorRefresh(
+          collectMissingSourceCheckItems(displayedMaterials, expandedMaterialIds, siblingCache),
+          { delayMs: 120 }
+        );
+      }
+    };
+
+    const vaultCreateRef = plugin.app.vault.on('create', handleVaultCreate);
+    const vaultDeleteRef = plugin.app.vault.on('delete', handleVaultDelete);
+    const vaultRenameRef = plugin.app.vault.on('rename', handleVaultRename);
+
+    if (!calendarTutorialDismissed) {
+      window.setTimeout(() => {
+        if (!calendarTutorialDismissed && !tutorialVisible) {
+          openIRTutorial(IR_TUTORIAL_DEFAULT_TAB);
+        }
+      }, 400);
+    }
+
     return () => {
       if (debounceTimer) window.clearTimeout(debounceTimer);
+      if (missingSourceScanTimer !== null) {
+        window.clearTimeout(missingSourceScanTimer);
+        missingSourceScanTimer = null;
+      }
+      if (missingSourceRetryTimer !== null) {
+        window.clearTimeout(missingSourceRetryTimer);
+        missingSourceRetryTimer = null;
+      }
+      missingSourceScanToken += 1;
       unsubscribeProjectionRuntime?.();
       unsubscribeProjectionRuntime = null;
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      activeDocument.removeEventListener('visibilitychange', handleVisibilityChange);
       plugin.app.workspace.off('active-leaf-change', handleActiveLeafChange);
       window.removeEventListener('pointerdown', handleUserInteractionPressure);
       window.removeEventListener('wheel', handleUserInteractionPressure);
       window.removeEventListener('keydown', handleUserInteractionPressure);
       window.removeEventListener('Weave:ir-data-updated', handleDataUpdate);
       window.removeEventListener('Weave:ir-material-finished', handleMaterialFinished as EventListener);
+      window.removeEventListener(IR_OPEN_TUTORIAL_EVENT, handleOpenTutorialEvent as EventListener);
+      plugin.app.vault.offref(vaultCreateRef);
+      plugin.app.vault.offref(vaultDeleteRef);
+      plugin.app.vault.offref(vaultRenameRef);
     };
   });
 
@@ -6600,9 +7924,27 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let searchableScheduleEntries = $derived(getSearchableScheduleEntries());
   let hasActiveSearch = $derived(Boolean(parsedSearchQuery?.raw.trim()));
   let searchMatchedEntries = $derived(getMatchedSearchEntries());
-  let displayedMaterials = $derived.by(() =>
-    hasActiveSearch ? searchMatchedEntries.map((entry) => entry.item) : selectedMaterials
-  );
+  let displayedMaterials = $derived.by(() => {
+    if (hasActiveSearch) {
+      if (!hideTodayCompletedReadingPoints) {
+        return searchMatchedEntries.map((entry) => entry.item);
+      }
+      const todayKey = formatDateKey(today);
+      const completedToday = new Set(calendarProgressByDate[todayKey] || []);
+      if (completedToday.size === 0) {
+        return searchMatchedEntries.map((entry) => entry.item);
+      }
+      return searchMatchedEntries
+        .filter((entry) => entry.dateKey !== todayKey || !completedToday.has(entry.item.id))
+        .map((entry) => entry.item);
+    }
+
+    if (hideTodayCompletedReadingPoints && isSameDay(selectedDate, today)) {
+      return selectedMaterials.filter((material) => !processedChunkIds.has(material.id));
+    }
+
+    return selectedMaterials;
+  });
   let recentSpreadCount = $state(0);
 
   async function refreshRecentSpreadCount(): Promise<void> {
@@ -6691,14 +8033,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }))
   );
   let searchAvailableTags = $derived.by(() =>
-    Array.from(
-      new Set(
-        Object.values(readingPointTagsById)
-          .flatMap((tags) => tags || [])
-          .map((tag) => String(tag || '').trim())
-          .filter(Boolean)
-      )
-    ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    mergeSearchAvailableTags(searchCatalogTags, readingPointTagsById)
   );
   let searchAvailablePriorities = $derived.by(() =>
     Array.from(new Set(searchableScheduleEntries.map((entry) => Number(entry.item.priority || 0)))).sort((a, b) => a - b)
@@ -6817,6 +8152,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     getScheduleItemDeckName,
     getMaterialExpandButtonLabel,
     getReadingPointTypeIndicator,
+    isSourceMissing,
+    getParentProgressForMaterial,
     handleMaterialClick,
     openMaterial,
     toggleMaterialExpand,
@@ -6877,6 +8214,35 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       dayLoadPopoverOpen = false;
     }
   });
+
+  $effect(() => {
+    const enabled = showMissingSourceIndicators;
+    const items = collectMissingSourceCheckItems(
+      displayedMaterials,
+      expandedMaterialIds,
+      siblingCache
+    );
+    // Track item identity so path updates / list changes re-run the scan.
+    void items.map((item) => `${item.id}:${item.sourceFile || ''}`).join('|');
+
+    if (!enabled) {
+      missingSourcePointIds = new Set();
+      return;
+    }
+
+    scheduleMissingSourceIndicatorRefresh(items, { delayMs: 80 });
+    return () => {
+      if (missingSourceScanTimer !== null) {
+        window.clearTimeout(missingSourceScanTimer);
+        missingSourceScanTimer = null;
+      }
+      if (missingSourceRetryTimer !== null) {
+        window.clearTimeout(missingSourceRetryTimer);
+        missingSourceRetryTimer = null;
+      }
+      missingSourceScanToken += 1;
+    };
+  });
 </script>
 
 <div
@@ -6899,6 +8265,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     bind:calendarToolsTriggerEl
     onAddReadingTarget={() => openAddReadingTargetModal()}
     onScanTopics={() => { void scanVaultIncrementalReadingDeckFiles(); }}
+    onOpenTutorial={() => openIRTutorial()}
     onToggleDayLoadPopover={toggleDayLoadPopover}
     onToggleSearchPanel={toggleSearchPanel}
     onShowMonthCalendarToolsMenu={showMonthCalendarToolsMenu}
@@ -6940,6 +8307,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
 
   <IRCalendarMonthGrid
+    viewMode={calendarViewMode}
     {weekdayLabels}
     {monthDays}
     {today}
@@ -7040,5 +8408,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   parentTitle={arpParentTitle}
   onClose={() => { showAddReadingPointModal = false; }}
   onCreated={() => { showAddReadingPointModal = false; }}
+/>
+
+<IRTutorial
+  visible={tutorialVisible}
+  initialTab={tutorialInitialTab}
+  showDismissOption={!calendarTutorialDismissed}
+  onClose={closeIRTutorial}
+  onDismissPermanently={() => { void dismissIRTutorialPermanently(); }}
 />
 

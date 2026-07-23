@@ -62,11 +62,11 @@
    * 禁止在 $effect 中手动 appendChild——那会与 Svelte 5 reconcile 冲突，导致可见菜单丢失事件绑定。
    */
   function portalToBody(node: HTMLElement, enabled: boolean = true) {
-    if (!enabled || typeof document === 'undefined' || !document.body) {
+    if (!enabled || typeof activeDocument === 'undefined' || !activeDocument.body) {
       return {};
     }
 
-    document.body.appendChild(node);
+    activeDocument.body.appendChild(node);
 
     return {
       destroy() {
@@ -195,13 +195,13 @@
   });
 
   onMount(() => {
-    document.addEventListener('click', handleClickOutside);
-    document.addEventListener('keydown', handleKeydown);
+    activeDocument.addEventListener('click', handleClickOutside);
+    activeDocument.addEventListener('keydown', handleKeydown);
   });
 
   onDestroy(() => {
-    document.removeEventListener('click', handleClickOutside);
-    document.removeEventListener('keydown', handleKeydown);
+    activeDocument.removeEventListener('click', handleClickOutside);
+    activeDocument.removeEventListener('keydown', handleKeydown);
     stopAutoPositioning();
   });
 </script>
@@ -210,7 +210,7 @@
   <div
     bind:this={menuElement}
     use:portalToBody={portal}
-    class="floating-menu {customClass}"
+    class="floating-menu weave-floating-menu {customClass}"
     style="top: {position.top}px; left: {position.left}px;"
     role={role}
     aria-hidden={!show}
@@ -252,7 +252,7 @@
     }
   }
 
-  :global(body > .floating-menu) {
+  :global(body > .floating-menu.weave-floating-menu) {
     position: fixed !important;
     pointer-events: auto;
   }

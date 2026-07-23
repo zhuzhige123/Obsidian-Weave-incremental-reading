@@ -4,11 +4,17 @@
   设计目标：
   - 与继续阅读建议弹窗统一为同一套轻书卷编辑卡片语言
   - 突出当前优先级、节奏含义与快捷选择
-  - 保留 0-10 连续优先级轴与实时预览能力
+  - 保留 0-10 连续优先级轴与四档配色预览
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import EnhancedIcon from '../ui/EnhancedIcon.svelte';
+  import {
+    getIRPriorityPalette,
+    IR_PRIORITY_PRESET_VALUES,
+    resolveIRPriorityTier,
+    type IRPriorityTier,
+  } from '../../services/incremental-reading/IRPriorityDisplay';
   import { tr } from '../../utils/i18n';
 
   interface Props {
@@ -20,10 +26,8 @@
     onPreview?: (value: number) => void;
   }
 
-  type PriorityTone = 'lowest' | 'low' | 'medium' | 'high' | 'urgent';
-
   interface PriorityPreset {
-    tone: PriorityTone;
+    tier: IRPriorityTier;
     value: number;
     label: string;
     shortHint: string;
@@ -44,25 +48,18 @@
   let localValue = $state(untrack(() => value));
   let isDragging = $state(false);
 
-  const priorityPresetTones: PriorityTone[] = ['lowest', 'low', 'medium', 'high', 'urgent'];
-  const priorityPresetValues = [0, 2.5, 5, 7.5, 10];
-  const priorityPresetColors = [
-    'var(--text-faint)',
-    'var(--text-muted)',
-    'var(--interactive-accent)',
-    'var(--text-warning)',
-    'var(--text-error)'
-  ];
-
   let priorityPresets = $derived(
-    priorityPresetTones.map((tone, index) => ({
-      tone,
-      value: priorityPresetValues[index],
-      label: t(`irPriority.presets.${tone}.label`),
-      shortHint: t(`irPriority.presets.${tone}.shortHint`),
-      description: t(`irPriority.presets.${tone}.description`),
-      color: priorityPresetColors[index]
-    })) as PriorityPreset[]
+    IR_PRIORITY_PRESET_VALUES.map(({ tier, value: presetValue }) => {
+      const palette = getIRPriorityPalette(presetValue);
+      return {
+        tier,
+        value: presetValue,
+        label: t(`irPriority.presets.${tier}.label`),
+        shortHint: t(`irPriority.presets.${tier}.shortHint`),
+        description: t(`irPriority.presets.${tier}.description`),
+        color: palette.text,
+      } satisfies PriorityPreset;
+    })
   );
 
   $effect(() => {
@@ -72,16 +69,12 @@
   });
 
   function getPriorityPreset(v: number): PriorityPreset {
-    const presets = priorityPresets;
-    if (v <= 1) return presets[0];
-    if (v <= 3.5) return presets[1];
-    if (v <= 6.5) return presets[2];
-    if (v <= 8.5) return presets[3];
-    return presets[4];
+    const tier = resolveIRPriorityTier(v);
+    return priorityPresets.find((preset) => preset.tier === tier) ?? priorityPresets[1];
   }
 
   function getPriorityColor(v: number): string {
-    return getPriorityPreset(v).color;
+    return getIRPriorityPalette(v).text;
   }
 
   function getPriorityLabel(v: number): string {
@@ -97,7 +90,7 @@
   }
 
   function isPresetActive(preset: PriorityPreset, v: number): boolean {
-    return getPriorityPreset(v).tone === preset.tone;
+    return resolveIRPriorityTier(v) === preset.tier;
   }
 
   function handleInput(event: Event): void {
@@ -472,7 +465,7 @@
 
   .priority-editor__presets {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -578,7 +571,7 @@
     }
 
     .priority-editor__presets {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>

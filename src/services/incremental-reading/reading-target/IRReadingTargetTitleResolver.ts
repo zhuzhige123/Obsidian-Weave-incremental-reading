@@ -114,7 +114,13 @@ export async function resolveReadingTargetTitleDraft(
 		if (target.kind === "vault-link" && target.resumeLink.includes("#")) {
 			const fragment = target.resumeLink.split("#").pop()?.trim();
 			if (fragment && !fragment.startsWith("^")) {
-				return { title: decodeURIComponent(fragment), titleDetected: true };
+				let decoded = fragment;
+				try {
+					decoded = decodeURIComponent(fragment);
+				} catch {
+					decoded = fragment;
+				}
+				return { title: decoded, titleDetected: true };
 			}
 		}
 
@@ -156,6 +162,8 @@ export function getReadingTargetKindLabel(
 			return i18n.t("irAddTarget.kindLabels.pdfBatch");
 		case "epub":
 			return i18n.t("irAddTarget.kindLabels.epub");
+		case "canvas":
+			return i18n.t("irAddTarget.kindLabels.canvas");
 		default:
 			return i18n.t("irAddTarget.kindLabels.unknown");
 	}

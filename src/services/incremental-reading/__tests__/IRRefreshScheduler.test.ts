@@ -5,6 +5,9 @@ const getCalendarQueryResultMock = vi.fn();
 const runHeavyLoadMock = vi.fn();
 const notifyMock = vi.fn();
 const markCompleteMock = vi.fn();
+const filterOutL1FreshDateKeysMock = vi.fn(
+	(keys: string[]) => keys.map((key) => String(key || "").trim()).filter(Boolean),
+);
 
 vi.mock("../IRScheduleIndexService", () => ({
 	getSharedIRScheduleIndexService: () => ({
@@ -18,6 +21,7 @@ vi.mock("../IRProjectionRuntime", () => ({
 		preloadColdStartCaches: vi.fn().mockResolvedValue(undefined),
 		notify: notifyMock,
 		markBackgroundReconcileComplete: markCompleteMock,
+		filterOutL1FreshDateKeys: filterOutL1FreshDateKeysMock,
 	}),
 }));
 
@@ -49,6 +53,9 @@ describe("IRRefreshScheduler", () => {
 		vi.useFakeTimers();
 		vi.clearAllMocks();
 		shouldSkipMock.mockResolvedValue(false);
+		filterOutL1FreshDateKeysMock.mockImplementation((keys: string[]) =>
+			keys.map((key) => String(key || "").trim()).filter(Boolean),
+		);
 		getCalendarQueryResultMock.mockResolvedValue({
 			materialsByDate: new Map([["2026-06-19", [{ id: "chunk-1" }]]]),
 		});
@@ -98,6 +105,37 @@ describe("IRRefreshScheduler", () => {
 		await vi.runAllTimersAsync();
 
 		expect(getCalendarQueryResultMock).not.toHaveBeenCalled();
+	});
+
+	it("skips notify when all priority dates are L1-fresh", async () => {
+		filterOutL1FreshDateKeysMock.mockReturnValue([]);
+		const scheduler = getSharedIRRefreshScheduler(app);
+
+		scheduler.scheduleCalendarReconcile({
+			priorityDateKeys: ["2026-06-19"],
+			reason: "after-complete",
+		});
+		await vi.runAllTimersAsync();
+
+		expect(getCalendarQueryResultMock).toHaveBeenCalled();
+		expect(markCompleteMock).toHaveBeenCalled();
+		expect(notifyMock).not.toHaveBeenCalled();
+	});
+
+	it("does not push empty day slices that would wipe the sidebar queue", async () => {
+		getCalendarQueryResultMock.mockResolvedValue({
+			materialsByDate: new Map(),
+		});
+		const scheduler = getSharedIRRefreshScheduler(app);
+
+		scheduler.scheduleCalendarReconcile({
+			priorityDateKeys: ["2026-06-19"],
+			reason: "incomplete-query",
+		});
+		await vi.runAllTimersAsync();
+
+		expect(markCompleteMock).toHaveBeenCalled();
+		expect(notifyMock).not.toHaveBeenCalled();
 	});
 
 	it("notifies reconcileFailed when background query throws", async () => {

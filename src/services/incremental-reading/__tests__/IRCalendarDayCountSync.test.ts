@@ -33,6 +33,26 @@ describe("IRCalendarDayCountSync", () => {
 		expect(counts.get("2026-06-18")).toBe(2);
 	});
 
+	it("can ignore pinned for active days while counting history pinned", () => {
+		const materialsByDate = new Map<string, ScheduleItem[]>([
+			["2026-06-18", [item("a")]],
+		]);
+		const pinnedByDate = new Map<string, ScheduleItem[]>([
+			["2026-06-18", [item("active-pinned-noise")]],
+			["2026-06-17", [item("history-done")]],
+		]);
+
+		const counts = buildVisibleDayCountsByDate(
+			materialsByDate,
+			pinnedByDate,
+			() => true,
+			(dateKey) => dateKey === "2026-06-17",
+		);
+
+		expect(counts.get("2026-06-18")).toBe(1);
+		expect(counts.get("2026-06-17")).toBe(1);
+	});
+
 	it("merges day count maps without dropping unrelated dates", () => {
 		const merged = mergeCalendarDayCountMaps(
 			new Map([

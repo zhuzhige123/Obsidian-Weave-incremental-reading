@@ -1,3 +1,4 @@
+import { DEFAULT_IR_DATA_ROOT } from "../../../config/paths";
 import {
 	getPluginEditorTempDir,
 	getVaultEditorTempDir,
@@ -26,6 +27,7 @@ describe("editor-temp-file-policy", () => {
 		const customApp = {
 			vault: { configDir: "custom-config" },
 		} as any;
+		const vaultEditorDir = `${DEFAULT_IR_DATA_ROOT}/editor`;
 
 		expect(getPluginEditorTempDir(defaultApp)).toBe(
 			".obsidian/plugins/weave-incremental-reading/cache/editor-temp",
@@ -33,8 +35,8 @@ describe("editor-temp-file-policy", () => {
 		expect(getPluginEditorTempDir(customApp)).toBe(
 			"custom-config/plugins/weave-incremental-reading/cache/editor-temp",
 		);
-		expect(getVaultEditorTempDir(defaultApp)).toBe("weave/editor");
-		expect(resolveDetachedEditorTempFolder(defaultApp)).toBe("weave/editor");
+		expect(getVaultEditorTempDir(defaultApp)).toBe(vaultEditorDir);
+		expect(resolveDetachedEditorTempFolder(defaultApp)).toBe(vaultEditorDir);
 		expect(
 			resolveDetachedEditorTempFolder(defaultApp, "notes/ch1/source.md"),
 		).toBe("notes/ch1");
@@ -57,20 +59,21 @@ describe("editor-temp-file-policy", () => {
 		const app = {
 			vault: { configDir: ".obsidian" },
 		} as any;
+		const vaultEditorDir = `${DEFAULT_IR_DATA_ROOT}/editor`;
 
 		expect(
 			resolveDetachedEditorTempFolder(
 				app,
 				"obsidian://weave-epub?vault=Vault&file=Books%2Fdemo.epub",
 			),
-		).toBe("weave/editor");
+		).toBe(vaultEditorDir);
 		expect(
 			resolveDetachedEditorTempFolder(app, "C:/Users/lihua/Desktop/book.md"),
-		).toBe("weave/editor");
+		).toBe(vaultEditorDir);
 		expect(resolveDetachedEditorTempFolder(app, "../outside/note.md")).toBe(
-			"weave/editor",
+			vaultEditorDir,
 		);
-		expect(resolveDetachedEditorTempFolder(app, ".")).toBe("weave/editor");
+		expect(resolveDetachedEditorTempFolder(app, ".")).toBe(vaultEditorDir);
 	});
 
 	it("distinguishes plugin cache modal buffers from legacy modal buffers", () => {

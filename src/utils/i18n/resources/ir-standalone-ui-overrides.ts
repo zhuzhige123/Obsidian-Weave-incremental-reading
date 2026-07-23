@@ -1,11 +1,11 @@
-import type { SupportedLanguage, TranslationKey } from "../types";
+import type { AuthoringLanguage, TranslationKey } from "../types";
 
 /**
  * 独立 IR 插件运行时仍需要的 Weave 管理 UI 文案子集。
  * 禁止再引入完整的 management-ui.ts / management.ts（主插件拆仓残留，体积过大）。
  */
 export const irStandaloneUiTranslationOverrides: Record<
-	SupportedLanguage,
+	AuthoringLanguage,
 	TranslationKey
 > = {
 	"zh-CN": {
@@ -34,6 +34,7 @@ export const irStandaloneUiTranslationOverrides: Record<
 				saveHistoryFailed: "保存搜索历史失败",
 				folderPanelTitle: "搜索文件夹",
 				sourcePanelTitle: "搜索来源文档",
+				tagPanelTitle: "搜索标签",
 				vaultRoot: "/（Vault 根目录）",
 				clearSearch: "清除搜索",
 				sort: "排序",
@@ -44,9 +45,11 @@ export const irStandaloneUiTranslationOverrides: Record<
 				deleteHistoryItem: "删除",
 				searchFolderPlaceholder: "搜索要包含的文件夹...",
 				searchSourcePlaceholder: "搜索要包含的来源文档...",
+				searchTagPlaceholder: "搜索要包含的标签...",
 				clearSuggestionSearch: "清除建议搜索",
 				noFolders: "暂无可选文件夹",
 				noSources: "暂无来源文档",
+				noTags: "暂无可选标签",
 				menuSections: {
 					status: "状态",
 					readingState: "阅读状态",
@@ -56,6 +59,7 @@ export const irStandaloneUiTranslationOverrides: Record<
 					yamlFilter: "YAML 属性筛选",
 					yamlInputFormat: "输入格式: yaml:属性名:值",
 					deck: "专题",
+					tag: "标签",
 					priority: "优先级",
 					type: "题型",
 					readingPointType: "阅读点类型",
@@ -152,6 +156,7 @@ export const irStandaloneUiTranslationOverrides: Record<
 				saveHistoryFailed: "Failed to save search history",
 				folderPanelTitle: "Search folders",
 				sourcePanelTitle: "Search source documents",
+				tagPanelTitle: "Search tags",
 				vaultRoot: "/ (Vault root)",
 				clearSearch: "Clear search",
 				sort: "Sort",
@@ -162,9 +167,11 @@ export const irStandaloneUiTranslationOverrides: Record<
 				deleteHistoryItem: "Delete",
 				searchFolderPlaceholder: "Search folders to include...",
 				searchSourcePlaceholder: "Search source documents to include...",
+				searchTagPlaceholder: "Search tags to include...",
 				clearSuggestionSearch: "Clear suggestion search",
 				noFolders: "No folders available",
 				noSources: "No source documents available",
+				noTags: "No tags available",
 				menuSections: {
 					status: "Status",
 					readingState: "Reading State",
@@ -174,6 +181,7 @@ export const irStandaloneUiTranslationOverrides: Record<
 					yamlFilter: "YAML Property Filter",
 					yamlInputFormat: "Input format: yaml:property:value",
 					deck: "Topic",
+					tag: "Tag",
 					priority: "Priority",
 					type: "Question Type",
 					readingPointType: "Reading Point Type",

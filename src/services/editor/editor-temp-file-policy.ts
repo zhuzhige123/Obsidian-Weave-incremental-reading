@@ -3,6 +3,7 @@ import { normalizePath } from "obsidian";
 import {
 	LEGACY_DOT_TUANKI,
 	PATHS,
+	WEAVE_DATA,
 	getPluginPaths,
 	getV2PathsFromApp,
 } from "../../config/paths";
@@ -199,8 +200,9 @@ export function isLegacyModalEditorPermanentFilePath(path: string): boolean {
 
 	if (normalizedPath.startsWith(`${LEGACY_DOT_TUANKI}/temp/`)) return true;
 	if (normalizedPath.startsWith(`${PATHS.temp}/`)) return true;
+	if (normalizedPath.startsWith(`${WEAVE_DATA}/temp/`)) return true;
 	if (normalizedPath.includes(`/${LEGACY_DOT_TUANKI}/temp/`)) return true;
-	if (normalizedPath.includes("/weave/temp/")) return true;
+	if (normalizedPath.includes(`/${WEAVE_DATA}/temp/`)) return true;
 	return false;
 }
 

@@ -4,7 +4,8 @@ import {
 	sanitizeUserReadingSourcePath,
 } from "./ir-internal-data-path";
 
-const LOCATOR_PATH_KEYS = [
+/** Locator fields that may store a vault source path. */
+export const IR_POINT_LOCATOR_PATH_KEYS = [
 	"filePath",
 	"sourcePath",
 	"chunkFilePath",
@@ -14,11 +15,18 @@ const LOCATOR_PATH_KEYS = [
 	"rawFilePath",
 ] as const;
 
-const METADATA_PATH_KEYS = [
+/** Metadata fields that may store a vault source path. */
+export const IR_POINT_METADATA_PATH_KEYS = [
 	"sourcePath",
 	"rawFilePath",
 	"chunkFilePath",
+	"pdfPath",
+	"canvasPath",
+	"epubFilePath",
 ] as const;
+
+const LOCATOR_PATH_KEYS = IR_POINT_LOCATOR_PATH_KEYS;
+const METADATA_PATH_KEYS = IR_POINT_METADATA_PATH_KEYS;
 
 function sanitizePathValue(value: unknown): { next: string; changed: boolean } {
 	if (typeof value !== "string" || !value.trim()) {

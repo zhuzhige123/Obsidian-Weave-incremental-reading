@@ -1,43 +1,63 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
+  import { Menu } from "obsidian";
   import TabNavigation from "../ui/TabNavigation.svelte";
   import type { IncrementalReadingSettingsHost } from "./types/incremental-reading-settings-host";
   import IncrementalReadingSettingsSection from "./sections/IncrementalReadingSettingsSection.svelte";
   import StandaloneIRLicenseSettingsPanel from "./StandaloneIRLicenseSettingsPanel.svelte";
   import FolderSearchInput from "../ui/FolderSearchInput.svelte";
+  import ObsidianSettingToggle from "./components/ObsidianSettingToggle.svelte";
+  import ObsidianSettingDropdown from "./components/ObsidianSettingDropdown.svelte";
+  import ObsidianSettingButton from "./components/ObsidianSettingButton.svelte";
   import { IRDataManagementModalObsidian } from "../incremental-reading/IRDataManagementModalObsidian";
   import {
     PremiumFeatureGuard,
     PREMIUM_FEATURES,
   } from "../../services/premium/PremiumFeatureGuard";
+  import { openObsidianWebUrl } from "../../services/obsidian/obsidian-open-web-url";
   import {
     applyPluginUiLanguagePreference,
+    LANGUAGE_OPTION_LABEL_KEYS,
     PLUGIN_UI_LANGUAGE_OPTIONS,
     tr,
     type PluginUiLanguagePreference,
   } from "../../utils/i18n";
+  import {
+    STANDALONE_IR_SETTINGS_NAVIGATE_EVENT,
+    resolveStandaloneIRSettingsTabId,
+    type StandaloneIRSettingsTabId,
+  } from "./standalone-ir-settings-search";
+
+  const QQ_PUBLIC_GROUP_URL = "https://qm.qq.com/q/9uyMPAFLXO";
+  const OTHER_GROUPS_DOCS_URL =
+    "https://iwi05cktlph.feishu.cn/wiki/GJiZwgcU8icgF9k8p3pcVAjcngg";
 
   interface Props {
     plugin: IncrementalReadingSettingsHost;
+    initialTab?: StandaloneIRSettingsTabId;
   }
 
-  type StandaloneIRSettingsTabId = "basic" | "core-scheduling" | "advanced" | "license" | "about";
-
-  let { plugin }: Props = $props();
+  let { plugin, initialTab }: Props = $props();
   let t = $derived($tr);
-  let activeTab = $state<StandaloneIRSettingsTabId>("basic");
+  let activeTab = $state<StandaloneIRSettingsTabId>(
+    untrack(() => initialTab ?? "basic"),
+  );
   let stateVersion = $state(0);
-  let localDataFolderDraft = $state("");
   let lastFolderDraft = $state("");
   let weaveParentFolderDraft = $state("");
   let showPremiumFeaturesPreviewDraft = $state(false);
   let uiLanguageDraft = $state<PluginUiLanguagePreference>("auto");
 
-  const languageOptionLabels: Record<PluginUiLanguagePreference, () => string> = {
-    auto: () => t("irSettings.standalone.language.auto"),
-    "zh-CN": () => t("irSettings.standalone.language.zhCN"),
-    "en-US": () => t("irSettings.standalone.language.enUS"),
-  };
+  function languageOptionLabel(option: PluginUiLanguagePreference): string {
+    return t(LANGUAGE_OPTION_LABEL_KEYS[option]);
+  }
+
+  let languageOptions = $derived(
+    PLUGIN_UI_LANGUAGE_OPTIONS.map((option) => ({
+      id: option,
+      label: languageOptionLabel(option),
+    })),
+  );
 
   function shouldShowPremiumFeatureEntry(featureId: string): boolean {
     return PremiumFeatureGuard.getInstance().shouldShowFeatureEntry(featureId, {
@@ -75,24 +95,59 @@
     t("irSettings.standalone.supportedFormats.epubSource"),
     t("irSettings.standalone.supportedFormats.canvas"),
   ]);
-  let contactItems = $derived([
+  type ContactLinkItem = {
+    kind: "link";
+    label: string;
+    href: string;
+  };
+  type ContactMenuItem = {
+    kind: "menu";
+    label: string;
+  };
+  type ContactItem = ContactLinkItem | ContactMenuItem;
+
+  let contactItems = $derived<ContactItem[]>([
     {
+      kind: "link",
       label: t("irSettings.standalone.about.contacts.docs"),
-      href: "https://github.com/zhuzhige123/weave-incremental-reading/tree/main/docs",
+      href: "https://iwi05cktlph.feishu.cn/wiki/CGhIwP51giW3BVknZq2c8r6Wnef",
     },
     {
+      kind: "link",
       label: t("irSettings.standalone.about.contacts.changelog"),
-      href: "https://github.com/zhuzhige123/weave-incremental-reading/blob/main/CHANGELOG.md",
+      href: "https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/CHANGELOG.md",
     },
     {
-      label: t("irSettings.standalone.about.contacts.feedback"),
-      href: "https://github.com/zhuzhige123/weave-incremental-reading/issues",
+      kind: "menu",
+      label: t("irSettings.standalone.about.contacts.community"),
     },
     {
+      kind: "link",
       label: t("irSettings.standalone.about.contacts.author"),
       href: "mailto:tutaoyuan8@outlook.com?subject=Weave%20Incremental%20Reading%20%E5%8F%8D%E9%A6%88",
     },
   ]);
+
+  function showCommunityFeedbackMenu(event: MouseEvent) {
+    const menu = new Menu();
+    menu.addItem((item) => {
+      item
+        .setTitle(t("irSettings.standalone.about.contacts.communityMenu.qqPublic"))
+        .setIcon("message-circle")
+        .onClick(() => {
+          void openObsidianWebUrl(plugin.app, QQ_PUBLIC_GROUP_URL);
+        });
+    });
+    menu.addItem((item) => {
+      item
+        .setTitle(t("irSettings.standalone.about.contacts.communityMenu.otherInDocs"))
+        .setIcon("book-open")
+        .onClick(() => {
+          void openObsidianWebUrl(plugin.app, OTHER_GROUPS_DOCS_URL);
+        });
+    });
+    menu.showAtMouseEvent(event);
+  }
   let incrementalReadingSettings = $derived.by(() => {
     stateVersion;
     return plugin.getIncrementalReadingSettings();
@@ -100,7 +155,6 @@
 
   $effect(() => {
     stateVersion;
-    localDataFolderDraft = incrementalReadingSettings.importFolder ?? "";
     lastFolderDraft = incrementalReadingSettings.selectionQuickCreateLastFolder ?? "";
     weaveParentFolderDraft = plugin.settings.weaveParentFolder ?? "";
     showPremiumFeaturesPreviewDraft = plugin.settings.showPremiumFeaturesPreview ?? false;
@@ -115,16 +169,24 @@
   });
 
   onMount(() => {
+    if (initialTab) {
+      const resolved = resolveStandaloneIRSettingsTabId(initialTab);
+      if (resolved) {
+        activeTab = resolved;
+      }
+    }
+
     const handleNavigateSettings = (event: Event) => {
-      const detail = (event as CustomEvent<{ tab?: StandaloneIRSettingsTabId }>).detail;
-      if (detail?.tab === "license") {
-        activeTab = "license";
+      const detail = (event as CustomEvent<{ tab?: string }>).detail;
+      const resolved = resolveStandaloneIRSettingsTabId(detail?.tab);
+      if (resolved) {
+        activeTab = resolved;
       }
     };
 
-    window.addEventListener("WeaveIncrementalReading:navigate-settings", handleNavigateSettings);
+    window.addEventListener(STANDALONE_IR_SETTINGS_NAVIGATE_EVENT, handleNavigateSettings);
     return () => {
-      window.removeEventListener("WeaveIncrementalReading:navigate-settings", handleNavigateSettings);
+      window.removeEventListener(STANDALONE_IR_SETTINGS_NAVIGATE_EVENT, handleNavigateSettings);
     };
   });
 
@@ -182,23 +244,17 @@
     });
   }
 
-  async function commitLocalDataFolder(): Promise<void> {
-    const nextValue = localDataFolderDraft.trim();
-    if (nextValue === (incrementalReadingSettings.importFolder ?? "")) {
-      return;
-    }
-    await updateIncrementalReadingField((settings) => {
-      settings.importFolder = nextValue;
-    });
-  }
-
   async function commitWeaveParentFolder(): Promise<void> {
     const nextValue = weaveParentFolderDraft.trim();
     if (nextValue === (plugin.settings.weaveParentFolder ?? "")) {
       return;
     }
+    // 单一数据根：importFolder 不再单独配置，一律由数据根推导（{root}/IR）
     await updateRootSettings((settings) => {
       settings.weaveParentFolder = nextValue;
+      if (settings.incrementalReading) {
+        settings.incrementalReading.importFolder = "";
+      }
     });
   }
 
@@ -231,48 +287,26 @@
     {#if activeTab === "basic"}
       <section class="standalone-ir-settings-section">
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
-          <div class="standalone-ir-settings-group-header">
-            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.language.title")}</h3>
-            <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.language.description")}</p>
-          </div>
-          <div class="standalone-ir-storage-row">
-            <div class="standalone-ir-storage-info">
-              <div class="standalone-ir-storage-name">{t("irSettings.standalone.language.title")}</div>
-            </div>
-            <div class="standalone-ir-storage-control">
-              <select
-                class="standalone-ir-language-select"
-                value={uiLanguageDraft}
-                onchange={(event) => {
-                  const nextValue = (event.currentTarget as HTMLSelectElement).value as PluginUiLanguagePreference;
-                  void commitUiLanguage(nextValue);
-                }}
-              >
-                {#each PLUGIN_UI_LANGUAGE_OPTIONS as option}
-                  <option value={option}>{languageOptionLabels[option]()}</option>
-                {/each}
-              </select>
-            </div>
-          </div>
+          <ObsidianSettingDropdown
+            name={t("irSettings.standalone.language.title")}
+            desc={t("irSettings.standalone.language.description")}
+            options={languageOptions}
+            value={uiLanguageDraft}
+            onChange={(value) => {
+              void commitUiLanguage(value as PluginUiLanguagePreference);
+            }}
+          />
         </div>
 
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
-          <div class="standalone-ir-premium-preview-setting-row">
-            <div class="standalone-ir-premium-preview-setting-copy">
-              <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.premiumPreview.title")}</h3>
-              <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.premiumPreview.description")}</p>
-            </div>
-            <label class="modern-switch">
-              <input
-                type="checkbox"
-                checked={showPremiumFeaturesPreviewDraft}
-                onchange={(e) => {
-                  void commitPremiumFeaturesPreviewEnabled((e.target as HTMLInputElement).checked);
-                }}
-              />
-              <span class="switch-slider"></span>
-            </label>
-          </div>
+          <ObsidianSettingToggle
+            name={t("irSettings.standalone.premiumPreview.title")}
+            desc={t("irSettings.standalone.premiumPreview.description")}
+            value={showPremiumFeaturesPreviewDraft}
+            onChange={(enabled) => {
+              void commitPremiumFeaturesPreviewEnabled(enabled);
+            }}
+          />
         </div>
 
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
@@ -281,28 +315,6 @@
             <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.dataFolders.description")}</p>
           </div>
           <div class="standalone-ir-storage-list">
-            <div class="standalone-ir-storage-row">
-              <div class="standalone-ir-storage-info">
-                <div class="standalone-ir-storage-name">{t("irSettings.standalone.dataFolders.localDataName")}</div>
-                <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.localDataDesc")}</p>
-              </div>
-              <div class="standalone-ir-storage-control">
-                <FolderSearchInput
-                  app={plugin.app}
-                  value={localDataFolderDraft}
-                  savedValue={incrementalReadingSettings.importFolder ?? ''}
-                  placeholder={t("irSettings.standalone.dataFolders.localDataPlaceholder")}
-                  onInput={(value) => {
-                    localDataFolderDraft = value;
-                  }}
-                  onCommit={async (value) => {
-                    localDataFolderDraft = value;
-                    await commitLocalDataFolder();
-                  }}
-                />
-              </div>
-            </div>
-
             <div class="standalone-ir-storage-row">
               <div class="standalone-ir-storage-info">
                 <div class="standalone-ir-storage-name">{t("irSettings.standalone.dataFolders.saveFolderName")}</div>
@@ -348,13 +360,12 @@
             </div>
 
             <div class="standalone-ir-storage-row standalone-ir-storage-row--action">
-              <div class="standalone-ir-storage-info">
-                <div class="standalone-ir-storage-name">{t("irSettings.standalone.dataFolders.dataMgmtName")}</div>
-                <p class="standalone-ir-storage-desc">{t("irSettings.standalone.dataFolders.dataMgmtDesc")}</p>
-              </div>
-              <div class="standalone-ir-storage-control standalone-ir-storage-control--action-only">
-                <button type="button" onclick={openDataManagementModal}>{t("irSettings.standalone.dataFolders.openDataMgmt")}</button>
-              </div>
+              <ObsidianSettingButton
+                name={t("irSettings.standalone.dataFolders.dataMgmtName")}
+                desc={t("irSettings.standalone.dataFolders.dataMgmtDesc")}
+                buttonText={t("irSettings.standalone.dataFolders.openDataMgmt")}
+                onClick={openDataManagementModal}
+              />
             </div>
           </div>
         </div>
@@ -422,14 +433,24 @@
 
           <div class="standalone-ir-about-links">
             {#each contactItems as item}
-              <a
-                class="standalone-ir-about-link"
-                href={item.href}
-                target={item.href.startsWith("http") ? "_blank" : undefined}
-                rel={item.href.startsWith("http") ? "noopener noreferrer" : undefined}
-              >
-                {item.label}
-              </a>
+              {#if item.kind === "link"}
+                <a
+                  class="standalone-ir-about-link"
+                  href={item.href}
+                  target={item.href.startsWith("http") ? "_blank" : undefined}
+                  rel={item.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                >
+                  {item.label}
+                </a>
+              {:else}
+                <button
+                  type="button"
+                  class="clickable-icon standalone-ir-about-link"
+                  onclick={showCommunityFeedbackMenu}
+                >
+                  {item.label}
+                </button>
+              {/if}
             {/each}
           </div>
         </div>
@@ -439,11 +460,6 @@
 </div>
 
 <style>
-  .standalone-ir-storage-control select.standalone-ir-language-select {
-    min-width: 12rem;
-    max-width: 100%;
-  }
-
   .standalone-ir-settings-root {
     /* Semantic typography scale for this settings panel */
     --standalone-ir-font-size-title: var(--font-ui-medium, 1rem);
@@ -601,24 +617,6 @@
     max-width: 100%;
   }
 
-  .standalone-ir-storage-control--action-only {
-    justify-content: flex-end;
-  }
-
-  .standalone-ir-premium-preview-setting-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--standalone-ir-space-4);
-  }
-
-  .standalone-ir-premium-preview-setting-copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--standalone-ir-space-1);
-    min-width: 0;
-  }
-
 
   .standalone-ir-settings-root :global(.incremental-reading-settings) {
     gap: 0;
@@ -753,7 +751,7 @@
 
   .standalone-ir-about-links {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
     gap: var(--standalone-ir-space-1) var(--standalone-ir-space-3);
     width: 100%;
   }
@@ -762,19 +760,43 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    height: auto;
+    min-height: 0;
     padding: var(--standalone-ir-space-2) var(--standalone-ir-space-2);
     border: none;
-    border-radius: var(--standalone-ir-radius-s);
+    border-radius: var(--clickable-icon-radius, var(--standalone-ir-radius-s));
     background: transparent;
     color: var(--text-muted);
+    font: inherit;
+    line-height: inherit;
+    cursor: pointer;
     text-decoration: none;
+    box-shadow: none;
     transition: color 0.15s ease, background-color 0.15s ease;
     text-align: center;
   }
 
-  .standalone-ir-about-link:hover {
+  .standalone-ir-settings-root button.standalone-ir-about-link.clickable-icon,
+  .standalone-ir-settings-root button.standalone-ir-about-link.clickable-icon:hover,
+  .standalone-ir-settings-root button.standalone-ir-about-link.clickable-icon:focus,
+  .standalone-ir-settings-root button.standalone-ir-about-link.clickable-icon:active {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    border-width: 0;
+    box-shadow: none;
+    background: transparent;
+    background-color: transparent;
+  }
+
+  .standalone-ir-about-link:hover,
+  .standalone-ir-settings-root button.standalone-ir-about-link.clickable-icon:hover,
+  .standalone-ir-settings-root button.standalone-ir-about-link.clickable-icon:focus {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
+    background-color: var(--background-modifier-hover);
   }
 
   @media (max-width: 720px) {
@@ -794,16 +816,6 @@
       flex-basis: auto;
     }
 
-    .standalone-ir-premium-preview-setting-row {
-      flex-direction: column;
-      align-items: stretch;
-      gap: var(--standalone-ir-space-3);
-    }
-
-    .standalone-ir-premium-preview-setting-row .modern-switch {
-      align-self: flex-end;
-    }
-
     .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .row) {
       padding: 1rem;
     }
@@ -814,13 +826,6 @@
 
     .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .row.row-has-desc) {
       align-items: stretch;
-    }
-
-    .standalone-ir-settings-root :global(.incremental-reading-settings .ir-dropdown-compact) {
-      flex: 1 1 auto;
-      width: 100%;
-      max-width: 100%;
-      margin-left: 0;
     }
 
     .standalone-ir-about-overview-item {

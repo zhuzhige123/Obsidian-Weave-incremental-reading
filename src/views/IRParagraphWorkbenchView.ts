@@ -3,6 +3,7 @@ import type { unmount } from "svelte";
 import type { WeavePlugin } from "../main";
 import { IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
 import type { ParagraphWorkbenchOpenInput } from "../services/incremental-reading/paragraph-workbench/types";
+import { labelParagraphWorkbenchSurface } from "../services/incremental-reading/paragraph-workbench/paragraph-workbench-maturity";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 import { getViewSurfaceTokens } from "../utils/view-location-utils";
@@ -33,9 +34,10 @@ export class IRParagraphWorkbenchView extends ItemView {
 	getDisplayText(): string {
 		const title =
 			this.openInput?.topicName || this.openInput?.sourcePath?.split("/").pop();
-		return title
+		const base = title
 			? `${title} · ${i18n.t("irViews.workbench.paragraphSuffix")}`
 			: i18n.t("irViews.workbench.defaultTitle");
+		return labelParagraphWorkbenchSurface(base);
 	}
 
 	getIcon(): string {

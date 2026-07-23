@@ -71,6 +71,16 @@ function resolveVaultPath(processEnv = process.env) {
 	return processEnv.OBSIDIAN_VAULT_PATH?.trim() || readEnvValueFromDotEnv("OBSIDIAN_VAULT_PATH");
 }
 
+function resolvePluginIdFromManifest() {
+	const manifestPath = path.join(PROJECT_ROOT, "manifest.json");
+	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	const pluginId = typeof manifest?.id === "string" ? manifest.id.trim() : "";
+	if (!pluginId) {
+		throw new Error(`manifest.json missing id: ${manifestPath}`);
+	}
+	return pluginId;
+}
+
 function resolvePluginDir(pluginId, processEnv = process.env) {
 	const vaultPath = resolveVaultPath(processEnv);
 	if (!vaultPath) {
@@ -313,6 +323,7 @@ module.exports = {
 	pruneManagedRuntimeAssetDirs,
 	readEnvValueFromDotEnv,
 	resolvePluginDir,
+	resolvePluginIdFromManifest,
 	resolveVaultPath,
 	syncRuntimeFiles,
 };

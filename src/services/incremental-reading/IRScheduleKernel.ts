@@ -8,6 +8,7 @@ import {
 import {
 	basenameWithoutExtension,
 	isIRInternalScheduleSourcePath,
+	shouldExcludeScheduleItemBySource,
 } from "../../utils/ir-internal-data-path";
 import { readAdvancedScheduleSettingsSnapshot } from "../../utils/ir-plugin-host-access";
 import { getChunkTopicIds, getTaskTopicId } from "../../utils/ir-topic-compat";
@@ -112,6 +113,15 @@ export interface IRPlannedScheduleItem {
 	scheduleStatus: string;
 	nextRepDate: number;
 	nextReviewDate: Date | null;
+	/**
+	 * 进入计划前的承诺 due（FSRS/手动改期）。
+	 * PlanGenerator 可改写 nextRepDate 做内存顺延；月历材料分桶必须用本字段。
+	 */
+	committedNextRepDate?: number;
+	/** Reading-point creation time (ms epoch). */
+	createdAt?: number;
+	/** Reading-point last update time (ms epoch). */
+	updatedAt?: number;
 	estimatedMinutes: number;
 	deckId?: string;
 	sourceType: "chunk" | "pdf" | "epub";
@@ -155,6 +165,13 @@ function formatDateKey(date: Date): string {
 		2,
 		"0",
 	)}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function normalizePointTimestampMs(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+		return value;
+	}
+	return undefined;
 }
 
 function estimateMinutesFromStats(stats?: {
@@ -579,6 +596,7 @@ export class IRScheduleKernel {
 			interleaveProfile: planningSettings.interleaveProfile,
 			maxTopicSharePercent: planningSettings.maxTopicSharePercent,
 		});
+		// 跨日平滑仅保留在内存计划内；默认不写回 nextRepDate（见 IRLoadDeferService.persistDeferrals）。
 		if (
 			generated.loadDeferrals.length > 0 &&
 			(planningSettings.enableLoadBasedDefer !== false ||
@@ -588,6 +606,7 @@ export class IRScheduleKernel {
 		) {
 			await applyLoadDeferralsFromPlan(this.app, generated.loadDeferrals, {
 				reason,
+				persistDeferrals: false,
 			});
 		}
 		const schedule: IRPlannedSchedule = {
@@ -684,6 +703,10 @@ export class IRScheduleKernel {
 		target.priority = manualPriority ?? effectivePriority ?? target.priority;
 		target.nextRepDate = nextRepDate;
 		target.nextReviewDate = nextRepDate > 0 ? new Date(nextRepDate) : null;
+		if (changeSet.nextRepDate !== undefined) {
+			target.committedNextRepDate =
+				nextRepDate > 0 ? nextRepDate : undefined;
+		}
 		target.intervalDays = intervalDays;
 		target.scheduleStatus = scheduleStatus;
 		target.explanation = buildExplanation({
@@ -926,11 +949,17 @@ export class IRScheduleKernel {
 		const nextRepDate = Number(chunk.nextRepDate || 0);
 		const nextReviewDate = nextRepDate > 0 ? new Date(nextRepDate) : null;
 		const filePath = String(chunk.filePath || "");
-		if (isIRInternalScheduleSourcePath(filePath)) {
-			return null;
-		}
 		const chunkMeta = (chunk.meta || {}) as unknown as Record<string, unknown>;
 		const title = extractChunkTitleWithMeta(filePath, chunk.chunkId, chunkMeta);
+		if (
+			isIRInternalScheduleSourcePath(filePath) ||
+			shouldExcludeScheduleItemBySource({
+				sourceFile: filePath,
+				title,
+			})
+		) {
+			return null;
+		}
 		const material = readingMaterialByPath.get(filePath);
 		const associationMeta = this.getAssociatedNoteMeta(
 			filePath,
@@ -980,6 +1009,9 @@ export class IRScheduleKernel {
 			scheduleStatus,
 			nextRepDate,
 			nextReviewDate,
+			committedNextRepDate: nextRepDate > 0 ? nextRepDate : undefined,
+			createdAt: normalizePointTimestampMs(chunk.createdAt),
+			updatedAt: normalizePointTimestampMs(chunk.updatedAt),
 			estimatedMinutes,
 			deckId: this.resolveCanonicalDeckId(
 				getChunkTopicIds(chunk)[0],
@@ -1070,7 +1102,12 @@ export class IRScheduleKernel {
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
 			return null;
 		}
-		if (isIRInternalScheduleSourcePath(task.pdfPath)) {
+		if (
+			shouldExcludeScheduleItemBySource({
+				sourceFile: task.pdfPath,
+				title: task.title,
+			})
+		) {
 			return null;
 		}
 
@@ -1113,6 +1150,9 @@ export class IRScheduleKernel {
 			scheduleStatus,
 			nextRepDate,
 			nextReviewDate,
+			committedNextRepDate: nextRepDate > 0 ? nextRepDate : undefined,
+			createdAt: normalizePointTimestampMs(task.createdAt),
+			updatedAt: normalizePointTimestampMs(task.updatedAt),
 			estimatedMinutes,
 			deckId: this.resolveCanonicalDeckId(
 				taskDeckIdentifier,
@@ -1148,7 +1188,12 @@ export class IRScheduleKernel {
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
 			return null;
 		}
-		if (isIRInternalScheduleSourcePath(task.epubFilePath)) {
+		if (
+			shouldExcludeScheduleItemBySource({
+				sourceFile: task.epubFilePath,
+				title: task.title,
+			})
+		) {
 			return null;
 		}
 
@@ -1190,6 +1235,9 @@ export class IRScheduleKernel {
 			scheduleStatus,
 			nextRepDate,
 			nextReviewDate,
+			committedNextRepDate: nextRepDate > 0 ? nextRepDate : undefined,
+			createdAt: normalizePointTimestampMs(task.createdAt),
+			updatedAt: normalizePointTimestampMs(task.updatedAt),
 			estimatedMinutes,
 			deckId: this.resolveCanonicalDeckId(
 				taskDeckIdentifier,

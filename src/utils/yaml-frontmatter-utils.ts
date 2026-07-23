@@ -25,6 +25,12 @@ import {
 	readString,
 	readStringArrayFromUnknown,
 } from "./unknown-record";
+import {
+	LEGACY_MARKDOWN_TAGS_YAML_KEY,
+	normalizeMarkdownTagsYamlKey,
+	readRawFrontmatterTagValue,
+	shouldClearLegacyWeaveTagsAfterWrite,
+} from "../services/incremental-reading/ir-tag-source-policy";
 
 type FrontmatterRecord = Record<string, unknown>;
 
@@ -197,6 +203,49 @@ export class YAMLFrontmatterManager {
 			logger.error("[YAMLFrontmatter] 更新YAML字段失败:", error);
 			throw error;
 		}
+	}
+
+	/**
+	 * Write reading-point tags to a configurable YAML frontmatter key.
+	 * Legacy `weave_tags` is cleared only when empty or identical to the
+	 * written value — never discard divergent IR tags while using another key.
+	 */
+	async updateFrontmatterTagsProperty(
+		file: TFile,
+		yamlKey: string,
+		tags: string[],
+	): Promise<string[]> {
+		const key = normalizeMarkdownTagsYamlKey(yamlKey);
+		const normalizedTags = normalizeWeaveTags(tags);
+
+		await this.app.fileManager.processFrontMatter(file, (rawFrontmatter) => {
+			const frontmatter = asFrontmatterRecord(rawFrontmatter);
+			const legacyTags = readRawFrontmatterTagValue(
+				frontmatter[LEGACY_MARKDOWN_TAGS_YAML_KEY],
+			);
+			if (normalizedTags.length > 0) {
+				frontmatter[key] = normalizedTags;
+			} else {
+				delete frontmatter[key];
+			}
+			if (
+				shouldClearLegacyWeaveTagsAfterWrite({
+					primaryKey: key,
+					writtenTags: normalizedTags,
+					legacyTags,
+				})
+			) {
+				delete frontmatter[LEGACY_MARKDOWN_TAGS_YAML_KEY];
+			}
+		});
+
+		logger.debug(
+			"[YAMLFrontmatter] 更新标签属性成功:",
+			file.path,
+			key,
+			normalizedTags,
+		);
+		return normalizedTags;
 	}
 
 	/**

@@ -14,6 +14,7 @@ const {
 	copyFileAtomicWithRetry,
 	pruneManagedRuntimeFiles,
 	resolvePluginDir,
+	resolvePluginIdFromManifest,
 	syncRuntimeFiles,
 } = require("./scripts/hot-reload-utils.cjs");
 
@@ -87,7 +88,7 @@ export default defineConfig(({ mode }) => {
 		"a11y_interactive_supports_focus",
 		"css_unused_selector",
 	]);
-	const pluginId = "weave-incremental-reading";
+	const pluginId = resolvePluginIdFromManifest();
 	const manifestFileName = DEFAULT_MANIFEST;
 
 	const resolvedPluginDir =

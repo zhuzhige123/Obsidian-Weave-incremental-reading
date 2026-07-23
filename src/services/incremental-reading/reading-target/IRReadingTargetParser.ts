@@ -1,13 +1,35 @@
-import { type App, normalizePath } from "obsidian";
+import { type App, TFile, normalizePath } from "obsidian";
 import { i18n } from "../../../utils/i18n";
 import { parsePdfCallouts } from "../../../utils/pdf-callout-parser";
 import { EpubLinkService } from "../../epub-integration/EpubLinkService";
 import { EPUB_RUNTIME } from "../../epub-integration/epub-runtime";
 import { isHttpUrl } from "../../obsidian/obsidian-open-web-url";
-import { normalizeObsidianBlockId } from "../paragraph-workbench/paragraph-block-reference";
+import {
+	OBSIDIAN_BLOCK_ID_LINE_REGEX,
+	normalizeObsidianBlockId,
+} from "../paragraph-workbench/paragraph-block-reference";
+import {
+	buildCanvasParsedReadingTarget,
+	parseCanvasNodeFragment,
+} from "./IRReadingTargetCanvas";
 import type { ParsedReadingTarget } from "./IRReadingTargetTypes";
 
 const WIKI_LINK_CAPTURE_REGEX = /!?\[\[([^\]]+)\]\]/;
+const MARKDOWN_HTTP_LINK_REGEX =
+	/^\[([^\]]*)\]\((https?:\/\/[^)\s]+)(?:\s+"[^"]*")?\)$/i;
+
+function parseMarkdownHttpLink(
+	raw: string,
+): { title?: string; url: string } | null {
+	const match = String(raw || "")
+		.trim()
+		.match(MARKDOWN_HTTP_LINK_REGEX);
+	if (!match?.[2]) {
+		return null;
+	}
+	const title = String(match[1] || "").trim() || undefined;
+	return { title, url: match[2] };
+}
 
 function stripOuterWikiSyntax(raw: string): string {
 	return String(raw || "")
@@ -200,12 +222,113 @@ function validateVaultBlock(
 	filePath: string,
 	blockId: string,
 ): string | null {
-	const cache = app.metadataCache.getCache(filePath);
-	const blockRef = cache?.blocks?.[blockId];
-	if (!blockRef) {
+	const normalizedBlockId = normalizeObsidianBlockId(blockId);
+	if (!normalizedBlockId) {
 		return i18n.t("irAddTarget.parser.blockRefNotFound", { filePath, blockId });
 	}
-	return null;
+	const cache = app.metadataCache.getCache(filePath);
+	if (cache?.blocks?.[normalizedBlockId]) {
+		return null;
+	}
+	return i18n.t("irAddTarget.parser.blockRefNotFound", {
+		filePath,
+		blockId: normalizedBlockId,
+	});
+}
+
+/**
+ * True when markdown source already contains an Obsidian block id marker.
+ * Used when metadataCache lags behind a freshly written `^blockId`.
+ */
+export function markdownContentHasObsidianBlockId(
+	content: string,
+	blockId: string,
+): boolean {
+	const normalizedBlockId = normalizeObsidianBlockId(blockId);
+	if (!normalizedBlockId) {
+		return false;
+	}
+	const lines = String(content || "").split(/\r\n|\n|\r/);
+	for (const line of lines) {
+		const match = String(line || "").match(OBSIDIAN_BLOCK_ID_LINE_REGEX);
+		if (match?.[1] === normalizedBlockId) {
+			return true;
+		}
+		// Prefer end-of-line markers (Obsidian standard), but also accept mid-line.
+		const trimmed = String(line || "").trimEnd();
+		if (
+			trimmed === `^${normalizedBlockId}` ||
+			trimmed.endsWith(` ^${normalizedBlockId}`)
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Cache-first block validation with vault content fallback.
+ * Freshly inserted block ids are often missing from metadataCache for a short window.
+ */
+export async function resolveVaultBlockValidationError(
+	app: App,
+	filePath: string,
+	blockId: string,
+): Promise<string | null> {
+	const cacheError = validateVaultBlock(app, filePath, blockId);
+	if (!cacheError) {
+		return null;
+	}
+
+	const normalizedPath = normalizePath(String(filePath || "").trim());
+	const file = app.vault.getAbstractFileByPath(normalizedPath);
+	if (!file) {
+		return cacheError;
+	}
+
+	try {
+		if (!(file instanceof TFile)) {
+			return cacheError;
+		}
+		const content = await app.vault.cachedRead(file);
+		if (markdownContentHasObsidianBlockId(content, blockId)) {
+			return null;
+		}
+	} catch {
+		return cacheError;
+	}
+	return cacheError;
+}
+
+/** Re-check vault-block targets when metadataCache has not indexed a fresh ^id yet. */
+export async function refineParsedReadingTargetValidation(
+	app: App,
+	target: ParsedReadingTarget,
+): Promise<ParsedReadingTarget> {
+	if (
+		target.kind !== "vault-block" ||
+		!target.validationError ||
+		!target.sourceFilePath ||
+		!target.blockId
+	) {
+		return target;
+	}
+
+	const error = await resolveVaultBlockValidationError(
+		app,
+		target.sourceFilePath,
+		target.blockId,
+	);
+	if (error) {
+		return {
+			...target,
+			validationError: error,
+		};
+	}
+	return {
+		...target,
+		validationError: undefined,
+	};
 }
 
 export function parseReadingTargetInput(
@@ -229,6 +352,18 @@ export function parseReadingTargetInput(
 			rawInput: raw,
 			resumeLink: raw,
 			webUrl: raw,
+		};
+	}
+
+	const markdownHttp = parseMarkdownHttpLink(raw);
+	if (markdownHttp) {
+		return {
+			kind: "web",
+			rawInput: raw,
+			resumeLink: markdownHttp.url,
+			webUrl: markdownHttp.url,
+			titleHint: markdownHttp.title,
+			alias: markdownHttp.title,
 		};
 	}
 
@@ -308,6 +443,26 @@ export function parseReadingTargetInput(
 			sourceFilePath: resolvedPath,
 			validationError: i18n.t("irAddTarget.parser.epubCfiRequired"),
 		};
+	}
+
+	if (/\.canvas$/i.test(resolvedPath)) {
+		const canvasNode = parseCanvasNodeFragment(parsed.fragment);
+		if (!canvasNode) {
+			return {
+				kind: "unknown",
+				rawInput: raw,
+				resumeLink: resolvedPath,
+				sourceFilePath: resolvedPath,
+				validationError: i18n.t("irAddTarget.parser.canvasNodeRequired"),
+			};
+		}
+		return buildCanvasParsedReadingTarget({
+			rawInput: raw,
+			sourceFilePath: resolvedPath,
+			nodeId: canvasNode.nodeId,
+			fragmentWithQuery: canvasNode.fragmentWithQuery,
+			alias: parsed.alias,
+		});
 	}
 
 	const resumeLink = parsed.blockId
