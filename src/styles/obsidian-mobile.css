@@ -377,15 +377,6 @@ body.is-phone .weave-settings .row {
    min-width: 0;
  }
 
- body.is-phone .weave-settings .row.row-has-modern-switch .modern-switch {
-   align-self: center;
- }
-
- body.is-phone .weave-settings .row.row-has-desc.row-has-modern-switch .modern-switch {
-   align-self: flex-start;
-   margin-top: 2px;
- }
-
 body.is-phone .weave-settings .setting-item-info,
 body.is-phone .weave-settings .label-with-desc {
   width: 100%;
@@ -428,23 +419,6 @@ body.is-phone .weave-settings .row input[type="number"] {
    margin-left: 12px;
  }
 
-body.is-phone .weave-settings .modern-switch {
-  width: 44px;
-}
-
-/* 📱 手机端：滑动条数值靠右对齐 */
-body.is-phone .weave-settings .slider-container {
-  width: 100%;
-  max-width: none;
-  justify-content: flex-end;
-}
-
-body.is-phone .weave-settings .slider-container .slider-value {
-  min-width: 50px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
 body.is-phone .weave-settings .group-title {
   font-size: 0.9375rem;
 }
@@ -461,16 +435,6 @@ body.is-phone .standalone-ir-settings-root .group-description {
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
-}
-
-body.is-phone .standalone-ir-settings-root .standalone-ir-premium-preview-setting-row {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-body.is-phone .standalone-ir-settings-root .standalone-ir-premium-preview-setting-row .modern-switch {
-  align-self: flex-end;
 }
 
 body.is-phone .standalone-ir-settings-root .standalone-ir-storage-row {

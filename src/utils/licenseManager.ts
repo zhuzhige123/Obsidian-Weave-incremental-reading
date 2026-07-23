@@ -136,27 +136,35 @@ export class LicenseManager {
 			// 移除 vault.adapter.path，避免路径变化触发设备变更
 		}
 
-		// 系统信息（如果可用）
-		try {
-			const os = window.require?.("os");
-			if (os) {
-				components.push(os.platform?.() || "unknown");
-				components.push(os.arch?.() || "unknown");
-				components.push(os.hostname?.() || "unknown");
-			}
-		} catch {
-			components.push("no-os-info");
+		// 平台信息：只用 Obsidian Platform API，禁止 Node/Electron require("os")
+		components.push(Platform.isDesktopApp ? "desktop" : "mobile");
+		if (Platform.isMacOS) {
+			components.push("macos");
+		} else if (Platform.isWin) {
+			components.push("windows");
+		} else if (Platform.isLinux) {
+			components.push("linux");
+		} else if (Platform.isIosApp) {
+			components.push("ios");
+		} else if (Platform.isAndroidApp) {
+			components.push("android");
+		} else {
+			components.push("unknown-os");
 		}
 
 		// Canvas指纹（轻量级）
 		try {
-			const canvas = activeDocument.createElement("canvas");
-			const ctx = canvas.getContext("2d");
-			if (ctx) {
-				ctx.textBaseline = "top";
-				ctx.font = "14px Arial";
-				ctx.fillText("Weave Device Fingerprint", 2, 2);
-				components.push(canvas.toDataURL().substring(0, 50));
+			const canvas = activeDocument.body.createEl("canvas");
+			try {
+				const ctx = canvas.getContext("2d");
+				if (ctx) {
+					ctx.textBaseline = "top";
+					ctx.font = "14px Arial";
+					ctx.fillText("Weave Device Fingerprint", 2, 2);
+					components.push(canvas.toDataURL().substring(0, 50));
+				}
+			} finally {
+				canvas.remove();
 			}
 		} catch {
 			components.push("no-canvas");
@@ -164,15 +172,21 @@ export class LicenseManager {
 
 		// WebGL信息（如果可用）
 		try {
-			const canvas = activeDocument.createElement("canvas");
-			const gl = canvas.getContext("webgl");
-			if (gl) {
-				const renderer = gl.getParameter(gl.RENDERER) as unknown;
-				const vendor = gl.getParameter(gl.VENDOR) as unknown;
-				components.push(
-					typeof renderer === "string" ? renderer : "unknown-renderer",
-				);
-				components.push(typeof vendor === "string" ? vendor : "unknown-vendor");
+			const canvas = activeDocument.body.createEl("canvas");
+			try {
+				const gl = canvas.getContext("webgl");
+				if (gl) {
+					const renderer = gl.getParameter(gl.RENDERER) as unknown;
+					const vendor = gl.getParameter(gl.VENDOR) as unknown;
+					components.push(
+						typeof renderer === "string" ? renderer : "unknown-renderer",
+					);
+					components.push(
+						typeof vendor === "string" ? vendor : "unknown-vendor",
+					);
+				}
+			} finally {
+				canvas.remove();
 			}
 		} catch {
 			components.push("no-webgl");

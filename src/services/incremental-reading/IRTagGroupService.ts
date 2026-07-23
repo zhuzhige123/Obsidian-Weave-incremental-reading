@@ -19,7 +19,6 @@ import type {
 	IRDocumentGroupMap,
 	IRDocumentGroupMapStore,
 	IRTagGroup,
-	IRTagGroupMatchSource,
 	IRTagGroupProfile,
 	IRTagGroupProfilesStore,
 	IRTagGroupsStore,
@@ -31,11 +30,26 @@ import {
 	IR_STORAGE_VERSION,
 } from "../../types/ir-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
+import { readIncrementalReadingSettings } from "../../utils/ir-plugin-host-access";
 import { logger } from "../../utils/logger";
+import { readString } from "../../utils/unknown-record";
 import {
 	IRPointStorageService,
 	getSharedIRPointStorageService,
 } from "./IRPointStorageService";
+import {
+	readTagsFromFrontmatterRecord,
+	resolveMarkdownTagsYamlKeyFromSettings,
+} from "./ir-tag-source-policy";
+import {
+	matchTagGroupByTags,
+	normalizeTagGroupCandidateTags,
+} from "./ir-tag-group-match";
+
+export {
+	matchTagGroupByTags,
+	normalizeTagGroupCandidateTags,
+} from "./ir-tag-group-match";
 
 // ============================================
 // 存储路径常量
@@ -101,45 +115,9 @@ export function computeTagGroupPriorityBias(
 	return Math.round(normalizedDelta * maxBias * confidence * 100) / 100;
 }
 
-export function normalizeTagGroupCandidateTags(tags: string[]): string[] {
-	const ordered = new Map<string, string>();
-	for (const rawTag of Array.isArray(tags) ? tags : []) {
-		const normalized = String(rawTag || "")
-			.trim()
-			.replace(/^#/, "")
-			.toLowerCase();
-		if (!normalized || ordered.has(normalized)) continue;
-		ordered.set(normalized, normalized);
-	}
-	return Array.from(ordered.values());
-}
-
-export function matchTagGroupByTags(
-	groups: Pick<IRTagGroup, "id" | "matchAnyTags" | "matchPriority">[],
-	tags: string[],
-): string {
-	const normalizedTags = normalizeTagGroupCandidateTags(tags);
-	if (normalizedTags.length === 0) {
-		return "default";
-	}
-
-	const normalizedSet = new Set(normalizedTags);
-	const sortedGroups = [...groups]
-		.filter((group) => group.id !== "default")
-		.sort((a, b) => (a.matchPriority ?? 0) - (b.matchPriority ?? 0));
-
-	for (const group of sortedGroups) {
-		const groupTags = normalizeTagGroupCandidateTags(group.matchAnyTags || []);
-		if (groupTags.some((tag) => normalizedSet.has(tag))) {
-			return group.id;
-		}
-	}
-
-	return "default";
-}
-
 // ============================================
-// IRTagGroupService 绫?// ============================================
+// IRTagGroupService
+// ============================================
 
 export class IRTagGroupService {
 	private app: App;
@@ -152,6 +130,13 @@ export class IRTagGroupService {
 	private groupScopeCache: Record<string, string[]> = {};
 	private deckScopesCache: IRTagGroupDeckScope[] = [];
 	private pointStorageService: IRPointStorageService | null = null;
+	private autoMatchedTopicsCache: {
+		fingerprint: string;
+		byGroupId: Record<
+			string,
+			Array<{ topicId: string; topicName: string; matchedPointCount: number }>
+		>;
+	} | null = null;
 
 	constructor(app: App) {
 		this.app = app;
@@ -264,6 +249,12 @@ export class IRTagGroupService {
 		}
 	}
 
+	/** Reload topic catalog from live `.irdeck` files (after first init). */
+	async refreshCatalog(): Promise<void> {
+		await this.initialize();
+		await this.loadDeckBackedCatalog();
+	}
+
 	private async doInitialize(): Promise<void> {
 		try {
 			const adapter = this.app.vault.adapter;
@@ -292,19 +283,15 @@ export class IRTagGroupService {
 
 	private cloneGroup(group: IRTagGroup): IRTagGroup {
 		return {
-			...group,
+			id: group.id,
+			name: group.name,
+			description: group.description,
 			matchAnyTags: Array.isArray(group.matchAnyTags)
 				? [...group.matchAnyTags]
 				: [],
-			matchSource: group.matchSource
-				? {
-						yamlTags: group.matchSource.yamlTags !== false,
-						inlineTags: group.matchSource.inlineTags !== false,
-						customProperties: Array.isArray(group.matchSource.customProperties)
-							? [...group.matchSource.customProperties]
-							: [],
-				  }
-				: undefined,
+			matchPriority: group.matchPriority,
+			createdAt: group.createdAt,
+			updatedAt: group.updatedAt,
 		};
 	}
 
@@ -729,24 +716,135 @@ export class IRTagGroupService {
 
 	async getGroupScopeTopicIds(groupId: string): Promise<string[]> {
 		await this.initialize();
-		return [...(this.groupScopeCache[String(groupId || "").trim()] || [])];
+		// Tag groups are global: scope is always all topics that hold the catalog.
+		void groupId;
+		return this.resolveAllTopicIds();
+	}
+
+	/**
+	 * Per-topic auto-match summary for settings UI (read-only).
+	 * Counts points whose `metadata.tagGroupId` equals the group.
+	 * Rebuilds all groups in one catalog pass and caches until catalog/groups change.
+	 */
+	async getAutoMatchedTopicResults(
+		groupId: string,
+	): Promise<
+		Array<{ topicId: string; topicName: string; matchedPointCount: number }>
+	> {
+		await this.initialize();
+		const normalizedGroupId = String(groupId || "").trim() || DEFAULT_TAG_GROUP.id;
+		const catalog = await this.getPointStorageService().listPointFileCatalogEntries();
+		const fingerprint = [
+			Object.keys(this.groupsCache).sort().join(","),
+			...catalog.map((entry) => {
+				const updatedAt = String(entry.fileData?.updatedAt || "").trim();
+				const pointCount = Array.isArray(entry.fileData?.points)
+					? entry.fileData.points.length
+					: 0;
+				return `${entry.topicId}:${updatedAt}:${pointCount}`;
+			}),
+		].join("|");
+
+		if (
+			!this.autoMatchedTopicsCache ||
+			this.autoMatchedTopicsCache.fingerprint !== fingerprint
+		) {
+			const byGroupId: Record<
+				string,
+				Array<{ topicId: string; topicName: string; matchedPointCount: number }>
+			> = {};
+			const seedRows = (): Array<{
+				topicId: string;
+				topicName: string;
+				matchedPointCount: number;
+			}> =>
+				this.deckScopesCache.map((scope) => ({
+					topicId: scope.topicId,
+					topicName: scope.topicName,
+					matchedPointCount: 0,
+				}));
+
+			for (const id of Object.keys(this.groupsCache)) {
+				byGroupId[id] = seedRows();
+			}
+			if (!byGroupId[DEFAULT_TAG_GROUP.id]) {
+				byGroupId[DEFAULT_TAG_GROUP.id] = seedRows();
+			}
+
+			const indexByTopic = new Map<
+				string,
+				Map<string, { topicId: string; topicName: string; matchedPointCount: number }>
+			>();
+			for (const [gid, rows] of Object.entries(byGroupId)) {
+				const topicMap = new Map(
+					rows.map((row) => [row.topicId, row] as const),
+				);
+				indexByTopic.set(gid, topicMap);
+			}
+
+			for (const entry of catalog) {
+				const topicId = String(entry.topicId || "").trim();
+				if (!topicId) continue;
+				const topicName =
+					String(entry.topicName || entry.fileData?.topicName || "").trim() ||
+					topicId;
+				for (const point of entry.fileData?.points || []) {
+					const pointGroupId =
+						readString(point?.metadata?.tagGroupId) || DEFAULT_TAG_GROUP.id;
+					let topicMap = indexByTopic.get(pointGroupId);
+					if (!topicMap) {
+						byGroupId[pointGroupId] = seedRows();
+						topicMap = new Map(
+							byGroupId[pointGroupId].map((row) => [row.topicId, row] as const),
+						);
+						indexByTopic.set(pointGroupId, topicMap);
+					}
+					let row = topicMap.get(topicId);
+					if (!row) {
+						row = { topicId, topicName, matchedPointCount: 0 };
+						topicMap.set(topicId, row);
+						byGroupId[pointGroupId].push(row);
+					}
+					row.matchedPointCount += 1;
+					if (!row.topicName) {
+						row.topicName = topicName;
+					}
+				}
+			}
+
+			for (const rows of Object.values(byGroupId)) {
+				rows.sort((a, b) => a.topicName.localeCompare(b.topicName, "zh-CN"));
+			}
+			this.autoMatchedTopicsCache = { fingerprint, byGroupId };
+		}
+
+		const cached = this.autoMatchedTopicsCache.byGroupId[normalizedGroupId];
+		if (cached) {
+			return cached.map((row) => ({ ...row }));
+		}
+		return this.deckScopesCache
+			.map((scope) => ({
+				topicId: scope.topicId,
+				topicName: scope.topicName,
+				matchedPointCount: 0,
+			}))
+			.sort((a, b) => a.topicName.localeCompare(b.topicName, "zh-CN"));
+	}
+
+	/** Always fan-out to every topic file — tag groups are global. */
+	private resolveAllTopicIds(): string[] {
+		return this.deckScopesCache
+			.map((scope) => String(scope.topicId || "").trim())
+			.filter(Boolean);
 	}
 
 	private resolveTargetTopicIds(
-		groupId: string,
-		targetTopicIds?: string[],
+		_groupId: string,
+		_targetTopicIds?: string[],
 	): string[] {
-		const explicit = (targetTopicIds || [])
-			.map((value) => String(value || "").trim())
-			.filter(Boolean);
-		if (explicit.length > 0) {
-			return Array.from(new Set(explicit));
-		}
-		const scoped = this.groupScopeCache[String(groupId || "").trim()] || [];
-		if (scoped.length > 0) {
-			return [...scoped];
-		}
-		return this.deckScopesCache.map((scope) => scope.topicId);
+		void _groupId;
+		void _targetTopicIds;
+		return this.resolveAllTopicIds();
 	}
 
 	async createGroup(
@@ -757,6 +855,8 @@ export class IRTagGroupService {
 		options: { targetTopicIds?: string[] } = {},
 	): Promise<IRTagGroup> {
 		await this.initialize();
+		await this.refreshCatalog();
+		void options;
 		const id = `group_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
 		const now = new Date().toISOString();
 		const group: IRTagGroup = {
@@ -768,11 +868,7 @@ export class IRTagGroupService {
 			createdAt: now,
 			updatedAt: now,
 		};
-		const targetTopicIds = this.resolveTargetTopicIds(
-			group.id,
-			options.targetTopicIds,
-		);
-		if (targetTopicIds.length === 0) {
+		if (this.resolveAllTopicIds().length === 0) {
 			throw new Error("当前没有可写入的 .irdeck 专题文件");
 		}
 
@@ -781,60 +877,77 @@ export class IRTagGroupService {
 			groupId: id,
 			updatedAt: now,
 		};
-		await this.getPointStorageService().mergeTagGroupCatalogIntoPointFiles({
-			groups: {
-				[id]: group,
-			},
-			profiles: {
-				[id]: profile,
-			},
-			targetTopicIds,
-		});
+		const affectedTopicIds =
+			await this.getPointStorageService().mergeTagGroupCatalogIntoPointFiles({
+				groups: {
+					[id]: group,
+				},
+				profiles: {
+					[id]: profile,
+				},
+			});
 		this.groupsCache[id] = this.cloneGroup(group);
 		this.profilesCache[id] = this.cloneProfile(profile);
-		this.groupScopeCache[id] = [...targetTopicIds].sort((a, b) =>
+		this.groupScopeCache[id] = [...affectedTopicIds].sort((a, b) =>
 			a.localeCompare(b, "zh-CN"),
 		);
+		this.autoMatchedTopicsCache = null;
 
 		return group;
 	}
 
 	async saveGroup(
 		group: IRTagGroup,
-		options: { targetTopicIds?: string[] } = {},
+		options: {
+			targetTopicIds?: string[];
+			profile?: IRTagGroupProfile;
+		} = {},
 	): Promise<{ affectedTopicIds: string[] }> {
 		await this.initialize();
-		const targetTopicIds = this.resolveTargetTopicIds(
-			group.id,
-			options.targetTopicIds,
-		);
-		if (targetTopicIds.length === 0) {
+		await this.refreshCatalog();
+		void options.targetTopicIds;
+		if (this.resolveAllTopicIds().length === 0) {
 			throw new Error("当前没有可写入的 .irdeck 专题文件");
 		}
-		const profile =
-			this.profilesCache[group.id] ||
-			this.cloneProfile({
-				...DEFAULT_TAG_GROUP_PROFILE,
-				groupId: group.id,
-			});
+		// Drop deprecated per-group matchSource; matching uses reading-point tags only.
+		const groupWithoutMatchSource: IRTagGroup = {
+			id: group.id,
+			name: group.name,
+			description: group.description,
+			matchAnyTags: Array.isArray(group.matchAnyTags)
+				? [...group.matchAnyTags]
+				: [],
+			matchPriority: group.matchPriority,
+			createdAt: group.createdAt,
+			updatedAt: group.updatedAt,
+		};
+		const profile = options.profile
+			? this.cloneProfile({
+					...options.profile,
+					groupId: group.id,
+			  })
+			: this.profilesCache[group.id] ||
+			  this.cloneProfile({
+					...DEFAULT_TAG_GROUP_PROFILE,
+					groupId: group.id,
+			  });
 		const affectedTopicIds =
 			await this.getPointStorageService().mergeTagGroupCatalogIntoPointFiles({
 				groups: {
-					[group.id]: group,
+					[group.id]: groupWithoutMatchSource,
 				},
 				profiles: {
 					[group.id]: profile,
 				},
-				targetTopicIds,
 			});
-		this.groupsCache[group.id] = this.cloneGroup(group);
+		this.groupsCache[group.id] = this.cloneGroup(groupWithoutMatchSource);
 		this.profilesCache[group.id] = this.cloneProfile(profile);
-		this.groupScopeCache[group.id] = [...targetTopicIds].sort((a, b) =>
+		this.groupScopeCache[group.id] = [...affectedTopicIds].sort((a, b) =>
 			a.localeCompare(b, "zh-CN"),
 		);
+		this.autoMatchedTopicsCache = null;
 		return {
-			affectedTopicIds:
-				affectedTopicIds.length > 0 ? affectedTopicIds : targetTopicIds,
+			affectedTopicIds,
 		};
 	}
 
@@ -862,52 +975,55 @@ export class IRTagGroupService {
 			return;
 		}
 
-		const currentScopeIds = new Set(this.groupScopeCache[groupId] || []);
-		const targetTopicIds = this.resolveTargetTopicIds(
-			groupId,
-			options?.targetTopicIds,
+		const remainingGroups = Object.values(this.groupsCache).filter(
+			(group) => group.id !== groupId,
 		);
+
 		const removedTopicIds = new Set(
 			await this.getPointStorageService().removeTagGroupFromPointFiles(
 				groupId,
-				targetTopicIds,
 			),
 		);
-		const remainingScopeIds = Array.from(currentScopeIds).filter(
-			(topicId) => !removedTopicIds.has(topicId),
-		);
+		void removedTopicIds;
 
-		if (remainingScopeIds.length === 0) {
-			for (const mapping of Object.values(this.documentMapCache)) {
-				if (mapping.groupId === groupId) {
-					mapping.groupId = "default";
-					mapping.updatedAt = new Date().toISOString();
-				}
+		for (const mapping of Object.values(this.documentMapCache)) {
+			if (mapping.groupId !== groupId) {
+				continue;
 			}
-			delete this.groupsCache[groupId];
-			delete this.profilesCache[groupId];
-			delete this.groupScopeCache[groupId];
-			await this.saveDocumentMap();
-		} else {
-			this.groupScopeCache[groupId] = remainingScopeIds.sort((a, b) =>
-				a.localeCompare(b, "zh-CN"),
+			mapping.groupId = matchTagGroupByTags(
+				remainingGroups,
+				mapping.tagsSnapshot || [],
 			);
+			mapping.updatedAt = new Date().toISOString();
 		}
+		delete this.groupsCache[groupId];
+		delete this.profilesCache[groupId];
+		delete this.groupScopeCache[groupId];
+		this.autoMatchedTopicsCache = null;
+		await this.saveDocumentMap();
 
-		// 只有在该标签组被全局移除时，才级联清理兼容层 chunk/source 残留 groupId
+		// 级联清理兼容层 chunk/source 残留 groupId（按剩余组重匹配）
 		if (
-			remainingScopeIds.length === 0 &&
 			options?.getAllChunkData &&
 			options?.saveChunkData
 		) {
 			try {
 				const allChunks = await options.getAllChunkData();
 				for (const chunk of Object.values(allChunks)) {
-					if (chunk?.meta?.tagGroup === groupId) {
-						chunk.meta.tagGroup = "default";
-						chunk.updatedAt = Date.now();
-						await options.saveChunkData(chunk);
+					if (chunk?.meta?.tagGroup !== groupId) {
+						continue;
 					}
+					const chunkTags = Array.isArray(
+						(chunk as { tags?: string[] }).tags,
+					)
+						? ((chunk as { tags?: string[] }).tags as string[])
+						: [];
+					chunk.meta.tagGroup = matchTagGroupByTags(
+						remainingGroups,
+						chunkTags,
+					);
+					chunk.updatedAt = Date.now();
+					await options.saveChunkData(chunk);
 				}
 			} catch (error) {
 				logger.warn(
@@ -916,19 +1032,17 @@ export class IRTagGroupService {
 				);
 			}
 		}
-		if (
-			remainingScopeIds.length === 0 &&
-			options?.getAllSources &&
-			options?.saveSource
-		) {
+		if (options?.getAllSources && options?.saveSource) {
 			try {
 				const allSources = await options.getAllSources();
 				for (const source of Object.values(allSources)) {
-					if (source?.tagGroup === groupId) {
-						source.tagGroup = "default";
-						source.updatedAt = Date.now();
-						await options.saveSource(source);
+					if (source?.tagGroup !== groupId) {
+						continue;
 					}
+					// Source meta has no tag list; rematch falls back to default.
+					source.tagGroup = matchTagGroupByTags(remainingGroups, []);
+					source.updatedAt = Date.now();
+					await options.saveSource(source);
 				}
 			} catch (error) {
 				logger.warn(
@@ -949,8 +1063,7 @@ export class IRTagGroupService {
 			groupId,
 		};
 		this.profilesCache[groupId] = created;
-		const targetTopicIds = this.resolveTargetTopicIds(groupId);
-		if (targetTopicIds.length > 0 && this.groupsCache[groupId]) {
+		if (this.resolveAllTopicIds().length > 0 && this.groupsCache[groupId]) {
 			await this.getPointStorageService().mergeTagGroupCatalogIntoPointFiles({
 				groups: {
 					[groupId]: this.groupsCache[groupId],
@@ -958,7 +1071,6 @@ export class IRTagGroupService {
 				profiles: {
 					[groupId]: created,
 				},
-				targetTopicIds,
 			});
 		}
 		return this.cloneProfile(created);
@@ -969,13 +1081,11 @@ export class IRTagGroupService {
 		options: { targetTopicIds?: string[] } = {},
 	): Promise<{ affectedTopicIds: string[] }> {
 		await this.initialize();
+		await this.refreshCatalog();
+		void options;
 		this.profilesCache[profile.groupId] = this.cloneProfile(profile);
 		const group = this.groupsCache[profile.groupId];
-		const targetTopicIds = this.resolveTargetTopicIds(
-			profile.groupId,
-			options.targetTopicIds,
-		);
-		if (!group || targetTopicIds.length === 0) {
+		if (!group || this.resolveAllTopicIds().length === 0) {
 			return { affectedTopicIds: [] };
 		}
 		const affectedTopicIds =
@@ -986,31 +1096,31 @@ export class IRTagGroupService {
 				profiles: {
 					[profile.groupId]: profile,
 				},
-				targetTopicIds,
 			});
-		this.groupScopeCache[profile.groupId] = [...targetTopicIds].sort((a, b) =>
+		this.groupScopeCache[profile.groupId] = [...affectedTopicIds].sort((a, b) =>
 			a.localeCompare(b, "zh-CN"),
 		);
 		return {
-			affectedTopicIds:
-				affectedTopicIds.length > 0 ? affectedTopicIds : targetTopicIds,
+			affectedTopicIds,
 		};
 	}
 
 	/**
-	 * 从阅读点 Markdown 文件中提取 weave_tags
+	 * 从阅读点 Markdown 文件 YAML 中提取标签（按全局 tagSource 策略）
 	 */
 	async extractTagsFromFile(filePath: string): Promise<string[]> {
 		return this.extractTagsWithSource(filePath);
 	}
 
 	/**
-	 * 兼容旧接口，但正式匹配来源已统一为阅读点标签 weave_tags
+	 * 兼容旧接口。`_matchSource` 已废弃：匹配只消费阅读点标签，
+	 * Markdown 标签来自全局 `tagSource.markdownYamlKey`（空时回退 weave_tags）。
 	 */
 	async extractTagsWithSource(
 		filePath: string,
-		_matchSource?: IRTagGroupMatchSource,
+		_matchSource?: unknown,
 	): Promise<string[]> {
+		void _matchSource;
 		try {
 			const file = this.app.vault.getAbstractFileByPath(filePath);
 			if (!(file instanceof TFile)) return [];
@@ -1018,21 +1128,12 @@ export class IRTagGroupService {
 			const cache = this.app.metadataCache.getFileCache(file);
 			const frontmatter =
 				(cache?.frontmatter as Record<string, unknown> | undefined) || {};
-			const rawValue = frontmatter.weave_tags;
-			if (Array.isArray(rawValue)) {
-				return normalizeTagGroupCandidateTags(
-					rawValue.map((tag) => String(tag)),
-				);
-			}
-			if (typeof rawValue === "string") {
-				return normalizeTagGroupCandidateTags(
-					rawValue
-						.split(",")
-						.map((tag) => tag.trim())
-						.filter(Boolean),
-				);
-			}
-			return [];
+			const yamlKey = resolveMarkdownTagsYamlKeyFromSettings(
+				readIncrementalReadingSettings(this.app),
+			);
+			return normalizeTagGroupCandidateTags(
+				readTagsFromFrontmatterRecord(frontmatter, yamlKey),
+			);
 		} catch (error) {
 			logger.debug(
 				`[IRTagGroupService] 提取阅读点标签失败: ${filePath}`,

@@ -7,6 +7,7 @@ import {
 	isLegacyBlockPointSnapshot,
 } from "./IRLegacyTaskCompatAdapter";
 import { getSharedIRPointStorageService } from "./IRPointStorageService";
+import { IRStorageService } from "./IRStorageService";
 
 export interface IRLegacyPointFormatScanResult {
 	legacyBlockCount: number;
@@ -112,6 +113,23 @@ export class IRLegacyPointUnificationService {
 		return result;
 	}
 
+	/**
+	 * 将单个 legacy-block 升级为 chunk-entry，并写回 chunk 调度存储，
+	 * 以便后续 pin / mutator 走 getChunkData 热路径。
+	 */
+	async upgradeLegacyBlockPointById(pointId: string): Promise<boolean> {
+		const normalizedId = String(pointId || "").trim();
+		if (!normalizedId) {
+			return false;
+		}
+		const pointStorage = getSharedIRPointStorageService(this.app);
+		const snapshot = await pointStorage.getPointSnapshotById(normalizedId);
+		if (!snapshot || !isLegacyBlockPointSnapshot(snapshot)) {
+			return false;
+		}
+		return this.upgradeLegacyBlockSnapshotToChunk(snapshot);
+	}
+
 	private async upgradeLegacyBlockSnapshotToChunk(
 		snapshot: IRPointSnapshot,
 	): Promise<boolean> {
@@ -199,6 +217,19 @@ export class IRLegacyPointUnificationService {
 				migratedAt: new Date().toISOString(),
 			},
 		});
+
+		try {
+			const storage = new IRStorageService(this.app);
+			await storage.initialize();
+			await storage.saveChunkData(chunk, {
+				skipScheduleCacheInvalidate: true,
+			});
+		} catch (error) {
+			logger.warn(
+				"[IRLegacyPointUnificationService] legacy→chunk 后写回 chunk 存储失败",
+				{ pointId, error },
+			);
+		}
 
 		return true;
 	}

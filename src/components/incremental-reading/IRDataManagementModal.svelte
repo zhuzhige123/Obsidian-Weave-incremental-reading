@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { Notice } from 'obsidian';
   import type WeavePlugin from '../../main';
   import { IRDeckDataManagementService } from '../../services/incremental-reading/IRDeckDataManagementService';
@@ -67,7 +67,7 @@
   let helpOpen = $state(false);
   let helpControlEl = $state<HTMLDivElement | undefined>(undefined);
 
-  const service = new IRDeckDataManagementService(plugin.app);
+  const service = untrack(() => new IRDeckDataManagementService(plugin.app));
 
   let dataMgmtTabs = $derived.by((): TabDefinition[] => {
     const vaultCount = scanResult?.vaultFiles.length ?? 0;
@@ -119,8 +119,8 @@
       }
     };
 
-    document.addEventListener('click', onDocumentClick, true);
-    return () => document.removeEventListener('click', onDocumentClick, true);
+    activeDocument.addEventListener('click', onDocumentClick, true);
+    return () => activeDocument.removeEventListener('click', onDocumentClick, true);
   });
 
   async function refreshScan(): Promise<void> {

@@ -61,6 +61,8 @@
     SCHEDULING_PRESET_KEYS,
     STRATEGY_OPTIONS
   } from './material-import/material-import-constants';
+  import { sortMaterialImportSelectedPaths } from './material-import/material-import-file-tree';
+  import { createMarkdownImportSequenceGroup } from './material-import/material-import-sequence';
   import {
     attachEpubItemContext,
     buildContentBlocksFromSelectedOutlineItems,
@@ -612,7 +614,7 @@
   async function goToSplitModeStep(paths: string[]): Promise<void> {
     if (paths.length === 0) return;
     
-    selectedFilePaths = paths;
+    selectedFilePaths = sortMaterialImportSelectedPaths(paths);
 
     const extensions = new Set<string>();
     for (const p of paths) {
@@ -834,6 +836,8 @@
     let errorCount = 0;
     let chunkCount = 0;
     let fallbackCursor = 0;
+    const sequenceGroup = createMarkdownImportSequenceGroup(filePaths);
+    let sequenceOrder = 0;
 
     for (let i = 0; i < filePaths.length; i++) {
       const filePath = filePaths[i];
@@ -888,8 +892,8 @@
 
           const dueAt = getReadingMaterialDueAt(material);
           const nextRepDate = dueAt ? new Date(dueAt).getTime() : undefined;
-          const materialOrder = createdMaterials.indexOf(material) + 1;
-          const sequenceMeta = buildSourceSequenceMeta(`md:${normalizePath(file.path)}`, materialOrder, nextRepDate);
+          sequenceOrder += 1;
+          const sequenceMeta = buildSourceSequenceMeta(sequenceGroup, sequenceOrder, nextRepDate);
           await ensureExternalDocumentChunkScheduled(
             createdFile,
             selectedDeckId,
@@ -927,6 +931,8 @@
     let successCount = 0;
     let errorCount = 0;
     let fallbackCursor = 0;
+    const sequenceGroup = createMarkdownImportSequenceGroup(filePaths);
+    let sequenceOrder = 0;
 
     for (let i = 0; i < filePaths.length; i++) {
       const filePath = filePaths[i];
@@ -961,12 +967,13 @@
           await materialManager.setNextReviewDate(material.uuid, assignedDate);
         }
 
+        sequenceOrder += 1;
         await ensureExternalDocumentChunkScheduled(
           file,
           selectedDeckId,
           selectedDeck.name,
           assignedDate?.getTime(),
-          buildSourceSequenceMeta(`md:${normalizePath(file.path)}`, 1, assignedDate?.getTime())
+          buildSourceSequenceMeta(sequenceGroup, sequenceOrder, assignedDate?.getTime())
         );
         successCount++;
       } catch (error) {
@@ -992,6 +999,8 @@
     let successCount = 0;
     let errorCount = 0;
     let fallbackCursor = 0;
+    const sequenceGroup = createMarkdownImportSequenceGroup(filePaths);
+    let sequenceOrder = 0;
 
     for (let i = 0; i < filePaths.length; i++) {
       const filePath = filePaths[i];
@@ -1028,12 +1037,13 @@
 
         const copiedFile = plugin.app.vault.getAbstractFileByPath(material.filePath);
         if (copiedFile instanceof TFile) {
+          sequenceOrder += 1;
           await ensureExternalDocumentChunkScheduled(
             copiedFile,
             selectedDeckId,
             selectedDeck.name,
             assignedDate?.getTime(),
-            buildSourceSequenceMeta(`md:${normalizePath(file.path)}`, 1, assignedDate?.getTime())
+            buildSourceSequenceMeta(sequenceGroup, sequenceOrder, assignedDate?.getTime())
           );
         }
 
@@ -1291,8 +1301,10 @@
   async function generateBatchPreview(): Promise<void> {
     try {
       const allBlocks: ImportContentBlock[] = [];
+      const orderedPaths = sortMaterialImportSelectedPaths(selectedFilePaths);
+      selectedFilePaths = orderedPaths;
 
-      for (const filePath of selectedFilePaths) {
+      for (const filePath of orderedPaths) {
         const file = plugin.app.vault.getAbstractFileByPath(filePath);
         if (file instanceof TFile) {
           const content = await plugin.app.vault.read(file);
@@ -1564,11 +1576,12 @@
       let errorCount = 0;
 
       if (mdFilePaths.length > 0) {
+        const orderedMdPaths = sortMaterialImportSelectedPaths(mdFilePaths);
         const mdResult = ruleSplitConfig.enableWholeFile
           ? wholeFileImportMode === 'reference'
-            ? await importWholeMdFilesByReference(mdFilePaths, assignments)
-            : await importWholeMdFilesAsCopies(mdFilePaths, assignments)
-          : await importMdFilesAsSourceDocuments(mdFilePaths, assignments);
+            ? await importWholeMdFilesByReference(orderedMdPaths, assignments)
+            : await importWholeMdFilesAsCopies(orderedMdPaths, assignments)
+          : await importMdFilesAsSourceDocuments(orderedMdPaths, assignments);
         successCount += mdResult.successCount;
         errorCount += mdResult.errorCount;
       }

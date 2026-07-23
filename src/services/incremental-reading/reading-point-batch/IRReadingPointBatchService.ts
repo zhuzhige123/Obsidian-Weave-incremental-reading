@@ -40,23 +40,26 @@ export class IRReadingPointBatchService {
 
 	async batchRemove(
 		materials: ScheduleItem[],
+		options?: { skipConfirm?: boolean },
 	): Promise<IRReadingPointBatchResult> {
 		const targets = dedupeMaterials(materials);
 		if (targets.length === 0) {
 			return emptyBatchResult();
 		}
 
-		const confirmed = await showObsidianConfirm(
-			this.app,
-			i18n.t("irSidebar.batch.confirmRemove", { count: targets.length }),
-			{
-				title: i18n.t("irSidebar.batch.removeTitle"),
-				confirmText: i18n.t("irSidebar.calendar.removeConfirm"),
-				confirmClass: "mod-warning",
-			},
-		);
-		if (!confirmed) {
-			return cancelledBatchResult(targets.length);
+		if (!options?.skipConfirm) {
+			const confirmed = await showObsidianConfirm(
+				this.app,
+				i18n.t("irSidebar.batch.confirmRemove", { count: targets.length }),
+				{
+					title: i18n.t("irSidebar.batch.removeTitle"),
+					confirmText: i18n.t("irSidebar.calendar.removeConfirm"),
+					confirmClass: "mod-warning",
+				},
+			);
+			if (!confirmed) {
+				return cancelledBatchResult(targets.length);
+			}
 		}
 
 		return await this.runDestructiveBatch(

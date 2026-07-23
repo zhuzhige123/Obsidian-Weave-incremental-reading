@@ -337,6 +337,7 @@ function mapLegacyBlockToProjectedItem(
 		scheduleStatus,
 		nextRepDate,
 		nextReviewDate: nextRepDate > 0 ? new Date(nextRepDate) : null,
+		committedNextRepDate: nextRepDate > 0 ? nextRepDate : undefined,
 		estimatedMinutes: estimateLegacyBlockMinutes(block, readingSecondsById),
 		deckId,
 		sourceType: "legacy-block",

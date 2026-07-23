@@ -10,15 +10,34 @@
     tags?: string[];
     disabled?: boolean;
     onTagsChange?: (tags: string[]) => void;
+    onDraftChange?: (draft: string) => void;
   }
 
-  let { app, tags = $bindable([]), disabled = false, onTagsChange }: Props = $props();
+  let {
+    app,
+    tags = $bindable([]),
+    disabled = false,
+    onTagsChange,
+    onDraftChange
+  }: Props = $props();
+
+  let tagInput = $state<{ commitPendingDraft?: () => void } | null>(null);
 
   $effect(() => {
     onTagsChange?.(tags);
   });
+
+  export function commitPendingDraft(): void {
+    tagInput?.commitPendingDraft?.();
+  }
 </script>
 
 <div class="reading-point-tags-prompt-panel">
-  <IRReadingPointTagInput {app} bind:tags {disabled} />
+  <IRReadingPointTagInput
+    bind:this={tagInput}
+    {app}
+    bind:tags
+    {disabled}
+    {onDraftChange}
+  />
 </div>

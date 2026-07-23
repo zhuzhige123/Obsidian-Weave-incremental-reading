@@ -7,14 +7,17 @@ vi.mock("obsidian", () => ({
 import {
 	getLinkableVaultNoteIcon,
 	isLinkableVaultNotePath,
+	isVaultNoteCarrierSourcePath,
+	resolveAssociatedNoteRelationMode,
 	resolveExternalBookmarkTaskKind,
+	supportsDerivedOutlinkNotesForScheduleItem,
 	supportsPointLinkedNotes,
 	supportsPointLinkedNotesForScheduleItem,
 	supportsPointLinkedNotesForSourcePath,
 } from "../IRLinkedNotePolicy";
 
 describe("IRLinkedNotePolicy", () => {
-	it("仅 PDF/EPUB 阅读点支持关联笔记", () => {
+	it("仅 PDF/EPUB 阅读点支持精选关联笔记写路径", () => {
 		expect(supportsPointLinkedNotes("pdf")).toBe(true);
 		expect(supportsPointLinkedNotes("epub")).toBe(true);
 		expect(supportsPointLinkedNotes("pdf-bookmark")).toBe(true);
@@ -76,5 +79,53 @@ describe("IRLinkedNotePolicy", () => {
 		expect(
 			resolveExternalBookmarkTaskKind({ sourceFile: "Books/demo.epub" }),
 		).toBe("epub");
+	});
+
+	it("按载体分流关联笔记关系模式", () => {
+		expect(isVaultNoteCarrierSourcePath("Notes/Topic.md")).toBe(true);
+		expect(isVaultNoteCarrierSourcePath("Boards/Map.canvas")).toBe(true);
+		expect(isVaultNoteCarrierSourcePath("Books/a.pdf")).toBe(false);
+
+		expect(
+			resolveAssociatedNoteRelationMode({
+				sourceType: "pdf",
+				sourceFile: "Books/a.pdf",
+			}),
+		).toBe("curated");
+		expect(
+			resolveAssociatedNoteRelationMode({
+				sourceType: "chunk",
+				sourceFile: "Notes/a.md",
+			}),
+		).toBe("derived-outlinks");
+		expect(
+			supportsDerivedOutlinkNotesForScheduleItem({
+				sourceType: "chunk",
+				sourceFile: "Notes/web-stub.md",
+			}),
+		).toBe(true);
+		expect(
+			supportsDerivedOutlinkNotesForScheduleItem({
+				sourceType: "chunk",
+			}),
+		).toBe(false);
+		expect(
+			supportsDerivedOutlinkNotesForScheduleItem({
+				sourceType: "chunk",
+				resumeLink: "https://example.com/article",
+			}),
+		).toBe(true);
+		expect(
+			supportsDerivedOutlinkNotesForScheduleItem({
+				sourceType: "pdf",
+				sourceFile: "Books/a.pdf",
+			}),
+		).toBe(false);
+		expect(
+			resolveAssociatedNoteRelationMode({
+				id: "unknown",
+				sourceFile: "Books/audio.mp3",
+			}),
+		).toBe("unavailable");
 	});
 });

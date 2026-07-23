@@ -36,6 +36,16 @@ export interface MaterialImportFileTreeHelpers {
 	clearCache: () => void;
 }
 
+/** 与导入树展示一致：按路径/文件名做自然语言排序（含数字序）。 */
+export function compareMaterialImportPaths(left: string, right: string): number {
+	return left.localeCompare(right, "zh-CN", { numeric: true });
+}
+
+/** 稳定导入顺序：勾选文件夹后不再依赖 vault.children / Set 插入顺序。 */
+export function sortMaterialImportSelectedPaths(paths: string[]): string[] {
+	return [...paths].sort(compareMaterialImportPaths);
+}
+
 export function createMaterialImportFileTreeHelpers(
 	app: App,
 	excludedImportFolderPath: string,
@@ -74,7 +84,7 @@ export function createMaterialImportFileTreeHelpers(
 	): MaterialImportTreeNode[] {
 		return nodes.sort((a, b) => {
 			if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-			return a.name.localeCompare(b.name, "zh-CN");
+			return compareMaterialImportPaths(a.name, b.name);
 		});
 	}
 
@@ -355,7 +365,7 @@ export function createMaterialImportFileTreeHelpers(
 			}
 		}
 		collect(nodes);
-		return Array.from(paths);
+		return sortMaterialImportSelectedPaths(Array.from(paths));
 	}
 
 	function getExplicitlySelectedFilePaths(

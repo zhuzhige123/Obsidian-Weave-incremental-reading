@@ -8,6 +8,9 @@
   import FolderSearchInput from '../../ui/FolderSearchInput.svelte';
   import ObsidianDropdown from '../../ui/ObsidianDropdown.svelte';
   import ObsidianIcon from '../../ui/ObsidianIcon.svelte';
+  import ObsidianSettingToggle from '../components/ObsidianSettingToggle.svelte';
+  import ObsidianSettingSlider from '../components/ObsidianSettingSlider.svelte';
+  import ObsidianSettingDropdown from '../components/ObsidianSettingDropdown.svelte';
 
   type ScheduleModeOption = { id: string; label: string; desc: string };
   type SubscriptionDeckOption = { id: string; label: string; description: string };
@@ -28,10 +31,10 @@
       folderPath: string
     ) => Promise<void>;
     handleFolderSubscriptionDeckChange: (ruleId: string, value: string) => Promise<void>;
-    handleFolderSubscriptionEnabledChange: (ruleId: string, event: Event) => Promise<void>;
+    handleFolderSubscriptionEnabledChange: (ruleId: string, enabled: boolean) => Promise<void>;
     removeFolderSubscriptionRule: (ruleId: string) => Promise<void>;
     handleFolderSubscriptionInitialScheduleModeChange: (value: string) => Promise<void>;
-    handleFolderSubscriptionImportConfirmThresholdChange: (event: Event) => void;
+    handleFolderSubscriptionImportConfirmThresholdChange: (value: number) => void;
     showTitle?: boolean;
     titleText?: string;
     addRuleLabel?: string;
@@ -62,6 +65,9 @@
   }: Props = $props();
 
   let t = $derived($tr);
+  const scheduleModeDropdownOptions = $derived(
+    initialScheduleModeOptions.map((opt) => ({ id: opt.id, label: opt.label })),
+  );
 </script>
 
 {#if showSection}
@@ -122,14 +128,13 @@
 
             <div class="subscription-rules-cell subscription-rules-cell-enabled-only">
               <div class="subscription-rules-mobile-label">{t('irSettings.autoSubscribeTableEnabledHeader')}</div>
-              <label class="modern-switch">
-                <input
-                  type="checkbox"
-                  checked={rule.enabled ?? false}
-                  onchange={(event) => void handleFolderSubscriptionEnabledChange(String(rule.id || ''), event)}
-                />
-                <span class="switch-slider"></span>
-              </label>
+              <ObsidianSettingToggle
+                compact
+                value={rule.enabled ?? false}
+                onChange={(enabled) => {
+                  void handleFolderSubscriptionEnabledChange(String(rule.id || ''), enabled);
+                }}
+              />
             </div>
 
             <div class="subscription-rules-cell subscription-rules-cell-delete">
@@ -149,80 +154,36 @@
       {/if}
     </div>
 
-    <div class="row">
-      <div class="label-with-desc">
-        <label for="irFolderSubscriptionInitialScheduleMode">{initialScheduleLabel ?? t('irSettings.autoSubscribeInitialScheduleLabel')}</label>
-        <p class="desc">{t('irSettings.autoSubscribeInitialScheduleDesc')}</p>
-      </div>
-      <div class="ir-dropdown-compact">
-        <ObsidianDropdown
-          options={initialScheduleModeOptions.map((opt) => ({ id: opt.id, label: opt.label, description: opt.desc }))}
-          value={getFolderSubscriptionInitialScheduleMode()}
-          onchange={(value) => {
-            void handleFolderSubscriptionInitialScheduleModeChange(value);
-          }}
-        />
-      </div>
-    </div>
+    <ObsidianSettingDropdown
+      name={initialScheduleLabel ?? t('irSettings.autoSubscribeInitialScheduleLabel')}
+      desc={t('irSettings.autoSubscribeInitialScheduleDesc')}
+      options={scheduleModeDropdownOptions}
+      value={getFolderSubscriptionInitialScheduleMode()}
+      onChange={(value) => {
+        void handleFolderSubscriptionInitialScheduleModeChange(value);
+      }}
+    />
 
-    <div class="row">
-      <div class="label-with-desc">
-        <label for="irFolderSubscriptionImportConfirmThreshold">{confirmThresholdLabel ?? t('irSettings.autoSubscribeConfirmThresholdLabel')}</label>
-        <p class="desc">{t('irSettings.autoSubscribeConfirmThresholdDesc')}</p>
-      </div>
-      <div class="slider-container">
-        <input
-          id="irFolderSubscriptionImportConfirmThreshold"
-          type="range"
-          min="0"
-          max="200"
-          step="5"
-          value={getFolderSubscriptionImportConfirmThreshold()}
-          class="modern-slider"
-          oninput={handleFolderSubscriptionImportConfirmThresholdChange}
-        />
-        <span class="slider-value">{getFolderSubscriptionImportConfirmThreshold()}</span>
-      </div>
-    </div>
+    <ObsidianSettingSlider
+      name={confirmThresholdLabel ?? t('irSettings.autoSubscribeConfirmThresholdLabel')}
+      desc={t('irSettings.autoSubscribeConfirmThresholdDesc')}
+      min={0}
+      max={200}
+      step={5}
+      value={getFolderSubscriptionImportConfirmThreshold()}
+      onChange={handleFolderSubscriptionImportConfirmThresholdChange}
+      formatValue={(value) => String(value)}
+    />
   </div>
 </div>
 {/if}
 
 <style>
-  .label-with-desc {
-    display: flex;
-    flex-direction: column;
-    gap: var(--size-4-1);
-    min-width: 0;
-  }
-
   .group-description {
     margin: 0;
     font-size: var(--ir-font-desc, var(--font-ui-smaller));
     color: var(--text-muted);
     line-height: var(--line-height-normal);
-  }
-
-  .label-with-desc > label {
-    margin: 0;
-    font-size: var(--ir-font-label, var(--font-ui-small));
-    font-weight: 600;
-    line-height: var(--line-height-tight);
-    color: var(--text-normal);
-  }
-
-  .label-with-desc > .desc {
-    margin: 0;
-    font-size: var(--ir-font-desc, var(--font-ui-smaller));
-    line-height: var(--line-height-normal);
-    color: var(--text-muted);
-  }
-
-  .ir-dropdown-compact {
-    flex: 0 0 220px;
-    width: 220px;
-    max-width: 100%;
-    margin-left: auto;
   }
 
   .subscription-rules-toolbar {
@@ -332,22 +293,15 @@
     color: var(--text-error);
   }
 
-  :global(.accent-blue) {
+  :global(.weave-settings .accent-blue) {
     --accent-color: #3b82f6;
   }
 
-  :global(.with-accent-bar.accent-blue::before) {
+  :global(.weave-settings .with-accent-bar.accent-blue::before) {
     background: linear-gradient(180deg, #3b82f6, #2563eb);
   }
 
   @media (max-width: 768px) {
-    .ir-dropdown-compact {
-      flex: 1 1 auto;
-      width: 100%;
-      max-width: 100%;
-      margin-left: 0;
-    }
-
     .subscription-rules-toolbar {
       align-items: stretch;
       flex-direction: column;

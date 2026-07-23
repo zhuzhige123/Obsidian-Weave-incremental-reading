@@ -1,3 +1,4 @@
+import { readOptionalString } from "../../utils/unknown-record";
 import { isHttpUrl } from "../obsidian/obsidian-open-web-url";
 import type { IRTraceSourceKind } from "./IRSourceTraceStats";
 import { isEpubBookmarkTaskId } from "./IREpubBookmarkTaskService";
@@ -168,8 +169,8 @@ export function resolveAnalyticsMaterialWebUrl(
 	if (!meta) {
 		return undefined;
 	}
-	const webUrl = String(meta[IR_WEB_CHUNK_META_URL_KEY] || "").trim();
-	return isHttpUrl(webUrl) ? webUrl : undefined;
+	const webUrl = readOptionalString(meta[IR_WEB_CHUNK_META_URL_KEY]);
+	return webUrl && isHttpUrl(webUrl) ? webUrl : undefined;
 }
 
 export function buildAnalyticsMaterialTypeBreakdown(input: {

@@ -11,6 +11,10 @@ import {
 	DEFAULT_IR_BLOCK_STATS,
 } from "../../types/ir-types";
 import { getTaskTopicId } from "../../utils/ir-topic-compat";
+import {
+	remapEmbeddedVaultPathInText,
+	remapVaultPath,
+} from "../../utils/ir-vault-path-remap";
 import { logger } from "../../utils/logger";
 import { resolveAssociatedNotePaths } from "./IRAssociatedNoteSignals";
 import {
@@ -363,6 +367,52 @@ export class IRPdfBookmarkTaskService {
 		};
 
 		return await this.persistTask(updated);
+	}
+
+	async updatePdfFileReferences(
+		oldPath: string,
+		newPath: string,
+	): Promise<number> {
+		const normalizedOldPath = normalizePath(String(oldPath || "").trim());
+		const normalizedNewPath = normalizePath(String(newPath || "").trim());
+		if (
+			!normalizedOldPath ||
+			!normalizedNewPath ||
+			normalizedOldPath === normalizedNewPath
+		) {
+			return 0;
+		}
+
+		const tasks = await this.getAllTasks();
+		let updatedCount = 0;
+		for (const task of tasks) {
+			const remappedPath = remapVaultPath(
+				task.pdfPath,
+				normalizedOldPath,
+				normalizedNewPath,
+			);
+			const remappedLink = remapEmbeddedVaultPathInText(
+				task.link,
+				normalizedOldPath,
+				normalizedNewPath,
+			);
+			if (
+				(!remappedPath || remappedPath === task.pdfPath) &&
+				remappedLink === task.link
+			) {
+				continue;
+			}
+
+			await this.persistTask({
+				...task,
+				pdfPath: remappedPath || task.pdfPath,
+				link: remappedLink,
+				updatedAt: Date.now(),
+			});
+			updatedCount += 1;
+		}
+
+		return updatedCount;
 	}
 
 	async updateTaskFromBlock(

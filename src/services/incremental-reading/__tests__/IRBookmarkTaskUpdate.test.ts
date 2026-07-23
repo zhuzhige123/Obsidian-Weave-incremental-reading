@@ -18,7 +18,7 @@ vi.mock("../../../config/paths", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../../../config/paths")>();
 	return {
 		...actual,
-		getReadableWeaveRoot: () => "weave",
+		getReadableWeaveRoot: () => "weave Incremental reading",
 		normalizeWeaveParentFolder: (value?: string) => value?.trim?.() || "",
 		getPluginPaths: () => ({
 			state: {

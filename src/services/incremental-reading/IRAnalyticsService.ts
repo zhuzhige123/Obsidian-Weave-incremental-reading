@@ -1185,7 +1185,8 @@ export class IRAnalyticsService {
 			});
 			const chunkMeta = (chunk.meta || {}) as unknown as Record<string, unknown>;
 			const resumeLink =
-				String(chunkMeta.resumeLink || material?.resumeLink || "").trim() ||
+				readString(chunkMeta.resumeLink) ||
+				readString(material?.resumeLink) ||
 				undefined;
 			const webUrl = resolveAnalyticsMaterialWebUrl(chunkMeta);
 			units.push({

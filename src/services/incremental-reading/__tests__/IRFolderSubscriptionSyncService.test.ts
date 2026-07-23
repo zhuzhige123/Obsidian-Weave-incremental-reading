@@ -130,6 +130,46 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 		]);
 	});
 
+	it("扫描结果不包含订阅文件夹内的图片等非 Markdown 文件", async () => {
+		const app = new App();
+		const article = new TFile("Inbox/Subscribed/article.md");
+		const image = new TFile("Inbox/Subscribed/cover.png");
+		const pdf = new TFile("Inbox/Subscribed/slides.pdf");
+
+		const subscribedFolder = buildFolder("Inbox/Subscribed", [
+			article,
+			image,
+			pdf,
+		]);
+		app.vault.getAbstractFileByPath.mockImplementation((path: string) => {
+			if (path === "Inbox/Subscribed") return subscribedFolder;
+			return null;
+		});
+
+		const result = await scanIncrementalReadingFolderSubscriptions({
+			app: app as any,
+			settings: {
+				rules: [
+					{
+						id: "rule-1",
+						enabled: true,
+						folderPath: "Inbox/Subscribed",
+						deckId: "deck-1",
+					},
+				],
+			},
+			existingChunks: [],
+			existingMaterials: [],
+			deckNameById: { "deck-1": "专题 A" },
+		});
+
+		expect(result.scannedMarkdownCount).toBe(1);
+		expect(result.pendingCount).toBe(1);
+		expect(result.candidates.map((entry) => entry.file.path)).toEqual([
+			"Inbox/Subscribed/article.md",
+		]);
+	});
+
 	it("应用订阅候选时会先补齐阅读材料和 YAML，再写入专题与调度", async () => {
 		const file = new TFile("Inbox/Subscribed/article-a.md");
 		const getOrCreateMaterial = vi.fn(async () => ({ uuid: "mat-1" }));
@@ -177,6 +217,49 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 				readingMaterialId: "mat-1",
 			}),
 		);
+	});
+
+	it("应用阶段也会跳过非 Markdown 候选，避免误创建阅读点", async () => {
+		const image = new TFile("Inbox/Subscribed/cover.png");
+		const getOrCreateMaterial = vi.fn(async () => ({ uuid: "mat-1" }));
+		const setReadingDeck = vi.fn(async () => true);
+		const ensureChunkScheduled = vi.fn(async () => true);
+
+		const result = await applyIncrementalReadingFolderSubscriptionCandidates({
+			candidates: [
+				{
+					file: image,
+					rule: {
+						id: "rule-1",
+						enabled: true,
+						folderPath: "Inbox/Subscribed",
+						deckId: "deck-1",
+					},
+					deckName: "专题 A",
+					hasChunkRecord: false,
+					isFullySubscribed: false,
+					needsSync: true,
+					syncGaps: ["missing_material", "missing_chunk"],
+					existsAlready: false,
+				},
+			],
+			pinToToday: true,
+			getOrCreateMaterial,
+			setReadingDeck,
+			ensureChunkScheduled,
+		});
+
+		expect(result).toEqual({
+			added: 0,
+			updated: 0,
+			unchanged: 0,
+			addedFiles: [],
+			updatedFiles: [],
+			unchangedFiles: [],
+		});
+		expect(getOrCreateMaterial).not.toHaveBeenCalled();
+		expect(setReadingDeck).not.toHaveBeenCalled();
+		expect(ensureChunkScheduled).not.toHaveBeenCalled();
 	});
 
 	it("仅有 weave-reading-id、无材料与 chunk 时仍会进入待同步候选", async () => {

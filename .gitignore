@@ -14,12 +14,19 @@ build/
 tmp/
 temp/
 .obsidian-community-staging/
+.obsidian-community-publish/
+.eslint-community-report.txt
+.eslint-all.json
+.eslint-phase-a.*
+eslint-main-report.json
 
-# OS / IDE
+# OS / IDE / agent local config
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+.codex/
+.cursor/
 
 # Environment and secrets
 .env
@@ -35,9 +42,19 @@ codes-*.txt
 codes-*.json
 *activation-code*
 *activation-codes*
+config/secrets.json
 
 # Local dev artifacts (not part of community repo)
 .desktop-hot-reload/
 .mobile-hot-reload/
 .dev-watch.lock.json
 .mobile-watch.lock.json
+platform-tools/
+docs/
+非常重要的文档 禁止删除/
+public-repo.gitignore
+public-repo-github-workflows/
+scripts/i18n-manual/
+scripts/i18n-locale-cache/
+scripts/archive/
+scripts/.unreachable-src-files.txt

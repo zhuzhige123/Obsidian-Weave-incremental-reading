@@ -19,6 +19,9 @@ import {
 	isPdfBookmarkTaskId,
 } from "./IRPdfBookmarkTaskService";
 import {
+	getSharedIRPointStorageService,
+} from "./IRPointStorageService";
+import {
 	IRPointTagService,
 	normalizeReadingPointTags,
 } from "./IRPointTagService";
@@ -343,6 +346,12 @@ export class IRPointWriteService {
 			if (!updatedChunk) {
 				return null;
 			}
+			// Dual-write YAML/chunk.tags must also land in canonical
+			// point.userData.tags — calendar search resolves tags from the point.
+			await getSharedIRPointStorageService(this.app).syncChunkPoint(
+				updatedChunk,
+				{ preserveExisting: true },
+			);
 			return {
 				kind: "chunk",
 				sourceDocumentPath:
@@ -461,6 +470,20 @@ export class IRPointWriteService {
 		);
 	}
 
+	async updateParentPointId(
+		target: IRPointWriteTarget,
+		parentPointId: string | null,
+	): Promise<boolean> {
+		const pointId = String(target.id || "").trim();
+		if (!pointId) {
+			return false;
+		}
+		return await getSharedIRPointStorageService(this.app).updatePointParentId(
+			pointId,
+			parentPointId,
+		);
+	}
+
 	async updateAssociatedNotes(
 		card: Card,
 		notePaths: string[],
@@ -518,10 +541,7 @@ export class IRPointWriteService {
 			return null;
 		}
 
-		if (result) {
-			this.storage.invalidateScheduleRuntimeCaches();
-		}
-
+		// 关联笔记只改元数据，不改 due / 队列分桶；禁止 invalidate 触发全量重算与选中日跳转。
 		return result;
 	}
 

@@ -3,8 +3,8 @@
   职责：管理增量阅读的材料类型标签组（IRTagGroup）
   
   功能：
-  - 显示已创建的标签组列表
-  - 创建/编辑/删除标签组
+  - 显示默认组 + 自定义标签组列表
+  - 创建/编辑/删除自定义标签组；编辑默认组参数
   - 显示标签组统计信息（文档数、样本量等）
   
   @version 3.0.0
@@ -15,9 +15,11 @@
   import { tr as trStore } from '../../../utils/i18n';
   import type { IRTagGroup, IRTagGroupProfile } from '../../../types/ir-types';
   import type { IncrementalReadingSettingsHost } from '../types/incremental-reading-settings-host';
-  import { DEFAULT_TAG_GROUP_PROFILE } from '../../../types/ir-types';
+  import { DEFAULT_TAG_GROUP, DEFAULT_TAG_GROUP_PROFILE } from '../../../types/ir-types';
   import EnhancedIcon from '../../ui/EnhancedIcon.svelte';
-  import IRTagGroupEditor from './IRTagGroupEditor.svelte';
+  import IRTagGroupEditor, {
+    type TagGroupMatchedTopic,
+  } from './IRTagGroupEditor.svelte';
   import IRTagGroupStatsModal from './IRTagGroupStatsModal.svelte';
   import { showObsidianConfirm } from '../../../utils/obsidian-confirm';
   import { IRTagGroupService } from '../../../services/incremental-reading/IRTagGroupService';
@@ -39,8 +41,7 @@
   let showEditor = $state(false);
   let editingGroup = $state<IRTagGroup | null>(null);
   let editingProfile = $state<IRTagGroupProfile | null>(null);
-  let deckScopes = $state<Array<{ topicId: string; topicName: string }>>([]);
-  let editingScopeTopicIds = $state<string[]>([]);
+  let editingMatchedTopics = $state<TagGroupMatchedTopic[]>([]);
   let loadError = $state<string | null>(null);
   let hasInitialized = $state(false);
   let showStatsModal = $state(false);
@@ -50,8 +51,24 @@
   type EditorSavePayload = {
     group: IRTagGroup;
     profile: IRTagGroupProfile;
-    targetTopicIds: string[];
   };
+
+  const displayGroups = $derived.by(() => {
+    const defaults = tagGroups.filter((group) => group.id === DEFAULT_TAG_GROUP.id);
+    const customs = tagGroups
+      .filter((group) => group.id !== DEFAULT_TAG_GROUP.id)
+      .sort((a, b) => (a.matchPriority ?? 0) - (b.matchPriority ?? 0));
+    if (defaults.length > 0) {
+      return [...defaults, ...customs];
+    }
+    return [
+      {
+        ...DEFAULT_TAG_GROUP,
+        name: t('irTagGroup.defaultGroupName'),
+      },
+      ...customs,
+    ];
+  });
 
   // 获取或创建服务
   async function getOrCreateService(): Promise<IRTagGroupService> {
@@ -78,12 +95,9 @@
     try {
       const service = await getOrCreateService();
       
-      // 获取所有标签组
       const allGroups = await service.getAllGroups();
-      deckScopes = await service.getDeckScopes();
-      tagGroups = allGroups.filter(g => g.id !== 'default');
+      tagGroups = allGroups;
       
-      // 获取统计信息
       const stats = await service.getGroupStats();
       
       const newProfiles: Record<string, IRTagGroupProfile> = {};
@@ -103,50 +117,64 @@
     }
   }
 
-  // 使用 onMount 进行异步初始化（Svelte 5 正确模式）
   onMount(async () => {
     await loadData();
   });
 
-  // 新建标签组
-  function handleCreate() {
+  async function handleCreate() {
     editingGroup = null;
     editingProfile = null;
-    editingScopeTopicIds = deckScopes.map((scope) => scope.topicId);
+    await loadMatchedTopicsForEditor(null);
     showEditor = true;
   }
 
-  // 编辑标签组
+  async function loadMatchedTopicsForEditor(group: IRTagGroup | null) {
+    try {
+      const service = await getOrCreateService();
+      const groupId = group?.id || '';
+      if (!groupId) {
+        // New group: show all topics with zero matches (will sync globally).
+        const scopes = await service.getDeckScopes();
+        editingMatchedTopics = scopes.map((scope) => ({
+          topicId: scope.topicId,
+          topicName: scope.topicName,
+          matchedPointCount: 0,
+        }));
+        return;
+      }
+      editingMatchedTopics = await service.getAutoMatchedTopicResults(groupId);
+    } catch {
+      editingMatchedTopics = [];
+    }
+  }
+
   async function handleEdit(group: IRTagGroup) {
-    const service = await getOrCreateService();
     editingGroup = { ...group };
     editingProfile = profiles[group.id]
       ? { ...profiles[group.id] }
       : { ...DEFAULT_TAG_GROUP_PROFILE, groupId: group.id };
-    const scopedTopicIds = await service.getGroupScopeTopicIds(group.id);
-    editingScopeTopicIds = scopedTopicIds.length > 0
-      ? scopedTopicIds
-      : deckScopes.map((scope) => scope.topicId);
+    await loadMatchedTopicsForEditor(group);
     showEditor = true;
   }
 
-  // 查看统计
+  function handleCreateClick() {
+    void handleCreate();
+  }
+
   function handleShowStats(group: IRTagGroup) {
     statsGroup = group;
     statsProfile = profiles[group.id] || DEFAULT_TAG_GROUP_PROFILE;
     showStatsModal = true;
   }
 
-  // 关闭统计模态窗
   function handleCloseStats() {
     showStatsModal = false;
     statsGroup = null;
     statsProfile = null;
   }
 
-  // 删除标签组
   async function handleDelete(group: IRTagGroup) {
-    if (group.id === 'default') {
+    if (group.id === DEFAULT_TAG_GROUP.id) {
       new Notice(t('irTagGroup.cannotDeleteDefault'));
       return;
     }
@@ -178,21 +206,14 @@
     }
   }
 
-  // 保存标签组
   async function handleSave(payload: EditorSavePayload) {
     try {
       const service = await getOrCreateService();
 
       const groupResult = await service.saveGroup(payload.group, {
-        targetTopicIds: payload.targetTopicIds
+        profile: payload.profile,
       });
-      const profileResult = await service.saveProfile(payload.profile, {
-        targetTopicIds: payload.targetTopicIds
-      });
-      const affectedTopicIds = Array.from(new Set([
-        ...groupResult.affectedTopicIds,
-        ...profileResult.affectedTopicIds
-      ]));
+      const affectedTopicIds = groupResult.affectedTopicIds;
       const actionNotice = editingGroup
         ? t('irTagGroup.updated', { name: payload.group.name })
         : t('irTagGroup.created', { name: payload.group.name });
@@ -202,9 +223,8 @@
       showEditor = false;
       editingGroup = null;
       editingProfile = null;
-      editingScopeTopicIds = [];
+      editingMatchedTopics = [];
       
-      // 重新加载数据
       hasInitialized = false;
       await loadData();
     } catch (error) {
@@ -212,20 +232,24 @@
     }
   }
 
-  // 关闭编辑器
   function handleCloseEditor() {
     showEditor = false;
     editingGroup = null;
     editingProfile = null;
-    editingScopeTopicIds = [];
+    editingMatchedTopics = [];
   }
 
-  // 格式化参数显示
   function formatFactor(value: number): string {
     return value.toFixed(2) + 'x';
   }
 
-  // 显示操作菜单
+  function displayGroupName(group: IRTagGroup): string {
+    if (group.id === DEFAULT_TAG_GROUP.id) {
+      return group.name?.trim() || t('irTagGroup.defaultGroupName');
+    }
+    return group.name;
+  }
+
   function showActionsMenu(group: IRTagGroup, event: MouseEvent) {
     const menu = new Menu();
     
@@ -242,14 +266,15 @@
           void handleEdit(group);
         });
     });
-    
-    menu.addSeparator();
-    
-    menu.addItem((item) => {
-      item.setTitle(t('irTagGroup.menuDelete'))
-        .setIcon('trash-2')
-        .onClick(() => handleDelete(group));
-    });
+
+    if (group.id !== DEFAULT_TAG_GROUP.id) {
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle(t('irTagGroup.menuDelete'))
+          .setIcon('trash-2')
+          .onClick(() => handleDelete(group));
+      });
+    }
     
     menu.showAtMouseEvent(event);
   }
@@ -264,7 +289,7 @@
         {t('irTagGroup.managerDesc')}
       </p>
     </div>
-    <button class="create-btn" onclick={handleCreate}>
+    <button class="create-btn" onclick={handleCreateClick}>
       <EnhancedIcon name="plus" size={16} />
       <span>{t('irTagGroup.createBtn')}</span>
     </button>
@@ -284,8 +309,6 @@
         {t('irTagGroup.retryBtn')}
       </button>
     </div>
-  {:else if tagGroups.length === 0}
-    <!-- empty: no custom tag groups -->
   {:else}
     <div class="tag-group-table-container">
       <table class="tag-group-table">
@@ -301,27 +324,35 @@
           </tr>
         </thead>
         <tbody>
-          {#each tagGroups as group (group.id)}
+          {#each displayGroups as group (group.id)}
             {@const profile = profiles[group.id] || DEFAULT_TAG_GROUP_PROFILE}
             {@const docCount = documentCounts[group.id] || 0}
-            <tr>
+            {@const isDefault = group.id === DEFAULT_TAG_GROUP.id}
+            <tr class:is-default={isDefault}>
               <td class="col-name">
-                <span class="group-name">{group.name}</span>
+                <span class="group-name">{displayGroupName(group)}</span>
+                {#if isDefault}
+                  <span class="default-badge">{t('irTagGroup.defaultBadge')}</span>
+                {/if}
               </td>
               <td class="col-tags">
                 <div class="tags-cell">
-                  {#each group.matchAnyTags.slice(0, 3) as tag}
-                    <span class="tag-badge">{tag}</span>
-                  {/each}
-                  {#if group.matchAnyTags.length > 3}
-                    <span class="tag-more">+{group.matchAnyTags.length - 3}</span>
+                  {#if isDefault}
+                    <span class="tag-badge is-muted">{t('irTagGroup.defaultTagsLabel')}</span>
+                  {:else}
+                    {#each group.matchAnyTags.slice(0, 3) as tag}
+                      <span class="tag-badge">{tag}</span>
+                    {/each}
+                    {#if group.matchAnyTags.length > 3}
+                      <span class="tag-more">+{group.matchAnyTags.length - 3}</span>
+                    {/if}
                   {/if}
                 </div>
               </td>
               <td class="col-docs">{docCount}</td>
               <td class="col-factor">{formatFactor(profile.intervalFactorBase)}</td>
               <td class="col-samples">{profile.sampleCount}</td>
-              <td class="col-priority">{group.matchPriority}</td>
+              <td class="col-priority">{isDefault ? '—' : group.matchPriority}</td>
               <td class="col-actions">
                 <button 
                   class="menu-btn"
@@ -337,7 +368,6 @@
       </table>
     </div>
 
-    <!-- 默认组提示 -->
     <div class="default-group-hint">{t('irTagGroup.defaultGroupHint')}</div>
   {/if}
 </div>
@@ -348,8 +378,7 @@
     {plugin}
     group={editingGroup}
     profile={editingProfile}
-    availableScopes={deckScopes}
-    selectedScopeTopicIds={editingScopeTopicIds}
+    matchedTopics={editingMatchedTopics}
     onSave={handleSave}
     onCancel={handleCloseEditor}
   />
@@ -372,7 +401,6 @@
     border-radius: var(--radius-m);
   }
 
-  /* 头部 */
   .manager-header {
     display: flex;
     justify-content: space-between;
@@ -401,68 +429,40 @@
   }
 
   .create-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: var(--size-2-2);
-    padding: var(--size-4-2) var(--size-4-3);
+    gap: 6px;
+    padding: 8px 12px;
     border: none;
     border-radius: var(--radius-s);
     background: var(--interactive-accent);
     color: var(--text-on-accent);
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s ease;
+    font-size: var(--font-ui-small);
     white-space: nowrap;
   }
 
-  .create-btn:hover {
-    background: var(--interactive-accent-hover);
-  }
-
-  /* 加载状态 */
-  .loading-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--size-4-2);
-    padding: var(--size-4-8);
-    color: var(--text-muted);
-  }
-
-  /* 错误状态 */
+  .loading-state,
   .error-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--size-4-2);
-    padding: var(--size-4-8);
-    color: var(--text-error);
-    text-align: center;
+    gap: 8px;
+    padding: 24px;
+    color: var(--text-muted);
   }
 
   .retry-btn {
-    margin-top: var(--size-4-2);
-    padding: var(--size-2-2) var(--size-4-3);
-    border: 1px solid var(--background-modifier-border);
+    margin-top: 4px;
+    padding: 6px 12px;
     border-radius: var(--radius-s);
-    background: transparent;
-    color: var(--text-normal);
-    font-size: var(--font-ui-smaller);
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
     cursor: pointer;
-    transition: all 0.15s ease;
   }
 
-  .retry-btn:hover {
-    background: var(--background-secondary);
-    border-color: var(--interactive-accent);
-  }
-
-  /* 表格容器 */
   .tag-group-table-container {
-    width: 100%;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .tag-group-table {
@@ -473,48 +473,23 @@
 
   .tag-group-table th,
   .tag-group-table td {
-    padding: var(--size-4-2) var(--size-4-3);
+    padding: 10px 8px;
     text-align: left;
     border-bottom: 1px solid var(--background-modifier-border);
+    vertical-align: middle;
   }
 
   .tag-group-table th {
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
     color: var(--text-muted);
-    background: var(--background-secondary-alt);
-    white-space: nowrap;
+    font-weight: 600;
   }
 
-  .tag-group-table tbody tr:hover {
-    background: var(--background-secondary-alt);
+  .tag-group-table tr.is-default {
+    background: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
   }
 
-  .tag-group-table tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  /* 列宽度 */
-  .col-name { min-width: 100px; }
-  .col-tags { min-width: 140px; }
-  .col-docs,
-  .col-factor,
-  .col-samples,
-  .col-priority { 
-    width: 80px; 
-    text-align: center;
-  }
-  .col-actions { 
-    width: 50px; 
-    text-align: center;
-  }
-
-  .tag-group-table td.col-docs,
-  .tag-group-table td.col-factor,
-  .tag-group-table td.col-samples,
-  .tag-group-table td.col-priority,
-  .tag-group-table td.col-actions {
-    text-align: center;
+  .col-name {
+    min-width: 120px;
   }
 
   .group-name {
@@ -522,58 +497,60 @@
     color: var(--text-normal);
   }
 
+  .default-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--background-modifier-border);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
   .tags-cell {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--size-4-1);
+    gap: 4px;
   }
 
   .tag-badge {
     display: inline-block;
-    padding: calc(var(--size-2-1) * 0.5) var(--size-2-2);
-    font-size: var(--font-ui-smaller);
-    background: var(--background-modifier-border);
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+  }
+
+  .tag-badge.is-muted {
     color: var(--text-muted);
-    border-radius: var(--radius-s);
   }
 
   .tag-more {
-    display: inline-block;
-    padding: calc(var(--size-2-1) * 0.5) var(--size-2-2);
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
+    color: var(--text-muted);
   }
 
-  /* 操作菜单按钮 */
   .menu-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
+    width: 28px;
+    height: 28px;
     border: none;
     border-radius: var(--radius-s);
     background: transparent;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.15s ease;
   }
 
   .menu-btn:hover {
-    background: var(--background-secondary);
+    background: var(--background-modifier-hover);
     color: var(--text-normal);
   }
 
-  /* 默认组提示 */
   .default-group-hint {
-    display: flex;
-    align-items: center;
-    gap: var(--size-4-2);
-    margin-top: var(--size-4-3);
-    padding: var(--size-4-2) var(--size-4-3);
-    background: var(--background-primary);
-    border-radius: var(--radius-s);
+    margin-top: 12px;
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
   }

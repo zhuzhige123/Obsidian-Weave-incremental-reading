@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
-import { Notice } from "obsidian";
-import { IRParagraphAddToTopicModal } from "../../../modals/IRParagraphAddToTopicModal";
+import { Menu, Notice, normalizePath } from "obsidian";
+import { openCreateIRTopicModal } from "../../../modals/CreateIRTopicModal";
 import {
 	createDefaultIRBlock,
 	generateIRBlockId,
@@ -16,7 +16,6 @@ import {
 	isWeaveMemoryHostAvailable,
 	resolveWeaveMemoryHost,
 } from "../../weave-integration/weave-memory-host";
-import { IRDeckManager } from "../IRDeckManager";
 import { IREpubBookmarkTaskService } from "../IREpubBookmarkTaskService";
 import { IRPointStorageService } from "../IRPointStorageService";
 import { IRPointWriteService } from "../IRPointWriteService";
@@ -44,6 +43,11 @@ import {
 	resolveParagraphWorkbenchSourcePath,
 } from "./paragraph-block-reference";
 import {
+	applySegmentWriteResultToSegment,
+	readSegmentTextFromSourceFile,
+	writeSegmentTextToSourceFile,
+} from "./paragraph-segment-source-sync";
+import {
 	createParagraphWorkbenchSession,
 	getCurrentWorkbenchSegment,
 	navigateParagraphWorkbenchSession,
@@ -62,6 +66,7 @@ import {
 } from "./paragraph-workbench-queue";
 import type {
 	ParagraphWorkbenchOpenInput,
+	ParagraphWorkbenchReadingTargetDraft,
 	ParagraphWorkbenchSession,
 } from "./types";
 
@@ -70,6 +75,7 @@ export class ParagraphWorkbenchService {
 	private priorityUi = 5;
 	private scheduleIntervalDays: ParagraphScheduleIntervalDays = 7;
 	private registeredPointId: string | null = null;
+	private segmentSyncInFlight: Promise<void> | null = null;
 
 	constructor(private readonly app: App) {}
 
@@ -126,6 +132,9 @@ export class ParagraphWorkbenchService {
 	): Promise<ParagraphWorkbenchSession | null> {
 		this.session = await createParagraphWorkbenchSession(this.app, input);
 		this.registeredPointId = input.pointId ?? null;
+		if (!this.session?.topicId) {
+			await this.resolveDocumentTopicAffiliation();
+		}
 		await this.refreshSessionQueueProgress();
 		if (!this.registeredPointId) {
 			await this.resolvePointForCurrentSegment();
@@ -205,48 +214,86 @@ export class ParagraphWorkbenchService {
 			.trim();
 	}
 
-	async openAddToTopicModal(): Promise<ParagraphWorkbenchSession | null> {
+	/**
+	 * Bind the current source document to an IR topic (document-level affiliation).
+	 * Does not create a reading point for the current paragraph.
+	 */
+	async openSelectDocumentTopic(
+		mouseEvent?: MouseEvent,
+		onSessionUpdated?: () => void,
+	): Promise<ParagraphWorkbenchSession | null> {
 		if (!this.session) {
 			new Notice(i18n.t("irServiceNotices.workbench.openContentFirst"), 3000);
 			return this.session;
 		}
 
-		const segment = getCurrentWorkbenchSegment(this.session);
-		if (!segment) {
-			new Notice(i18n.t("irServiceNotices.workbench.noParagraph"), 3000);
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
+		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
+			new Notice(i18n.t("irServiceNotices.workbench.sourcePathUnknown"), 3500);
 			return this.session;
 		}
 
 		try {
 			const storage = new IRStorageService(this.app);
 			await storage.initialize();
-			const deckManager = new IRDeckManager(this.app, storage);
 			const decks = Object.values(await storage.getAllDecks())
 				.filter((deck) => !deck.archivedAt)
 				.sort((left, right) => left.name.localeCompare(right.name));
-			const draft = deriveSegmentTitleDraft(segment);
 
-			await new Promise<void>((resolve) => {
-				const modal = new IRParagraphAddToTopicModal(this.app, {
-					deckOptions: decks,
-					initialDeckId: this.session?.topicId,
-					initialTitle: draft.title,
-					titleDetected: draft.titleDetected,
-					onCreateDeck: async (name) => await deckManager.createDeck(name),
-					onSubmit: async (payload) => {
-						await this.addCurrentSegmentToTopic(payload.deckId, payload.title);
+			const notifyUpdated = () => {
+				onSessionUpdated?.();
+			};
+
+			const bindAndNotify = async (deckId: string, deckName: string) => {
+				await this.bindDocumentToTopic(deckId, deckName);
+				notifyUpdated();
+			};
+
+			if (decks.length === 0) {
+				openCreateIRTopicModal({
+					app: this.app,
+					onCreated: async (deck) => {
+						await bindAndNotify(deck.id, deck.name);
 					},
 				});
-				const originalOnClose = modal.onClose.bind(modal);
-				modal.onClose = () => {
-					originalOnClose();
-					resolve();
-				};
-				modal.open();
+				return this.session;
+			}
+
+			const menu = new Menu();
+			for (const deck of decks) {
+				menu.addItem((item) => {
+					item
+						.setTitle(deck.name)
+						.setChecked(deck.id === this.session?.topicId)
+						.onClick(() => {
+							void bindAndNotify(deck.id, deck.name);
+						});
+				});
+			}
+			menu.addSeparator();
+			menu.addItem((item) => {
+				item
+					.setTitle(i18n.t("irModals.paragraphAddToTopic.newTopic"))
+					.onClick(() => {
+						openCreateIRTopicModal({
+							app: this.app,
+							onCreated: async (deck) => {
+								await bindAndNotify(deck.id, deck.name);
+							},
+						});
+					});
 			});
+
+			if (mouseEvent) {
+				menu.showAtMouseEvent(mouseEvent);
+			} else {
+				menu.showAtPosition({ x: 12, y: 12 });
+			}
 		} catch (error) {
 			logger.error(
-				"[ParagraphWorkbenchService] openAddToTopicModal failed:",
+				"[ParagraphWorkbenchService] openSelectDocumentTopic failed:",
 				error,
 			);
 			new Notice(
@@ -255,6 +302,268 @@ export class ParagraphWorkbenchService {
 			);
 		}
 
+		return this.session;
+	}
+
+	/**
+	 * Sync detached editor content back into the source markdown segment range.
+	 */
+	async syncCurrentSegmentTextToSource(
+		nextText: string,
+	): Promise<ParagraphWorkbenchSession | null> {
+		if (!this.session || this.session.sourceType !== "markdown") {
+			return this.session;
+		}
+		const segment = getCurrentWorkbenchSegment(this.session);
+		if (!segment) {
+			return this.session;
+		}
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
+		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
+			return this.session;
+		}
+
+		const normalizedNext = String(nextText ?? "").replace(/\r\n?/g, "\n");
+		if (normalizedNext === String(segment.text || "").replace(/\r\n?/g, "\n")) {
+			return this.session;
+		}
+
+		try {
+			const write = await writeSegmentTextToSourceFile(
+				this.app,
+				sourcePath,
+				segment,
+				normalizedNext,
+			);
+			const segments = this.session.segments.slice();
+			const index = this.session.currentIndex;
+			if (index >= 0 && index < segments.length) {
+				segments[index] = applySegmentWriteResultToSegment(
+					segment,
+					write,
+					{
+						obsidianBlockId:
+							extractObsidianBlockIdFromSegment({
+								...segment,
+								text: write.text,
+							}) || segment.metadata?.obsidianBlockId,
+					},
+				);
+			}
+			this.session = {
+				...this.session,
+				segments,
+			};
+			return this.session;
+		} catch (error) {
+			logger.error(
+				"[ParagraphWorkbenchService] syncCurrentSegmentTextToSource failed:",
+				error,
+			);
+			new Notice(i18n.t("irParagraphWorkbench.addToTopicFailed"), 3000);
+			return this.session;
+		}
+	}
+
+	/**
+	 * Prepare the current content block for AddReadingTargetModal:
+	 * flush editor→source if needed, ensure Obsidian block id on markdown source,
+	 * then return embed/link draft.
+	 */
+	async prepareCurrentBlockReadingTarget(options?: {
+		editorText?: string | null;
+	}): Promise<ParagraphWorkbenchReadingTargetDraft | null> {
+		if (!this.session) {
+			new Notice(i18n.t("irServiceNotices.workbench.openContentFirst"), 3000);
+			return null;
+		}
+
+		const segment = getCurrentWorkbenchSegment(this.session);
+		if (!segment) {
+			new Notice(i18n.t("irServiceNotices.workbench.noParagraph"), 3000);
+			return null;
+		}
+
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
+		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
+			new Notice(i18n.t("irServiceNotices.workbench.sourcePathUnknown"), 3500);
+			return null;
+		}
+
+		try {
+			if (
+				this.session.sourceType === "markdown" &&
+				typeof options?.editorText === "string"
+			) {
+				await this.syncCurrentSegmentTextToSource(options.editorText);
+			}
+
+			const currentSegment =
+				getCurrentWorkbenchSegment(this.session) || segment;
+			const draft = deriveSegmentTitleDraft(currentSegment);
+			const title = draft.title;
+			const deckId = String(this.session.topicId || "").trim() || undefined;
+
+			if (this.session.sourceType === "canvas") {
+				const nodeId =
+					readString(currentSegment.metadata?.canvasNodeId) ||
+					readString(currentSegment.id);
+				if (!nodeId) {
+					new Notice(
+						i18n.t("irServiceNotices.workbench.noParagraph"),
+						3000,
+					);
+					return null;
+				}
+				const link = buildCanvasNodeEmbedWikiLink(sourcePath, nodeId, title);
+				const text = String(currentSegment.text || "").trim();
+				return {
+					link,
+					title,
+					deckId,
+					canvasTextCandidates: text ? [text] : undefined,
+				};
+			}
+
+			if (this.session.sourceType === "epub") {
+				const cfi =
+					readString(currentSegment.metadata?.cfiRange) ||
+					readString(currentSegment.sourceLink);
+				if (!cfi) {
+					new Notice(
+						i18n.t("irServiceNotices.workbench.epubParagraphLocationFailed"),
+						3500,
+					);
+					return null;
+				}
+				const params = new URLSearchParams();
+				params.set("file", sourcePath);
+				params.set("cfi", cfi);
+				const chapterHref = readString(currentSegment.metadata?.chapterHref);
+				if (chapterHref) {
+					params.set("href", chapterHref);
+				}
+				const link = `[${title}](obsidian://weave-epub-reader?${params.toString()})`;
+				return { link, title, deckId };
+			}
+
+			const { blockId: obsidianBlockId, anchorLineIndex } =
+				await ensureSegmentBlockIdInSourceFile(
+					this.app,
+					sourcePath,
+					currentSegment,
+				);
+
+			const rangeSegment = getCurrentWorkbenchSegment(this.session) || currentSegment;
+			const startLine =
+				typeof rangeSegment.metadata?.startLine === "number"
+					? Number(rangeSegment.metadata.startLine)
+					: anchorLineIndex;
+			const rangeForRead = {
+				...rangeSegment,
+				metadata: {
+					...(rangeSegment.metadata || {}),
+					startLine,
+					endLine: anchorLineIndex,
+					obsidianBlockId,
+				},
+			};
+			const syncedText = await readSegmentTextFromSourceFile(
+				this.app,
+				sourcePath,
+				rangeForRead,
+			);
+			const segments = this.session.segments.slice();
+			const index = this.session.currentIndex;
+			if (index >= 0 && index < segments.length) {
+				segments[index] = {
+					...rangeForRead,
+					id: obsidianBlockId,
+					text: syncedText,
+					sourceLink: `${sourcePath}#^${obsidianBlockId}`,
+				};
+				this.session = {
+					...this.session,
+					segments,
+				};
+			}
+
+			const refreshed = getCurrentWorkbenchSegment(this.session);
+			const link = buildObsidianEmbedBlockWikiLink(sourcePath, obsidianBlockId);
+			return {
+				link,
+				title: deriveSegmentTitleDraft(refreshed || currentSegment).title,
+				deckId,
+			};
+		} catch (error) {
+			logger.error(
+				"[ParagraphWorkbenchService] prepareCurrentBlockReadingTarget failed:",
+				error,
+			);
+			new Notice(i18n.t("irParagraphWorkbench.addToTopicFailed"), 3000);
+			return null;
+		}
+	}
+
+	/** Refresh queue/point state after AddReadingTargetModal succeeds. */
+	async refreshAfterReadingTargetAdded(): Promise<ParagraphWorkbenchSession | null> {
+		if (!this.session) {
+			return null;
+		}
+		await this.refreshSessionQueueProgress();
+		await this.resolvePointForCurrentSegment();
+		await this.syncPriorityFromRegisteredPoint();
+		return this.session;
+	}
+
+	async bindDocumentToTopic(
+		deckId: string,
+		deckName?: string,
+	): Promise<ParagraphWorkbenchSession | null> {
+		if (!this.session) {
+			return null;
+		}
+
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
+		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
+			new Notice(i18n.t("irServiceNotices.workbench.sourcePathUnknown"), 3500);
+			return this.session;
+		}
+
+		const storage = new IRStorageService(this.app);
+		await storage.initialize();
+		const deck = await storage.getDeckById(deckId);
+		if (!deck || deck.archivedAt) {
+			new Notice(i18n.t("irNotices.deckNotFoundOrArchived"), 3000);
+			return this.session;
+		}
+
+		const previousTopicId = String(this.session.topicId || "").trim();
+		await this.attachDocumentToDeck(storage, deckId, sourcePath);
+		if (previousTopicId && previousTopicId !== deckId) {
+			await this.detachDocumentFromDeckIfUnused(
+				storage,
+				previousTopicId,
+				sourcePath,
+			);
+		}
+
+		this.applyDocumentTopicToSession(deck.id, deckName || deck.name);
+		await this.refreshSessionQueueProgress();
+		await this.resolvePointForCurrentSegment();
+		await this.syncPriorityFromRegisteredPoint();
+		new Notice(
+			i18n.t("irServiceNotices.workbench.documentTopicBound", {
+				deckName: deck.name,
+			}),
+			2500,
+		);
 		return this.session;
 	}
 
@@ -347,17 +656,17 @@ export class ParagraphWorkbenchService {
 			return;
 		}
 
-		obsidianBlockId = await ensureSegmentBlockIdInSourceFile(
+		const ensured = await ensureSegmentBlockIdInSourceFile(
 			this.app,
 			sourcePath,
 			segment,
 		);
+		obsidianBlockId = ensured.blockId;
 		await this.reloadCurrentSessionSegments();
 
 		const blockRefLink = buildObsidianEmbedBlockWikiLink(
 			sourcePath,
 			obsidianBlockId,
-			title,
 		);
 		const blockId = generateIRBlockId();
 		const headingPath = title ? [title] : [];
@@ -437,11 +746,12 @@ export class ParagraphWorkbenchService {
 		try {
 			let obsidianBlockId = extractObsidianBlockIdFromSegment(segment);
 			if (!obsidianBlockId && this.session.sourceType === "markdown") {
-				obsidianBlockId = await ensureSegmentBlockIdInSourceFile(
+				const ensured = await ensureSegmentBlockIdInSourceFile(
 					this.app,
 					sourcePath,
 					segment,
 				);
+				obsidianBlockId = ensured.blockId;
 				await this.reloadCurrentSessionSegments();
 			}
 
@@ -959,6 +1269,116 @@ export class ParagraphWorkbenchService {
 				readingTimeSeconds,
 			);
 			await this.refreshSessionQueueProgress();
+		}
+	}
+
+	private applyDocumentTopicToSession(deckId: string, deckName: string): void {
+		if (!this.session) {
+			return;
+		}
+		this.session = {
+			...this.session,
+			topicId: deckId,
+			topicName: deckName,
+		};
+	}
+
+	private async attachDocumentToDeck(
+		storage: IRStorageService,
+		deckId: string,
+		sourcePath: string,
+	): Promise<void> {
+		const latestDeck = await storage.getDeckById(deckId);
+		if (!latestDeck) {
+			return;
+		}
+		const normalizedPath = normalizePath(sourcePath);
+		const sourceFiles = new Set(
+			(latestDeck.sourceFiles || []).map((path) => normalizePath(path)),
+		);
+		sourceFiles.add(normalizedPath);
+		latestDeck.sourceFiles = Array.from(sourceFiles);
+		latestDeck.updatedAt = new Date().toISOString();
+		await storage.saveDeck(latestDeck);
+	}
+
+	private async detachDocumentFromDeckIfUnused(
+		storage: IRStorageService,
+		deckId: string,
+		sourcePath: string,
+	): Promise<void> {
+		const latestDeck = await storage.getDeckById(deckId);
+		if (!latestDeck) {
+			return;
+		}
+		const normalizedPath = normalizePath(sourcePath);
+		const blocks = await storage.getBlocksByFile(normalizedPath);
+		const stillHasBlocks = blocks.some(
+			(block) =>
+				latestDeck.blockIds?.includes(block.id) ||
+				block.deckPath === deckId,
+		);
+		if (stillHasBlocks) {
+			return;
+		}
+		latestDeck.sourceFiles = (latestDeck.sourceFiles || []).filter(
+			(path) => normalizePath(path) !== normalizedPath,
+		);
+		latestDeck.updatedAt = new Date().toISOString();
+		await storage.saveDeck(latestDeck);
+	}
+
+	private async resolveDocumentTopicAffiliation(): Promise<void> {
+		if (!this.session || this.session.topicId) {
+			return;
+		}
+		const sourcePath = resolveParagraphWorkbenchSourcePath(
+			this.session.sourcePath,
+		);
+		if (!sourcePath || isDetachedEditorTempFilePath(sourcePath)) {
+			return;
+		}
+
+		const storage = new IRStorageService(this.app);
+		await storage.initialize();
+		const normalizedPath = normalizePath(sourcePath);
+		const decks = Object.values(await storage.getAllDecks()).filter(
+			(deck) => !deck.archivedAt,
+		);
+
+		const affiliated = decks.find((deck) =>
+			(deck.sourceFiles || []).some(
+				(path) => normalizePath(path) === normalizedPath,
+			),
+		);
+		if (affiliated) {
+			this.applyDocumentTopicToSession(affiliated.id, affiliated.name);
+			return;
+		}
+
+		const blocks = await storage.getBlocksByFile(normalizedPath);
+		const deckCounts = new Map<string, number>();
+		for (const block of blocks) {
+			const deckId = String(block.deckPath || "").trim();
+			if (!deckId) {
+				continue;
+			}
+			deckCounts.set(deckId, (deckCounts.get(deckId) || 0) + 1);
+		}
+		let bestDeckId = "";
+		let bestCount = 0;
+		for (const [deckId, count] of deckCounts) {
+			if (count > bestCount) {
+				bestDeckId = deckId;
+				bestCount = count;
+			}
+		}
+		if (!bestDeckId) {
+			return;
+		}
+		const deck = decks.find((item) => item.id === bestDeckId);
+		if (deck) {
+			this.applyDocumentTopicToSession(deck.id, deck.name);
 		}
 	}
 

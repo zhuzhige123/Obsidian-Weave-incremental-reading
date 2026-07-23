@@ -67,9 +67,9 @@
 	});
 
 	onMount(() => {
-		document.addEventListener('mousedown', handlePointerDownOutside);
+		activeDocument.addEventListener('mousedown', handlePointerDownOutside);
 		return () => {
-			document.removeEventListener('mousedown', handlePointerDownOutside);
+			activeDocument.removeEventListener('mousedown', handlePointerDownOutside);
 		};
 	});
 </script>

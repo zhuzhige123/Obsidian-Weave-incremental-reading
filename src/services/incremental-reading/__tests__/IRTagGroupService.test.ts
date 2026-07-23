@@ -63,7 +63,11 @@ function buildProfile(
 	};
 }
 
-function buildPoint(pointId: string, tagGroupId: string) {
+function buildPoint(
+	pointId: string,
+	tagGroupId: string,
+	tags: string[] = [],
+) {
 	return {
 		id: pointId,
 		pointType: "epub-bookmark",
@@ -109,7 +113,7 @@ function buildPoint(pointId: string, tagGroupId: string) {
 		},
 		userData: {
 			title: pointId,
-			tags: [],
+			tags,
 			isStarred: false,
 		},
 		stats: {
@@ -234,8 +238,14 @@ describe("IRTagGroupService", () => {
 			{ topicId: "topic-a", topicName: "专题 A" },
 			{ topicId: "topic-b", topicName: "专题 B" },
 		]);
-		expect(await service.getGroupScopeTopicIds("paper")).toEqual(["topic-a"]);
-		expect(await service.getGroupScopeTopicIds("novel")).toEqual(["topic-b"]);
+		expect(await service.getGroupScopeTopicIds("paper")).toEqual([
+			"topic-a",
+			"topic-b",
+		]);
+		expect(await service.getGroupScopeTopicIds("novel")).toEqual([
+			"topic-a",
+			"topic-b",
+		]);
 		expect((await service.getProfile("paper")).intervalFactorBase).toBe(1.9);
 	});
 
@@ -291,7 +301,7 @@ describe("IRTagGroupService", () => {
 		const deckFile = JSON.parse(files.get(pointFilePath) || "{}");
 
 		expect(groups.map((group) => group.id)).toEqual(["default"]);
-		expect(await service.getGroupScopeTopicIds("paper")).toEqual([]);
+		expect(await service.getGroupScopeTopicIds("paper")).toEqual(["topic-a"]);
 		expect(deckFile.tagGroups?.paper).toBeUndefined();
 		expect(deckFile.tagGroupProfiles?.paper).toBeUndefined();
 	});
@@ -354,7 +364,9 @@ describe("IRTagGroupService", () => {
 		expect(report.removedLegacyFileCount).toBe(2);
 		expect(report.remainingLegacyFiles).toEqual([]);
 		expect(groups.some((group) => group.id === "paper")).toBe(true);
-		expect(await service.getGroupScopeTopicIds("paper")).toEqual(["topic-a"]);
+		expect(await service.getGroupScopeTopicIds("paper")).toEqual([
+			"topic-a",
+		]);
 		expect(deckFile.tagGroups.paper).toMatchObject({
 			id: "paper",
 			name: "论文",
@@ -370,7 +382,7 @@ describe("IRTagGroupService", () => {
 		);
 	});
 
-	it("writes group and profile back only to selected .irdeck files", async () => {
+	it("always syncs saved groups to every .irdeck topic (global tag groups)", async () => {
 		const v2Paths = getV2Paths("");
 		const topicAPath = normalizeTestPath(
 			`${v2Paths.ir.root}/points/专题 A.irdeck`,
@@ -417,34 +429,37 @@ describe("IRTagGroupService", () => {
 			sampleCount: 6,
 		});
 
+		// Explicit targetTopicIds are ignored — groups always fan out to all topics.
 		const groupResult = await service.saveGroup(group, {
 			targetTopicIds: ["topic-b"],
-		});
-		const profileResult = await service.saveProfile(profile, {
-			targetTopicIds: ["topic-b"],
+			profile,
 		});
 		const topicAFile = JSON.parse(files.get(topicAPath) || "{}");
 		const topicBFile = JSON.parse(files.get(topicBPath) || "{}");
 
-		expect(groupResult.affectedTopicIds).toEqual(["topic-b"]);
-		expect(new Set(profileResult.affectedTopicIds)).toEqual(
-			new Set(["topic-b"]),
+		expect(new Set(groupResult.affectedTopicIds)).toEqual(
+			new Set(["topic-a", "topic-b"]),
 		);
-		expect(topicAFile.tagGroups.paper).toBeUndefined();
-		expect(topicAFile.tagGroupProfiles.paper).toBeUndefined();
+		expect(topicAFile.tagGroups.paper).toMatchObject({
+			id: "paper",
+			name: "论文",
+		});
 		expect(topicBFile.tagGroups.paper).toMatchObject({
 			id: "paper",
 			name: "论文",
 		});
-		expect(topicBFile.tagGroupProfiles.paper).toMatchObject({
+		expect(topicAFile.tagGroupProfiles.paper).toMatchObject({
 			groupId: "paper",
 			intervalFactorBase: 2.2,
 			sampleCount: 6,
 		});
-		expect(await service.getGroupScopeTopicIds("paper")).toEqual(["topic-b"]);
+		expect(await service.getGroupScopeTopicIds("paper")).toEqual([
+			"topic-a",
+			"topic-b",
+		]);
 	});
 
-	it("removes a group from selected .irdeck files and resets affected points to default", async () => {
+	it("removes a group from every .irdeck file and resets untagged points to default", async () => {
 		const v2Paths = getV2Paths("");
 		const group = buildGroup("paper", "论文", ["paper"]);
 		const profile = buildProfile("paper");
@@ -517,11 +532,63 @@ describe("IRTagGroupService", () => {
 		expect(topicAFile.tagGroups.paper).toBeUndefined();
 		expect(topicAFile.tagGroupProfiles.paper).toBeUndefined();
 		expect(topicAFile.points[0].metadata.tagGroupId).toBe("default");
-		expect(topicBFile.tagGroups.paper).toMatchObject({
-			id: "paper",
-			name: "论文",
+		expect(topicBFile.tagGroups.paper).toBeUndefined();
+		expect(topicBFile.tagGroupProfiles.paper).toBeUndefined();
+		expect(topicBFile.points[0].metadata.tagGroupId).toBe("default");
+		expect((await service.getAllGroups()).map((g) => g.id)).not.toContain(
+			"paper",
+		);
+	});
+
+	it("rematches deleted-group points onto another remaining tag group", async () => {
+		const v2Paths = getV2Paths("");
+		const paper = buildGroup("paper", "论文", ["paper"]);
+		const fiction = buildGroup("fiction", "小说", ["fiction"]);
+		paper.matchPriority = 10;
+		fiction.matchPriority = 20;
+		const topicPath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/专题 A.irdeck`,
+		);
+		const { app, files } = createMemoryApp({
+			initialFiles: {
+				[v2Paths.ir.pointFilesIndex]: JSON.stringify({
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					updatedAt: "2026-04-17T00:00:00.000Z",
+					files: [
+						{
+							topicId: "topic-a",
+							topicName: "专题 A",
+							file: "points/专题 A.irdeck",
+							pointCount: 1,
+							updatedAt: "2026-04-17T00:00:00.000Z",
+						},
+					],
+				}),
+				[topicPath]: buildPointFile({
+					topicId: "topic-a",
+					topicName: "专题 A",
+					tagGroups: {
+						default: cloneDefaultGroup(),
+						paper,
+						fiction,
+					},
+					tagGroupProfiles: {
+						default: cloneDefaultProfile(),
+						paper: buildProfile("paper"),
+						fiction: buildProfile("fiction"),
+					},
+					points: [buildPoint("point-a", "paper", ["paper", "fiction"])],
+				}),
+			},
 		});
-		expect(topicBFile.points[0].metadata.tagGroupId).toBe("paper");
-		expect(await service.getGroupScopeTopicIds("paper")).toEqual(["topic-b"]);
+		const service = new IRTagGroupService(app as any);
+
+		await service.getAllGroups();
+		await service.deleteGroup("paper");
+
+		const topicFile = JSON.parse(files.get(topicPath) || "{}");
+		expect(topicFile.tagGroups.paper).toBeUndefined();
+		expect(topicFile.tagGroups.fiction).toBeDefined();
+		expect(topicFile.points[0].metadata.tagGroupId).toBe("fiction");
 	});
 });

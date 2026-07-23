@@ -16,6 +16,10 @@ const pointTagSpies = {
 	matchGroupForTags: vi.fn(),
 };
 
+const pointStorageSpies = {
+	syncChunkPoint: vi.fn(),
+};
+
 const storageSpies = {
 	initialize: vi.fn(),
 	getAllBlocks: vi.fn(),
@@ -71,6 +75,12 @@ vi.mock("../IRPointTagService", () => ({
 		).filter(Boolean),
 }));
 
+vi.mock("../IRPointStorageService", () => ({
+	getSharedIRPointStorageService: () => ({
+		syncChunkPoint: pointStorageSpies.syncChunkPoint,
+	}),
+}));
+
 vi.mock("../IRStorageService", () => ({
 	IRStorageService: class {
 		initialize = storageSpies.initialize;
@@ -122,6 +132,7 @@ import { IRPointWriteService } from "../IRPointWriteService";
 describe("IRPointWriteService", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		pointStorageSpies.syncChunkPoint.mockResolvedValue({});
 		storageSpies.initialize.mockResolvedValue(undefined);
 		storageSpies.getAllBlocks.mockResolvedValue({});
 		storageSpies.getAllDecks.mockResolvedValue({});
@@ -183,9 +194,12 @@ describe("IRPointWriteService", () => {
 	});
 
 	it("target 形式的标签更新会复用统一写入口卡片适配", async () => {
-		pointTagSpies.saveChunkTags.mockResolvedValue({
+		const updatedChunk = {
+			chunkId: "chunk-1",
 			filePath: "Inbox\\Chunk.md",
-		});
+			tags: ["gamma"],
+		};
+		pointTagSpies.saveChunkTags.mockResolvedValue(updatedChunk);
 		const service = new IRPointWriteService({} as any);
 
 		const result = await service.updatePointTags(
@@ -200,6 +214,10 @@ describe("IRPointWriteService", () => {
 		expect(pointTagSpies.saveChunkTags).toHaveBeenCalledWith("chunk-1", [
 			"gamma",
 		]);
+		expect(pointStorageSpies.syncChunkPoint).toHaveBeenCalledWith(
+			updatedChunk,
+			{ preserveExisting: true },
+		);
 		expect(result).toEqual({
 			kind: "chunk",
 			sourceDocumentPath: "Inbox/Chunk.md",
@@ -284,6 +302,7 @@ describe("IRPointWriteService", () => {
 			kind: "epub",
 			sourceDocumentPath: "Books/Novel.epub",
 		});
+		expect(storageSpies.invalidateScheduleRuntimeCaches).not.toHaveBeenCalled();
 	});
 
 	it("chunk 专题更新只保留首个专题", async () => {

@@ -6,9 +6,9 @@ import {
 import { irStandaloneUiTranslationOverrides } from "./resources/ir-standalone-ui-overrides";
 import { irUiSurfaceTranslations } from "./resources/ir-ui-surfaces";
 import { licenseUiTranslationOverrides } from "./resources/license-ui";
-import type { SupportedLanguage, TranslationKey } from "./types";
+import type { AuthoringLanguage, TranslationKey } from "./types";
 
-export const translations: Record<SupportedLanguage, TranslationKey> = {
+export const translations: Record<AuthoringLanguage, TranslationKey> = {
 	"zh-CN": {
 		...standaloneBaseTranslations["zh-CN"],
 		...incrementalReadingTranslations["zh-CN"],
@@ -22,7 +22,7 @@ export const translations: Record<SupportedLanguage, TranslationKey> = {
 };
 
 export const translationOverrides: Partial<
-	Record<SupportedLanguage, TranslationKey>
+	Record<AuthoringLanguage, TranslationKey>
 > = {
 	"zh-CN": {
 		...licenseUiTranslationOverrides["zh-CN"],

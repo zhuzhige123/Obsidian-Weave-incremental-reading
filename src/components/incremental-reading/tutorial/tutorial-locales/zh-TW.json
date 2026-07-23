@@ -1,0 +1,399 @@
+{
+  "basics": [
+    {
+      "title": "外掛是什麼",
+      "paragraphs": [
+        "Weave Incremental Reading 把「以後再看」變成可持續推進的閱讀佇列：把散落在 Markdown、PDF、Canvas、網頁、EPUB 等處的材料，整理成可排期、可續讀、可回跳的閱讀點。",
+        "本外掛是獨立的增量閱讀主控；可與 Weave 主外掛、Weave EPUB Reader 協同，不依賴主外掛也能單獨使用。"
+      ]
+    },
+    {
+      "title": "三個核心概念",
+      "listGroups": [
+        {
+          "items": [
+            "閱讀點：一條待閱讀任務，帶來源溯源，可從佇列一鍵回跳原文。",
+            "專題（.irdeck）：閱讀點的容器，以專題檔案儲存在知識庫中。",
+            "增量閱讀日曆：主介面。按日期檢視待處理、已排期與逾期的閱讀點，並安排每日推進節奏。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "核心能力一覽",
+      "listGroups": [
+        {
+          "items": [
+            "統一「新增連結」入口：貼上網頁、雙鏈、塊引用、PDF++、Canvas 節點、EPUB 定位連結。",
+            "材料匯入與訂閱資料夾：批次拆分 Markdown / 匯入 PDF·EPUB 章節；也可訂閱資料夾自動補齊到專題（高階功能）。",
+            "排程與續讀：加工流 / 閱讀清單、每日上限與負載平滑；標記後續讀點可回到原文位置。",
+            "連續閱讀：按同一來源展開相關閱讀點，便於順著一篇文件連續推進。",
+            "關聯筆記：為 PDF / EPUB 閱讀點掛接 Markdown 等筆記（高階功能）。",
+            "來源回跳：Markdown、PDF++、Canvas、網頁、EPUB 等型別保留穩定續讀連結。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "日曆怎麼用",
+      "paragraphs": [
+        "開啟增量閱讀日曆後，上方是月曆熱力，下方是選中日期的閱讀點列表。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "頂部「+」：開啟新增閱讀點（日常主路徑）。",
+            "頂部「更多」選單：匯入材料、更新訂閱資料夾、資料管理、檢視模式等。",
+            "點選日期可檢視當天佇列；完成閱讀後按排程策略決定下次出現時間。",
+            "閱讀點右鍵 / 長按：排期、優先順序、連續閱讀、關聯筆記、標籤組等更多操作。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "連續閱讀",
+      "paragraphs": [
+        "適合同一文件被拆成多個閱讀點時，按來源連續推進，而不是在列表裡到處找下一塊。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "入口：閱讀點右鍵 / 長按 →「更多操作」→「連續閱讀」。",
+            "開啟後，閱讀點旁會出現展開按鈕，可展開同一來源文件下的其它閱讀點。",
+            "該能力屬於基礎排程輔助，無需高階授權。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "關聯筆記",
+      "paragraphs": [
+        "關聯筆記依閱讀點類型分流：PDF / EPUB 用手寫精選關聯；Markdown / 網頁（摘錄筆記載體）用 Obsidian 出鏈做相關筆記統計與開啟。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "入口：閱讀點右鍵 / 長按 →「關聯筆記」。",
+            "PDF / EPUB：開啟、追加、新建、設主筆記、移除等精選關聯操作。",
+            "Markdown / 網頁：開啟來源筆記，並瀏覽來源筆記的出鏈相關筆記；網頁還可在瀏覽器開啟原連結。",
+            "網頁閱讀點建立時已落成摘錄 MD 載體；僅當載體遺失時，選單會提示並允許重新建立摘錄筆記。",
+            "已關聯（或存在出鏈）時，列表項上可出現「筆記」徽章。",
+            "關聯筆記為高階功能：未啟用時入口可能隱藏，或在開啟「高階功能預覽」後顯示為帶鎖項。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "標籤組",
+      "paragraphs": [
+        "標籤組用於按標籤為不同材料配置獨立的排程偏好與間隔因子，多組同時命中時按優先順序匹配。",
+        "請注意：標籤組當前仍在完善中，暫時可能無法正常使用；請勿把它當作當前版本的日常主流程依賴，後續版本會繼續修好。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "設定入口：設定 → Weave Incremental Reading →「高階排程」→ 標籤組管理。",
+            "日曆入口：閱讀點右鍵 / 長按 →「標籤組」（檢視或切換）。",
+            "標籤組為高階功能；完善完成前，建議先用專題、優先順序與基礎排程推進閱讀。"
+          ]
+        }
+      ]
+    }
+  ],
+  "add": [
+    {
+      "title": "推薦入口",
+      "paragraphs": [
+        "日常新增一條閱讀點，請用「新增閱讀目標」模態窗，而不是材料匯入。",
+        "匯入適合把整份文件或整本書拆成大量閱讀點；新增適合一條連結、一個選區、一個 Canvas 節點。"
+      ],
+      "buttons": [
+        {
+          "icon": "plus",
+          "label": "新增連結",
+          "description": "日曆頂部工具欄主入口"
+        },
+        {
+          "icon": "command",
+          "label": "命令面板",
+          "description": "「新增閱讀目標到增量閱讀」"
+        }
+      ]
+    },
+    {
+      "title": "模態窗五步",
+      "listGroups": [
+        {
+          "items": [
+            "貼上連結，或點選「當前位置」捕獲 Markdown 編輯器中的塊 / 行錨點。",
+            "確認閱讀點名稱。",
+            "選擇歸屬專題（.irdeck）。",
+            "安排首次閱讀日（自選日期或系統推薦）。",
+            "可選：建立閱讀筆記、在源筆記追加標記；確認後寫入佇列並排期。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "支援貼上的型別",
+      "listGroups": [
+        {
+          "items": [
+            "網頁：https://…",
+            "Vault 連結 / 塊引用：[[筆記]]、[[筆記#^塊ID]]",
+            "PDF++ 選區或書籤連結（callout 內的 PDF 連結亦可）",
+            "Canvas 節點：[[畫布.canvas#^nodeId]]",
+            "EPUB 定位連結（需安裝並啟用 Weave EPUB Reader）"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "其它快捷入口",
+      "buttons": [
+        {
+          "icon": "text-select",
+          "label": "Markdown 選區",
+          "description": "命令「從當前選區建立增量閱讀點」"
+        },
+        {
+          "icon": "globe",
+          "label": "Obsidian 瀏覽器",
+          "description": "網頁選單 / 選區右鍵 → 新增到增量閱讀"
+        },
+        {
+          "icon": "layout-dashboard",
+          "label": "Canvas 節點",
+          "description": "節點選單 → 新增到增量閱讀"
+        }
+      ]
+    }
+  ],
+  "import": [
+    {
+      "title": "何時用材料匯入",
+      "paragraphs": [
+        "當你要把整份 Markdown、PDF 目錄或 EPUB 目錄批次變成閱讀點時，使用「匯入閱讀材料」。",
+        "入口：日曆頂部「更多」→ 匯入閱讀材料。"
+      ]
+    },
+    {
+      "title": "匯入步驟",
+      "listGroups": [
+        {
+          "items": [
+            "選擇檔案（同批只能是同一類：md / pdf / epub，不可混合同批）。",
+            "PDF / EPUB 會先進入目錄（outline）步驟，勾選要匯入的章節。",
+            "選擇拆分模式並配置引數。",
+            "預覽生成的閱讀點後確認匯入。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "格式與能力邊界",
+      "listGroups": [
+        {
+          "heading": "Markdown",
+          "items": [
+            "可按標題、空行等規則拆分；整檔案可選擇「引用」或「複製」。",
+            "相容匯入目錄預設為「外掛資料資料夾 / IR」。"
+          ]
+        },
+        {
+          "heading": "PDF / EPUB（高階功能）",
+          "items": [
+            "按目錄生成書籤式閱讀點，保留章節續讀資訊。",
+            "EPUB 目錄解析依賴 Weave EPUB Reader 提供的能力。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "訂閱資料夾",
+      "paragraphs": [
+        "訂閱資料夾適合「剪藏 / 收件箱」場景：指定 Vault 中的 Markdown 資料夾後，系統會掃描並自動把符合條件的新材料補齊到對應專題，再按排程進入增量閱讀佇列。",
+        "這與一次性「匯入閱讀材料」不同：匯入是你主動選檔案拆分；訂閱是持續監聽資料夾並自動補齊。"
+      ],
+      "listGroups": [
+        {
+          "items": [
+            "配置入口：設定 → Weave Incremental Reading →「基礎」→「訂閱剪藏資料夾」（新增規則、選資料夾、繫結專題、初次排期方式、批次確認閾值）。",
+            "手動同步：日曆頂部「更多」→「更新訂閱資料夾」，或命令面板「更新訂閱資料夾」。",
+            "日常也會在外掛啟動或相關檔案變更時後臺自動同步。",
+            "訂閱資料夾為高階功能：未啟用時入口可能隱藏，或在開啟「高階功能預覽」後顯示為帶鎖項。"
+          ]
+        }
+      ]
+    }
+  ],
+  "trace": [
+    {
+      "title": "溯源原則",
+      "paragraphs": [
+        "每個閱讀點儲存穩定的續讀連結與來源型別。從日曆開啟時，外掛按型別路由回原文，並儘可能定位到建立時的位置。"
+      ]
+    },
+    {
+      "title": "Canvas 節點",
+      "paragraphs": [
+        "加入：Canvas 節點選單，或貼上 [[畫布.canvas#^nodeId]]。",
+        "回跳：開啟對應 Canvas，並按節點 ID（必要時輔以文本候選）定位高亮。",
+        "依賴：Obsidian 內建 Canvas。"
+      ]
+    },
+    {
+      "title": "Obsidian 瀏覽器（網頁）",
+      "paragraphs": [
+        "加入：內建 Web Viewer 的「新增到增量閱讀」，或貼上 https 連結；網頁型閱讀點通常會建立閱讀筆記。",
+        "回跳：用 Obsidian 瀏覽器開啟該 URL。",
+        "依賴：Obsidian 內建網頁檢視器。"
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader 選中文本",
+      "paragraphs": [
+        "加入：在閱讀器中選中文本後走「新增到增量閱讀」/ 貼上 EPUB 定位連結；高亮本身不會自動變成閱讀點。",
+        "回跳：通過 obsidian://weave-epub-reader 協議開啟書籍並定位到 CFI / 章節。",
+        "依賴：Weave EPUB Reader。"
+      ]
+    },
+    {
+      "title": "Obsidian Markdown",
+      "paragraphs": [
+        "加入：塊引用 [[筆記#^塊ID]]、行錨點，或編輯器「當前位置」/ 選區快速建立。",
+        "回跳：開啟筆記並滾動到塊或行，必要時顯示溯源定位高亮。",
+        "依賴：Obsidian 原生 Markdown。"
+      ]
+    },
+    {
+      "title": "PDF（PDF++）",
+      "paragraphs": [
+        "加入：貼上 PDF++ 選區 / 書籤連結，或用匯入按目錄批次建立。",
+        "回跳：開啟 PDF 並解析頁碼與選區錨點。",
+        "依賴：Obsidian PDF 能力；精確選區定位建議配合 PDF++。"
+      ]
+    }
+  ],
+  "data": [
+    {
+      "title": "兩層儲存",
+      "listGroups": [
+        {
+          "items": [
+            "Vault 資料：專題與閱讀點的真相來源（應納入備份與同步）。",
+            "外掛目錄：設定、快取與執行時狀態（多數可重建，備份優先 Vault）。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Vault 資料根",
+      "paragraphs": [
+        "預設資料夾名為「weave Incremental reading」，可在設定中修改。其下直接存放 points、materials、registry 等，與 Weave 系列其它外掛常用的 weave/ 目錄隔離。"
+      ],
+      "code": "weave Incremental reading/\n  points/                 # .irdeck topic files\n  materials/\n  registry/\n  pdf-bookmark-tasks.json\n  epub-bookmark-tasks.json\n  IR/                     # compatibility import folder"
+    },
+    {
+      "title": ".irdeck 專題檔案",
+      "paragraphs": [
+        "每個專題是一份 .irdeck 檔案：包含專題後設資料與 points 陣列（排程、溯源、關聯等）。跨外掛協作時，閱讀點應以 .irdeck 中的記錄為唯一真相。"
+      ]
+    },
+    {
+      "title": "外掛目錄與備份建議",
+      "listGroups": [
+        {
+          "items": [
+            "設定儲存在 .obsidian/plugins/weave-incremental-reading/data.json。",
+            "cache/ 與 state/ 為本地加速與執行態，遷移機器時可不必強求一致。",
+            "備份請優先完整複製外掛資料資料夾（含全部 .irdeck）；更改資料根路徑前先確認舊目錄內容已就緒。"
+          ]
+        }
+      ]
+    }
+  ],
+  "family": [
+    {
+      "title": "Weave 是什麼",
+      "paragraphs": [
+        "Weave 是一組面向 Obsidian 的知識工作流外掛，圍繞「讀 → 記 → 排 → 複習」組織長期學習。",
+        "Weave EPUB Reader 負責在庫內讀書與摘錄；Weave 主外掛負責記憶牌組、題庫與智慧制卡；Weave Incremental Reading（本外掛）負責增量閱讀佇列與日曆排期。"
+      ],
+      "listGroups": [
+        {
+          "heading": "三者分工",
+          "items": [
+            "Weave EPUB Reader：在 Obsidian 內閱讀書籍，管理摘錄與高亮，並與筆記、Canvas、牌組聯動。",
+            "Weave 主外掛：從任意來源段落生成帶溯源連結的記憶卡片，並以多檢視管理與 FSRS 複習。",
+            "Weave Incremental Reading：把「以後再看」整理成閱讀點佇列，用專題與月曆排程推進節奏。"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave Incremental Reading（當前外掛）",
+      "paragraphs": [
+        "解決「收藏很多、同時開很多本書卻都讀不深」的問題：用月曆推進閱讀點，而不是靠意志力硬啃。"
+      ],
+      "listGroups": [
+        {
+          "heading": "核心功能",
+          "items": [
+            "閱讀點與專題（.irdeck）",
+            "增量閱讀月曆、連續閱讀與負載排程",
+            "統一新增連結、材料匯入與訂閱資料夾",
+            "關聯筆記（PDF / EPUB）、標籤組（完善中）",
+            "Markdown / PDF / Canvas / 網頁 / EPUB 來源回跳"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave 主外掛",
+      "paragraphs": [
+        "基於 Obsidian 的知識卡片系統：從庫內任意檔案的段落摘錄生成帶溯源連結的記憶卡片，支援表格、看板、網格等檢視與題庫練習。"
+      ],
+      "listGroups": [
+        {
+          "heading": "核心功能",
+          "items": [
+            "摘錄制卡與多檢視管理",
+            "題庫、錯題本與考試統計",
+            "FSRS 間隔複習與學習會話",
+            "可與本外掛共享授權繼承關係"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Weave EPUB Reader",
+      "paragraphs": [
+        "在 Vault 內開啟 EPUB 等書籍，邊讀邊摘錄；通過深連結把書中位置與筆記、增量閱讀點連在一起。"
+      ],
+      "listGroups": [
+        {
+          "heading": "與本外掛的關係",
+          "items": [
+            "EPUB 章節可匯入為增量閱讀點",
+            "閱讀器選中文本可建立帶定位資訊的閱讀點",
+            "從日曆回跳時開啟閱讀器並定位到原文"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "怎麼組合使用",
+      "listGroups": [
+        {
+          "items": [
+            "只做增量閱讀佇列：只裝本外掛即可。",
+            "還要讀 EPUB 並回跳章節：本外掛 + Weave EPUB Reader。",
+            "還要制卡與複習：本外掛 + Weave 主外掛。",
+            "完整閉環（讀 → 記 → 排 → 複習）：三款都裝。"
+          ]
+        }
+      ]
+    }
+  ]
+}

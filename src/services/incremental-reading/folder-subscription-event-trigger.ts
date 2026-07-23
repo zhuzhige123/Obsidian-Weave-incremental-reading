@@ -3,6 +3,7 @@ import type {
 	IncrementalReadingFolderSubscriptionSettings,
 } from "../../types/plugin-settings.d";
 import { resolveIncrementalReadingFolderSubscriptionRuleForFile } from "./folder-subscription-settings";
+import { isFolderSubscriptionMarkdownPath } from "./folder-subscription-vault-scan";
 
 export type FolderSubscriptionVaultEvent = "create" | "rename";
 
@@ -27,6 +28,7 @@ function hasMatchingRule(
 
 /**
  * 自动订阅触发策略（降噪版）：
+ * - 仅 Markdown 笔记（`.md`）可触发；图片/附件等一律忽略
  * - create：仅当新文件位于订阅规则内时触发
  * - rename：仅当文件从规则外移动到规则内时触发
  * 其它变化（内容修改、规则内重命名等）不触发自动同步
@@ -41,6 +43,10 @@ export function shouldTriggerFolderSubscriptionResyncForVaultEvent(options: {
 		| null;
 }): boolean {
 	const { eventType, nextPath, previousPath, settingsOrRules } = options;
+	if (!isFolderSubscriptionMarkdownPath(nextPath)) {
+		return false;
+	}
+
 	const nextMatched = hasMatchingRule(nextPath, settingsOrRules);
 	if (!nextMatched) {
 		return false;

@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { setIcon } from "obsidian";
 	import type { WeavePlugin } from "../../../main";
 	import { tr } from "../../../utils/i18n";
 	import MarkdownRenderer from "../../atoms/MarkdownRenderer.svelte";
-	import IRParagraphShellEditorHost from "./IRParagraphShellEditorHost.svelte";
 	import {
 		PARAGRAPH_SCHEDULE_INTERVAL_DAYS,
 		clampParagraphPriorityUi,
@@ -16,7 +15,12 @@
 		resolveParagraphWorkbenchDisplaySettings,
 		type ParagraphScheduleIntervalDays,
 	} from "../../../services/incremental-reading/paragraph-workbench/paragraph-reading-shell";
+	import { isParagraphWorkbenchExperimental } from "../../../services/incremental-reading/paragraph-workbench/paragraph-workbench-maturity";
 	import IRPrioritySlider from "../IRPrioritySlider.svelte";
+	import { AddReadingTargetModalObsidian } from "../AddReadingTargetModalObsidian";
+	import IRParagraphShellEditorHost, {
+		type ParagraphShellEditorApi,
+	} from "./IRParagraphShellEditorHost.svelte";
 	import { ParagraphWorkbenchService } from "../../../services/incremental-reading/paragraph-workbench/ParagraphWorkbenchService";
 	import type {
 		ParagraphWorkbenchOpenInput,
@@ -36,7 +40,9 @@
 	let { plugin, initialInput = null }: Props = $props();
 
 	let t = $derived($tr);
-	const workbenchService = new ParagraphWorkbenchService(plugin.app);
+	const workbenchService = untrack(
+		() => new ParagraphWorkbenchService(plugin.app),
+	);
 	let session = $state<ParagraphWorkbenchSession | null>(null);
 	let display = $derived(workbenchService?.getDisplay() ?? null);
 	let currentSegment = $derived(session?.segments?.[session.currentIndex] ?? null);
@@ -52,6 +58,10 @@
 	let textViewportEl = $state<HTMLElement | null>(null);
 	let immersive = $state(false);
 	let hasTextSelection = $state(false);
+	let addReadingTargetModalInstance: AddReadingTargetModalObsidian | null = null;
+	let editorApi: ParagraphShellEditorApi | null = null;
+	let editorSyncTick = $state(0);
+	let editorSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let fontScale = $state(resolveParagraphWorkbenchDisplaySettings().fontScale);
 	let surfaceStyle = $state<IRParagraphWorkbenchSurfaceStyle>(
@@ -193,12 +203,117 @@
 		);
 	}
 
-	async function openTopicPicker(): Promise<void> {
-		const next = await workbenchService.openAddToTopicModal();
+	function openTopicPicker(event: MouseEvent): void {
+		void workbenchService.openSelectDocumentTopic(event, () => {
+			session = workbenchService.getSession();
+			priorityUi = workbenchService.getPriorityUi();
+		});
+	}
+
+	function clearEditorSyncTimer(): void {
+		if (editorSyncTimer) {
+			clearTimeout(editorSyncTimer);
+			editorSyncTimer = null;
+		}
+	}
+
+	function handleEditorReady(api: ParagraphShellEditorApi): void {
+		editorApi = api;
+	}
+
+	function handleEditorChange(content: string): void {
+		clearEditorSyncTimer();
+		editorSyncTimer = setTimeout(() => {
+			editorSyncTimer = null;
+			void workbenchService.syncCurrentSegmentTextToSource(content).then((next) => {
+				if (next) {
+					session = next;
+				}
+			});
+		}, 280);
+	}
+
+	async function flushEditorToSource(): Promise<string | null> {
+		clearEditorSyncTimer();
+		if (paragraphViewMode !== "edit" || !editorApi) {
+			return null;
+		}
+		const text = editorApi.flush();
+		const next = await workbenchService.syncCurrentSegmentTextToSource(text);
 		if (next) {
 			session = next;
-			priorityUi = workbenchService.getPriorityUi();
 		}
+		return text;
+	}
+
+	/** Wait for Svelte/DOM to paint the refreshed block (with ^IR- id) before opening modal. */
+	async function waitForDisplayPaint(): Promise<void> {
+		await new Promise<void>((resolve) => {
+			window.requestAnimationFrame(() => {
+				window.requestAnimationFrame(() => resolve());
+			});
+		});
+	}
+
+	/**
+	 * Ordered flow:
+	 * 1) write block id into source
+	 * 2) refresh current block display (show ^IR-…)
+	 * 3) open AddReadingTarget modal with the embed resume link
+	 */
+	async function openAddCurrentBlockToIR(): Promise<void> {
+		const editorText = await flushEditorToSource();
+		const draft = await workbenchService.prepareCurrentBlockReadingTarget({
+			editorText,
+		});
+		if (!draft) {
+			session = workbenchService.getSession();
+			return;
+		}
+
+		// Step 2: refresh workbench display so the new block id is visible first.
+		session = workbenchService.getSession();
+		const refreshedSegment =
+			session?.segments?.[session.currentIndex] ?? null;
+		const refreshedText = String(refreshedSegment?.text || "");
+		if (refreshedText && paragraphViewMode === "edit") {
+			editorSyncTick += 1;
+			editorApi?.setValue(refreshedText);
+		}
+		await waitForDisplayPaint();
+
+		// Step 3: open modal with prefilled source/trace link.
+		if (addReadingTargetModalInstance) {
+			addReadingTargetModalInstance.close();
+			addReadingTargetModalInstance = null;
+		}
+
+		addReadingTargetModalInstance = new AddReadingTargetModalObsidian(plugin.app, {
+			plugin,
+			initialLink: draft.link,
+			initialTitle: draft.title,
+			initialDeckId: draft.deckId || session?.topicId || "",
+			initialCanvasTextCandidates: draft.canvasTextCandidates,
+			defaultScheduleMode: "custom",
+			onClose: () => {
+				addReadingTargetModalInstance = null;
+			},
+			onAdded: () => {
+				void workbenchService.refreshAfterReadingTargetAdded().then((next) => {
+					if (next) {
+						session = next;
+						priorityUi = workbenchService.getPriorityUi();
+						editorSyncTick += 1;
+						const addedSegment =
+							next.segments?.[next.currentIndex] ?? null;
+						if (addedSegment?.text && paragraphViewMode === "edit") {
+							editorApi?.setValue(addedSegment.text);
+						}
+					}
+				});
+			},
+		});
+		addReadingTargetModalInstance.open();
 	}
 
 	async function handleExcerpt(): Promise<void> {
@@ -248,8 +363,11 @@
 	}
 
 	function applyImmersiveClass(active: boolean): void {
-		document.body.classList.toggle("weave-ir-immersive-paragraph-mode", active);
-		document.documentElement.classList.toggle("weave-ir-immersive-paragraph-mode", active);
+		activeDocument.body.classList.toggle("weave-ir-immersive-paragraph-mode", active);
+		activeDocument.documentElement.classList.toggle(
+			"weave-ir-immersive-paragraph-mode",
+			active,
+		);
 	}
 
 	async function setImmersive(active: boolean): Promise<void> {
@@ -260,8 +378,10 @@
 		applyImmersiveClass(active);
 		if (active) {
 			try {
-				const host = workbenchRootEl?.closest(".workspace-leaf-content") ?? document.documentElement;
-				if (document.fullscreenElement !== host) {
+				const host =
+					workbenchRootEl?.closest(".workspace-leaf-content") ??
+					activeDocument.documentElement;
+				if (activeDocument.fullscreenElement !== host) {
 					await host.requestFullscreen?.();
 				}
 			} catch {
@@ -270,8 +390,8 @@
 			return;
 		}
 		try {
-			if (document.fullscreenElement) {
-				await document.exitFullscreen?.();
+			if (activeDocument.fullscreenElement) {
+				await activeDocument.exitFullscreen?.();
 			}
 		} catch { /* ignored */ }
 	}
@@ -281,7 +401,7 @@
 	}
 
 	function handleFullscreenChange(): void {
-		const active = Boolean(document.fullscreenElement);
+		const active = Boolean(activeDocument.fullscreenElement);
 		if (!active && immersive) {
 			immersive = false;
 			applyImmersiveClass(false);
@@ -307,9 +427,9 @@
 			refreshTextSelectionState();
 		};
 
-		document.addEventListener("fullscreenchange", handleFullscreenChange);
-		document.addEventListener("pointerdown", handlePointerDown, true);
-		document.addEventListener("selectionchange", handleSelectionActivity);
+		activeDocument.addEventListener("fullscreenchange", handleFullscreenChange);
+		activeDocument.addEventListener("pointerdown", handlePointerDown, true);
+		activeDocument.addEventListener("selectionchange", handleSelectionActivity);
 
 		const unsubscribeProjection = workbenchService.subscribeProjectionScheduleRefresh(() => {
 			session = workbenchService.getSession();
@@ -317,10 +437,14 @@
 
 		return () => {
 			unsubscribeProjection();
-			document.removeEventListener("fullscreenchange", handleFullscreenChange);
-			document.removeEventListener("pointerdown", handlePointerDown, true);
-			document.removeEventListener("selectionchange", handleSelectionActivity);
+			activeDocument.removeEventListener("fullscreenchange", handleFullscreenChange);
+			activeDocument.removeEventListener("pointerdown", handlePointerDown, true);
+			activeDocument.removeEventListener("selectionchange", handleSelectionActivity);
 			applyImmersiveClass(false);
+			clearEditorSyncTimer();
+			addReadingTargetModalInstance?.close();
+			addReadingTargetModalInstance = null;
+			editorApi = null;
 		};
 	});
 
@@ -350,11 +474,42 @@
 	data-surface-style={surfaceStyle}
 	bind:this={workbenchRootEl}
 >
+	{#if isParagraphWorkbenchExperimental()}
+		<div
+			class="ir-paragraph-workbench__experimental-banner"
+			role="status"
+			aria-live="polite"
+		>
+			<span class="ir-paragraph-workbench__experimental-badge">
+				{t("irParagraphWorkbench.experimentalBadge")}
+			</span>
+			<div class="ir-paragraph-workbench__experimental-copy">
+				<strong>{t("irParagraphWorkbench.experimentalBannerTitle")}</strong>
+				<p>{t("irParagraphWorkbench.experimentalBannerBody")}</p>
+			</div>
+		</div>
+	{/if}
 	<header class="ir-paragraph-workbench__header">
 		<div class="ir-paragraph-workbench__header-left">
-			<button type="button" class="clickable-icon ir-paragraph-workbench__topic-btn" onclick={() => void openTopicPicker()}>
+			<button
+				type="button"
+				class="clickable-icon ir-paragraph-workbench__topic-btn"
+				onclick={(event) => openTopicPicker(event)}
+				title={t("irParagraphWorkbench.selectDocumentTopicHint")}
+				aria-label={t("irParagraphWorkbench.selectIrTopic")}
+			>
 				<span class="ir-paragraph-workbench__topic-icon" use:icon={"book-plus"}></span>
 				<span>{session?.topicName || t("irParagraphWorkbench.selectIrTopic")}</span>
+			</button>
+			<button
+				type="button"
+				class="clickable-icon ir-paragraph-workbench__add-block-btn"
+				onclick={() => void openAddCurrentBlockToIR()}
+				title={t("irParagraphWorkbench.addCurrentBlockHint")}
+				aria-label={t("irParagraphWorkbench.addCurrentBlock")}
+			>
+				<span class="ir-paragraph-workbench__add-block-icon" use:icon={"plus-circle"}></span>
+				<span>{t("irParagraphWorkbench.addCurrentBlock")}</span>
 			</button>
 		</div>
 		<div class="ir-paragraph-workbench__header-right">
@@ -536,6 +691,9 @@
 								value={currentSegment.text}
 								fontScale={fontScale}
 								sessionId={`ir-paragraph-workbench-${currentSegment.id}`}
+								syncTick={editorSyncTick}
+								onChange={handleEditorChange}
+								onReady={handleEditorReady}
 							/>
 						{:else if session?.sourceType === "epub" && currentSegment.html}
 							<div class="ir-paragraph-workbench__text" style={`--weave-paragraph-font-scale:${fontScale / 100};`}>

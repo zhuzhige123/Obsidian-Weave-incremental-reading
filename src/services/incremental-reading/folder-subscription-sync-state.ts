@@ -21,6 +21,7 @@ export type ExistingChunkLike = {
 	nextRepDate?: number;
 	meta?: {
 		autoSubscribedAt?: string;
+		autoSubscribedFolderPath?: string;
 		externalDocument?: boolean;
 		readingMaterialId?: string;
 	} & Record<string, unknown>;

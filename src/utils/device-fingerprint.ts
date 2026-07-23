@@ -34,25 +34,6 @@ export function collectStableDeviceComponents(_app: App): string[] {
 	components.push(String(navigator.hardwareConcurrency || 0));
 	components.push(String(navigator.maxTouchPoints || 0));
 
-	try {
-		const os = (
-			window as unknown as { require?: (id: string) => unknown }
-		).require?.("os") as
-			| {
-					platform?: () => string;
-					arch?: () => string;
-					hostname?: () => string;
-			  }
-			| undefined;
-		if (os) {
-			components.push(os.platform?.() || "unknown");
-			components.push(os.arch?.() || "unknown");
-			components.push(os.hostname?.() || "unknown");
-		}
-	} catch {
-		components.push("no-os-info");
-	}
-
 	return components.filter((value) => value && value !== "undefined");
 }
 

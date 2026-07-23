@@ -176,20 +176,83 @@ export class Modal {
 // Mock Setting class
 export class Setting {
 	settingEl: HTMLElement;
+	controlEl: HTMLElement;
 
 	constructor(containerEl: HTMLElement) {
 		this.settingEl = document.createElement("div");
+		this.controlEl = document.createElement("div");
+		this.settingEl.appendChild(this.controlEl);
 		containerEl.appendChild(this.settingEl);
 	}
 
 	setName = vi.fn().mockReturnThis();
 	setDesc = vi.fn().mockReturnThis();
-	addText = vi.fn().mockReturnThis();
+	addText = vi.fn((cb?: (text: {
+		setPlaceholder: (placeholder: string) => unknown;
+		setValue: (value: string) => unknown;
+		onChange: (cb: (value: string) => void) => unknown;
+		inputEl: HTMLInputElement;
+	}) => void) => {
+		const inputEl = document.createElement("input");
+		cb?.({
+			setPlaceholder: vi.fn().mockReturnThis(),
+			setValue: vi.fn().mockReturnThis(),
+			onChange: vi.fn().mockReturnThis(),
+			inputEl,
+		});
+		return this;
+	});
 	addTextArea = vi.fn().mockReturnThis();
-	addToggle = vi.fn().mockReturnThis();
-	addDropdown = vi.fn().mockReturnThis();
-	addButton = vi.fn().mockReturnThis();
-	addSlider = vi.fn().mockReturnThis();
+	addToggle = vi.fn((cb?: (toggle: {
+		setValue: (value: boolean) => unknown;
+		onChange: (cb: (value: boolean) => void) => unknown;
+	}) => void) => {
+		cb?.({
+			setValue: vi.fn().mockReturnThis(),
+			onChange: vi.fn().mockReturnThis(),
+		});
+		return this;
+	});
+	addDropdown = vi.fn((cb?: (dropdown: {
+		addOption: (value: string, label: string) => unknown;
+		setValue: (value: string) => unknown;
+		onChange: (cb: (value: string) => void) => unknown;
+	}) => void) => {
+		cb?.({
+			addOption: vi.fn().mockReturnThis(),
+			setValue: vi.fn().mockReturnThis(),
+			onChange: vi.fn().mockReturnThis(),
+		});
+		return this;
+	});
+	addButton = vi.fn((cb?: (button: {
+		setButtonText: (text: string) => unknown;
+		setCta: () => unknown;
+		onClick: (cb: () => void) => unknown;
+	}) => void) => {
+		cb?.({
+			setButtonText: vi.fn().mockReturnThis(),
+			setCta: vi.fn().mockReturnThis(),
+			onClick: vi.fn().mockReturnThis(),
+		});
+		return this;
+	});
+	addSlider = vi.fn((cb?: (slider: {
+		setLimits: (min: number, max: number, step: number) => unknown;
+		setValue: (value: number) => unknown;
+		setDynamicTooltip: () => unknown;
+		setDisabled: (disabled: boolean) => unknown;
+		onChange: (cb: (value: number) => void) => unknown;
+	}) => void) => {
+		cb?.({
+			setLimits: vi.fn().mockReturnThis(),
+			setValue: vi.fn().mockReturnThis(),
+			setDynamicTooltip: vi.fn().mockReturnThis(),
+			setDisabled: vi.fn().mockReturnThis(),
+			onChange: vi.fn().mockReturnThis(),
+		});
+		return this;
+	});
 	setClass = vi.fn().mockReturnThis();
 	setTooltip = vi.fn().mockReturnThis();
 	setDisabled = vi.fn().mockReturnThis();
@@ -528,6 +591,30 @@ export class WorkspaceLeaf {
 
 // Mock utility functions
 export const normalizePath = vi.fn((path: string) => path.replace(/\\/g, "/"));
+
+/** Minimal stand-in for Obsidian `getAllTags(cache)`. */
+export const getAllTags = vi.fn((cache: any): string[] | null => {
+	if (!cache) {
+		return null;
+	}
+	const tags = new Set<string>();
+	for (const entry of cache.tags || []) {
+		const tag = String(entry?.tag || "").trim();
+		if (tag) {
+			tags.add(tag.startsWith("#") ? tag : `#${tag}`);
+		}
+	}
+	const fmTags = cache.frontmatter?.tags;
+	const fmList = Array.isArray(fmTags) ? fmTags : fmTags ? [fmTags] : [];
+	for (const raw of fmList) {
+		const tag = String(raw || "").trim();
+		if (tag) {
+			tags.add(tag.startsWith("#") ? tag : `#${tag}`);
+		}
+	}
+	return Array.from(tags);
+});
+
 export const moment = vi.fn(() => ({
 	format: vi.fn().mockReturnValue("2025-01-02"),
 	valueOf: vi.fn().mockReturnValue(Date.now()),

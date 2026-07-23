@@ -5,6 +5,10 @@ import type {
 	IncrementalReadingSettings,
 } from "../../types/plugin-settings.d";
 import { normalizeIncrementalReadingFolderSubscriptionSettings } from "./folder-subscription-settings";
+import {
+	DEFAULT_IR_TAG_SOURCE_POLICY,
+	normalizeIRTagSourcePolicy,
+} from "./ir-tag-source-policy";
 import { resolveParagraphWorkbenchDisplaySettings } from "./paragraph-workbench/paragraph-reading-shell";
 
 export const DEFAULT_IR_CALENDAR_SIDEBAR_SETTINGS: IRCalendarSidebarSettings = {
@@ -14,11 +18,22 @@ export const DEFAULT_IR_CALENDAR_SIDEBAR_SETTINGS: IRCalendarSidebarSettings = {
 	calendarViewMode: "full",
 	showMaterialTimers: true,
 	showReadingPointTypeLabels: false,
+	showMissingSourceIndicators: true,
+	hideTodayCompletedReadingPoints: false,
 	backgroundWall: {
 		imagePath: "",
 		fadePercent: 72,
 	},
 };
+
+function resolveCalendarViewMode(
+	mode: unknown,
+): NonNullable<IRCalendarSidebarSettings["calendarViewMode"]> {
+	if (mode === "full" || mode === "two-row" || mode === "one-row") {
+		return mode;
+	}
+	return DEFAULT_IR_CALENDAR_SIDEBAR_SETTINGS.calendarViewMode ?? "full";
+}
 
 export const DEFAULT_IR_FOLDER_SUBSCRIPTION_SETTINGS: IncrementalReadingFolderSubscriptionSettings =
 	{
@@ -66,6 +81,9 @@ export function buildDefaultIncrementalReadingSettings(
 		priorityHalfLifeDays: 7,
 		learnAheadDays: 3,
 		tagGroupFollowMode: "ask",
+		tagSource: {
+			...DEFAULT_IR_TAG_SOURCE_POLICY,
+		},
 		folderSubscription: {
 			...DEFAULT_IR_FOLDER_SUBSCRIPTION_SETTINGS,
 		},
@@ -85,6 +103,7 @@ export function normalizeIRCalendarSidebarSettings(
 	return {
 		...DEFAULT_IR_CALENDAR_SIDEBAR_SETTINGS,
 		...(settings ?? {}),
+		calendarViewMode: resolveCalendarViewMode(settings?.calendarViewMode),
 		backgroundWall: {
 			...DEFAULT_IR_CALENDAR_SIDEBAR_SETTINGS.backgroundWall,
 			...(settings?.backgroundWall ?? {}),
@@ -107,8 +126,8 @@ export function normalizeIncrementalReadingSettings(
 	return {
 		...defaults,
 		...(settings ?? {}),
-		// 保留用户输入（允许为空）；实际使用路径在读取调用侧通过 resolveIRImportFolder 再做兜底解析
-		importFolder: String(settings?.importFolder || "").trim(),
+		// 已合并进 weaveParentFolder：不再单独持久化自定义 importFolder，读取时由 resolveIRImportFolder 从数据根推导
+		importFolder: "",
 		selectionQuickCreateLastFolder: String(
 			settings?.selectionQuickCreateLastFolder || "",
 		).trim(),
@@ -131,6 +150,7 @@ export function normalizeIncrementalReadingSettings(
 		paragraphWorkbench: resolveParagraphWorkbenchDisplaySettings(
 			settings?.paragraphWorkbench,
 		),
+		tagSource: normalizeIRTagSourcePolicy(settings?.tagSource),
 		flowStretchPercent:
 			typeof settings?.flowStretchPercent === "number"
 				? Math.max(0, Math.min(40, Math.round(settings.flowStretchPercent)))

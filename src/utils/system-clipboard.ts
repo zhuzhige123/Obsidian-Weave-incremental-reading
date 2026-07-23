@@ -5,7 +5,7 @@ function writeWithExecCommand(text: string): boolean {
 		return false;
 	}
 
-	const textarea = activeDocument.createElement("textarea");
+	const textarea = activeDocument.body.createEl("textarea");
 	textarea.value = text;
 	textarea.setAttribute("readonly", "true");
 	applyStyleProps(textarea, {
@@ -13,7 +13,6 @@ function writeWithExecCommand(text: string): boolean {
 		opacity: "0",
 		pointerEvents: "none",
 	});
-	activeDocument.body.appendChild(textarea);
 	textarea.select();
 	textarea.setSelectionRange(0, text.length);
 

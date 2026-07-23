@@ -112,7 +112,7 @@ function measureSafeAreaInsets(): { top: number; bottom: number } {
 		return cachedSafeAreaInsets;
 	}
 
-	const probe = activeDocument.createElement("div");
+	const probe = activeDocument.body.createDiv();
 	probe.dataset.weaveSafeAreaProbe = "true";
 	applyStyleProps(probe, {
 		position: "fixed",
@@ -125,8 +125,6 @@ function measureSafeAreaInsets(): { top: number; bottom: number } {
 		paddingTop: "env(safe-area-inset-top, 0px)",
 		paddingBottom: "env(safe-area-inset-bottom, 0px)",
 	});
-
-	activeDocument.body.appendChild(probe);
 
 	const computedStyle = window.getComputedStyle(probe);
 	const insets = {

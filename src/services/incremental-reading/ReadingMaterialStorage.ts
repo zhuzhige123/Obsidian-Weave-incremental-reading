@@ -10,6 +10,7 @@
  */
 
 import type { App } from "obsidian";
+import { normalizePath } from "obsidian";
 import { getPluginPaths, getV2PathsFromApp } from "../../config/paths";
 import type {
 	AnchorRecord,
@@ -29,6 +30,7 @@ import {
 	remapAssociatedNotePaths,
 	resolveAssociatedNotePaths,
 } from "./IRAssociatedNoteSignals";
+import { remapVaultPath } from "../../utils/ir-vault-path-remap";
 
 type ReadingMaterialRuntimeStore = {
 	version: string;
@@ -318,8 +320,22 @@ export class ReadingMaterialStorage {
 	 * 通过文件路径获取阅读材料
 	 */
 	getMaterialByPath(filePath: string): ReadingMaterial | null {
+		const normalized = normalizePath(String(filePath || "").trim());
+		if (!normalized) {
+			return null;
+		}
+		const needle = normalized.toLowerCase();
 		for (const material of this.materialsCache.values()) {
-			if (material.filePath === filePath) {
+			const materialPath = normalizePath(
+				String(material.filePath || "").trim(),
+			);
+			if (!materialPath) {
+				continue;
+			}
+			if (
+				materialPath === normalized ||
+				materialPath.toLowerCase() === needle
+			) {
 				return material;
 			}
 		}
@@ -374,47 +390,128 @@ export class ReadingMaterialStorage {
 		oldPath: string,
 		newPath: string,
 	): Promise<number> {
+		const result = await this.remapVaultFileReferences(oldPath, newPath, {
+			includeSourcePath: false,
+			includeAssociatedNotes: true,
+		});
+		return result.updatedAssociatedNoteCount;
+	}
+
+	/**
+	 * Remap reading-material source filePath when a vault file/folder is renamed.
+	 */
+	async remapSourceFileReferences(
+		oldPath: string,
+		newPath: string,
+	): Promise<number> {
+		const result = await this.remapVaultFileReferences(oldPath, newPath, {
+			includeSourcePath: true,
+			includeAssociatedNotes: false,
+		});
+		return result.updatedSourceCount;
+	}
+
+	/**
+	 * Single-pass remap for material source paths and/or associated notes.
+	 */
+	async remapVaultFileReferences(
+		oldPath: string,
+		newPath: string,
+		options?: {
+			includeSourcePath?: boolean;
+			includeAssociatedNotes?: boolean;
+		},
+	): Promise<{
+		updatedSourceCount: number;
+		updatedAssociatedNoteCount: number;
+	}> {
+		const normalizedOldPath = normalizePath(String(oldPath || "").trim());
+		const normalizedNewPath = normalizePath(String(newPath || "").trim());
+		const includeSourcePath = options?.includeSourcePath !== false;
+		const includeAssociatedNotes = options?.includeAssociatedNotes !== false;
+		if (
+			!normalizedOldPath ||
+			!normalizedNewPath ||
+			normalizedOldPath === normalizedNewPath ||
+			(!includeSourcePath && !includeAssociatedNotes)
+		) {
+			return { updatedSourceCount: 0, updatedAssociatedNoteCount: 0 };
+		}
+
 		const updates: ReadingMaterial[] = [];
+		const nowIso = new Date().toISOString();
+		let updatedSourceCount = 0;
+		let updatedAssociatedNoteCount = 0;
 
 		for (const material of this.materialsCache.values()) {
-			const currentPaths = resolveAssociatedNotePaths({
-				associatedNotePath:
-					material.primaryAssociatedNotePath || material.associatedNotePath,
-				associatedNotePaths: material.associatedNotePaths,
-			});
-			if (currentPaths.length === 0) {
-				continue;
+			let next = material;
+			let changed = false;
+
+			if (includeSourcePath) {
+				const remapped = remapVaultPath(
+					material.filePath,
+					normalizedOldPath,
+					normalizedNewPath,
+				);
+				if (remapped && remapped !== material.filePath) {
+					const basename = remapped.includes("/")
+						? remapped.slice(remapped.lastIndexOf("/") + 1)
+						: remapped;
+					const title = basename.replace(/\.[^/.]+$/, "") || material.title;
+					next = {
+						...next,
+						filePath: remapped,
+						title,
+						modified: nowIso,
+					};
+					changed = true;
+					updatedSourceCount += 1;
+				}
 			}
 
-			const nextPaths = remapAssociatedNotePaths(
-				currentPaths,
-				oldPath,
-				newPath,
+			if (includeAssociatedNotes) {
+				const currentPaths = resolveAssociatedNotePaths({
+					associatedNotePath:
+						next.primaryAssociatedNotePath || next.associatedNotePath,
+					associatedNotePaths: next.associatedNotePaths,
+				});
+				if (currentPaths.length > 0) {
+					const nextPaths = remapAssociatedNotePaths(
+						currentPaths,
+						normalizedOldPath,
+						normalizedNewPath,
+					);
+					const notesChanged =
+						nextPaths.length !== currentPaths.length ||
+						nextPaths.some((path, index) => path !== currentPaths[index]);
+					if (notesChanged) {
+						next = {
+							...next,
+							primaryAssociatedNotePath: nextPaths[0] || undefined,
+							associatedNotePath: nextPaths[0] || undefined,
+							associatedNotePaths: nextPaths,
+							modified: nowIso,
+						};
+						changed = true;
+						updatedAssociatedNoteCount += 1;
+					}
+				}
+			}
+
+			if (changed) {
+				updates.push(next);
+			}
+		}
+
+		if (updates.length > 0) {
+			await this.saveMaterials(updates);
+			logger.debug(
+				`[ReadingMaterialStorage] vault path remap ${normalizedOldPath} -> ${normalizedNewPath}`,
+				{ updatedSourceCount, updatedAssociatedNoteCount },
 			);
-			if (
-				nextPaths.length === currentPaths.length &&
-				nextPaths.every((path, index) => path === currentPaths[index])
-			) {
-				continue;
-			}
-
-			updates.push({
-				...material,
-				primaryAssociatedNotePath: nextPaths[0] || undefined,
-				associatedNotePath: nextPaths[0] || undefined,
-				associatedNotePaths: nextPaths,
-			});
 		}
 
-		if (updates.length === 0) {
-			return 0;
-		}
-
-		await this.saveMaterials(updates);
-		logger.debug(
-			`[ReadingMaterialStorage] 已重映射 ${updates.length} 个材料的关联笔记路径: ${oldPath} -> ${newPath}`,
-		);
-		return updates.length;
+		return { updatedSourceCount, updatedAssociatedNoteCount };
 	}
 
 	// ===== 会话记录操作 =====

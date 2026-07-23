@@ -50,6 +50,7 @@ import {
 	countInvalidSourcePathFieldsInRawPoint,
 	sanitizePointSourcePathFields,
 } from "../../utils/ir-point-source-path";
+import { remapPointSourcePaths } from "../../utils/ir-vault-path-remap";
 import { normalizeChunkForRuntime } from "../../utils/ir-topic-compat";
 import { logger } from "../../utils/logger";
 import { safeReadJson, safeWriteJson } from "../../utils/safe-json-io";
@@ -58,6 +59,12 @@ import { sanitizeForSync } from "../../utils/sync-safe-filename";
 import { readString } from "../../utils/unknown-record";
 import { parseYAMLFromContent } from "../../utils/yaml-utils";
 import { remapAssociatedNotePaths } from "./IRAssociatedNoteSignals";
+import {
+	readTagsFromFrontmatterRecord,
+	resolveMarkdownTagsYamlKeyFromSettings,
+} from "./ir-tag-source-policy";
+import { matchTagGroupByTags } from "./ir-tag-group-match";
+import { readIncrementalReadingSettings } from "../../utils/ir-plugin-host-access";
 import {
 	type IRLegacyReadApi,
 	deriveLegacyBlockTitle,
@@ -71,6 +78,11 @@ import {
 	resolveLegacyBlockTopicIds,
 	resolveLegacyTopicName,
 } from "./IRPointStorageLegacyMigration";
+import {
+	type IRLearningOutcomeKind,
+	type IRLearningOutcomeStatsSnapshot,
+	resolveOutcomeStatDelta,
+} from "./ir-outcome-contract";
 import { buildPointFilesIndexRevision } from "./IRScheduleFingerprint";
 
 type AdapterLike = App["vault"]["adapter"];
@@ -225,7 +237,9 @@ function normalizeStringArray(values: unknown): string[] {
 function normalizeReadingTags(values: unknown): string[] {
 	const normalized = new Map<string, string>();
 	for (const value of Array.isArray(values) ? values : []) {
-		const tag = String(value || "").trim();
+		const tag = String(value || "")
+			.trim()
+			.replace(/^#+/, "");
 		if (!tag) {
 			continue;
 		}
@@ -1543,6 +1557,82 @@ export class IRPointStorageService {
 		return updatedPointCount;
 	}
 
+	/**
+	 * When a vault file/folder is renamed, rewrite reading-point source paths
+	 * (source.path, locator/metadata path fields, resumeLink embeds, linked notes).
+	 */
+	async remapSourceFileReferences(
+		oldPath: string,
+		newPath: string,
+	): Promise<number> {
+		const normalizedOldPath = normalizePath(String(oldPath || "").trim());
+		const normalizedNewPath = normalizePath(String(newPath || "").trim());
+		if (
+			!normalizedOldPath ||
+			!normalizedNewPath ||
+			normalizedOldPath === normalizedNewPath
+		) {
+			return 0;
+		}
+
+		const catalog = await this.listPointFileCatalogEntries();
+		const pointFilesIndex = await this.readPointFilesIndex();
+		const nowIso = new Date().toISOString();
+		let updatedPointCount = 0;
+		let updatedFileCount = 0;
+
+		for (const entry of catalog) {
+			let fileChanged = false;
+			const nextPoints = (entry.fileData.points || []).map((point) => {
+				const result = remapPointSourcePaths(
+					point,
+					normalizedOldPath,
+					normalizedNewPath,
+				);
+				if (!result.changed) {
+					return point;
+				}
+				fileChanged = true;
+				updatedPointCount += 1;
+				return {
+					...result.point,
+					timestamps: {
+						...result.point.timestamps,
+						updatedAt: nowIso,
+					},
+				};
+			});
+
+			if (!fileChanged) {
+				continue;
+			}
+
+			await this.persistPointFileData(entry.absolutePath, {
+				...entry.fileData,
+				updatedAt: nowIso,
+				points: nextPoints,
+			});
+			const indexEntry = this.findIndexEntryByFilePath(
+				pointFilesIndex.files,
+				entry.absolutePath,
+			);
+			if (indexEntry) {
+				indexEntry.updatedAt = nowIso;
+			}
+			updatedFileCount += 1;
+		}
+
+		if (updatedFileCount > 0) {
+			await this.writePointFilesIndex(pointFilesIndex);
+			this.invalidatePointSnapshotListCache();
+			logger.debug(
+				`[IRPointStorageService] 已重映射 ${updatedPointCount} 个阅读点的源文件路径: ${normalizedOldPath} -> ${normalizedNewPath}`,
+			);
+		}
+
+		return updatedPointCount;
+	}
+
 	private isLegacyDeckBlockPoint(
 		point: Partial<IRPoint> | null | undefined,
 	): boolean {
@@ -2094,11 +2184,15 @@ export class IRPointStorageService {
 					return point;
 				}
 				changed = true;
+				const rematchedGroupId = matchTagGroupByTags(
+					Object.values(nextGroups),
+					Array.isArray(point.userData?.tags) ? point.userData.tags : [],
+				);
 				return {
 					...point,
 					metadata: {
 						...metadata,
-						tagGroupId: DEFAULT_TAG_GROUP.id,
+						tagGroupId: rematchedGroupId,
 					},
 				};
 			});
@@ -2718,20 +2812,17 @@ export class IRPointStorageService {
 	}
 
 	private cloneTagGroup(group: IRTagGroup): IRTagGroup {
+		// Drop deprecated matchSource on clone; matching uses reading-point tags only.
 		return {
-			...group,
+			id: group.id,
+			name: group.name,
+			description: group.description,
 			matchAnyTags: Array.isArray(group.matchAnyTags)
 				? [...group.matchAnyTags]
 				: [],
-			matchSource: group.matchSource
-				? {
-						yamlTags: group.matchSource.yamlTags !== false,
-						inlineTags: group.matchSource.inlineTags !== false,
-						customProperties: Array.isArray(group.matchSource.customProperties)
-							? [...group.matchSource.customProperties]
-							: [],
-				  }
-				: undefined,
+			matchPriority: group.matchPriority,
+			createdAt: group.createdAt,
+			updatedAt: group.updatedAt,
 		};
 	}
 
@@ -2893,14 +2984,6 @@ export class IRPointStorageService {
 			if (!group || typeof group !== "object") {
 				continue;
 			}
-			const rawMatchSource =
-				group.matchSource && typeof group.matchSource === "object"
-					? (group.matchSource as {
-							yamlTags?: unknown;
-							inlineTags?: unknown;
-							customProperties?: unknown;
-					  })
-					: null;
 			const normalizedGroupId = String(group.id || groupId || "").trim();
 			if (!normalizedGroupId) {
 				continue;
@@ -2920,15 +3003,6 @@ export class IRPointStorageService {
 				matchPriority: Number.isFinite(group.matchPriority)
 					? Number(group.matchPriority)
 					: 999,
-				matchSource: rawMatchSource
-					? {
-							yamlTags: rawMatchSource.yamlTags !== false,
-							inlineTags: rawMatchSource.inlineTags !== false,
-							customProperties: Array.isArray(rawMatchSource.customProperties)
-								? rawMatchSource.customProperties.map((value) => String(value))
-								: [],
-					  }
-					: undefined,
 				createdAt:
 					typeof group.createdAt === "string" && group.createdAt.trim()
 						? group.createdAt
@@ -3394,6 +3468,133 @@ export class IRPointStorageService {
 		return fallbackTopicId ? [fallbackTopicId] : [DEFAULT_TOPIC_ID];
 	}
 
+	/**
+	 * Set or clear `relations.parentPointId` on a canonical IRPoint.
+	 * Rejects self-parent and ancestor cycles. Does not move topic files.
+	 */
+	async updatePointParentId(
+		pointId: string,
+		parentPointId: string | null,
+	): Promise<boolean> {
+		await this.initialize();
+		const normalizedPointId = String(pointId || "").trim();
+		if (!normalizedPointId) {
+			return false;
+		}
+
+		const nextParentId = String(parentPointId || "").trim() || null;
+		if (nextParentId && nextParentId === normalizedPointId) {
+			return false;
+		}
+
+		if (nextParentId) {
+			const parentSnapshot = await this.getPointSnapshotById(nextParentId);
+			if (!parentSnapshot) {
+				return false;
+			}
+
+			const seen = new Set<string>([normalizedPointId]);
+			let cursor: string | null = nextParentId;
+			while (cursor) {
+				if (seen.has(cursor)) {
+					return false;
+				}
+				seen.add(cursor);
+				const ancestor = await this.getPointSnapshotById(cursor);
+				cursor =
+					String(ancestor?.point.relations?.parentPointId || "").trim() ||
+					null;
+			}
+		}
+
+		const locateAndPatch = async (
+			absolutePath: string,
+			topicId: string,
+			topicName: string,
+		): Promise<boolean> => {
+			const fileData = await this.readPointFile(
+				absolutePath,
+				topicId,
+				topicName,
+			);
+			const pointIndex = fileData.points.findIndex(
+				(point) => String(point?.id || "").trim() === normalizedPointId,
+			);
+			if (pointIndex < 0) {
+				return false;
+			}
+
+			const existingPoint = fileData.points[pointIndex];
+			const previousParentId =
+				String(existingPoint.relations?.parentPointId || "").trim() || null;
+			if (previousParentId === nextParentId) {
+				return true;
+			}
+
+			const nowIso = new Date().toISOString();
+			const nextPoint: IRPoint = {
+				...existingPoint,
+				relations: {
+					...existingPoint.relations,
+					parentPointId: nextParentId,
+				},
+				timestamps: {
+					...existingPoint.timestamps,
+					updatedAt: nowIso,
+				},
+			};
+			const nextPoints = [...fileData.points];
+			nextPoints[pointIndex] = nextPoint;
+			await this.persistPointFileData(absolutePath, {
+				...fileData,
+				topicId,
+				topicName,
+				updatedAt: nowIso,
+				points: nextPoints,
+			});
+			this.pointIdLocationIndex.set(normalizedPointId, {
+				absolutePath,
+				topicId,
+				topicName,
+			});
+			return true;
+		};
+
+		await this.ensurePointIdLocationIndex();
+		const indexed = this.pointIdLocationIndex.get(normalizedPointId);
+		if (indexed?.absolutePath) {
+			const patched = await locateAndPatch(
+				indexed.absolutePath,
+				indexed.topicId,
+				indexed.topicName,
+			);
+			if (patched) {
+				return true;
+			}
+			this.pointIdLocationIndex.delete(normalizedPointId);
+		}
+
+		const index = await this.readPointFilesIndex();
+		for (const entry of index.files) {
+			const absolutePath = this.resolveIndexedPointFilePath(
+				entry.file,
+			)?.absolutePath;
+			if (!absolutePath) {
+				continue;
+			}
+			const patched = await locateAndPatch(
+				absolutePath,
+				entry.topicId,
+				entry.topicName,
+			);
+			if (patched) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	private async resolveTopicNameFromCurrentState(
 		topicId: string,
 		index: IRPointFileIndex,
@@ -3554,6 +3755,214 @@ export class IRPointStorageService {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Apply a cross-plugin learning outcome to L0 point storage.
+	 * Idempotent for the same artifactId / notePath on a point.
+	 */
+	async applyPointOutcome(input: {
+		pointId: string;
+		kind: IRLearningOutcomeKind;
+		artifactId?: string;
+		notePath?: string;
+		count?: number;
+	}): Promise<{
+		ok: boolean;
+		alreadyLinked: boolean;
+		point: IRPoint | null;
+		stats: IRLearningOutcomeStatsSnapshot | null;
+	}> {
+		await this.initialize();
+		const normalizedPointId = String(input.pointId || "").trim();
+		const artifactId = String(input.artifactId || "").trim();
+		const notePath = normalizePath(String(input.notePath || "").trim());
+		const delta = resolveOutcomeStatDelta(input.kind, input.count ?? 1);
+
+		if (!normalizedPointId) {
+			return {
+				ok: false,
+				alreadyLinked: false,
+				point: null,
+				stats: null,
+			};
+		}
+
+		const locateAndPatch = async (
+			absolutePath: string,
+			topicId: string,
+			topicName: string,
+		): Promise<{
+			ok: boolean;
+			alreadyLinked: boolean;
+			point: IRPoint | null;
+			stats: IRLearningOutcomeStatsSnapshot | null;
+		} | null> => {
+			const fileData = await this.readPointFile(
+				absolutePath,
+				topicId,
+				topicName,
+			);
+			const pointIndex = fileData.points.findIndex(
+				(point) => String(point?.id || "").trim() === normalizedPointId,
+			);
+			if (pointIndex < 0) {
+				return null;
+			}
+
+			const existingPoint = fileData.points[pointIndex];
+			const linkedCardIds = normalizeStringArray(
+				existingPoint.relations?.linkedCardIds,
+			);
+			const linkedNotePaths = normalizeStringArray(
+				existingPoint.relations?.linkedNotePaths,
+			);
+
+			const cardAlreadyLinked =
+				Boolean(artifactId) && linkedCardIds.includes(artifactId);
+			const noteAlreadyLinked =
+				Boolean(notePath) && linkedNotePaths.includes(notePath);
+
+			if (
+				(input.kind === "extract" || input.kind === "memory-card") &&
+				cardAlreadyLinked
+			) {
+				return {
+					ok: true,
+					alreadyLinked: true,
+					point: existingPoint,
+					stats: {
+						extractCount: Number(existingPoint.stats?.extractCount || 0),
+						cardCreatedCount: Number(
+							existingPoint.stats?.cardCreatedCount || 0,
+						),
+						noteCreatedCount: Number(
+							existingPoint.stats?.noteCreatedCount || 0,
+						),
+					},
+				};
+			}
+
+			if (input.kind === "note" && noteAlreadyLinked) {
+				return {
+					ok: true,
+					alreadyLinked: true,
+					point: existingPoint,
+					stats: {
+						extractCount: Number(existingPoint.stats?.extractCount || 0),
+						cardCreatedCount: Number(
+							existingPoint.stats?.cardCreatedCount || 0,
+						),
+						noteCreatedCount: Number(
+							existingPoint.stats?.noteCreatedCount || 0,
+						),
+					},
+				};
+			}
+
+			const nextLinkedCardIds =
+				(input.kind === "extract" || input.kind === "memory-card") &&
+				artifactId &&
+				!cardAlreadyLinked
+					? [...linkedCardIds, artifactId]
+					: linkedCardIds;
+			const nextLinkedNotePaths =
+				input.kind === "note" && notePath && !noteAlreadyLinked
+					? [...linkedNotePaths, notePath]
+					: linkedNotePaths;
+
+			const nowIso = new Date().toISOString();
+			const nextPoint: IRPoint = {
+				...existingPoint,
+				relations: {
+					...existingPoint.relations,
+					linkedCardIds: nextLinkedCardIds,
+					linkedNotePaths: nextLinkedNotePaths,
+				},
+				stats: {
+					...existingPoint.stats,
+					extractCount:
+						Number(existingPoint.stats?.extractCount || 0) + delta.extracts,
+					cardCreatedCount:
+						Number(existingPoint.stats?.cardCreatedCount || 0) +
+						delta.cardsCreated,
+					noteCreatedCount:
+						Number(existingPoint.stats?.noteCreatedCount || 0) +
+						delta.notesWritten,
+				},
+				timestamps: {
+					...existingPoint.timestamps,
+					updatedAt: nowIso,
+					lastInteractionAt: nowIso,
+				},
+			};
+
+			const nextPoints = [...fileData.points];
+			nextPoints[pointIndex] = nextPoint;
+			await this.persistPointFileData(absolutePath, {
+				...fileData,
+				topicId,
+				topicName,
+				updatedAt: nowIso,
+				points: nextPoints,
+			});
+
+			this.pointIdLocationIndex.set(normalizedPointId, {
+				absolutePath,
+				topicId,
+				topicName,
+			});
+
+			return {
+				ok: true,
+				alreadyLinked: false,
+				point: nextPoint,
+				stats: {
+					extractCount: nextPoint.stats.extractCount,
+					cardCreatedCount: nextPoint.stats.cardCreatedCount,
+					noteCreatedCount: nextPoint.stats.noteCreatedCount,
+				},
+			};
+		};
+
+		await this.ensurePointIdLocationIndex();
+		const indexed = this.pointIdLocationIndex.get(normalizedPointId);
+		if (indexed?.absolutePath) {
+			const patched = await locateAndPatch(
+				indexed.absolutePath,
+				indexed.topicId,
+				indexed.topicName,
+			);
+			if (patched) {
+				return patched;
+			}
+			this.pointIdLocationIndex.delete(normalizedPointId);
+		}
+
+		const index = await this.readPointFilesIndex();
+		for (const entry of index.files) {
+			const absolutePath = this.resolveIndexedPointFilePath(
+				entry.file,
+			)?.absolutePath;
+			if (!absolutePath) {
+				continue;
+			}
+			const patched = await locateAndPatch(
+				absolutePath,
+				entry.topicId,
+				entry.topicName,
+			);
+			if (patched) {
+				return patched;
+			}
+		}
+
+		return {
+			ok: false,
+			alreadyLinked: false,
+			point: null,
+			stats: null,
+		};
 	}
 
 	private getTopicFileBaseName(topicName: string): string {
@@ -3979,6 +4388,11 @@ export class IRPointStorageService {
 		}
 	}
 
+	/**
+	 * Read IR reading-point tags from markdown YAML dual-write.
+	 * Uses global `tagSource.markdownYamlKey` (default `weave_tags`), with
+	 * legacy `weave_tags` fallback when a non-legacy primary key is empty.
+	 */
 	private async readChunkTags(chunkFilePath: string): Promise<string[]> {
 		const normalizedPath = normalizePath(String(chunkFilePath || "").trim());
 		if (!normalizedPath || !(await this.adapter.exists(normalizedPath))) {
@@ -3988,20 +4402,15 @@ export class IRPointStorageService {
 		try {
 			const content = await this.adapter.read(normalizedPath);
 			const yaml = parseYAMLFromContent(content);
-			const rawTags = yaml?.tags;
-			if (Array.isArray(rawTags)) {
-				return normalizeReadingTags(
-					rawTags.map((tag) => String(tag || "").trim()).filter(Boolean),
-				);
-			}
-			if (typeof rawTags === "string" && rawTags.trim()) {
-				return normalizeReadingTags(
-					rawTags
-						.split(",")
-						.map((tag) => tag.trim())
-						.filter(Boolean),
-				);
-			}
+			const yamlKey = resolveMarkdownTagsYamlKeyFromSettings(
+				readIncrementalReadingSettings(this.app),
+			);
+			return normalizeReadingTags(
+				readTagsFromFrontmatterRecord(
+					(yaml as Record<string, unknown> | null) || {},
+					yamlKey,
+				),
+			);
 		} catch (error) {
 			logger.warn(
 				`[IRPointStorageService] 读取 chunk 标签失败: ${normalizedPath}`,
@@ -4010,6 +4419,17 @@ export class IRPointStorageService {
 		}
 
 		return [];
+	}
+
+	/** Prefer in-memory chunk.tags (authoritative after saveChunkTags); else YAML. */
+	private async resolveChunkPointTags(
+		chunk: IRChunkFileData,
+	): Promise<string[]> {
+		const rawChunkTags = (chunk as { tags?: string[] }).tags;
+		if (Array.isArray(rawChunkTags)) {
+			return normalizeReadingTags(rawChunkTags);
+		}
+		return await this.readChunkTags(chunk.filePath);
 	}
 
 	private deriveChunkPointTitle(chunk: IRChunkFileData): string {
@@ -4410,6 +4830,21 @@ export class IRPointStorageService {
 				  }
 				: existingPoint.trace;
 			const shouldTouchUpdatedAt = shouldMergeTrace || Boolean(input.metadata);
+			const nextUserData = { ...existingPoint.userData };
+			let userDataChanged = false;
+			// Explicit tags (including []) must apply; otherwise edit-tags saves are no-ops
+			// under preserveExisting and search keeps reading stale/empty userData.tags.
+			if (Array.isArray(input.tags)) {
+				nextUserData.tags = normalizeReadingTags(input.tags);
+				userDataChanged = true;
+			}
+
+			const nextParentPointId =
+				input.parentPointId !== undefined
+					? String(input.parentPointId || "").trim() || null
+					: existingPoint.relations.parentPointId ?? null;
+			const parentRelationChanged =
+				(existingPoint.relations.parentPointId ?? null) !== nextParentPointId;
 
 			return {
 				...existingPoint,
@@ -4428,15 +4863,18 @@ export class IRPointStorageService {
 				relations: {
 					...existingPoint.relations,
 					topicIds,
+					parentPointId: nextParentPointId,
 				},
 				trace: mergedTrace,
 				metadata: mergedMetadata,
-				timestamps: shouldTouchUpdatedAt
-					? {
-							...existingPoint.timestamps,
-							updatedAt: new Date().toISOString(),
-					  }
-					: existingPoint.timestamps,
+				userData: nextUserData,
+				timestamps:
+					shouldTouchUpdatedAt || userDataChanged || parentRelationChanged
+						? {
+								...existingPoint.timestamps,
+								updatedAt: new Date().toISOString(),
+						  }
+						: existingPoint.timestamps,
 				audit: existingPoint.audit || {
 					createdBy: "legacy-migration",
 					origin: {
@@ -4549,7 +4987,10 @@ export class IRPointStorageService {
 						: topicId
 						? [topicId]
 						: [...(existingPoint?.relations.topicIds || [])],
-				parentPointId: existingPoint?.relations.parentPointId ?? null,
+				parentPointId:
+					input.parentPointId !== undefined
+						? String(input.parentPointId || "").trim() || null
+						: existingPoint?.relations.parentPointId ?? null,
 				linkedCardIds: [...(existingPoint?.relations.linkedCardIds || [])],
 				linkedNotePaths,
 			},
@@ -4557,8 +4998,9 @@ export class IRPointStorageService {
 				title: input.title || existingPoint?.userData.title || input.id,
 				note:
 					input.note !== undefined ? input.note : existingPoint?.userData.note,
+				// Same strip/#-dedupe as edit-tags / search (`normalizeReadingTags`)
 				tags: Array.isArray(input.tags)
-					? normalizeStringArray(input.tags)
+					? normalizeReadingTags(input.tags)
 					: [...(existingPoint?.userData.tags || [])],
 				isStarred:
 					typeof input.isStarred === "boolean"
@@ -4807,7 +5249,7 @@ export class IRPointStorageService {
 				| Record<string, unknown>
 				| undefined) || {};
 		const linkedNotePaths: string[] = [];
-		const tags = await this.readChunkTags(normalizedChunk.filePath);
+		const tags = await this.resolveChunkPointTags(normalizedChunk);
 		const title = this.deriveChunkPointTitle(normalizedChunk);
 		const rawStats =
 			normalizedChunk.stats && isRecord(normalizedChunk.stats)
@@ -4894,7 +5336,12 @@ export class IRPointStorageService {
 				isStarred: Boolean(normalizedChunk.favorite),
 				linkedNotePaths,
 				explicitTagGroupId:
-					typeof source?.tagGroup === "string" ? source.tagGroup : undefined,
+					typeof chunkMeta.tagGroup === "string" &&
+					String(chunkMeta.tagGroup || "").trim()
+						? String(chunkMeta.tagGroup).trim()
+						: typeof source?.tagGroup === "string" && source.tagGroup.trim()
+							? source.tagGroup.trim()
+							: undefined,
 				stats: rawStats
 					? {
 							impressions:
@@ -5038,10 +5485,73 @@ export class IRPointStorageService {
 		}
 
 		if (deleted) {
+			await this.clearChildParentLinksForDeletedParent(pointId);
 			await this.writePointFilesIndex(index);
+			this.invalidatePointSnapshotListCache();
 		}
 
 		return deleted;
+	}
+
+	/**
+	 * When a parent point is removed, clear stale `parentPointId` on children.
+	 */
+	private async clearChildParentLinksForDeletedParent(
+		deletedParentId: string,
+	): Promise<void> {
+		const normalizedParentId = String(deletedParentId || "").trim();
+		if (!normalizedParentId) {
+			return;
+		}
+
+		const index = await this.readPointFilesIndex();
+		let touched = false;
+		for (const entry of index.files) {
+			const absolutePath = this.resolveIndexedPointFilePath(
+				entry.file,
+			)?.absolutePath;
+			if (!absolutePath) {
+				continue;
+			}
+			const fileData = await this.readPointFile(
+				absolutePath,
+				entry.topicId,
+				entry.topicName,
+			);
+			let fileChanged = false;
+			const nextPoints = fileData.points.map((point) => {
+				const childParent =
+					String(point.relations?.parentPointId || "").trim() || null;
+				if (childParent !== normalizedParentId) {
+					return point;
+				}
+				fileChanged = true;
+				return {
+					...point,
+					relations: {
+						...point.relations,
+						parentPointId: null,
+					},
+					timestamps: {
+						...point.timestamps,
+						updatedAt: new Date().toISOString(),
+					},
+				};
+			});
+			if (!fileChanged) {
+				continue;
+			}
+			touched = true;
+			entry.updatedAt = new Date().toISOString();
+			await this.persistPointFileData(absolutePath, {
+				...fileData,
+				updatedAt: new Date().toISOString(),
+				points: nextPoints,
+			});
+		}
+		if (touched) {
+			await this.writePointFilesIndex(index);
+		}
 	}
 
 	async saveReaderState(

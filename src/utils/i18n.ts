@@ -2,10 +2,18 @@ import { getLanguage } from "obsidian";
 import { derived, get, writable } from "svelte/store";
 import { logger } from "../utils/logger";
 import { vaultStorage } from "../utils/vault-local-storage";
+import { applyFlatOverlay } from "./i18n/hydrate-locale";
 import {
 	type PluginUiLanguagePreference,
+	SUPPORTED_LANGUAGES,
+	getLocaleFallback,
 	normalizePluginUiLanguagePreference,
-} from "./i18n/plugin-ui-language";
+	resolveHostLanguage,
+} from "./i18n/locale-registry";
+import jaJpFlat from "./i18n/locales/ja-JP.json";
+import koKrFlat from "./i18n/locales/ko-KR.json";
+import ruRuFlat from "./i18n/locales/ru-RU.json";
+import zhTwFlat from "./i18n/locales/zh-TW.json";
 import { translationOverrides, translations } from "./i18n/resources";
 import type {
 	I18nConfig,
@@ -21,8 +29,10 @@ export type {
 } from "./i18n/types";
 export type { PluginUiLanguagePreference } from "./i18n/plugin-ui-language";
 export {
+	LANGUAGE_OPTION_LABEL_KEYS,
 	normalizePluginUiLanguagePreference,
 	PLUGIN_UI_LANGUAGE_OPTIONS,
+	SUPPORTED_LANGUAGES,
 } from "./i18n/plugin-ui-language";
 
 function isTranslationBranch(
@@ -55,15 +65,22 @@ function mergeTranslationTrees(
 	return merged;
 }
 
+const zhCnMerged = mergeTranslationTrees(
+	translations["zh-CN"],
+	translationOverrides["zh-CN"],
+);
+const enUsMerged = mergeTranslationTrees(
+	translations["en-US"],
+	translationOverrides["en-US"],
+);
+
 export const translationCatalog: Record<SupportedLanguage, TranslationKey> = {
-	"zh-CN": mergeTranslationTrees(
-		translations["zh-CN"],
-		translationOverrides["zh-CN"],
-	),
-	"en-US": mergeTranslationTrees(
-		translations["en-US"],
-		translationOverrides["en-US"],
-	),
+	"zh-CN": zhCnMerged,
+	"en-US": enUsMerged,
+	"ja-JP": applyFlatOverlay(enUsMerged, jaJpFlat as Record<string, string>),
+	"ko-KR": applyFlatOverlay(enUsMerged, koKrFlat as Record<string, string>),
+	"ru-RU": applyFlatOverlay(enUsMerged, ruRuFlat as Record<string, string>),
+	"zh-TW": applyFlatOverlay(zhCnMerged, zhTwFlat as Record<string, string>),
 };
 
 export function flattenTranslationLeafKeys(
@@ -82,7 +99,7 @@ export function flattenTranslationLeafKeys(
 const defaultConfig: I18nConfig = {
 	defaultLanguage: "zh-CN",
 	fallbackLanguage: "zh-CN",
-	supportedLanguages: ["zh-CN", "en-US"],
+	supportedLanguages: [...SUPPORTED_LANGUAGES],
 };
 
 const translationKeyAliases: Record<string, string> = {};
@@ -149,10 +166,6 @@ function getTranslationAliasCandidates(key: string): string[] {
 	return [...candidates];
 }
 
-// ============================================================================
-// 自动检测Obsidian语言设置
-// ============================================================================
-
 /**
  * 检测 Obsidian 宿主语言并映射到插件支持的语言。
  */
@@ -170,54 +183,34 @@ function detectObsidianLanguage(): SupportedLanguage {
 			obsidianLang = vaultStorage.getItem("language");
 		}
 
-		if (obsidianLang) {
-			if (
-				obsidianLang === "zh" ||
-				obsidianLang === "zh-CN" ||
-				obsidianLang === "zh-TW" ||
-				obsidianLang.startsWith("zh")
-			) {
-				return "zh-CN";
-			}
-			return "en-US";
+		const fromHost = resolveHostLanguage(obsidianLang);
+		if (fromHost) {
+			return fromHost;
 		}
 
-		// 方法2: 使用moment.locale() - Obsidian使用moment.js管理语言
-		// @ts-ignore - moment是Obsidian全局变量
-		const momentLocale = window.moment?.locale?.();
-		if (momentLocale) {
-			// 中文locale: zh-cn, zh-tw
-			if (momentLocale.startsWith("zh")) {
-				return "zh-CN";
-			}
-			// 其他语言使用英文
-			return "en-US";
+		const momentLocale = window.moment?.locale?.() as string | undefined;
+		const fromMoment = resolveHostLanguage(momentLocale);
+		if (fromMoment) {
+			return fromMoment;
 		}
 
-		// 方法3: 文档语言标签（备用）
-		const documentLang = window?.document?.documentElement?.lang;
-		if (documentLang) {
-			if (documentLang.startsWith("zh")) {
-				return "zh-CN";
-			}
-			return "en-US";
+		const fromDocument = resolveHostLanguage(
+			window?.document?.documentElement?.lang,
+		);
+		if (fromDocument) {
+			return fromDocument;
 		}
 
-		// 方法4: 浏览器语言 (最后备用)
-		const browserLang = window?.navigator?.language;
-		if (browserLang?.startsWith("zh")) {
-			return "zh-CN";
+		const fromBrowser = resolveHostLanguage(window?.navigator?.language);
+		if (fromBrowser) {
+			return fromBrowser;
 		}
 
-		return "en-US";
-	} catch { /* ignored */
+		return defaultConfig.defaultLanguage;
+	} catch {
 		return defaultConfig.defaultLanguage;
 	}
 }
-
-// ============================================================================
-// 状态管理
-// ============================================================================
 
 export const currentLanguage = writable<SupportedLanguage>(
 	defaultConfig.defaultLanguage,
@@ -280,10 +273,6 @@ export function initI18n(): void {
 }
 export const i18nConfig = writable<I18nConfig>(defaultConfig);
 
-// ============================================================================
-// 国际化服务类
-// ============================================================================
-
 export class I18nService {
 	private static instance: I18nService;
 	private currentLang: SupportedLanguage = defaultConfig.defaultLanguage;
@@ -291,12 +280,10 @@ export class I18nService {
 	private readonly missingKeyWarnings = new Set<string>();
 
 	private constructor() {
-		// 订阅语言变化
 		currentLanguage.subscribe((_lang) => {
 			this.currentLang = _lang;
 		});
 
-		// 订阅配置变化
 		i18nConfig.subscribe((_config) => {
 			this.config = _config;
 		});
@@ -309,18 +296,14 @@ export class I18nService {
 		return I18nService.instance;
 	}
 
-	/**
-	 * 获取翻译文本
-	 */
 	t(key: string, params?: Record<string, string | number>): string {
 		const translation = this.resolveTranslation(key, this.currentLang);
 
 		if (!translation) {
-			// 尝试回退语言
-			const fallbackTranslation =
-				this.currentLang === this.config.fallbackLanguage
-					? null
-					: this.resolveTranslation(key, this.config.fallbackLanguage);
+			const fallbackLang = getLocaleFallback(this.currentLang);
+			const fallbackTranslation = fallbackLang
+				? this.resolveTranslation(key, fallbackLang)
+				: null;
 			if (fallbackTranslation) {
 				return this.interpolate(fallbackTranslation, params);
 			}
@@ -328,7 +311,7 @@ export class I18nService {
 			if (!this.missingKeyWarnings.has(key)) {
 				this.missingKeyWarnings.add(key);
 				logger.warn(
-					`Translation not found for key: ${key} (lang: ${this.currentLang}, fallback: ${this.config.fallbackLanguage})`,
+					`Translation not found for key: ${key} (lang: ${this.currentLang}, fallback: ${fallbackLang ?? "none"})`,
 				);
 			}
 
@@ -338,20 +321,16 @@ export class I18nService {
 		return this.interpolate(translation, params);
 	}
 
-	/**
-	 * 检查当前语言或回退语言是否存在翻译（含兼容别名）
-	 */
 	hasTranslation(key: string): boolean {
+		if (this.resolveTranslation(key, this.currentLang)) {
+			return true;
+		}
+		const fallbackLang = getLocaleFallback(this.currentLang);
 		return Boolean(
-			this.resolveTranslation(key, this.currentLang) ||
-				(this.currentLang !== this.config.fallbackLanguage &&
-					this.resolveTranslation(key, this.config.fallbackLanguage)),
+			fallbackLang && this.resolveTranslation(key, fallbackLang),
 		);
 	}
 
-	/**
-	 * 获取指定语言的翻译（含兼容别名）
-	 */
 	private resolveTranslation(
 		key: string,
 		language: SupportedLanguage,
@@ -371,9 +350,6 @@ export class I18nService {
 		return null;
 	}
 
-	/**
-	 * 获取指定语言的直接翻译
-	 */
 	private getDirectTranslation(
 		key: string,
 		language: SupportedLanguage,
@@ -392,9 +368,6 @@ export class I18nService {
 		return typeof current === "string" ? current : null;
 	}
 
-	/**
-	 * 插值处理
-	 */
 	private interpolate(
 		text: string,
 		params?: Record<string, string | number>,
@@ -410,9 +383,6 @@ export class I18nService {
 		});
 	}
 
-	/**
-	 * 设置当前语言
-	 */
 	setLanguage(language: SupportedLanguage): void {
 		if (this.config.supportedLanguages.includes(language)) {
 			currentLanguage.set(language);
@@ -421,23 +391,14 @@ export class I18nService {
 		}
 	}
 
-	/**
-	 * 获取当前语言
-	 */
 	getCurrentLanguage(): SupportedLanguage {
 		return this.currentLang;
 	}
 
-	/**
-	 * 获取支持的语言列表
-	 */
 	getSupportedLanguages(): SupportedLanguage[] {
 		return this.config.supportedLanguages;
 	}
 
-	/**
-	 * 检查是否支持指定语言
-	 */
 	isLanguageSupported(language: string): language is SupportedLanguage {
 		return this.config.supportedLanguages.includes(
 			language as SupportedLanguage,
@@ -445,17 +406,11 @@ export class I18nService {
 	}
 }
 
-// ============================================================================
-// 导出实例和工具函数
-// ============================================================================
-
 export const i18n = I18nService.getInstance();
 
-// 便捷的翻译函数
 export const t = (key: string, params?: Record<string, string | number>) =>
 	i18n.t(key, params);
 
-// Svelte store 用于响应式翻译
 export const tr = derived(
 	currentLanguage,
 	(_$currentLanguage) =>
@@ -463,7 +418,6 @@ export const tr = derived(
 			i18n.t(key, params),
 );
 
-// 用于渲染列表型文案（按换行拆分）。缺失翻译时返回空数组，避免渲染键名。
 export const trArray = derived(currentLanguage, (_$currentLanguage) =>
 	(key: string): string[] => {
 		if (!i18n.hasTranslation(key)) return [];

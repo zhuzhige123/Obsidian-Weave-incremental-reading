@@ -747,6 +747,7 @@ export class IRV4SchedulerService {
 		) {
 			await applyLoadDeferralsFromPlan(this.app, plan.loadDeferrals, {
 				reason: "ui_refresh",
+				persistDeferrals: false,
 			});
 		}
 
@@ -897,6 +898,14 @@ export class IRV4SchedulerService {
 			scheduleStatus: block.status,
 			nextRepDate: block.nextRepDate,
 			nextReviewDate,
+			createdAt:
+				typeof block.createdAt === "number" && block.createdAt > 0
+					? block.createdAt
+					: undefined,
+			updatedAt:
+				typeof block.updatedAt === "number" && block.updatedAt > 0
+					? block.updatedAt
+					: undefined,
 			estimatedMinutes,
 			sourceType,
 			...sequenceMeta,

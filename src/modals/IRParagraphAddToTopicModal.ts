@@ -10,6 +10,8 @@ export interface IRParagraphAddToTopicSubmitPayload {
 interface IRParagraphAddToTopicModalOptions {
 	deckOptions: IRDeck[];
 	initialDeckId?: string;
+	/** When set, topic is document-bound and cannot be changed in this modal. */
+	fixedDeckId?: string;
 	initialTitle: string;
 	titleDetected: boolean;
 	onCreateDeck: (name: string) => Promise<IRDeck>;
@@ -21,6 +23,7 @@ export class IRParagraphAddToTopicModal extends Modal {
 	private deckOptions: IRDeck[];
 	private draftTitle: string;
 	private selectedDeckId: string;
+	private readonly deckLocked: boolean;
 	private titleInputEl: HTMLInputElement | null = null;
 	private deckButtonEl: HTMLButtonElement | null = null;
 	private submitButtonEl: HTMLButtonElement | null = null;
@@ -34,7 +37,10 @@ export class IRParagraphAddToTopicModal extends Modal {
 		this.options = options;
 		this.deckOptions = [...options.deckOptions];
 		this.draftTitle = options.initialTitle;
-		this.selectedDeckId = String(options.initialDeckId || "").trim();
+		const fixedDeckId = String(options.fixedDeckId || "").trim();
+		this.deckLocked = Boolean(fixedDeckId);
+		this.selectedDeckId =
+			fixedDeckId || String(options.initialDeckId || "").trim();
 	}
 
 	onOpen(): void {
@@ -56,7 +62,9 @@ export class IRParagraphAddToTopicModal extends Modal {
 			cls: "setting-item-name",
 		});
 		deckInfoEl.createDiv({
-			text: i18n.t("irModals.paragraphAddToTopic.deckDesc"),
+			text: this.deckLocked
+				? i18n.t("irModals.paragraphAddToTopic.deckDescFixed")
+				: i18n.t("irModals.paragraphAddToTopic.deckDesc"),
 			cls: "setting-item-description",
 		});
 
@@ -64,25 +72,32 @@ export class IRParagraphAddToTopicModal extends Modal {
 			text: this.getDeckButtonText(),
 		});
 		this.deckButtonEl.addClass("weave-selection-to-ir-picker-button");
-		this.deckButtonEl.addEventListener("click", (evt) => {
-			this.showDeckMenu(evt as MouseEvent);
-		});
-
-		const newDeckRow = contentEl.createDiv({
-			cls: "weave-ir-paragraph-new-deck-row",
-		});
-		if (this.showNewDeckInput) {
-			this.renderNewDeckInput(newDeckRow);
+		if (this.deckLocked) {
+			this.deckButtonEl.disabled = true;
+			this.deckButtonEl.addClass("is-disabled");
 		} else {
-			const createDeckBtn = newDeckRow.createEl("button", {
-				text: i18n.t("irModals.paragraphAddToTopic.newTopic"),
+			this.deckButtonEl.addEventListener("click", (evt) => {
+				this.showDeckMenu(evt as MouseEvent);
 			});
-			createDeckBtn.addClass("mod-cta");
-			createDeckBtn.addEventListener("click", () => {
-				this.showNewDeckInput = true;
-				newDeckRow.empty();
+		}
+
+		if (!this.deckLocked) {
+			const newDeckRow = contentEl.createDiv({
+				cls: "weave-ir-paragraph-new-deck-row",
+			});
+			if (this.showNewDeckInput) {
 				this.renderNewDeckInput(newDeckRow);
-			});
+			} else {
+				const createDeckBtn = newDeckRow.createEl("button", {
+					text: i18n.t("irModals.paragraphAddToTopic.newTopic"),
+				});
+				createDeckBtn.addClass("mod-cta");
+				createDeckBtn.addEventListener("click", () => {
+					this.showNewDeckInput = true;
+					newDeckRow.empty();
+					this.renderNewDeckInput(newDeckRow);
+				});
+			}
 		}
 
 		const titleDesc = this.options.titleDetected

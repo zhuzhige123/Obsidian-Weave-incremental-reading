@@ -13,15 +13,18 @@
     type TagSuggestionItem
   } from '../../utils/tag-suggest';
   import { IRPointTagService, normalizeReadingPointTags } from '../../services/incremental-reading/IRPointTagService';
+  import { commitReadingPointTagDraft } from '../../services/incremental-reading/reading-point-edit/commitReadingPointTagDraft';
   import { tr } from '../../utils/i18n';
 
   interface Props {
     app: App;
     tags?: string[];
     disabled?: boolean;
+    /** Parent save/close must see uncommitted draft text. */
+    onDraftChange?: (draft: string) => void;
   }
 
-  let { app, tags = $bindable([]), disabled = false }: Props = $props();
+  let { app, tags = $bindable([]), disabled = false, onDraftChange }: Props = $props();
 
   let t = $derived($tr);
 
@@ -38,7 +41,12 @@
     if (disabled || !tagInputEl) {
       return false;
     }
-    return tagDraft.length > 0 || document.activeElement === tagInputEl;
+    return tagDraft.length > 0 || activeDocument.activeElement === tagInputEl;
+  }
+
+  function setTagDraft(next: string): void {
+    tagDraft = next;
+    onDraftChange?.(next);
   }
 
   function addTag(raw: string): void {
@@ -48,13 +56,22 @@
     }
     if (tags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
       new Notice(t('irReadingPointEdit.tags.tagExists', { tag: formatTagSuggestionLabel(normalized) }), 2200);
-      tagDraft = '';
+      setTagDraft('');
       tagInputEl?.focus();
       return;
     }
-    tags = [...tags, normalized];
-    tagDraft = '';
+    tags = commitReadingPointTagDraft(tags, normalized);
+    setTagDraft('');
     tagInputEl?.focus();
+  }
+
+  /** Commit current input into chips (used by modal Save before persist). */
+  export function commitPendingDraft(): void {
+    const query = getTagDraftQuery();
+    if (!query) {
+      return;
+    }
+    addTag(query);
   }
 
   function removeTagAt(index: number): void {
@@ -179,9 +196,10 @@
     bind:this={tagInputEl}
     class="ir-tag-input"
     type="text"
-    bind:value={tagDraft}
+    value={tagDraft}
     {disabled}
     placeholder={tags.length === 0 ? t('irReadingPointEdit.tags.placeholder') : ''}
+    oninput={(event) => setTagDraft((event.currentTarget as HTMLInputElement).value)}
     onkeydown={handleTagKeydown}
   />
 </div>

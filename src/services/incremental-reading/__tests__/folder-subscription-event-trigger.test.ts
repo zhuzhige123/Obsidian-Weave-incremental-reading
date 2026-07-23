@@ -29,6 +29,25 @@ describe("shouldTriggerFolderSubscriptionResyncForVaultEvent", () => {
 		).toBe(false);
 	});
 
+	it("忽略图片与其它非 Markdown 附件的 create/rename", () => {
+		expect(
+			shouldTriggerFolderSubscriptionResyncForVaultEvent({
+				eventType: "create",
+				nextPath: "Inbox/Subscribed/cover.png",
+				settingsOrRules: rules,
+			}),
+		).toBe(false);
+
+		expect(
+			shouldTriggerFolderSubscriptionResyncForVaultEvent({
+				eventType: "rename",
+				nextPath: "Inbox/Subscribed/photo.jpg",
+				previousPath: "Elsewhere/photo.jpg",
+				settingsOrRules: rules,
+			}),
+		).toBe(false);
+	});
+
 	it("rename 仅在外部移入订阅范围时触发", () => {
 		expect(
 			shouldTriggerFolderSubscriptionResyncForVaultEvent({

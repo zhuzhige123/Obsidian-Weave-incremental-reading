@@ -1,5 +1,6 @@
 import { App, normalizePath } from "obsidian";
 import { getPluginPathsById, getV2PathsFromApp } from "../../config/paths";
+import { CURRENT_PLUGIN_ID } from "../../config/plugin-runtime";
 import type {
 	IRBackupOrphanEntry,
 	IRDataManagementScanResult,
@@ -21,7 +22,7 @@ import { readString } from "../../utils/unknown-record";
 import { IRPointStorageService } from "./IRPointStorageService";
 
 const IR_DECK_FILE_EXTENSION = ".irdeck";
-const BACKUP_PLUGIN_IDS = ["weave-incremental-reading", "weave"] as const;
+const BACKUP_PLUGIN_IDS = [CURRENT_PLUGIN_ID, "weave"] as const;
 
 export class IRDeckDataManagementService {
 	private app: App;

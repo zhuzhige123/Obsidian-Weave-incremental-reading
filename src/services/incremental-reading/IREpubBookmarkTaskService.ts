@@ -11,6 +11,7 @@ import {
 	DEFAULT_IR_BLOCK_STATS,
 } from "../../types/ir-types";
 import { getTaskTopicId } from "../../utils/ir-topic-compat";
+import { remapVaultPath } from "../../utils/ir-vault-path-remap";
 import { logger } from "../../utils/logger";
 import { buildEpubChapterResumeLink } from "../epub-integration/epub-chapter-locate";
 import { getIrEpubStorageService } from "../epub-integration/ir-epub-storage-access";
@@ -351,7 +352,7 @@ export class IREpubBookmarkTaskService {
 		const tasks = await this.getAllTasks();
 		let updatedCount = 0;
 		for (const task of tasks) {
-			const remapped = this.remapPath(
+			const remapped = remapVaultPath(
 				task.epubFilePath,
 				normalizedOldPath,
 				normalizedNewPath,
@@ -721,27 +722,6 @@ export class IREpubBookmarkTaskService {
 				.map((value) => String(value || "").trim())
 				.filter(Boolean),
 		);
-	}
-
-	private remapPath(
-		filePath: string,
-		oldPath: string,
-		newPath: string,
-	): string | null {
-		const normalizedFilePath = normalizePath(filePath || "");
-		if (!normalizedFilePath) {
-			return null;
-		}
-
-		if (normalizedFilePath === oldPath) {
-			return newPath;
-		}
-
-		if (normalizedFilePath.startsWith(`${oldPath}/`)) {
-			return `${newPath}${normalizedFilePath.slice(oldPath.length)}`;
-		}
-
-		return null;
 	}
 
 	private async deleteTasksByPredicate(

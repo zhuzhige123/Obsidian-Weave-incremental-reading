@@ -2,8 +2,13 @@ import type { App } from "obsidian";
 import { getPluginPaths } from "../../config/paths";
 import type { IRBlock, IRChunkFileData } from "../../types/ir-types";
 import { DirectoryUtils } from "../../utils/directory-utils";
-import { isIRInternalScheduleSourcePath } from "../../utils/ir-internal-data-path";
+import {
+	isIRDeckGhostPointSnapshot,
+	isIRInternalScheduleSourcePath,
+	shouldExcludeScheduleItemBySource,
+} from "../../utils/ir-internal-data-path";
 import { logger } from "../../utils/logger";
+import { scheduleIRDeckGhostPointCleanup } from "./IRDeckGhostPointCleanup";
 import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
 import {
@@ -122,6 +127,33 @@ export class IRScheduleIndexService {
 			);
 		}
 		return null;
+	}
+
+	/**
+	 * 仅返回已 warm 的 schedule 源，永不触发全库重建。
+	 * 供 due 索引日列表 O(k) hydrate 使用。
+	 */
+	async peekWarmScheduleSources(): Promise<IRScheduleIndexSources | null> {
+		try {
+			if (!(await this.warmDiskCache()) || !this.memoryStore) {
+				return null;
+			}
+			return {
+				chunks: this.memoryStore.chunks,
+				blocks: this.memoryStore.blocks,
+				pdfTasks: this.memoryStore.pdfTasks,
+				epubTasks: this.memoryStore.epubTasks,
+				scheduleFingerprint: this.memoryStore.scheduleFingerprint,
+				generatedAt: Date.parse(this.memoryStore.updatedAt) || Date.now(),
+				fromCache: true,
+			};
+		} catch (error) {
+			logger.debug(
+				"[IRScheduleIndexService] peekWarmScheduleSources unavailable",
+				error,
+			);
+			return null;
+		}
 	}
 
 	private getIndexPath(): string {
@@ -260,12 +292,33 @@ export class IRScheduleIndexService {
 		const pdfTasks: IRPdfBookmarkTask[] = [];
 		const epubTasks: IREpubBookmarkTask[] = [];
 		const seenIds = new Set<string>();
+		const ghostPointIds: string[] = [];
 
 		for (const snapshot of snapshots) {
+			const pointId = String(snapshot.point?.id || "").trim();
+			if (isIRDeckGhostPointSnapshot(snapshot)) {
+				if (pointId) {
+					ghostPointIds.push(pointId);
+				}
+				continue;
+			}
+
 			const kind = getStoredPointKind(snapshot);
 			if (kind === "chunk") {
 				const { chunk } = buildLegacyChunkFromPointSnapshot(snapshot);
-				if (isIRInternalScheduleSourcePath(chunk.filePath)) {
+				if (
+					isIRInternalScheduleSourcePath(chunk.filePath) ||
+					shouldExcludeScheduleItemBySource({
+						sourceFile: chunk.filePath,
+						title: String(
+							(chunk.meta as { pointTitle?: string } | undefined)
+								?.pointTitle || "",
+						),
+					})
+				) {
+					if (pointId) {
+						ghostPointIds.push(pointId);
+					}
 					continue;
 				}
 				if (!seenIds.has(chunk.chunkId)) {
@@ -276,7 +329,16 @@ export class IRScheduleIndexService {
 			}
 			if (kind === "pdf") {
 				const task = buildLegacyPdfTaskFromPointSnapshot(snapshot);
-				if (isIRInternalScheduleSourcePath(task.pdfPath)) {
+				if (
+					isIRInternalScheduleSourcePath(task.pdfPath) ||
+					shouldExcludeScheduleItemBySource({
+						sourceFile: task.pdfPath,
+						title: task.title,
+					})
+				) {
+					if (pointId) {
+						ghostPointIds.push(pointId);
+					}
 					continue;
 				}
 				if (!seenIds.has(task.id)) {
@@ -287,7 +349,16 @@ export class IRScheduleIndexService {
 			}
 			if (kind === "epub") {
 				const task = buildLegacyEpubTaskFromPointSnapshot(snapshot);
-				if (isIRInternalScheduleSourcePath(task.epubFilePath)) {
+				if (
+					isIRInternalScheduleSourcePath(task.epubFilePath) ||
+					shouldExcludeScheduleItemBySource({
+						sourceFile: task.epubFilePath,
+						title: task.title,
+					})
+				) {
+					if (pointId) {
+						ghostPointIds.push(pointId);
+					}
 					continue;
 				}
 				if (!seenIds.has(task.id)) {
@@ -296,6 +367,10 @@ export class IRScheduleIndexService {
 				}
 			}
 			// Phase 3：legacy-block 不再进入 schedule index；请用数据管理窗「统一阅读点格式」迁移。
+		}
+
+		if (ghostPointIds.length > 0) {
+			scheduleIRDeckGhostPointCleanup(this.app, ghostPointIds);
 		}
 
 		await Promise.all([

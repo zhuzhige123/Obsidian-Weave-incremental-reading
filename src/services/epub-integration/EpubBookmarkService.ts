@@ -5,6 +5,7 @@
  * 等宿主插件通过插件注册表调用；独立 IR 本体不直接挂载此服务。
  */
 import { App, TFile, normalizePath, parseYaml } from "obsidian";
+import { getV2Paths, getV2PathsFromApp } from "../../config/paths";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { logger } from "../../utils/logger";
 import { getObsidianPluginAs } from "../../utils/obsidian-plugin-registry";
@@ -14,7 +15,8 @@ import { EpubLinkService } from "./EpubLinkService";
 import { getEpubRuntime } from "./epub-runtime";
 import type { EpubBook } from "./types";
 
-export const DEFAULT_EPUB_BOOKMARK_FOLDER = "weave/epub-bookmarks";
+/** Default when no App/settings are available (tests / static docs). Prefer {@link EpubBookmarkService.getBookmarkFolder}. */
+export const DEFAULT_EPUB_BOOKMARK_FOLDER = getV2Paths().ir.epubBookmarks;
 const EPUB_BOOKMARK_FILE_FORMAT = "weave-epub-bookmarks/v1";
 
 export interface EpubBookmarkRecord {
@@ -103,7 +105,7 @@ export class EpubBookmarkService {
 				return configured;
 			}
 		}
-		return DEFAULT_EPUB_BOOKMARK_FOLDER;
+		return getV2PathsFromApp(this.app).ir.epubBookmarks;
 	}
 
 	async loadBookmarksForBook(book: EpubBook): Promise<EpubBookmarkRecord[]> {

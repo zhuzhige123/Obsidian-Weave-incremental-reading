@@ -101,6 +101,7 @@ export async function loadIRCalendarView(
 	const isCancelled = options.isCancelled ?? (() => false);
 	const runtime = getSharedIRProjectionRuntime(app);
 	const queryService = getSharedIRCalendarQueryService(app);
+	const loadStartedAt = Date.now();
 
 	const scheduleReconcile = {
 		deckIds,
@@ -176,6 +177,12 @@ export async function loadIRCalendarView(
 			priorityDateKeys,
 			forceRecompute: false,
 		});
+		logger.info("[IRCalendarViewLoad] shell_only from projection cache", {
+			durationMs: Date.now() - loadStartedAt,
+			source: projectionHydrate.source,
+			skipReconcile,
+			priorityDateKeys,
+		});
 		if (!skipReconcile) {
 			logger.debug(
 				"[IRCalendarViewLoad] projection shell served; deferring reconcile",
@@ -196,21 +203,20 @@ export async function loadIRCalendarView(
 		};
 	}
 
+	// 无 projection 时即使 skip=true 也不得宣称 shell_only（会导致空列表假完成）。
 	const skipReconcile = await runtime.shouldSkipBackgroundReconcile({
 		deckIds,
 		priorityDateKeys,
 		forceRecompute: false,
 	});
 	if (skipReconcile) {
-		return {
-			phase: "shell_only",
-			monthHeatmap,
-			projectionHydrate: null,
-			tier0: null,
-			fastQuery: null,
-			fullQuery: null,
-			scheduleReconcile,
-		};
+		logger.info(
+			"[IRCalendarViewLoad] skip gate true but no projection; continuing tier0/empty",
+			{
+				durationMs: Date.now() - loadStartedAt,
+				priorityDateKeys,
+			},
+		);
 	}
 
 	const tier0 = await awaitWithTimeout(
@@ -231,6 +237,10 @@ export async function loadIRCalendarView(
 	}
 
 	if (tier0) {
+		logger.info("[IRCalendarViewLoad] tier0 hydrated", {
+			durationMs: Date.now() - loadStartedAt,
+			priorityDateKeys,
+		});
 		return {
 			phase: "tier0",
 			monthHeatmap,
@@ -242,9 +252,10 @@ export async function loadIRCalendarView(
 		};
 	}
 
-	logger.debug(
+	logger.info(
 		"[IRCalendarViewLoad] no projection shell; deferring lean query to background reconcile",
 		{
+			durationMs: Date.now() - loadStartedAt,
 			priorityDateKeys,
 		},
 	);

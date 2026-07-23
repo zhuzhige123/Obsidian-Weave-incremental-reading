@@ -4,6 +4,7 @@ import {
 	populateCalendarFolderSubscriptionSyncMenu,
 	populateCalendarMaterialImportMenu,
 	populateCalendarPointDeckScanMenu,
+	populateCalendarViewModeMenu,
 } from "../ir-calendar-tools-menu";
 
 type TrackingMenu = Menu & {
@@ -63,6 +64,34 @@ describe("populateCalendarBackgroundWallMenu", () => {
 		expect(submenu?.findItemByTitle("选择图片")).toBeTruthy();
 		expect(submenu?.findItemByTitle("清除图片")?.isDisabled()).toBe(true);
 		expect(submenu?.findItemByTitle("设置淡化 70%")).toBeTruthy();
+	});
+});
+
+describe("populateCalendarViewModeMenu", () => {
+	it("用父项子菜单承载三种月历视图并勾选当前模式", () => {
+		const menu = new Menu() as TrackingMenu;
+		const onSelectMode = vi.fn();
+
+		populateCalendarViewModeMenu(menu, {
+			viewModeTitle: "月历视图",
+			currentMode: "one-row",
+			modes: [
+				{ mode: "one-row", title: "单行月历视图", icon: "minus" },
+				{ mode: "two-row", title: "双行月历视图", icon: "list" },
+				{ mode: "full", title: "完整月历视图", icon: "calendar" },
+			],
+			onSelectMode,
+		});
+
+		const parent = menu.findItemByTitle("月历视图");
+		const submenu = parent?.getSubmenu() as TrackingMenu | null;
+		expect(submenu).toBeTruthy();
+		expect(submenu?.findItemByTitle("单行月历视图")?.isChecked()).toBe(true);
+		expect(submenu?.findItemByTitle("双行月历视图")?.isChecked()).toBe(false);
+		expect(submenu?.findItemByTitle("完整月历视图")?.isChecked()).toBe(false);
+
+		submenu?.findItemByTitle("双行月历视图")?.trigger();
+		expect(onSelectMode).toHaveBeenCalledWith("two-row");
 	});
 });
 

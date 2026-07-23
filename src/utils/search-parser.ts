@@ -1,6 +1,6 @@
 /**
- * 卡片搜索解析器
- * 支持基于卡片数据的搜索语法
+ * IR calendar search query parser.
+ * Supports attribute filters used by the incremental-reading calendar search.
  */
 
 export interface DateRange {
@@ -18,19 +18,16 @@ export interface SearchQuery {
 	// 基础搜索
 	text: string[]; // 普通文本搜索
 
-	// 卡片属性
-	decks: string[]; // deck: 牌组名称
+	// 阅读点属性
+	decks: string[]; // deck: 专题名称
 	tags: string[]; // tag: 标签
 	priorities: number[]; // priority: 优先级
-	types: string[]; // type: 题型
+	types: string[]; // type: 阅读点类型
 	sources: string[]; // source: 来源文档
 	folders: string[]; // folder: 来源文件夹
 
 	statuses: string[];
 	states: string[];
-	accuracies: string[];
-	attempts: number[];
-	errors: string[];
 
 	// 日期范围筛选
 	dateRanges: DateRange[]; // created:YYYY-MM-DD..YYYY-MM-DD
@@ -52,6 +49,22 @@ export interface SearchQuery {
 	raw: string;
 }
 
+function shiftDateKey(dateKey: string, dayOffset: number): string {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || "").trim());
+	if (!match) {
+		return dateKey;
+	}
+	const date = new Date(
+		Number(match[1]),
+		Number(match[2]) - 1,
+		Number(match[3]) + dayOffset,
+	);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 /**
  * 解析搜索查询
  */
@@ -66,9 +79,6 @@ export function parseSearchQuery(query: string): SearchQuery {
 		folders: [],
 		statuses: [],
 		states: [],
-		accuracies: [],
-		attempts: [],
-		errors: [],
 		dateRanges: [],
 		modifiedRanges: [],
 		dueRanges: [],
@@ -99,54 +109,45 @@ export function parseSearchQuery(query: string): SearchQuery {
 		}
 	}
 
-	// 提取各前缀
-	execAll(/deck:"([^"]+)"|deck:(\S+)/g, (m) => {
+	// 提取各前缀（正向匹配需避开 -prefix: 否定写法）
+	execAll(/(?<!-)deck:"([^"]+)"|(?<!-)deck:(\S+)/g, (m) => {
 		result.decks.push(m[1] || m[2]);
 	});
 
-	execAll(/tag:(\S+)/g, (m) => {
+	execAll(/(?<!-)tag:(\S+)/g, (m) => {
 		let tagValue = m[1];
 		if (tagValue.startsWith("#")) tagValue = tagValue.slice(1);
 		result.tags.push(tagValue);
 	});
 
-	execAll(/priority:(\d+)/g, (m) => {
-		result.priorities.push(parseInt(m[1]));
+	execAll(/(?<!-)priority:(\d+(?:\.\d+)?)/g, (m) => {
+		const parsed = Number(m[1]);
+		if (Number.isFinite(parsed)) {
+			result.priorities.push(parsed);
+		}
 	});
 
-	execAll(/type:(\S+)/g, (m) => {
+	execAll(/(?<!-)type:(\S+)/g, (m) => {
 		result.types.push(m[1]);
 	});
 
-	execAll(/source:"([^"]+)"|source:(\S+)/g, (m) => {
+	execAll(/(?<!-)source:"([^"]+)"|(?<!-)source:(\S+)/g, (m) => {
 		result.sources.push(m[1] || m[2]);
 	});
 
-	execAll(/folder:"([^"]+)"|folder:(\S+)/g, (m) => {
+	execAll(/(?<!-)folder:"([^"]+)"|(?<!-)folder:(\S+)/g, (m) => {
 		result.folders.push(m[1] || m[2]);
 	});
 
-	execAll(/status:(\S+)/g, (m) => {
+	execAll(/(?<!-)status:(\S+)/g, (m) => {
 		result.statuses.push(m[1]);
 	});
 
-	execAll(/state:(\S+)/g, (m) => {
+	execAll(/(?<!-)state:(\S+)/g, (m) => {
 		result.states.push(m[1]);
 	});
 
-	execAll(/accuracy:"([^"]+)"|accuracy:(\S+)/g, (m) => {
-		result.accuracies.push(m[1] || m[2]);
-	});
-
-	execAll(/attempts:(\d+)/g, (m) => {
-		result.attempts.push(parseInt(m[1]));
-	});
-
-	execAll(/error:(\S+)/g, (m) => {
-		result.errors.push(m[1]);
-	});
-
-	execAll(/created:"([^"]+)"|created:(\S+)/g, (m) => {
+	execAll(/(?<!-)created:"([^"]+)"|(?<!-)created:(\S+)/g, (m) => {
 		const raw = m[1] || m[2];
 		const dateRange = parseDateRange(raw);
 		if (dateRange) {
@@ -154,7 +155,7 @@ export function parseSearchQuery(query: string): SearchQuery {
 		}
 	});
 
-	execAll(/modified:"([^"]+)"|modified:(\S+)/g, (m) => {
+	execAll(/(?<!-)modified:"([^"]+)"|(?<!-)modified:(\S+)/g, (m) => {
 		const raw = m[1] || m[2];
 		const dateRange = parseDateRange(raw);
 		if (dateRange) {
@@ -162,7 +163,7 @@ export function parseSearchQuery(query: string): SearchQuery {
 		}
 	});
 
-	execAll(/due:"([^"]+)"|due:(\S+)/g, (m) => {
+	execAll(/(?<!-)due:"([^"]+)"|(?<!-)due:(\S+)/g, (m) => {
 		const raw = m[1] || m[2];
 		const dateRange = parseDateRange(raw);
 		if (dateRange) {
@@ -170,7 +171,7 @@ export function parseSearchQuery(query: string): SearchQuery {
 		}
 	});
 
-	execAll(/yaml:(?:"([^"]+)"|([^\s:]+)):(?:"([^"]+)"|(\S+))/g, (m) => {
+	execAll(/(?<!-)yaml:(?:"([^"]+)"|([^\s:]+)):(?:"([^"]+)"|(\S+))/g, (m) => {
 		const key = m[1] || m[2];
 		const value = m[3] || m[4];
 		if (key && value) {
@@ -197,6 +198,9 @@ export function parseSearchQuery(query: string): SearchQuery {
 		result.excludeFolders.push(m[1] || m[2]);
 	});
 	execAll(/-status:(\S+)/g, (m) => {
+		result.excludeStatuses.push(m[1]);
+	});
+	execAll(/-state:(\S+)/g, (m) => {
 		result.excludeStatuses.push(m[1]);
 	});
 
@@ -233,13 +237,13 @@ export function parseSearchQuery(query: string): SearchQuery {
 /**
  * 解析日期范围字符串
  * 支持格式：
- * - YYYY-MM-DD..YYYY-MM-DD  起止日期
- * - >YYYY-MM-DD             晚于指定日期
- * - <YYYY-MM-DD             早于指定日期
+ * - YYYY-MM-DD..YYYY-MM-DD  起止日期（含两端）
+ * - >YYYY-MM-DD             晚于指定日期（不含当天）
+ * - <YYYY-MM-DD             早于指定日期（不含当天）
  * - YYYY-MM                 指定月份
  * - YYYY-MM-DD              指定单天
  */
-function parseDateRange(raw: string): DateRange | null {
+export function parseDateRange(raw: string): DateRange | null {
 	if (!raw) return null;
 
 	// 起止范围: 2024-01-01..2024-12-31
@@ -248,14 +252,18 @@ function parseDateRange(raw: string): DateRange | null {
 		return { from: from || undefined, to: to || undefined };
 	}
 
-	// 大于: >2024-01-01
+	// 大于: >2024-01-01 → 从次日开始（晚于）
 	if (raw.startsWith(">")) {
-		return { from: raw.slice(1) };
+		const day = raw.slice(1);
+		const from = /^\d{4}-\d{2}-\d{2}$/.test(day) ? shiftDateKey(day, 1) : day;
+		return { from };
 	}
 
-	// 小于: <2024-12-31
+	// 小于: <2024-12-31 → 截止到前一日（早于）
 	if (raw.startsWith("<")) {
-		return { to: raw.slice(1) };
+		const day = raw.slice(1);
+		const to = /^\d{4}-\d{2}-\d{2}$/.test(day) ? shiftDateKey(day, -1) : day;
+		return { to };
 	}
 
 	// 月份: 2024-01 → 2024-01-01..2024-01-31

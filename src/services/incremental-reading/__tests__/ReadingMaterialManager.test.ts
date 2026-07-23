@@ -57,7 +57,7 @@ describe("ReadingMaterialManager", () => {
 			category: ReadingCategory.Later,
 			priority: 42,
 			copyToImportFolder: true,
-			importFolder: "weave/incremental-reading/IR",
+			importFolder: "weave Incremental reading/IR",
 		});
 
 		expect(create).not.toHaveBeenCalled();
@@ -173,7 +173,7 @@ describe("ReadingMaterialManager", () => {
 				priority: 42,
 				tags: ["weave-incremental-reading"],
 				deckId: "deck-1",
-				importFolder: "weave/incremental-reading/IR",
+				importFolder: "weave Incremental reading/IR",
 			},
 		);
 
@@ -520,7 +520,7 @@ describe("ReadingMaterialManager", () => {
 	it("从全局侧边栏删除 Markdown 阅读材料时应清理外部文档调度残留", async () => {
 		const material: any = {
 			uuid: "mat-1",
-			filePath: "weave/incremental-reading/IR/source/01_第一节.md",
+			filePath: "weave Incremental reading/IR/source/01_第一节.md",
 			title: "第一节",
 			category: ReadingCategory.Later,
 			priority: 50,

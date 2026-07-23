@@ -14,7 +14,7 @@ function annotateSettingItems(root: ParentNode): void {
 		(item) => {
 			item.classList.toggle(
 				"has-toggle-switch",
-				item.querySelector(".toggle-switch") !== null,
+				item.querySelector(".checkbox-container.mod-toggle, .toggle-switch") !== null,
 			);
 			item.classList.toggle(
 				"has-setting-description",
@@ -32,7 +32,9 @@ function annotateSettingRows(root: ParentNode): void {
 		);
 		row.classList.toggle(
 			"row-has-modern-switch",
-			row.querySelector(".modern-switch") !== null,
+			row.querySelector(
+				".ir-obsidian-setting-toggle-host, .checkbox-container.mod-toggle",
+			) !== null,
 		);
 		row.classList.toggle(
 			"row-has-checkbox-toggle",
@@ -40,7 +42,9 @@ function annotateSettingRows(root: ParentNode): void {
 		);
 		row.classList.toggle(
 			"row-has-dropdown",
-			row.querySelector(".obsidian-dropdown-trigger") !== null,
+			row.querySelector(
+				".obsidian-dropdown-trigger, .ir-obsidian-setting-dropdown-host, select.dropdown",
+			) !== null,
 		);
 		row.classList.toggle(
 			"row-has-select",

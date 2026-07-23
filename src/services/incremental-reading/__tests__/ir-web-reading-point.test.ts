@@ -21,7 +21,7 @@ describe("ir-web-reading-point", () => {
 		} as any;
 		const material = {
 			resumeLink: "https://obsidian.md/blog",
-			sourceFile: "weave/incremental-reading/IR/page.md",
+			sourceFile: "weave Incremental reading/IR/page.md",
 		} as ScheduleItem;
 
 		expect(resolveScheduleItemWebUrl(app, material)).toBe(
@@ -33,7 +33,7 @@ describe("ir-web-reading-point", () => {
 		const app = {
 			metadataCache: {
 				getCache: (path: string) =>
-					path === "weave/incremental-reading/IR/page.md"
+					path === "weave Incremental reading/IR/page.md"
 						? {
 								frontmatter: {
 									"weave-ir-web-url": "https://example.org/article",
@@ -43,8 +43,8 @@ describe("ir-web-reading-point", () => {
 			},
 		} as any;
 		const material = {
-			resumeLink: "[[weave/incremental-reading/IR/page]]",
-			sourceFile: "weave/incremental-reading/IR/page.md",
+			resumeLink: "[[weave Incremental reading/IR/page]]",
+			sourceFile: "weave Incremental reading/IR/page.md",
 		} as ScheduleItem;
 
 		expect(resolveScheduleItemWebUrl(app, material)).toBe(

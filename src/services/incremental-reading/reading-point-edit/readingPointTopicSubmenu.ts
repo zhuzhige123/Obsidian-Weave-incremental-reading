@@ -41,15 +41,24 @@ export async function populateReadingPointTopicSubmenu(
 			return;
 		}
 
+		// Obsidian 原生 Menu 会对长标题做省略；勿把「当前专题：完整名称」塞进同一行。
+		// 名称单独成行（与列表项宽度一致），避免「测试3」被裁成「测」。
+		const currentDeck =
+			decks.find((deck) => deck.id === draft.deckId) ?? null;
+		const currentTopicName = String(
+			currentDeck?.name || draft.deckName || draft.deckId || "",
+		).trim();
+
 		submenu.addItem((item) => {
 			item
-				.setTitle(
-					i18n.t("irServiceNotices.topicSubmenu.currentTopic", {
-						topic: draft.deckName || draft.deckId,
-					}),
-				)
+				.setTitle(i18n.t("irServiceNotices.topicSubmenu.currentTopicLabel"))
 				.setDisabled(true);
 		});
+		if (currentTopicName) {
+			submenu.addItem((item) => {
+				item.setTitle(currentTopicName).setChecked(true).setDisabled(true);
+			});
+		}
 		submenu.addSeparator();
 
 		for (const deck of decks) {

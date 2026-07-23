@@ -6,9 +6,13 @@
   import FloatingMenu from '../ui/FloatingMenu.svelte';
   import { ICON_NAMES } from '../../icons/index.js';
   import { logger } from '../../utils/logger';
-  import { normalizeTagSuggestionOptions, TagInputSuggest } from '../../utils/tag-suggest';
+  import {
+    filterTagSuggestionItems,
+    normalizeTagSuggestionOptions,
+  } from '../../utils/tag-suggest';
   import { tr } from '../../utils/i18n';
   import { SCHEDULE_ITEM_TYPE_BADGES } from '../../services/incremental-reading/IRCalendarScheduleItemTypeBadge';
+  import { formatCalendarDateKey } from './ir-calendar-date';
 
   const SEARCH_HISTORY_DATA_SOURCE = 'incremental-reading';
 
@@ -70,8 +74,7 @@
   let showDropdown = $state(false);
   let anchorWidth = $state(0);
   let activeMenu: Menu | null = null;
-  let tagSuggest: TagInputSuggest | null = null;
-  let activeSuggestionPanel = $state<'folder' | 'source' | null>(null);
+  let activeSuggestionPanel = $state<'folder' | 'source' | 'tag' | null>(null);
   let suggestionQuery = $state('');
   let suggestionInputRef: HTMLInputElement | null = $state(null);
   let t = $derived($tr);
@@ -79,6 +82,20 @@
 
   const normalizedAvailableTags = $derived.by(() => {
     return normalizeTagSuggestionOptions(availableTags || []);
+  });
+
+  /** 标签建议由主搜索框 `tag:` 后缀实时过滤（对齐专题列表，无独立搜索框）。 */
+  const tagSuggestionItems = $derived.by(() => {
+    if (activeSuggestionPanel !== 'tag') {
+      return [];
+    }
+    // 读取 value，保证主搜索框输入时列表可响应式刷新
+    void value;
+    return filterTagSuggestionItems(
+      normalizedAvailableTags,
+      getTagFilterQuery(),
+      40,
+    );
   });
 
   // 搜索选项定义
@@ -232,13 +249,37 @@
       .replace(/['"]+$/, '');
   }
 
+  /** 标签过滤查询：优先光标所在 token；光标不可靠时回退到 value 末尾的 tag: 片段。 */
+  function getTagFilterQuery(): string {
+    const token = getCurrentSearchToken();
+    if (token.toLowerCase().startsWith('tag:')) {
+      return token
+        .slice(4)
+        .trim()
+        .replace(/^['"]+/, '')
+        .replace(/['"]+$/, '');
+    }
+
+    const trailing = value.match(/(?:^|\s)(tag:[^\s]*)$/i)?.[1] ?? '';
+    if (!trailing.toLowerCase().startsWith('tag:')) {
+      return '';
+    }
+
+    return trailing
+      .slice(4)
+      .trim()
+      .replace(/^['"]+/, '')
+      .replace(/['"]+$/, '');
+  }
+
   // 检测并显示建议
   function checkAndShowSuggestions() {
     const lastWord = getCurrentSearchToken();
     const normalizedWord = lastWord.toLowerCase();
 
     if (normalizedWord.startsWith('tag:')) {
-      closeActiveMenu();
+      // 与专题列表同构：展示标签列表；继续在主搜索框输入则实时过滤
+      openTagSuggestionPanel();
     } else if (lastWord.endsWith('folder:')) {
       openFolderPicker();
     } else if (lastWord.endsWith('deck:')) {
@@ -261,6 +302,9 @@
       showYamlSuggestions();
     } else {
       closeActiveMenu();
+      if (activeSuggestionPanel === 'tag') {
+        activeSuggestionPanel = null;
+      }
     }
   }
 
@@ -292,9 +336,14 @@
   }
 
   function getSuggestionPanelTitle(): string {
-    return activeSuggestionPanel === 'folder'
-      ? t('management.cardSearch.folderPanelTitle')
-      : t('management.cardSearch.sourcePanelTitle');
+    if (activeSuggestionPanel === 'folder') {
+      return t('management.cardSearch.folderPanelTitle');
+    }
+    if (activeSuggestionPanel === 'tag') {
+      // 与专题 Menu 标题「专题」对齐，使用短标题「标签」
+      return t('management.cardSearch.menuSections.tag');
+    }
+    return t('management.cardSearch.sourcePanelTitle');
   }
 
   function getSuggestionItems(): string[] {
@@ -330,6 +379,12 @@
     suggestionQuery = '';
   }
 
+  function handleTagSuggestionSelect(tag: string, e: MouseEvent) {
+    e.preventDefault();
+    replaceLastWord(tag);
+    activeSuggestionPanel = null;
+  }
+
   function openSourceSuggestionPanel() {
     showDropdown = false;
     closeActiveMenu();
@@ -338,6 +393,16 @@
     window.setTimeout(() => {
       suggestionInputRef?.focus();
       suggestionInputRef?.select();
+    }, 0);
+  }
+
+  function openTagSuggestionPanel() {
+    showDropdown = false;
+    closeActiveMenu();
+    activeSuggestionPanel = 'tag';
+    // 焦点留在主搜索框，便于继续输入并实时过滤标签列表
+    window.setTimeout(() => {
+      inputRef?.focus();
     }, 0);
   }
 
@@ -375,7 +440,9 @@
       item.setTitle(t('management.cardSearch.menuSections.readingState'));
       item.setDisabled(true);
     });
-    const values = availableStates.length > 0 ? availableStates : ['new', 'learning', 'review', 'queued', 'active', 'scheduled', 'done', 'suspended', 'removed'];
+    const values = availableStates.length > 0
+      ? availableStates
+      : ['new', 'queued', 'scheduled', 'active', 'suspended', 'done', 'removed'];
     values.slice(0, 20).forEach((v) => {
       menu.addItem((item) => {
         item.setTitle(v);
@@ -403,24 +470,27 @@
     });
 
     const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
+    const todayStr = formatCalendarDateKey(now);
     const thisMonthStr = todayStr.slice(0, 7);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
     const thisYearStart = `${now.getFullYear()}-01-01`;
+    const weekEndStr = formatCalendarDateKey(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7),
+    );
 
     const presets = dateType === 'due'
       ? [
           { label: t('management.cardSearch.dateMenus.dueToday', { date: todayStr }), value: todayStr },
           { label: t('management.cardSearch.dateMenus.overdue'), value: `<${todayStr}` },
-          { label: t('management.cardSearch.dateMenus.dueThisWeek'), value: `${todayStr}..${new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10)}` },
+          { label: t('management.cardSearch.dateMenus.dueThisWeek'), value: `${todayStr}..${weekEndStr}` },
           { label: t('management.cardSearch.dateMenus.dueThisMonth', { month: thisMonthStr }), value: thisMonthStr },
         ]
       : [
           { label: t('management.cardSearch.dateMenus.today', { date: todayStr }), value: todayStr },
           { label: t('management.cardSearch.dateMenus.thisMonth', { month: thisMonthStr }), value: thisMonthStr },
           { label: t('management.cardSearch.dateMenus.lastMonth', { month: lastMonthStr }), value: lastMonthStr },
-          { label: t('management.cardSearch.dateMenus.thisYear'), value: `>${thisYearStart}` },
+          { label: t('management.cardSearch.dateMenus.thisYear'), value: `${thisYearStart}..${todayStr}` },
           { label: t('management.cardSearch.dateMenus.range'), value: `${thisYearStart}..${todayStr}` },
         ];
     presets.forEach(({ label, value: v }) => {
@@ -458,11 +528,9 @@
     showMenuSafe(menu);
   }
 
-  // 显示标签建议
+  // 显示标签建议（结构对齐专题列表；过滤走主搜索框）
   function showTagSuggestions() {
-    closeActiveMenu();
-    inputRef?.focus();
-    inputRef?.dispatchEvent(new Event('input', { bubbles: true }));
+    openTagSuggestionPanel();
   }
 
   // 显示牌组建议
@@ -640,31 +708,6 @@
       }, 50);
     }
   }
-
-  $effect(() => {
-    if (!inputRef) {
-      tagSuggest?.destroy();
-      tagSuggest = null;
-      return;
-    }
-
-    const suggest = new TagInputSuggest(app, inputRef, {
-      getItems: () => normalizedAvailableTags,
-      getQuery: () => getSuggestionQuery('tag:'),
-      isActive: () => getCurrentSearchToken().toLowerCase().startsWith('tag:'),
-      onSelectTag: (tag) => replaceLastWord(tag),
-      limit: 40,
-    });
-
-    tagSuggest = suggest;
-
-    return () => {
-      suggest.destroy();
-      if (tagSuggest === suggest) {
-        tagSuggest = null;
-      }
-    };
-  });
 </script>
 
 <div class="card-search-container" bind:this={containerRef}>
@@ -796,49 +839,68 @@
       <div class="search-dropdown search-suggestion-panel weave-card-search-dropdown-panel" style={getDropdownStyle()}>
         <div class="dropdown-section">
           <div class="dropdown-section-header">{getSuggestionPanelTitle()}</div>
-          <div class="suggestion-search-box">
-            <input
-              bind:this={suggestionInputRef}
-              type="text"
-              class="suggestion-search-input"
-              placeholder={activeSuggestionPanel === 'folder'
-                ? t('management.cardSearch.searchFolderPlaceholder')
-                : t('management.cardSearch.searchSourcePlaceholder')}
-              bind:value={suggestionQuery}
-            />
-            {#if suggestionQuery}
-              <button
-                type="button"
-                class="clickable-icon suggestion-search-clear"
-                onclick={() => {
-                  suggestionQuery = '';
-                  suggestionInputRef?.focus();
-                }}
-                aria-label={t('management.cardSearch.clearSuggestionSearch')}
-              >
-                <EnhancedIcon name={ICON_NAMES.TIMES} size={12} />
-              </button>
-            {/if}
-          </div>
-          {#if getSuggestionItems().length === 0}
-            <div class="dropdown-empty-state">
-              {activeSuggestionPanel === 'folder'
-                ? t('management.cardSearch.noFolders')
-                : t('management.cardSearch.noSources')}
-            </div>
-          {:else}
-            {#each getSuggestionItems() as item}
-              <div
-                class="dropdown-item dropdown-item--multiline"
-                role="button"
-                tabindex="-1"
-                onmousedown={(e) => handleSuggestionItemSelect(item, e)}
-              >
-                <span class="dropdown-item-label dropdown-item-label--multiline">
-                  {getSuggestionItemLabel(item)}
-                </span>
+          {#if activeSuggestionPanel === 'tag'}
+            {#if tagSuggestionItems.length === 0}
+              <div class="dropdown-empty-state">
+                {t('management.cardSearch.noTags')}
               </div>
-            {/each}
+            {:else}
+              {#each tagSuggestionItems as item}
+                <div
+                  class="dropdown-item"
+                  role="button"
+                  tabindex="-1"
+                  onmousedown={(e) => handleTagSuggestionSelect(item.tag, e)}
+                >
+                  <span class="dropdown-item-label">{item.tag}</span>
+                </div>
+              {/each}
+            {/if}
+          {:else}
+            <div class="suggestion-search-box">
+              <input
+                bind:this={suggestionInputRef}
+                type="text"
+                class="suggestion-search-input"
+                placeholder={activeSuggestionPanel === 'folder'
+                  ? t('management.cardSearch.searchFolderPlaceholder')
+                  : t('management.cardSearch.searchSourcePlaceholder')}
+                bind:value={suggestionQuery}
+              />
+              {#if suggestionQuery}
+                <button
+                  type="button"
+                  class="clickable-icon suggestion-search-clear"
+                  onclick={() => {
+                    suggestionQuery = '';
+                    suggestionInputRef?.focus();
+                  }}
+                  aria-label={t('management.cardSearch.clearSuggestionSearch')}
+                >
+                  <EnhancedIcon name={ICON_NAMES.TIMES} size={12} />
+                </button>
+              {/if}
+            </div>
+            {#if getSuggestionItems().length === 0}
+              <div class="dropdown-empty-state">
+                {activeSuggestionPanel === 'folder'
+                  ? t('management.cardSearch.noFolders')
+                  : t('management.cardSearch.noSources')}
+              </div>
+            {:else}
+              {#each getSuggestionItems() as item}
+                <div
+                  class="dropdown-item dropdown-item--multiline"
+                  role="button"
+                  tabindex="-1"
+                  onmousedown={(e) => handleSuggestionItemSelect(item, e)}
+                >
+                  <span class="dropdown-item-label dropdown-item-label--multiline">
+                    {getSuggestionItemLabel(item)}
+                  </span>
+                </div>
+              {/each}
+            {/if}
           {/if}
         </div>
       </div>

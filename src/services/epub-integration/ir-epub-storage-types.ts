@@ -17,4 +17,9 @@ export interface IrEpubStorageLike {
 		sourceId?: string,
 		fallbackFilePath?: string,
 	): Promise<string | null>;
+	/** Optional: rewrite registry paths after a vault file/folder rename. */
+	remapSourceFileReferences?(
+		oldPath: string,
+		newPath: string,
+	): Promise<number>;
 }

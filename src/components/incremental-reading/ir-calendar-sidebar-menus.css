@@ -4,7 +4,7 @@
   z-index: var(--weave-z-menu, 1200);
 }
 
-:global(.floating-menu.ir-calendar-scheduling-menu) {
+.floating-menu.ir-calendar-scheduling-menu {
   pointer-events: auto;
   min-width: min(240px, calc(100vw - 24px));
   border-radius: var(--radius-m, 10px);
@@ -14,13 +14,13 @@
   overflow: hidden;
 }
 
-:global(.floating-menu.ir-calendar-scheduling-menu .ir-calendar-scheduling-panel) {
+.floating-menu.ir-calendar-scheduling-menu .ir-calendar-scheduling-panel {
   display: flex;
   flex-direction: column;
   width: 100%;
 }
 
-:global(.floating-menu.ir-calendar-priority-menu) {
+.floating-menu.ir-calendar-priority-menu {
   width: min(360px, calc(100vw - 24px));
   min-width: min(360px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
@@ -34,7 +34,7 @@
   overflow: hidden;
 }
 
-:global(.floating-menu.ir-calendar-priority-menu .ir-calendar-priority-panel) {
+.floating-menu.ir-calendar-priority-menu .ir-calendar-priority-panel {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -42,7 +42,7 @@
   background: transparent;
 }
 
-:global(.floating-menu.ir-calendar-priority-menu .ir-calendar-preview-summary) {
+.floating-menu.ir-calendar-priority-menu .ir-calendar-preview-summary {
   margin: 0 16px 16px;
   padding: 12px 14px;
   border-radius: 16px;
@@ -55,6 +55,7 @@
   box-shadow: none;
 }
 
+/* Portaled menus: keep plugin-unique prefixes, never scope under .ir-calendar-sidebar. */
 .ir-calendar-scheduling-grid {
   display: flex;
   flex-direction: column;

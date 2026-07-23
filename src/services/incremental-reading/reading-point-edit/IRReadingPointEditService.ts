@@ -32,6 +32,7 @@ import { IRPointStorageService } from "../IRPointStorageService";
 import {
 	IRPointTagService,
 	normalizeReadingPointTags,
+	resolveReadingPointTags,
 } from "../IRPointTagService";
 import {
 	IRPointWriteService,
@@ -306,7 +307,7 @@ export class IRReadingPointEditService {
 			pointId;
 
 		const metadata = snapshot?.point.metadata || {};
-		const tags = await this.loadTags(material, pdfTask, epubTask, null);
+		const tags = await this.loadTags(material, pdfTask, epubTask, chunk);
 		const tagGroupId =
 			tags.length > 0
 				? await this.pointTagService.matchGroupForTags(tags)
@@ -686,17 +687,23 @@ export class IRReadingPointEditService {
 		epubTask: IREpubBookmarkTask | null,
 		chunk: IRChunkFileData | null,
 	): Promise<string[]> {
-		if (isPdfBookmarkTaskId(material.id)) {
-			return normalizeReadingPointTags(pdfTask?.tags || []);
-		}
-		if (isEpubBookmarkTaskId(material.id)) {
-			return normalizeReadingPointTags(epubTask?.tags || []);
-		}
-		if (chunk) {
-			return await this.pointTagService.getChunkTags(chunk);
-		}
 		const snapshot = await this.pointStorage.getPointSnapshotById(material.id);
-		return normalizeReadingPointTags(snapshot?.point.userData?.tags || []);
+		return await resolveReadingPointTags({
+			materialId: material.id,
+			sourceType: material.sourceType,
+			pdfTaskTags: pdfTask?.tags,
+			epubTaskTags: epubTask?.tags,
+			hasPointSnapshot: Boolean(snapshot?.point),
+			pointUserDataTags: snapshot?.point.userData?.tags,
+			getChunkTags: async () => {
+				const resolvedChunk =
+					chunk || (await this.storage.getChunkData(material.id));
+				if (!resolvedChunk) {
+					return [];
+				}
+				return await this.pointTagService.getChunkTags(resolvedChunk);
+			},
+		});
 	}
 
 	private buildMetadataPatch(
@@ -1023,6 +1030,7 @@ export class IRReadingPointEditService {
 			}
 		}
 		chunk.favorite = input.isStarred;
+		(chunk as { tags?: string[] }).tags = input.tags;
 		chunk.meta = {
 			...(chunk.meta || {}),
 			pointTitle: input.title,

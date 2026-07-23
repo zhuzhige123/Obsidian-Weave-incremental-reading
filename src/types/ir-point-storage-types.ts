@@ -306,6 +306,8 @@ export interface IRLegacyPointInput {
 	note?: string;
 	isStarred?: boolean;
 	linkedNotePaths?: string[];
+	/** Optional explicit parent reading point (content-split tree). */
+	parentPointId?: string | null;
 	explicitTagGroupId?: string;
 	stats?: {
 		impressions?: number;

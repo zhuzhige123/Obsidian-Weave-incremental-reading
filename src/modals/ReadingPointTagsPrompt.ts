@@ -2,6 +2,10 @@ import { App, Modal, Notice } from "obsidian";
 import { mount, unmount } from "svelte";
 import ReadingPointTagsPromptPanel from "../components/incremental-reading/reading-point-edit/ReadingPointTagsPromptPanel.svelte";
 import { normalizeReadingPointTags } from "../services/incremental-reading/IRPointTagService";
+import {
+	commitReadingPointTagDraft,
+	hasReadingPointTagDraft,
+} from "../services/incremental-reading/reading-point-edit/commitReadingPointTagDraft";
 import { buildSaveInputFromDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditSaveBuilder";
 import { IRReadingPointEditService } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditService";
 import type { IRReadingPointEditDraft } from "../services/incremental-reading/reading-point-edit/IRReadingPointEditTypes";
@@ -12,12 +16,18 @@ import { showObsidianConfirm } from "../utils/obsidian-confirm";
 
 export interface ReadingPointTagsPromptOptions {
 	draft: IRReadingPointEditDraft;
-	onSaved?: () => void;
+	onSaved?: (tags: string[]) => void;
 }
 
+type TagsPromptPanelInstance = {
+	commitPendingDraft?: () => void;
+};
+
 export class ReadingPointTagsPrompt extends Modal {
-	private component: Parameters<typeof unmount>[0] | null = null;
+	private component: (TagsPromptPanelInstance & Parameters<typeof unmount>[0]) | null =
+		null;
 	private tags: string[] = [];
+	private pendingDraft = "";
 	private initialTagsKey = "";
 	private submitting = false;
 
@@ -50,8 +60,11 @@ export class ReadingPointTagsPrompt extends Modal {
 				onTagsChange: (nextTags: string[]) => {
 					this.tags = nextTags;
 				},
+				onDraftChange: (draftText: string) => {
+					this.pendingDraft = draftText;
+				},
 			},
-		});
+		}) as TagsPromptPanelInstance & Parameters<typeof unmount>[0];
 
 		const buttonRow = this.contentEl.createDiv({
 			cls: "modal-button-container",
@@ -73,7 +86,19 @@ export class ReadingPointTagsPrompt extends Modal {
 		};
 	}
 
+	private flushPendingDraftIntoTags(): void {
+		// Capture before the input clears draft via onDraftChange; onTagsChange
+		// from the Svelte panel may still be deferred via $effect.
+		const draft = this.pendingDraft;
+		this.component?.commitPendingDraft?.();
+		this.tags = commitReadingPointTagDraft(this.tags, draft);
+		this.pendingDraft = "";
+	}
+
 	private isDirty(): boolean {
+		if (hasReadingPointTagDraft(this.pendingDraft)) {
+			return true;
+		}
 		return (
 			JSON.stringify(normalizeReadingPointTags(this.tags)) !==
 			this.initialTagsKey
@@ -105,6 +130,9 @@ export class ReadingPointTagsPrompt extends Modal {
 			return;
 		}
 
+		// Users often type a tag and click Save without pressing Enter first.
+		this.flushPendingDraftIntoTags();
+
 		if (!this.isDirty()) {
 			this.forceClose();
 			return;
@@ -112,17 +140,18 @@ export class ReadingPointTagsPrompt extends Modal {
 
 		this.submitting = true;
 		try {
+			const normalizedTags = normalizeReadingPointTags(this.tags);
 			const service = new IRReadingPointEditService(this.app);
 			const result = await service.saveEdit(
 				buildSaveInputFromDraft(this.app, this.options.draft, {
-					tags: normalizeReadingPointTags(this.tags),
+					tags: normalizedTags,
 				}),
 			);
 
 			if (result.changed) {
 				new Notice(i18n.t("irModals.readingPointTags.tagsUpdated"), 2500);
 			}
-			this.options.onSaved?.();
+			this.options.onSaved?.(normalizedTags);
 			this.forceClose();
 		} catch (error) {
 			logger.error("[ReadingPointTagsPrompt] save failed", error);

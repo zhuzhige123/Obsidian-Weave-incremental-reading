@@ -173,12 +173,12 @@
       resizeObserver.observe(anchorElement);
     }
 
-    document.addEventListener('pointerdown', onPointerDown, true);
+    activeDocument.addEventListener('pointerdown', onPointerDown, true);
     window.addEventListener('resize', onWindowMove);
     window.addEventListener('scroll', onWindowMove, true);
 
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
+      activeDocument.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('resize', onWindowMove);
       window.removeEventListener('scroll', onWindowMove, true);
       resizeObserver?.disconnect();

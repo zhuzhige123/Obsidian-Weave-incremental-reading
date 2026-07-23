@@ -1,6 +1,8 @@
 import { normalizePath } from "obsidian";
 import {
+	type AssociatedNoteRelationMode,
 	type PointLinkedNotesScheduleCarrier,
+	resolveAssociatedNoteRelationMode,
 	supportsPointLinkedNotesForScheduleItem,
 } from "./IRLinkedNotePolicy";
 
@@ -38,10 +40,51 @@ export function getPointAssociatedNotePath(
 	return material?.associatedNoteScope === "material" ? "" : normalizedPath;
 }
 
+/** True when curated linked-note writes are allowed (PDF/EPUB). */
 export function canUsePointLinkedNotes(
 	material?: AssociatedNoteCarrier | null,
 ): boolean {
 	return supportsPointLinkedNotesForScheduleItem(material);
+}
+
+export {
+	resolveAssociatedNoteRelationMode as getAssociatedNoteRelationMode,
+	type AssociatedNoteRelationMode,
+};
+
+/**
+ * Calendar / context-menu offer for associated notes.
+ *
+ * - curated: PDF/EPUB manual linked notes
+ * - derived: MD / web carrier outbound links (read-only)
+ * Premium preview must never surface the entry on unavailable types.
+ */
+export type AssociatedNoteMenuOffer =
+	| { kind: "hidden" }
+	| { kind: "premium-gate" }
+	| { kind: "manage-curated" }
+	| { kind: "manage-derived" };
+
+export function resolveAssociatedNoteMenuOffer(
+	material: AssociatedNoteCarrier | null | undefined,
+	access: {
+		canUseFeature: boolean;
+		shouldShowFeatureEntry: boolean;
+	},
+): AssociatedNoteMenuOffer {
+	const mode = resolveAssociatedNoteRelationMode(material);
+	if (mode === "unavailable") {
+		return { kind: "hidden" };
+	}
+	if (access.canUseFeature) {
+		return mode === "curated"
+			? { kind: "manage-curated" }
+			: { kind: "manage-derived" };
+	}
+	if (access.shouldShowFeatureEntry) {
+		return { kind: "premium-gate" };
+	}
+	return { kind: "hidden" };
 }
 
 export function hasVisibleAssociatedNote(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	applyObsidianBlockIdToLines,
 	blockReferencesObsidianId,
 	buildCanvasNodeEmbedWikiLink,
 	buildObsidianBlockResumeLink,
@@ -7,12 +8,15 @@ import {
 	buildObsidianEmbedBlockWikiLink,
 	cleanParagraphBlockTitle,
 	deriveSegmentTitleDraft,
+	ensureBlockIdOnMarkdownSelection,
 	extractObsidianBlockIdFromText,
 	extractWikiLinkTarget,
 	findDuplicateBlockForSegment,
+	findSegmentLastContentLineIndex,
 	formatObsidianBlockId,
 	generateObsidianBlockId,
 	resolveLegacyBlockResumeLink,
+	resolveObsidianBlockRangeAroundLines,
 } from "../paragraph-block-reference";
 
 describe("paragraph-block-reference", () => {
@@ -47,15 +51,15 @@ describe("paragraph-block-reference", () => {
 	});
 
 	it("extracts obsidian block id from text", () => {
-		expect(extractObsidianBlockIdFromText("段落末尾 ^ir_abc12345")).toBe(
-			"ir_abc12345",
+		expect(extractObsidianBlockIdFromText("段落末尾 ^IR-abc12345")).toBe(
+			"IR-abc12345",
 		);
-		expect(formatObsidianBlockId("ir_abc12345")).toBe("^ir_abc12345");
+		expect(formatObsidianBlockId("IR-abc12345")).toBe("^IR-abc12345");
 	});
 
-	it("generates ir_ prefixed block ids", () => {
+	it("generates IR- prefixed block ids", () => {
 		const blockId = generateObsidianBlockId();
-		expect(blockId.startsWith("ir_")).toBe(true);
+		expect(blockId.startsWith("IR-")).toBe(true);
 		expect(blockId.length).toBeGreaterThan(4);
 	});
 
@@ -63,15 +67,48 @@ describe("paragraph-block-reference", () => {
 		expect(
 			resolveLegacyBlockResumeLink({
 				filePath: "Notes/demo.md",
-				notes: "![[Notes/demo.md#^ir_d420d8|标题]]",
+				notes: "![[Notes/demo.md#^IR-d420d8|标题]]",
 			}),
-		).toBe("Notes/demo.md#^ir_d420d8");
-		expect(extractWikiLinkTarget("![[Notes/demo.md#^ir_d420d8]]")).toBe(
-			"Notes/demo.md#^ir_d420d8",
+		).toBe("Notes/demo.md#^IR-d420d8");
+		expect(extractWikiLinkTarget("![[Notes/demo.md#^IR-d420d8]]")).toBe(
+			"Notes/demo.md#^IR-d420d8",
 		);
 		expect(
-			buildObsidianBlockResumeLink("Notes/demo.md", "ir_d420d8", "标题"),
-		).toBe("[[Notes/demo.md#^ir_d420d8|标题]]");
+			buildObsidianBlockResumeLink("Notes/demo.md", "IR-d420d8", "标题"),
+		).toBe("[[Notes/demo.md#^IR-d420d8|标题]]");
+	});
+
+	it("expands selection to enclosing blank-line block", () => {
+		const lines = [
+			"其他段落",
+			"",
+			"第一行",
+			"第二行",
+			"",
+			"下一段",
+		];
+		expect(resolveObsidianBlockRangeAroundLines(lines, 2, 2)).toEqual({
+			startLine: 2,
+			endLine: 3,
+		});
+		expect(resolveObsidianBlockRangeAroundLines(lines, 3, 3)).toEqual({
+			startLine: 2,
+			endLine: 3,
+		});
+	});
+
+	it("ensures block id on markdown selection and reuses existing", () => {
+		const content = "前言\n\n选中这段话。\n\n下一段";
+		const first = ensureBlockIdOnMarkdownSelection(content, 2, 2);
+		expect(first.alreadyExisted).toBe(false);
+		expect(first.changed).toBe(true);
+		expect(first.blockId.startsWith("IR-")).toBe(true);
+		expect(first.nextContent).toContain(`选中这段话。 ^${first.blockId}`);
+
+		const second = ensureBlockIdOnMarkdownSelection(first.nextContent, 2, 2);
+		expect(second.alreadyExisted).toBe(true);
+		expect(second.blockId).toBe(first.blockId);
+		expect(second.changed).toBe(false);
 	});
 
 	it("cleans markdown heading prefixes from titles", () => {
@@ -82,6 +119,43 @@ describe("paragraph-block-reference", () => {
 		expect(
 			buildCanvasNodeEmbedWikiLink("Boards/demo.canvas", "node-1", "节点"),
 		).toBe("![[Boards/demo.canvas?node=node-1|节点]]");
+	});
+
+	it("appends block id to the last content line and ensures a trailing blank line", () => {
+		const lines = [
+			"前言",
+			"",
+			"在处理语言信息时，一般人在短期记忆阶段主要依赖声码，而在长期记忆阶段，意码则变得更为重要。",
+			"下一段开头",
+		];
+		const result = applyObsidianBlockIdToLines(
+			lines,
+			{ startLine: 2, endLine: 2 },
+			"IR-d420d8",
+		);
+		expect(result.alreadyExisted).toBe(false);
+		expect(result.lines[2]).toBe(
+			"在处理语言信息时，一般人在短期记忆阶段主要依赖声码，而在长期记忆阶段，意码则变得更为重要。 ^IR-d420d8",
+		);
+		expect(result.lines[3]).toBe("");
+		expect(result.lines[4]).toBe("下一段开头");
+		expect(result.insertedTrailingBlank).toBe(true);
+	});
+
+	it("does not put block id on a blank endLine; uses last non-empty line instead", () => {
+		const lines = ["第一行", "最后一句。", "", "下一段"];
+		expect(
+			findSegmentLastContentLineIndex(lines, { startLine: 0, endLine: 2 }),
+		).toBe(1);
+		const result = applyObsidianBlockIdToLines(
+			lines,
+			{ startLine: 0, endLine: 2 },
+			"IR-abc12345",
+		);
+		expect(result.lines[1]).toBe("最后一句。 ^IR-abc12345");
+		expect(result.lines[2]).toBe("");
+		expect(result.lines[3]).toBe("下一段");
+		expect(result.insertedTrailingBlank).toBe(false);
 	});
 
 	it("detects duplicate blocks by obsidian block id in notes", () => {

@@ -1,22 +1,22 @@
 /* IRCalendar sidebar shell, background wall, responsive layout */
-:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view) {
+.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view {
   padding: 0;
   overflow: hidden;
   --weave-ir-calendar-host-background: var(--weave-surface-background, var(--background-primary));
   background: var(--weave-ir-calendar-host-background);
 }
 
-:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"][data-weave-surface-context="sidebar"]) {
+.workspace-leaf-content[data-type^="weave-ir-calendar-view"][data-weave-surface-context="sidebar"] {
   background: transparent;
 }
 
-:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view[data-weave-surface-context="sidebar"]) {
+.workspace-leaf-content[data-type^="weave-ir-calendar-view"] > .view-content.weave-ir-calendar-view[data-weave-surface-context="sidebar"] {
   /* 侧边栏里尽量继承 Obsidian/主题提供的宿主背景，避免我们再叠一层“secondary”底色导致偏色。 */
   --weave-ir-calendar-host-background: transparent;
   background: transparent;
 }
 
-:global(.workspace-leaf-content[data-type^="weave-ir-calendar-view"][data-weave-surface-context="sidebar"] > .view-content.weave-ir-calendar-view .ir-calendar-sidebar) {
+.workspace-leaf-content[data-type^="weave-ir-calendar-view"][data-weave-surface-context="sidebar"] > .view-content.weave-ir-calendar-view .ir-calendar-sidebar {
   --weave-ir-sidebar-surface-background: transparent;
   background: transparent;
 }
@@ -38,7 +38,7 @@
   max-width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 12px;
+  padding: 0 12px 12px;
   background: var(--weave-ir-sidebar-surface-background);
   box-sizing: border-box;
   container-type: inline-size;
@@ -52,7 +52,7 @@
   z-index: 1;
 }
 
-.calendar-background-wall {
+.ir-calendar-sidebar .calendar-background-wall {
   position: absolute;
   inset: 0 0 auto 0;
   height: min(58%, 420px);
@@ -61,14 +61,12 @@
   overflow: hidden;
 }
 
-.calendar-background-wall__image,
-.calendar-background-wall__veil,
-.calendar-background-wall__mist {
+.ir-calendar-sidebar .calendar-background-wall__image, .ir-calendar-sidebar .calendar-background-wall__veil, .ir-calendar-sidebar .calendar-background-wall__mist {
   position: absolute;
   inset: 0;
 }
 
-.calendar-background-wall__image {
+.ir-calendar-sidebar .calendar-background-wall__image {
   background-position: center top;
   background-repeat: no-repeat;
   background-size: cover;
@@ -81,7 +79,7 @@
   -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.78) 54%, transparent 100%);
 }
 
-.calendar-background-wall__veil {
+.ir-calendar-sidebar .calendar-background-wall__veil {
   background:
     linear-gradient(
       180deg,
@@ -92,7 +90,7 @@
     );
 }
 
-.calendar-background-wall__mist {
+.ir-calendar-sidebar .calendar-background-wall__mist {
   background:
     radial-gradient(circle at 14% 14%, color-mix(in srgb, white calc(var(--calendar-background-wall-fade-ratio) * 12%), transparent) 0%, transparent 48%),
     radial-gradient(circle at 86% 22%, color-mix(in srgb, white calc(var(--calendar-background-wall-fade-ratio) * 10%), transparent) 0%, transparent 42%),
@@ -106,13 +104,10 @@
 
 
 
-:global(
-  .workspace-leaf-content[data-type^="weave-ir-calendar-view"]
+.workspace-leaf-content[data-type^="weave-ir-calendar-view"]
     .view-content.weave-ir-calendar-view
     .calendar-grid
-    button.day-cell.clickable-icon
-),
-.ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon {
+    button.day-cell.clickable-icon, .ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon {
   border: none;
   border-width: 0;
   border-color: transparent;
@@ -122,38 +117,33 @@
   background-color: transparent;
   box-shadow: none;
   filter: none;
-  min-height: unset;
+  min-height: 36px;
   height: auto;
-  padding: 0;
+  aspect-ratio: auto;
+  padding: 2px 0;
 }
 
-:global(
-  .workspace-leaf-content[data-type^="weave-ir-calendar-view"]
+.workspace-leaf-content[data-type^="weave-ir-calendar-view"]
     .view-content.weave-ir-calendar-view
     .calendar-grid
-    button.day-cell.clickable-icon:hover
-),
-.ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon:hover {
+    button.day-cell.clickable-icon:hover, .ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon:hover {
   border: none;
   background: transparent;
   background-color: transparent;
   box-shadow: none;
 }
 
-:global(
-  .workspace-leaf-content[data-type^="weave-ir-calendar-view"]
+.workspace-leaf-content[data-type^="weave-ir-calendar-view"]
     .view-content.weave-ir-calendar-view
     .calendar-grid
-    button.day-cell.clickable-icon:active
-),
-.ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon:active {
+    button.day-cell.clickable-icon:active, .ir-calendar-sidebar .calendar-grid button.day-cell.clickable-icon:active {
   border: none;
   background: transparent;
   background-color: transparent;
   box-shadow: none;
 }
 
-.reading-tag-filter-bar {
+.ir-calendar-sidebar .reading-tag-filter-bar {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -163,11 +153,11 @@
   scrollbar-width: none;
 }
 
-.reading-tag-filter-bar::-webkit-scrollbar {
+.ir-calendar-sidebar .reading-tag-filter-bar::-webkit-scrollbar {
   display: none;
 }
 
-.reading-tag-filter-chip {
+.ir-calendar-sidebar .reading-tag-filter-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -183,7 +173,7 @@
   cursor: pointer;
 }
 
-.reading-tag-filter-count {
+.ir-calendar-sidebar .reading-tag-filter-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -196,7 +186,7 @@
   padding: 0 4px;
 }
 
-.reading-tag-filter-chip.active {
+.ir-calendar-sidebar .reading-tag-filter-chip.active {
   border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--interactive-accent) 12%, var(--weave-ir-sidebar-surface-background));
   color: var(--interactive-accent);
@@ -205,102 +195,119 @@
 
 /* chrome styles moved to ir-calendar-sidebar-chrome.css */
 /* content styles moved to ir-calendar-sidebar-content.css */
-.day-load-trigger-btn--warning {
+.ir-calendar-sidebar .day-load-trigger-btn--warning {
   color: color-mix(in srgb, var(--color-yellow) 82%, var(--text-muted));
 }
 
-.day-load-trigger-btn--overloaded {
+.ir-calendar-sidebar .day-load-trigger-btn--overloaded {
   color: color-mix(in srgb, var(--color-orange) 86%, var(--text-muted));
 }
 
-.day-load-trigger-btn--warning:hover,
-.day-load-trigger-btn--overloaded:hover {
+.ir-calendar-sidebar .day-load-trigger-btn--warning:hover, .ir-calendar-sidebar .day-load-trigger-btn--overloaded:hover {
   color: var(--text-normal);
 }
 
 @container (max-width: 340px) {
   .ir-calendar-sidebar {
-    padding: 8px;
+    padding: 0 8px 8px;
   }
 
-  .calendar-top-tools {
+  .ir-calendar-sidebar .calendar-top-tools {
     padding-inline: 8px;
   }
 
-  .calendar-header {
+  .ir-calendar-sidebar .calendar-header {
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
 
-  .month-title {
+  .ir-calendar-sidebar .month-title {
     gap: 6px;
   }
 
-  .month-title__month {
+  .ir-calendar-sidebar .month-title__month {
     font-size: 16px;
   }
 
-  .month-title__year {
+  .ir-calendar-sidebar .month-title__year {
     font-size: 10px;
   }
 
-  .calendar-tool-btn {
+  .ir-calendar-sidebar .calendar-tool-btn {
     width: 28px;
     height: 28px;
   }
 
-  .month-nav {
+  .ir-calendar-sidebar .month-nav {
     gap: 4px;
     padding: 0;
   }
 
-  .today-btn {
+  .ir-calendar-sidebar .today-btn {
     height: 28px;
     padding: 0 8px;
     font-size: 10px;
   }
 
-  .calendar-sync-status__label {
+  .ir-calendar-sidebar .calendar-sync-status__label {
     display: none;
   }
 
-  .calendar-sync-status {
+  .ir-calendar-sidebar .calendar-sync-status {
     max-width: none;
     padding: 0 4px;
   }
 
-  .calendar-grid-container {
+  .ir-calendar-sidebar .calendar-grid-container {
     padding: 0 0 6px;
     margin-bottom: 6px;
   }
 
-  .weekdays,
-  .calendar-grid {
+  .ir-calendar-sidebar .weekdays, .ir-calendar-sidebar .calendar-grid {
+    column-gap: 6px;
+    row-gap: 6px;
+  }
+
+  .ir-calendar-sidebar .weekdays {
+    margin-bottom: 6px;
+  }
+
+  .ir-calendar-sidebar .calendar-grid.is-one-row {
     gap: 6px;
   }
 
-  .weekday {
-    font-size: 8px;
+  .ir-calendar-sidebar .calendar-grid.is-one-row .day-cell.clickable-icon {
+    flex-basis: calc((100% - 36px) / 7);
+    width: calc((100% - 36px) / 7);
+    min-width: 30px;
+    min-height: 40px;
   }
 
-  .day-number {
+  .ir-calendar-sidebar .weekday {
+    font-size: 9px;
+  }
+
+  .ir-calendar-sidebar .day-number {
     font-size: 11px;
   }
 
-  .day-complete-icon {
-    width: 16px;
-    height: 16px;
+  .ir-calendar-sidebar .day-complete-icon {
+    width: 11px;
+    height: 11px;
   }
 
-  .day-surface,
-  .day-cell.has-tasks.today .day-surface,
-  .day-cell.has-tasks.selected .day-surface {
+  .ir-calendar-sidebar .day-complete-icon :global(svg) {
+    width: 11px;
+    height: 11px;
+  }
+
+  .ir-calendar-sidebar .day-surface, .ir-calendar-sidebar .day-cell.has-tasks.today .day-surface, .ir-calendar-sidebar .day-cell.has-tasks.selected .day-surface {
     width: 24px;
     height: 24px;
-    top: calc(50% - 1px);
+    top: 50%;
   }
 
-  .heat-dot {
+  .ir-calendar-sidebar .heat-dot {
     width: 4px;
     height: 4px;
   }
@@ -308,62 +315,65 @@
 
 @container (max-width: 280px) {
   .ir-calendar-sidebar {
-    padding: 6px;
+    padding: 0 6px 6px;
   }
 
-  .calendar-top-tools {
+  .ir-calendar-sidebar .calendar-top-tools {
     padding-inline: 6px;
   }
 
-  .calendar-header {
+  .ir-calendar-sidebar .calendar-header {
     gap: 4px;
   }
 
-  .month-title {
+  .ir-calendar-sidebar .month-title {
     gap: 4px;
   }
 
-  .month-title__month {
+  .ir-calendar-sidebar .month-title__month {
     font-size: 14px;
   }
 
-  .month-title__year {
+  .ir-calendar-sidebar .month-title__year {
     font-size: 10px;
   }
 
-  .calendar-tool-btn {
+  .ir-calendar-sidebar .calendar-tool-btn {
     width: 26px;
     height: 26px;
   }
 
-  .month-nav {
+  .ir-calendar-sidebar .month-nav {
     gap: 3px;
   }
 
-  .today-btn {
+  .ir-calendar-sidebar .today-btn {
     height: 26px;
     padding: 0 5px;
     font-size: 9px;
   }
 
-  .calendar-grid-container {
+  .ir-calendar-sidebar .calendar-grid-container {
     padding: 0 0 4px;
   }
 
-  .day-number {
+  .ir-calendar-sidebar .day-number {
     font-size: 10px;
   }
 
-  .day-complete-icon {
-    width: 14px;
-    height: 14px;
+  .ir-calendar-sidebar .day-complete-icon {
+    width: 10px;
+    height: 10px;
   }
 
-  .day-surface,
-  .day-cell.has-tasks.today .day-surface,
-  .day-cell.has-tasks.selected .day-surface {
+  .ir-calendar-sidebar .day-complete-icon :global(svg) {
+    width: 10px;
+    height: 10px;
+  }
+
+  .ir-calendar-sidebar .day-surface, .ir-calendar-sidebar .day-cell.has-tasks.today .day-surface, .ir-calendar-sidebar .day-cell.has-tasks.selected .day-surface {
     width: 22px;
     height: 22px;
-    top: calc(50% - 1px);
+    top: 50%;
   }
 }

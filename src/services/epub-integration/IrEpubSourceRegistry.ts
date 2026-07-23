@@ -5,6 +5,7 @@ import {
 	normalizeWeaveParentFolder,
 } from "../../config/paths";
 import { DirectoryUtils } from "../../utils/directory-utils";
+import { remapVaultPath } from "../../utils/ir-vault-path-remap";
 import { logger } from "../../utils/logger";
 import { isSupportedBookFile, isSupportedBookPath } from "./book-format";
 import { getEpubRuntime } from "./epub-runtime";
@@ -168,6 +169,67 @@ export class IrEpubSourceRegistry implements IrEpubStorageLike {
 			return normalizedFallback;
 		}
 		return null;
+	}
+
+	async remapSourceFileReferences(
+		oldPath: string,
+		newPath: string,
+	): Promise<number> {
+		const normalizedOldPath = normalizePath(String(oldPath || "").trim());
+		const normalizedNewPath = normalizePath(String(newPath || "").trim());
+		if (
+			!normalizedOldPath ||
+			!normalizedNewPath ||
+			normalizedOldPath === normalizedNewPath
+		) {
+			return 0;
+		}
+
+		const registry = await this.loadSourceRegistry();
+		let updatedCount = 0;
+		const nextRegistry = registry.map((entry) => {
+			let changed = false;
+			let filePath = entry.filePath;
+			let lastKnownPath = entry.lastKnownPath;
+
+			const remappedFilePath = remapVaultPath(
+				filePath,
+				normalizedOldPath,
+				normalizedNewPath,
+			);
+			if (remappedFilePath && remappedFilePath !== filePath) {
+				filePath = remappedFilePath;
+				changed = true;
+			}
+
+			const remappedLastKnown = remapVaultPath(
+				lastKnownPath,
+				normalizedOldPath,
+				normalizedNewPath,
+			);
+			if (remappedLastKnown && remappedLastKnown !== lastKnownPath) {
+				lastKnownPath = remappedLastKnown;
+				changed = true;
+			}
+
+			if (!changed) {
+				return entry;
+			}
+			updatedCount += 1;
+			return {
+				...entry,
+				filePath,
+				lastKnownPath,
+				lastSeenAt: Date.now(),
+			};
+		});
+
+		if (updatedCount === 0) {
+			return 0;
+		}
+
+		await this.saveSourceRegistry(nextRegistry);
+		return updatedCount;
 	}
 
 	private async loadSourceRegistry(): Promise<EpubSourceRegistryEntry[]> {

@@ -28,9 +28,13 @@ export interface IRCalendarSidebarSettings {
 	continuousReadingEnabled?: boolean;
 	autoStartNextTimerEnabled?: boolean;
 	showSchedulingPreview?: boolean;
-	calendarViewMode?: "full" | "two-row";
+	calendarViewMode?: "full" | "two-row" | "one-row";
 	showMaterialTimers?: boolean;
 	showReadingPointTypeLabels?: boolean;
+	/** When true, calendar material list shows a warning icon for vault sources that cannot be found. Default: true. */
+	showMissingSourceIndicators?: boolean;
+	/** When true, hide reading points already completed today from today's material list. Default: false. */
+	hideTodayCompletedReadingPoints?: boolean;
 	backgroundWall?: {
 		imagePath?: string;
 		fadePercent?: number;
@@ -58,6 +62,21 @@ export interface IncrementalReadingFolderSubscriptionSettings {
 	deckId?: string;
 	initialScheduleMode?: IncrementalReadingFolderSubscriptionInitialScheduleMode;
 	importConfirmThreshold?: number;
+}
+
+/**
+ * Global tag source policy for reading points.
+ * Tag-group matching always consumes resolved reading-point tags;
+ * this policy only controls where Markdown (and future adapters) sync from/to.
+ */
+export interface IRTagSourcePolicy {
+	/**
+	 * YAML frontmatter property used for Markdown reading-point tags.
+	 * Default: legacy `weave_tags` (safe for existing installs). Prefer
+	 * Obsidian-native `tags` when you want graph/search interoperability.
+	 * Legacy `weave_tags` is still read when a non-legacy primary key is empty.
+	 */
+	markdownYamlKey: string;
 }
 
 export interface IncrementalReadingSettings {
@@ -110,9 +129,9 @@ export interface IncrementalReadingSettings {
 	maxInterval?: number;
 
 	/**
-	 * 旧材料导入 / 非 Markdown 源文件复制用的兼容目录
-	 * 不再决定新的正文 Markdown 默认创建位置
-	 * @default 'weave/incremental-reading'
+	 * Compatibility: 旧材料导入 / 非 Markdown 源文件复制用的兼容目录。
+	 * 已合并进插件数据文件夹（weaveParentFolder）；运行时由 resolveIRImportFolder 推导为 `{dataRoot}/IR`。
+	 * @default ''
 	 */
 	importFolder?: string;
 
@@ -264,6 +283,12 @@ export interface IncrementalReadingSettings {
 	tagGroupFollowMode?: "off" | "ask" | "auto";
 
 	/**
+	 * Where reading-point tags are synced from for each material class.
+	 * Matching always uses resolved `userData.tags` (or task tags).
+	 */
+	tagSource?: IRTagSourcePolicy;
+
+	/**
 	 * 待读天数（统一用于统计和提前阅读范围）
 	 * 用于统计N天内到期的内容块，显示为"待读"，同时限制提前阅读范围
 	 * 范围: 1-14, 默认: 3
@@ -313,6 +338,9 @@ export const DEFAULT_IR_SETTINGS: IncrementalReadingSettings = {
 	priorityHalfLifeDays: 7,
 	learnAheadDays: 3,
 	tagGroupFollowMode: "ask",
+	tagSource: {
+		markdownYamlKey: "weave_tags",
+	},
 	folderSubscription: {
 		rules: [],
 		initialScheduleMode: "today",
@@ -325,6 +353,8 @@ export const DEFAULT_IR_SETTINGS: IncrementalReadingSettings = {
 		calendarViewMode: "full",
 		showMaterialTimers: true,
 		showReadingPointTypeLabels: false,
+		showMissingSourceIndicators: true,
+		hideTodayCompletedReadingPoints: false,
 		backgroundWall: {
 			imagePath: "",
 			fadePercent: 72,

@@ -295,18 +295,24 @@ describe("IRCalendarDayIndexService", () => {
 		expect(hydrated?.materialsByDate.get("2026-05-29")?.[0]?.id).toBe(
 			"chunk-1",
 		);
-		expect(hydrated?.materialsByDate.get("2026-05-30")?.[0]?.id).toBe(
-			"chunk-2b",
+		// syncFromMaterialsByDate 防缩减：不得丢已有 id；权威替换走 patchDaySlices。
+		const day30Ids = new Set(
+			(hydrated?.materialsByDate.get("2026-05-30") || []).map(
+				(item) => item.id,
+			),
 		);
+		expect(day30Ids.has("chunk-2")).toBe(true);
+		expect(day30Ids.has("chunk-2b")).toBe(true);
 
 		await service.flushPendingWrites();
 		const monthHeatmap = await service.tryHydrateMonthHeatmap({
 			cacheKey,
 			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-b",
 			monthKeys: ["2026-05"],
 		});
 		expect(monthHeatmap?.get("2026-05")?.["2026-05-29"]).toBe(1);
-		expect(monthHeatmap?.get("2026-05")?.["2026-05-30"]).toBe(1);
+		expect(monthHeatmap?.get("2026-05")?.["2026-05-30"]).toBe(2);
 	});
 
 	it("drops shell hydration when schedule fingerprint changes", async () => {
@@ -383,5 +389,167 @@ describe("IRCalendarDayIndexService", () => {
 
 		expect(tier0?.materialsByDate.get("2026-05-29")).toEqual([]);
 		expect(tier0?.materialsByDate.get("2026-05-30")).toHaveLength(1);
+	});
+
+	it("syncFromMaterialsByDate refuses committed-due shrink over fuller L1 queue", async () => {
+		const service = new IRCalendarDayIndexService(app);
+		const cacheKey = "__all__::__default__";
+		const fullQueue = [
+			{
+				id: "pending-1",
+				title: "pending-1",
+				sourceFile: "Notes/a.md",
+				priority: 5,
+				intervalDays: 1,
+				scheduleStatus: "scheduled",
+				nextRepDate: 0,
+				nextReviewDate: null,
+			},
+			{
+				id: "pending-2",
+				title: "pending-2",
+				sourceFile: "Notes/b.md",
+				priority: 5,
+				intervalDays: 1,
+				scheduleStatus: "scheduled",
+				nextRepDate: 0,
+				nextReviewDate: null,
+			},
+			{
+				id: "done-1",
+				title: "done-1",
+				sourceFile: "Notes/c.md",
+				priority: 5,
+				intervalDays: 1,
+				scheduleStatus: "done",
+				nextRepDate: 0,
+				nextReviewDate: null,
+			},
+		] as any[];
+
+		await service.patchDaySlices({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
+			dayPatches: new Map([["2026-05-29", fullQueue]]),
+		});
+		await service.flushPendingWrites();
+
+		await service.syncFromMaterialsByDate({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-b",
+			materialsByDate: new Map([
+				[
+					"2026-05-29",
+					[
+						{
+							id: "pending-1",
+							title: "pending-1-updated",
+							sourceFile: "Notes/a.md",
+							priority: 5,
+							intervalDays: 1,
+							scheduleStatus: "scheduled",
+							nextRepDate: 0,
+							nextReviewDate: null,
+						} as any,
+					],
+				],
+			]),
+			priorityDateKeys: ["2026-05-29"],
+		});
+		await service.flushPendingWrites();
+
+		const hydrated = await service.tryHydrateDateKeys({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-b",
+			dateKeys: ["2026-05-29"],
+		});
+		const ids = new Set(
+			(hydrated?.materialsByDate.get("2026-05-29") || []).map(
+				(item) => item.id,
+			),
+		);
+		expect(ids.has("pending-1")).toBe(true);
+		expect(ids.has("pending-2")).toBe(true);
+		expect(ids.has("done-1")).toBe(true);
+		expect(
+			hydrated?.materialsByDate.get("2026-05-29")?.find(
+				(item) => item.id === "pending-1",
+			)?.title,
+		).toBe("pending-1-updated");
+		expect(hydrated?.daySummaries.get("2026-05-29")?.totalCount).toBe(3);
+	});
+
+	it("patchDaySlices can authoritatively shrink a day queue", async () => {
+		const service = new IRCalendarDayIndexService(app);
+		const cacheKey = "__all__::__default__";
+		await service.patchDaySlices({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
+			dayPatches: new Map([
+				[
+					"2026-05-29",
+					[
+						{
+							id: "chunk-1",
+							title: "a",
+							sourceFile: "Notes/a.md",
+							priority: 5,
+							intervalDays: 1,
+							scheduleStatus: "scheduled",
+							nextRepDate: 0,
+							nextReviewDate: null,
+						} as any,
+						{
+							id: "chunk-2",
+							title: "b",
+							sourceFile: "Notes/b.md",
+							priority: 5,
+							intervalDays: 1,
+							scheduleStatus: "scheduled",
+							nextRepDate: 0,
+							nextReviewDate: null,
+						} as any,
+					],
+				],
+			]),
+		});
+		await service.patchDaySlices({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
+			dayPatches: new Map([
+				[
+					"2026-05-29",
+					[
+						{
+							id: "chunk-1",
+							title: "a",
+							sourceFile: "Notes/a.md",
+							priority: 5,
+							intervalDays: 1,
+							scheduleStatus: "scheduled",
+							nextRepDate: 0,
+							nextReviewDate: null,
+						} as any,
+					],
+				],
+			]),
+		});
+		await service.flushPendingWrites();
+
+		const hydrated = await service.tryHydrateDateKeys({
+			cacheKey,
+			settingsFingerprint: "settings-a",
+			scheduleFingerprint: "schedule-a",
+			dateKeys: ["2026-05-29"],
+		});
+		expect(hydrated?.materialsByDate.get("2026-05-29")).toHaveLength(1);
+		expect(hydrated?.materialsByDate.get("2026-05-29")?.[0]?.id).toBe(
+			"chunk-1",
+		);
 	});
 });
