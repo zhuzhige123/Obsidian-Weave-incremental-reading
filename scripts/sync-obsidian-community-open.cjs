@@ -11,7 +11,7 @@
  */
 const fs = require("fs");
 const path = require("path");
-const { execFileSync } = require("child_process");
+const { execFileSync, spawnSync } = require("child_process");
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const TEMPLATE_DIR = path.join(PROJECT_ROOT, "obsidian-community");
@@ -370,6 +370,44 @@ function ensurePublishClone(remoteUrl) {
 }
 
 function replacePublishTreeFromStaging(stagingRoot) {
+	// Node recursive rm/cp can abort on Windows with STATUS_STACK_BUFFER_OVERRUN
+	// for large trees; prefer robocopy / shell-assisted delete when available.
+	if (process.platform === "win32") {
+		for (const entry of fs.readdirSync(PUBLISH_DIR, { withFileTypes: true })) {
+			if (entry.name === ".git") continue;
+			const absolutePath = path.join(PUBLISH_DIR, entry.name);
+			try {
+				fs.rmSync(absolutePath, { recursive: true, force: true });
+			} catch {
+				// Fall through to robocopy mirror cleanup if needed.
+			}
+		}
+		const result = spawnSync(
+			"robocopy",
+			[
+				stagingRoot,
+				PUBLISH_DIR,
+				"/E",
+				"/PURGE",
+				"/XD",
+				".git",
+				"/NFL",
+				"/NDL",
+				"/NJH",
+				"/NJS",
+				"/nc",
+				"/ns",
+				"/np",
+			],
+			{ cwd: PROJECT_ROOT, encoding: "utf8", windowsHide: true }
+		);
+		// robocopy: 0-7 success, >=8 failure
+		if ((result.status ?? 0) >= 8) {
+			fail(`robocopy failed with exit code ${result.status}`);
+		}
+		return;
+	}
+
 	for (const entry of fs.readdirSync(PUBLISH_DIR, { withFileTypes: true })) {
 		if (entry.name === ".git") continue;
 		fs.rmSync(path.join(PUBLISH_DIR, entry.name), { recursive: true, force: true });

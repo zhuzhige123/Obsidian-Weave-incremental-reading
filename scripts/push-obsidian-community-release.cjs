@@ -97,6 +97,7 @@ function runNpmScript(scriptName) {
 	const result = spawnSync(npmCmd, ["run", scriptName], {
 		cwd: PROJECT_ROOT,
 		stdio: "inherit",
+		shell: process.platform === "win32",
 	});
 	if (result.status !== 0) {
 		fail(`npm run ${scriptName} failed`);
