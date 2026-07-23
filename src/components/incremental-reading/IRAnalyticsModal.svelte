@@ -15,6 +15,7 @@
   } from '../../services/incremental-reading/IRAnalyticsService';
   import { createManagedChartRuntime } from '../../utils/chart-runtime';
   import type { EChartsOption } from '../../utils/echarts-loader';
+  import type { ThemeColors } from '../../utils/echarts-theme';
   import { logger } from '../../utils/logger';
   // Alias avoids clashing with HTML `<tr>` in the outcome table markup.
   import { tr as i18nTr } from '../../utils/i18n';
@@ -35,6 +36,9 @@
 
   const TOP_MATERIAL_LIMIT = 5;
   const MATERIAL_CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
+  /** Fixed chart viewport; full horizon still comes from selectedDays. */
+  const FORECAST_VISIBLE_DAYS_DESKTOP = 14;
+  const FORECAST_VISIBLE_DAYS_MOBILE = 7;
 
   const isMobile = Platform.isMobile;
   const WHEEL_THROTTLE_MS = 180;
@@ -52,6 +56,7 @@
   let selectedDays = $state(30);
   let selectedMode = $state<IRAnalyticsMode>('overall');
   let selectedSelectionKey = $state('');
+  let chartScrollViewportRef = $state<HTMLDivElement | null>(null);
   let chartRef = $state<HTMLDivElement | null>(null);
   let compositionChartRef = $state<HTMLDivElement | null>(null);
   let analyticsService = $state<ReturnType<typeof getSharedIRAnalyticsService> | null>(null);
@@ -60,6 +65,9 @@
   let loadError = $state('');
   let loadRequestId = 0;
   let wheelThrottle = false;
+  /** Non-reactive: preserves native forecast scroll without retriggering chart $effect. */
+  let forecastScrollDataKey = '';
+  let forecastScrollLeft = 0;
 
   async function getAnalyticsService() {
     if (!analyticsService) {
@@ -422,7 +430,55 @@
     };
   }
 
-  function buildForecastOption(data: IRAnalyticsSnapshot, theme: any): EChartsOption {
+  function getForecastVisibleDays(totalPoints: number): number {
+    const preferred = isMobile ? FORECAST_VISIBLE_DAYS_MOBILE : FORECAST_VISIBLE_DAYS_DESKTOP;
+    return Math.max(1, Math.min(preferred, totalPoints));
+  }
+
+  function getForecastDataKey(data: IRAnalyticsSnapshot): string {
+    return `${selectedDays}::${data.forecast.length}::${data.forecast[0]?.dateKey ?? ''}::${data.forecast[data.forecast.length - 1]?.dateKey ?? ''}`;
+  }
+
+  function captureForecastScrollLeft(): void {
+    if (!chartScrollViewportRef || activeTab !== 'forecast') return;
+    forecastScrollLeft = chartScrollViewportRef.scrollLeft;
+  }
+
+  function restoreForecastScrollLeft(dataKey: string): void {
+    if (!chartScrollViewportRef || activeTab !== 'forecast') return;
+    if (forecastScrollDataKey !== dataKey) {
+      forecastScrollDataKey = dataKey;
+      forecastScrollLeft = 0;
+    }
+    chartScrollViewportRef.scrollLeft = forecastScrollLeft;
+  }
+
+  function applyChartContainerWidth(data: IRAnalyticsSnapshot, tab: ChartTab): void {
+    if (!chartRef) return;
+    if (tab !== 'forecast') {
+      chartRef.style.width = '100%';
+      return;
+    }
+
+    const viewportWidth =
+      chartScrollViewportRef?.clientWidth ||
+      chartRef.parentElement?.clientWidth ||
+      0;
+    if (viewportWidth <= 0) {
+      chartRef.style.width = '100%';
+      return;
+    }
+
+    const totalPoints = data.forecast.length;
+    const visibleDays = getForecastVisibleDays(totalPoints);
+    const nextWidth =
+      totalPoints <= visibleDays
+        ? viewportWidth
+        : Math.ceil((viewportWidth / visibleDays) * totalPoints);
+    chartRef.style.width = `${nextWidth}px`;
+  }
+
+  function buildForecastOption(data: IRAnalyticsSnapshot, theme: ThemeColors): EChartsOption {
     const presentTypes = getPresentMaterialTypes(
       data.forecast.map((point) => point.typeCounts)
     );
@@ -468,7 +524,10 @@
       xAxis: {
         type: 'category',
         data: data.forecast.map((point) => point.label),
-        axisLabel: { color: theme.subTextColor },
+        axisLabel: {
+          color: theme.subTextColor,
+          hideOverlap: true
+        },
         axisLine: { lineStyle: { color: theme.axisLineColor } }
       },
       yAxis: [
@@ -517,7 +576,8 @@
       onWheelStep: (step) => adjustQuickRange(step),
       onPinchStep: (step) => adjustQuickRange(step),
       cooldownMs: WHEEL_THROTTLE_MS,
-      enabled: () => activeTab !== 'activity'
+      // Forecast pans via native overflow scroll instead of changing selectedDays.
+      enabled: () => activeTab !== 'activity' && activeTab !== 'forecast'
     }
   });
 
@@ -749,7 +809,34 @@
 
   $effect(() => {
     if (!snapshot || activeTab === 'activity') return;
+    captureForecastScrollLeft();
+    applyChartContainerWidth(snapshot, activeTab);
     chartRuntime.render({ snapshot, activeTab });
+    if (activeTab === 'forecast') {
+      restoreForecastScrollLeft(getForecastDataKey(snapshot));
+    }
+  });
+
+  $effect(() => {
+    const viewport = chartScrollViewportRef;
+    if (!viewport) return;
+
+    const handleScroll = () => captureForecastScrollLeft();
+    viewport.addEventListener('scroll', handleScroll, { passive: true });
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (!snapshot || activeTab !== 'forecast') return;
+      captureForecastScrollLeft();
+      applyChartContainerWidth(snapshot, 'forecast');
+      chartRuntime.resize();
+      restoreForecastScrollLeft(getForecastDataKey(snapshot));
+    });
+    resizeObserver.observe(viewport);
+
+    return () => {
+      viewport.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
+    };
   });
 
   $effect(() => {
@@ -943,7 +1030,13 @@
               <div class="state-description">{getEmptyStateDescription()}</div>
             </div>
           {:else}
-            <div class="chart-container" bind:this={chartRef}></div>
+            <div
+              class="chart-scroll-viewport"
+              class:chart-scroll-viewport--forecast={activeTab === 'forecast'}
+              bind:this={chartScrollViewportRef}
+            >
+              <div class="chart-container" bind:this={chartRef}></div>
+            </div>
           {/if}
         </div>
       {/if}
@@ -1304,13 +1397,27 @@
     flex-direction: column;
   }
 
-  .chart-container {
+  .chart-scroll-viewport {
     flex: 1;
     width: 100%;
     height: 100%;
     min-height: 420px;
     border-radius: 12px;
     background: var(--background-primary);
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .chart-scroll-viewport--forecast {
+    overflow-x: auto;
+  }
+
+  .chart-container {
+    width: 100%;
+    height: 100%;
+    min-width: 100%;
+    min-height: 420px;
+    background: transparent;
   }
 
   .chart-stage > .state-panel {
@@ -1435,6 +1542,7 @@
       padding-right: 0;
     }
 
+    .chart-scroll-viewport,
     .chart-container,
     .chart-stage > .state-panel {
       min-height: 320px;
