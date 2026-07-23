@@ -2,6 +2,20 @@
 
 Weave Incremental Reading 的用户向版本更新说明。安装或升级后可在 [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases) 查看对应版本详情。
 
+## [0.5.25] - 2026-07-23
+
+本次 **Weave Incremental Reading v0.5.25** 更新优化体验 1 项。最低 Obsidian 版本要求仍为 **1.8.7**。
+
+### 【阅读分析】
+
+- **优化：** 预测负荷图表改为固定可视窗口（桌面约 14 天、手机约 7 天），完整时间范围仍由上方天数选择决定；超出可视窗口时可横向滚动查看，滚动位置在重绘时尽量保持，滚轮不再误改选中天数。
+
+### 【给升级用户的说明】
+
+常规升级即可。打开阅读分析 → 预测负荷即可体验新的横向浏览方式。
+
+---
+
 ## [0.5.24] - 2026-07-23
 
 本次 **Weave Incremental Reading v0.5.24** 更新优化体验若干项。最低 Obsidian 版本要求仍为 **1.8.7**。
