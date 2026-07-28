@@ -64,7 +64,11 @@ function createMockTFile(path: string): TFile {
 	} as unknown as TFile;
 }
 
-function createMemoryApp(initialFiles: Record<string, string> = {}) {
+function createMemoryApp(options?: {
+	initialFiles?: Record<string, string>;
+	weaveParentFolder?: string;
+}) {
+	const initialFiles = options?.initialFiles ?? {};
 	const files = new Map<string, string>();
 	const folders = new Set<string>([
 		"",
@@ -123,10 +127,20 @@ function createMemoryApp(initialFiles: Record<string, string> = {}) {
 		},
 	};
 
+	const weaveParentFolder = options?.weaveParentFolder;
+	const plugins = weaveParentFolder
+		? {
+				getPlugin: () => ({
+					settings: { weaveParentFolder },
+				}),
+			}
+		: undefined;
+
 	return {
 		app: {
 			scope: {},
 			vault,
+			...(plugins ? { plugins } : {}),
 		} as any,
 		files,
 	};
@@ -154,9 +168,11 @@ describe("DetachedLeafEditor temp file placement", () => {
 		);
 	});
 
-	it("uses the source file directory when sourcePath points to a nested file", async () => {
+	it("keeps temp files under the IR editor folder even when sourcePath is nested", async () => {
 		const { app, files } = createMemoryApp({
-			"notes/ch1/source.md": "# source",
+			initialFiles: {
+				"notes/ch1/source.md": "# source",
+			},
 		});
 		const editor = new DetachedLeafEditor(app, document.createElement("div"), {
 			sessionId: "session-2",
@@ -166,14 +182,19 @@ describe("DetachedLeafEditor temp file placement", () => {
 
 		await (editor as any).prepareTempFile();
 
-		const expectedPath = "notes/ch1/weave-editor-session-2.md";
-		expect(files.get(expectedPath)).toBe("nested");
-		expect((editor as any).tempFile?.path).toBe(expectedPath);
+		const { DEFAULT_IR_DATA_ROOT } = await import("../../../config/paths");
+		const expectedPath = `${DEFAULT_IR_DATA_ROOT}/editor/weave-editor-session-2.md`;
+		expect(files.get(normalizeTestPath(expectedPath))).toBe("nested");
+		expect((editor as any).tempFile?.path).toBe(
+			normalizeTestPath(expectedPath),
+		);
 	});
 
-	it("uses vault root when sourcePath points to a root-level file", async () => {
+	it("keeps temp files under the IR editor folder for root-level source files", async () => {
 		const { app, files } = createMemoryApp({
-			"source.md": "# root source",
+			initialFiles: {
+				"source.md": "# root source",
+			},
 		});
 		const editor = new DetachedLeafEditor(app, document.createElement("div"), {
 			sessionId: "session-3",
@@ -183,24 +204,34 @@ describe("DetachedLeafEditor temp file placement", () => {
 
 		await (editor as any).prepareTempFile();
 
-		expect(files.get("weave-editor-session-3.md")).toBe("root");
-		expect((editor as any).tempFile?.path).toBe("weave-editor-session-3.md");
+		const { DEFAULT_IR_DATA_ROOT } = await import("../../../config/paths");
+		const expectedPath = `${DEFAULT_IR_DATA_ROOT}/editor/weave-editor-session-3.md`;
+		expect(files.get(normalizeTestPath(expectedPath))).toBe("root");
+		expect((editor as any).tempFile?.path).toBe(
+			normalizeTestPath(expectedPath),
+		);
 	});
 
-	it("uses the parent directory when sourcePath points to a pdf source file", async () => {
+	it("respects a custom IR parent folder from settings", async () => {
 		const { app, files } = createMemoryApp({
-			"library/book.pdf": "pdf-placeholder",
+			initialFiles: {
+				"library/book.pdf": "pdf-placeholder",
+			},
+			weaveParentFolder: "Custom IR Root",
 		});
 		const editor = new DetachedLeafEditor(app, document.createElement("div"), {
-			sessionId: "session-4",
+			sessionId: "ir-paragraph-workbench-4",
 			sourcePath: "library/book.pdf",
 			value: "pdf-note",
 		});
 
 		await (editor as any).prepareTempFile();
 
-		const expectedPath = "library/weave-editor-session-4.md";
-		expect(files.get(expectedPath)).toBe("pdf-note");
-		expect((editor as any).tempFile?.path).toBe(expectedPath);
+		const expectedPath =
+			"Custom IR Root/editor/weave-editor-ir-paragraph-workbench-4.md";
+		expect(files.get(normalizeTestPath(expectedPath))).toBe("pdf-note");
+		expect((editor as any).tempFile?.path).toBe(
+			normalizeTestPath(expectedPath),
+		);
 	});
 });

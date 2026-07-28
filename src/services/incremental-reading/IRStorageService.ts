@@ -1572,6 +1572,42 @@ export class IRStorageService {
 		});
 	}
 
+	/**
+	 * 归档阅读点后：若源文件为 Markdown，在 YAML `tags` 中追加 `we_已归档`（幂等）。
+	 * 非 md（pdf/epub 等）直接跳过；不清理 weave-reading-* 字段。
+	 */
+	async markMarkdownSourceArchived(sourcePath: string): Promise<void> {
+		await this.initialize();
+
+		const normalizedPath = normalizePath(String(sourcePath || "").trim());
+		if (!normalizedPath.toLowerCase().endsWith(".md")) {
+			return;
+		}
+
+		const file = this.app.vault.getAbstractFileByPath(normalizedPath);
+		if (!(file instanceof TFile)) {
+			return;
+		}
+
+		try {
+			await this.app.fileManager.processFrontMatter(file, (rawFrontmatter) => {
+				const frontmatter = asRecord(rawFrontmatter);
+				if (!frontmatter) {
+					return;
+				}
+				frontmatter.tags = this.mergeFrontmatterTag(
+					frontmatter.tags,
+					"we_已归档",
+				);
+			});
+		} catch (error) {
+			logger.warn(
+				`[IRStorageService] 为已归档阅读点写入源 Markdown 标签失败: ${normalizedPath}`,
+				error,
+			);
+		}
+	}
+
 	async removeMaterialScheduleData(filePath: string): Promise<void> {
 		await this.initialize();
 

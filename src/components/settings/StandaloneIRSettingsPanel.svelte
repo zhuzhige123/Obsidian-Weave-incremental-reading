@@ -8,8 +8,6 @@
   import FolderSearchInput from "../ui/FolderSearchInput.svelte";
   import ObsidianSettingToggle from "./components/ObsidianSettingToggle.svelte";
   import ObsidianSettingDropdown from "./components/ObsidianSettingDropdown.svelte";
-  import ObsidianSettingButton from "./components/ObsidianSettingButton.svelte";
-  import { IRDataManagementModalObsidian } from "../incremental-reading/IRDataManagementModalObsidian";
   import {
     PremiumFeatureGuard,
     PREMIUM_FEATURES,
@@ -257,12 +255,6 @@
       }
     });
   }
-
-  function openDataManagementModal(): void {
-    new IRDataManagementModalObsidian(plugin.app, {
-      plugin: plugin as import("../../main").default,
-    }).open();
-  }
 </script>
 
 <div class="standalone-ir-settings-root weave-settings">
@@ -287,26 +279,41 @@
     {#if activeTab === "basic"}
       <section class="standalone-ir-settings-section">
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
-          <ObsidianSettingDropdown
-            name={t("irSettings.standalone.language.title")}
-            desc={t("irSettings.standalone.language.description")}
-            options={languageOptions}
-            value={uiLanguageDraft}
-            onChange={(value) => {
-              void commitUiLanguage(value as PluginUiLanguagePreference);
-            }}
-          />
+          <div class="standalone-ir-settings-group-header">
+            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.language.title")}</h3>
+            <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.language.description")}</p>
+          </div>
+          <div class="standalone-ir-storage-row">
+            <div class="standalone-ir-storage-info">
+              <div class="standalone-ir-storage-name">{t("irSettings.standalone.language.title")}</div>
+            </div>
+            <div class="standalone-ir-storage-control">
+              <ObsidianSettingDropdown
+                compact
+                options={languageOptions}
+                value={uiLanguageDraft}
+                onChange={(value) => {
+                  void commitUiLanguage(value as PluginUiLanguagePreference);
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
-          <ObsidianSettingToggle
-            name={t("irSettings.standalone.premiumPreview.title")}
-            desc={t("irSettings.standalone.premiumPreview.description")}
-            value={showPremiumFeaturesPreviewDraft}
-            onChange={(enabled) => {
-              void commitPremiumFeaturesPreviewEnabled(enabled);
-            }}
-          />
+          <div class="standalone-ir-premium-preview-setting-row">
+            <div class="standalone-ir-premium-preview-setting-copy">
+              <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.premiumPreview.title")}</h3>
+              <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.premiumPreview.description")}</p>
+            </div>
+            <ObsidianSettingToggle
+              compact
+              value={showPremiumFeaturesPreviewDraft}
+              onChange={(enabled) => {
+                void commitPremiumFeaturesPreviewEnabled(enabled);
+              }}
+            />
+          </div>
         </div>
 
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
@@ -357,15 +364,6 @@
                   }}
                 />
               </div>
-            </div>
-
-            <div class="standalone-ir-storage-row standalone-ir-storage-row--action">
-              <ObsidianSettingButton
-                name={t("irSettings.standalone.dataFolders.dataMgmtName")}
-                desc={t("irSettings.standalone.dataFolders.dataMgmtDesc")}
-                buttonText={t("irSettings.standalone.dataFolders.openDataMgmt")}
-                onClick={openDataManagementModal}
-              />
             </div>
           </div>
         </div>
@@ -617,6 +615,29 @@
     max-width: 100%;
   }
 
+  .standalone-ir-storage-control :global(.ir-obsidian-setting-dropdown-host) {
+    width: 100%;
+  }
+
+  .standalone-ir-storage-control :global(.ir-obsidian-setting-dropdown-host .dropdown) {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .standalone-ir-premium-preview-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--standalone-ir-space-4);
+  }
+
+  .standalone-ir-premium-preview-setting-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--standalone-ir-space-1);
+    min-width: 0;
+  }
+
 
   .standalone-ir-settings-root :global(.incremental-reading-settings) {
     gap: 0;
@@ -814,6 +835,16 @@
       width: 100%;
       max-width: 100%;
       flex-basis: auto;
+    }
+
+    .standalone-ir-premium-preview-setting-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--standalone-ir-space-3);
+    }
+
+    .standalone-ir-premium-preview-setting-row :global(.ir-obsidian-setting-toggle-host) {
+      align-self: flex-end;
     }
 
     .standalone-ir-settings-root :global(.incremental-reading-settings.settings-layout-flat .row) {

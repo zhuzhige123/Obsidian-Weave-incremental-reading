@@ -48,6 +48,8 @@ export class IRCalendarView extends ItemView {
 	private focusDeckName = "";
 	private sourceFilePath = "";
 	private isOpen = false;
+	/** Invalidates in-flight mounts when setState/onOpen/onClose overlap. */
+	private loadGeneration = 0;
 
 	constructor(leaf: WorkspaceLeaf, plugin: WeavePlugin) {
 		super(leaf);
@@ -78,6 +80,7 @@ export class IRCalendarView extends ItemView {
 	getState(): IRCalendarViewState {
 		return {
 			filePath: this.sourceFilePath,
+			// Read-compat for older workspace JSON that stored `file`.
 			file: this.sourceFilePath,
 			focusDeckId: this.focusDeckId,
 			focusDeckName: this.focusDeckName,
@@ -227,17 +230,26 @@ export class IRCalendarView extends ItemView {
 	 * 异步加载组件
 	 */
 	private async loadComponentAsync(): Promise<void> {
+		const loadGeneration = ++this.loadGeneration;
+
 		try {
 			if (!this.canUseIncrementalReading()) {
 				return;
 			}
 
 			await this.waitForPluginReady();
+			if (!this.isCurrentLoad(loadGeneration)) {
+				return;
+			}
 
 			if (this.component) {
 				const { unmount } = await import("svelte");
 				void unmount(this.component);
 				this.component = null;
+			}
+
+			if (!this.isCurrentLoad(loadGeneration)) {
+				return;
 			}
 
 			this.contentEl.empty();
@@ -246,6 +258,10 @@ export class IRCalendarView extends ItemView {
 			const { default: Component } = await import(
 				"../components/incremental-reading/IRCalendarSidebar.svelte"
 			);
+			if (!this.isCurrentLoad(loadGeneration)) {
+				return;
+			}
+
 			this.component = mount(Component, {
 				target: this.contentEl,
 				props: {
@@ -258,6 +274,9 @@ export class IRCalendarView extends ItemView {
 
 			logger.debug("[IRCalendarView] Calendar component mounted");
 		} catch (error) {
+			if (!this.isCurrentLoad(loadGeneration)) {
+				return;
+			}
 			logger.error("[IRCalendarView] Failed to mount calendar:", error);
 			this.contentEl.empty();
 			this.contentEl.createDiv({
@@ -265,6 +284,10 @@ export class IRCalendarView extends ItemView {
 				text: i18n.t("irViews.calendar.loadFailed"),
 			});
 		}
+	}
+
+	private isCurrentLoad(loadGeneration: number): boolean {
+		return this.isOpen && this.loadGeneration === loadGeneration;
 	}
 
 	/**
@@ -320,6 +343,7 @@ export class IRCalendarView extends ItemView {
 	 */
 	async onClose(): Promise<void> {
 		this.isOpen = false;
+		this.loadGeneration += 1;
 		logger.debug("[IRCalendarView] Closing calendar view");
 
 		if (this.premiumUnsubscribe) {

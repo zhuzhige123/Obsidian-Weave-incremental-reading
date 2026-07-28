@@ -119,7 +119,10 @@ import {
 	normalizePluginUiLanguagePreference,
 	syncI18nWithObsidianLanguage,
 } from "./utils/i18n";
-import { isIRDeckFilePath } from "./utils/ir-internal-data-path";
+import {
+	basenameWithoutExtension,
+	isIRDeckFilePath,
+} from "./utils/ir-internal-data-path";
 import {
 	LICENSED_PRODUCTS,
 	getLegacyPrimaryLicense,
@@ -830,8 +833,9 @@ export default class StandaloneIncrementalReadingPlugin
 						"",
 				})),
 				pinToToday,
+				// 仅「按算法正常调度」使用；「添加到今天」路径忽略该选项。
 				initialScheduleSpread: {
-					enabled: irSettings.enableHorizonSmoothing !== false,
+					enabled: !pinToToday,
 					horizonDays: Number(irSettings.horizonSpreadDays) || 7,
 					anchorMs: todayStart.getTime(),
 				},
@@ -957,16 +961,20 @@ export default class StandaloneIncrementalReadingPlugin
 			throw new Error("ir-calendar-leaf-unavailable");
 		}
 
-		await leaf.setViewState({
-			type: VIEW_TYPE_IR_CALENDAR,
-			active: true,
-			...(options.state ? { state: options.state } : {}),
-		});
-		if (options.preferredLeaf && options.preferredLeaf !== leaf) {
-			options.preferredLeaf.detach();
+		try {
+			await leaf.setViewState({
+				type: VIEW_TYPE_IR_CALENDAR,
+				active: true,
+				...(options.state ? { state: options.state } : {}),
+			});
+			revealLeaf(this.app, leaf);
+		} finally {
+			// Always drop the proxy `.irdeck` leaf after calendar takes over,
+			// even if reveal throws.
+			if (options.preferredLeaf && options.preferredLeaf !== leaf) {
+				options.preferredLeaf.detach();
+			}
 		}
-
-		revealLeaf(this.app, leaf);
 	}
 
 	async openIRTutorial(initialTab?: string): Promise<void> {
@@ -1017,24 +1025,20 @@ export default class StandaloneIncrementalReadingPlugin
 			throw new Error("irdeck-path-empty");
 		}
 
-		let focusDeckId = "";
-		let focusDeckName =
-			normalizedPath
-				.split("/")
-				.pop()
-				?.replace(/\.irdeck$/i, "") || "";
-		try {
-			const pointReadService = await import(
-				"./services/incremental-reading/IRPointDataReadService"
-			);
-			const entry = await new pointReadService.IRPointDataReadService(
-				this.app,
-			).getPointFileEntryByPath(normalizedPath);
-			focusDeckId = String(entry?.topicId || "").trim();
-			focusDeckName = String(entry?.topicName || "").trim() || focusDeckName;
-		} catch (error) {
-			logger.warn("[Standalone IR] 解析 IRDeck 失败，将回退到通用日历:", error);
+		const fallbackName = basenameWithoutExtension(normalizedPath);
+		const pointReadService = await import(
+			"./services/incremental-reading/IRPointDataReadService"
+		);
+		const entry = await new pointReadService.IRPointDataReadService(
+			this.app,
+		).getPointFileEntryByPath(normalizedPath);
+		const focusDeckId = String(entry?.topicId || "").trim();
+		if (!focusDeckId) {
+			throw new Error("irdeck-topic-unresolved");
 		}
+
+		const focusDeckName =
+			String(entry?.topicName || "").trim() || fallbackName;
 
 		await this.activateIRCalendarView({
 			preferredLeaf,
@@ -1051,7 +1055,22 @@ export default class StandaloneIncrementalReadingPlugin
 		deckName?: string;
 		closeLegacyFocusLeaves?: boolean;
 	}): Promise<void> {
-		await this.activateIRCalendarView();
+		const deckPath = normalizePath(String(options?.deckPath || "").trim());
+		if (deckPath) {
+			try {
+				await this.openIRDeckCalendar(deckPath);
+			} catch (error) {
+				// Legacy focus tabs may carry a stale deckPath; still leave the
+				// old view and land on the unscoped calendar instead of hanging.
+				logger.warn(
+					"[Standalone IR] 旧焦点视图专题解析失败，回退到通用日历:",
+					error,
+				);
+				await this.activateIRCalendarView();
+			}
+		} else {
+			await this.activateIRCalendarView();
+		}
 		if (options?.closeLegacyFocusLeaves) {
 			this.app.workspace.detachLeavesOfType(VIEW_TYPE_IR_FOCUS);
 		}

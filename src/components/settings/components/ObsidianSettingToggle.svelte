@@ -65,7 +65,10 @@
 
   .ir-obsidian-setting-toggle-host :global(.setting-item) {
     border: none;
-    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0.65em 0;
   }
 
   .ir-obsidian-setting-toggle-host--compact {
@@ -73,7 +76,8 @@
   }
 
   .ir-obsidian-setting-toggle-host--compact :global(.setting-item) {
-    justify-content: center;
+    padding: 0;
+    justify-content: flex-end;
   }
 
   .ir-obsidian-setting-toggle-host--compact :global(.setting-item-info) {
@@ -82,5 +86,13 @@
 
   .ir-obsidian-setting-toggle-host--compact :global(.setting-item-control) {
     margin: 0;
+  }
+
+  .ir-obsidian-setting-toggle-host :global(.setting-item-name) {
+    color: var(--text-normal);
+  }
+
+  .ir-obsidian-setting-toggle-host :global(.setting-item-description) {
+    color: var(--text-muted);
   }
 </style>

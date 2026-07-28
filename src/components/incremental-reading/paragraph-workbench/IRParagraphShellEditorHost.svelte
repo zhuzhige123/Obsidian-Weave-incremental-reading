@@ -139,6 +139,7 @@
 		lastAppliedSyncTick = untrack(() => syncTick);
 		const instance = new DetachedLeafEditor(app, container, {
 			value: initialValue,
+			// sourcePath 仅用于换源时重建编辑器；临时文件固定写入 IR 数据根/editor/
 			sourcePath: path,
 			sessionId: id,
 			onChange: () => {

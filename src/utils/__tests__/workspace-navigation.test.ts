@@ -9,7 +9,10 @@ vi.mock("obsidian", () => {
 });
 
 import { TFile } from "obsidian";
-import { openLinkWithExistingLeaf } from "../workspace-navigation";
+import {
+	openLinkWithExistingLeaf,
+	resolveWorkspaceActiveLeaf,
+} from "../workspace-navigation";
 
 type MockLeaf = {
 	view: {
@@ -118,5 +121,27 @@ describe("openLinkWithExistingLeaf", () => {
 			false,
 			{ active: true },
 		);
+	});
+});
+
+describe("resolveWorkspaceActiveLeaf", () => {
+	it("prefers getMostRecentLeaf over missing getActiveLeaf", () => {
+		const leaf = { id: "recent" } as any;
+		const workspace = {
+			getMostRecentLeaf: () => leaf,
+			activeLeaf: null,
+		};
+
+		expect(resolveWorkspaceActiveLeaf(workspace)).toBe(leaf);
+	});
+
+	it("falls back to activeLeaf when getMostRecentLeaf is empty", () => {
+		const leaf = { id: "active" } as any;
+		const workspace = {
+			getMostRecentLeaf: () => null,
+			activeLeaf: leaf,
+		};
+
+		expect(resolveWorkspaceActiveLeaf(workspace)).toBe(leaf);
 	});
 });
