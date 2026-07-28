@@ -24,5 +24,6 @@ export interface IncrementalReadingSettingsHost {
 	saveSettings(): Promise<void>;
 	syncIncrementalReadingFolderSubscriptionFromSettings?: (options?: {
 		trigger?: "startup" | "settings" | "file-change" | "manual";
+		filePaths?: string[];
 	}) => Promise<number>;
 }

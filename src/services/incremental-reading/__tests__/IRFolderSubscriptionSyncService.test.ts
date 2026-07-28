@@ -413,4 +413,80 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 			"missing_chunk",
 		]);
 	});
+
+	it("limitToFiles 只评估指定文件，不扫整棵订阅树", async () => {
+		const app = new App();
+		const target = new TFile("Inbox/Subscribed/new.md");
+		const sibling = new TFile("Inbox/Subscribed/old.md");
+		const subscribedFolder = buildFolder("Inbox/Subscribed", [target, sibling]);
+		app.vault.getAbstractFileByPath.mockImplementation((path: string) => {
+			if (path === "Inbox/Subscribed") return subscribedFolder;
+			if (path === target.path) return target;
+			if (path === sibling.path) return sibling;
+			return null;
+		});
+
+		const result = await scanIncrementalReadingFolderSubscriptions({
+			app: app as any,
+			settings: {
+				rules: [
+					{
+						id: "rule-1",
+						enabled: true,
+						folderPath: "Inbox/Subscribed",
+						deckId: "deck-1",
+					},
+				],
+			},
+			existingChunks: [],
+			existingMaterials: [],
+			deckNameById: { "deck-1": "专题 A" },
+			limitToFiles: [target],
+		});
+
+		expect(result.scannedMarkdownCount).toBe(1);
+		expect(result.pendingCount).toBe(1);
+		expect(result.candidates.map((entry) => entry.file.path)).toEqual([
+			target.path,
+		]);
+	});
+
+	it("limitToFilePaths 忽略规则外路径与非 md", async () => {
+		const app = new App();
+		const inside = new TFile("Inbox/Subscribed/new.md");
+		const outside = new TFile("Elsewhere/other.md");
+		app.vault.getAbstractFileByPath.mockImplementation((path: string) => {
+			if (path === inside.path) return inside;
+			if (path === outside.path) return outside;
+			return null;
+		});
+
+		const result = await scanIncrementalReadingFolderSubscriptions({
+			app: app as any,
+			settings: {
+				rules: [
+					{
+						id: "rule-1",
+						enabled: true,
+						folderPath: "Inbox/Subscribed",
+						deckId: "deck-1",
+					},
+				],
+			},
+			existingChunks: [],
+			existingMaterials: [],
+			deckNameById: { "deck-1": "专题 A" },
+			limitToFilePaths: [
+				inside.path,
+				outside.path,
+				"Inbox/Subscribed/cover.png",
+				"Inbox/Subscribed/missing.md",
+			],
+		});
+
+		expect(result.scannedMarkdownCount).toBe(1);
+		expect(result.candidates.map((entry) => entry.file.path)).toEqual([
+			inside.path,
+		]);
+	});
 });

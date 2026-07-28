@@ -114,7 +114,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import type { IRPointParentProgress } from '../../services/incremental-reading/IRPointParentRelation';
   import { buildLegacyChunkFromPointSnapshot } from '../../services/incremental-reading/IRLegacyTaskCompatAdapter';
   import { IRReadingPointBatchService } from '../../services/incremental-reading/reading-point-batch/IRReadingPointBatchService';
-  import { populateReadingPointBatchSubmenu } from '../../services/incremental-reading/reading-point-batch/readingPointBatchSubmenu';
+  import {
+    populateBatchTopicSubmenu,
+    populateReadingPointBatchSubmenu,
+    runBatchMenuAction,
+  } from '../../services/incremental-reading/reading-point-batch/readingPointBatchSubmenu';
   import { resolveScheduleItemWriteTarget } from '../../services/incremental-reading/reading-point-batch/resolveScheduleItemWriteTarget';
   import { IRAnalyticsModalObsidian } from './IRAnalyticsModalObsidian';
   import {
@@ -5514,6 +5518,26 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       .filter((item): item is ScheduleItem => Boolean(item));
   }
 
+  function runBatchToolbarDestructive(
+    operation: "delete" | "remove",
+  ): void {
+    const targets = getBatchActionTargets();
+    if (targets.length === 0) {
+      new Notice(t('irSidebar.batch.selectItemsFirst'));
+      return;
+    }
+
+    const batchService = getReadingPointBatchService();
+    void runBatchMenuAction(
+      () =>
+        operation === "delete"
+          ? batchService.batchDelete(targets)
+          : batchService.batchRemove(targets),
+      applyBatchOperationResult,
+      operation,
+    );
+  }
+
   function showBatchActionsMenu(event: MouseEvent): void {
     const targets = getBatchActionTargets();
     if (targets.length === 0) {
@@ -5521,14 +5545,15 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       return;
     }
 
+    // Toolbar already exposes delete/remove; open move-topic list directly.
     const menu = new Menu();
-    void populateReadingPointBatchSubmenu(menu, {
-      app: plugin.app,
+    void populateBatchTopicSubmenu(
+      menu,
+      plugin.app,
       targets,
-      batchService: getReadingPointBatchService(),
-      onApplied: applyBatchOperationResult,
-      selectionHelpers: false
-    });
+      getReadingPointBatchService(),
+      applyBatchOperationResult,
+    );
     menu.showAtPosition({ x: event.clientX, y: event.clientY });
   }
 
@@ -8399,6 +8424,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       selectedCount={batchSelectedIds.size}
       onSelectAllDisplayed={selectAllDisplayedMaterials}
       onClearSelection={clearBatchSelection}
+      onBatchDelete={() => runBatchToolbarDestructive('delete')}
+      onBatchRemove={() => runBatchToolbarDestructive('remove')}
       onShowBatchActionsMenu={showBatchActionsMenu}
       onExitSelectionMode={exitBatchSelectionMode}
     />

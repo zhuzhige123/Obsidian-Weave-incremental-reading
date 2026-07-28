@@ -162,6 +162,15 @@
   background: var(--background-modifier-hover);
 }
 
+.ir-calendar-sidebar button.batch-floating-toolbar__btn--danger {
+  color: var(--text-error);
+}
+
+.ir-calendar-sidebar button.batch-floating-toolbar__btn--danger:hover {
+  color: var(--text-error);
+  background: var(--background-modifier-hover);
+}
+
 .ir-calendar-sidebar .footer-timer-bar {
   display: flex;
   align-items: center;

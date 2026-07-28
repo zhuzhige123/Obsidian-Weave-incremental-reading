@@ -6,6 +6,8 @@
     selectedCount: number;
     onSelectAllDisplayed: () => void;
     onClearSelection: () => void;
+    onBatchDelete: () => void;
+    onBatchRemove: () => void;
     onShowBatchActionsMenu: (event: MouseEvent) => void;
     onExitSelectionMode: () => void;
   }
@@ -15,6 +17,8 @@
     selectedCount,
     onSelectAllDisplayed,
     onClearSelection,
+    onBatchDelete,
+    onBatchRemove,
     onShowBatchActionsMenu,
     onExitSelectionMode,
   }: Props = $props();
@@ -50,12 +54,30 @@
       </button>
       <button
         type="button"
+        class="clickable-icon batch-floating-toolbar__btn batch-floating-toolbar__btn--danger"
+        onclick={onBatchDelete}
+        title={t('irSidebar.menu.delete')}
+        aria-label={t('irSidebar.menu.delete')}
+      >
+        <ObsidianIcon name="trash-2" size={16} />
+      </button>
+      <button
+        type="button"
+        class="clickable-icon batch-floating-toolbar__btn"
+        onclick={onBatchRemove}
+        title={t('irSidebar.menu.remove')}
+        aria-label={t('irSidebar.menu.remove')}
+      >
+        <ObsidianIcon name="x-circle" size={16} />
+      </button>
+      <button
+        type="button"
         class="clickable-icon batch-floating-toolbar__btn batch-floating-toolbar__btn--primary"
         onclick={onShowBatchActionsMenu}
-        title={t('irSidebar.batch.openBatchActions')}
-        aria-label={t('irSidebar.batch.openBatchActions')}
+        title={t('irSidebar.menu.moveReadingPointTopic')}
+        aria-label={t('irSidebar.menu.moveReadingPointTopic')}
       >
-        <ObsidianIcon name="copy-check" size={16} />
+        <ObsidianIcon name="layers" size={16} />
       </button>
     {/if}
     <button

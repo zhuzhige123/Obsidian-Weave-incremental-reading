@@ -22,6 +22,7 @@ import {
 import {
 	collectMarkdownFilesForFolderSubscriptionRules,
 	isFolderSubscriptionMarkdownExtension,
+	resolveMarkdownFilesForFolderSubscriptionPaths,
 } from "./folder-subscription-vault-scan";
 import { IR_RUNTIME } from "./ir-runtime";
 
@@ -218,6 +219,13 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 	existingChunks?: ExistingChunkLike[];
 	existingMaterials?: ExistingMaterialLike[];
 	deckNameById?: Record<string, string>;
+	/**
+	 * file-change 增量：只评估这些文件，跳过订阅文件夹整树 walk。
+	 * 传入 path 列表时内部解析为仍存在的 Markdown TFile。
+	 */
+	limitToFilePaths?: string[];
+	/** 已解析的 TFile 列表；与 limitToFilePaths 二选一，优先使用本字段。 */
+	limitToFiles?: TFile[];
 }): Promise<IRFolderSubscriptionScanResult> {
 	const {
 		app,
@@ -225,13 +233,31 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 		existingChunks = [],
 		existingMaterials = [],
 		deckNameById = {},
+		limitToFilePaths,
+		limitToFiles,
 	} = options;
 	const activeRules =
 		getActiveIncrementalReadingFolderSubscriptionRules(settings);
-	const markdownFiles = collectMarkdownFilesForFolderSubscriptionRules(
-		app,
-		activeRules,
-	);
+	const incrementalMode =
+		Array.isArray(limitToFiles) || Array.isArray(limitToFilePaths);
+	const markdownFiles = incrementalMode
+		? (Array.isArray(limitToFiles)
+				? limitToFiles.filter((file) =>
+						isFolderSubscriptionMarkdownExtension(file.extension),
+				  )
+				: resolveMarkdownFilesForFolderSubscriptionPaths(
+						app,
+						limitToFilePaths || [],
+				  )
+		  ).filter((file) =>
+				Boolean(
+					resolveIncrementalReadingFolderSubscriptionRuleForFile(
+						file.path,
+						activeRules,
+					),
+				),
+		  )
+		: collectMarkdownFilesForFolderSubscriptionRules(app, activeRules);
 
 	if (activeRules.length === 0 || markdownFiles.length === 0) {
 		return {
