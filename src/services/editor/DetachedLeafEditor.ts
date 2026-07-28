@@ -16,6 +16,7 @@ import { i18n } from "../../utils/i18n";
 import { logger } from "../../utils/logger";
 import { applyStyleProps } from "../../utils/style-props";
 import { readVaultConfigValue } from "../../utils/vault-config";
+import { resolveWorkspaceActiveLeaf } from "../../utils/workspace-navigation";
 import EditorContextManager from "./EditorContextManager";
 import {
 	buildDetachedEditorTempFilePath,
@@ -26,6 +27,7 @@ import {
 export interface DetachedEditorOptions {
 	value?: string;
 	placeholder?: string;
+	/** @deprecated 不再影响临时文件落盘；临时文件固定写入可配置 IR 数据根下的 editor/ */
 	sourcePath?: string;
 	sessionId?: string;
 	onSubmit?: (editor: DetachedLeafEditor) => void;
@@ -82,21 +84,7 @@ export class DetachedLeafEditor extends Component {
 	}
 
 	private getWorkspaceActiveLeaf(): WorkspaceLeaf | null {
-		try {
-			const workspace = this.app.workspace as {
-				getActiveLeaf?: () => WorkspaceLeaf | null;
-				getMostRecentLeaf?: () => WorkspaceLeaf | null;
-			};
-			if (typeof workspace.getActiveLeaf === "function") {
-				return workspace.getActiveLeaf() || null;
-			}
-			if (typeof workspace.getMostRecentLeaf === "function") {
-				return workspace.getMostRecentLeaf() || null;
-			}
-			return null;
-		} catch {
-			return null;
-		}
+		return resolveWorkspaceActiveLeaf(this.app.workspace);
 	}
 
 	private setWorkspaceActiveLeaf(
@@ -281,10 +269,8 @@ export class DetachedLeafEditor extends Component {
 
 	private async prepareTempFile() {
 		const sessionId = this.options.sessionId || Date.now().toString();
-		const folderPath = resolveDetachedEditorTempFolder(
-			this.app,
-			this.options.sourcePath,
-		);
+		// 固定写入 {IR 数据根}/editor/，尊重设置中的 weaveParentFolder，不跟源文件同目录。
+		const folderPath = resolveDetachedEditorTempFolder(this.app);
 		const preferredPath = buildDetachedEditorTempFilePath(
 			folderPath,
 			`weave-editor-${sessionId}.md`,

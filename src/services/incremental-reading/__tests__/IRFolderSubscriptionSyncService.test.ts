@@ -215,8 +215,119 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 			"专题 A",
 			expect.objectContaining({
 				readingMaterialId: "mat-1",
+				pinToToday: true,
+				scheduleDate: undefined,
 			}),
 		);
+	});
+
+	it("添加到今天：批量新材料全部钉今天，不跨日摊开", async () => {
+		const files = [
+			new TFile("Inbox/Subscribed/a.md"),
+			new TFile("Inbox/Subscribed/b.md"),
+			new TFile("Inbox/Subscribed/c.md"),
+		];
+		const getOrCreateMaterial = vi.fn(async (file: TFile) => ({
+			uuid: `mat-${file.basename}`,
+		}));
+		const setReadingDeck = vi.fn(async () => true);
+		const ensureChunkScheduled = vi.fn(async () => true);
+		const anchorMs = new Date("2026-07-28T00:00:00").getTime();
+
+		await applyIncrementalReadingFolderSubscriptionCandidates({
+			candidates: files.map((file) => ({
+				file,
+				rule: {
+					id: "rule-1",
+					enabled: true,
+					folderPath: "Inbox/Subscribed",
+					deckId: "deck-1",
+				},
+				deckName: "专题 A",
+				hasChunkRecord: false,
+				isFullySubscribed: false,
+				needsSync: true,
+				syncGaps: ["missing_material", "missing_chunk"],
+				existsAlready: false,
+			})),
+			pinToToday: true,
+			initialScheduleSpread: {
+				enabled: true,
+				horizonDays: 3,
+				anchorMs,
+			},
+			getOrCreateMaterial,
+			setReadingDeck,
+			ensureChunkScheduled,
+		});
+
+		expect(ensureChunkScheduled).toHaveBeenCalledTimes(3);
+		for (const call of ensureChunkScheduled.mock.calls) {
+			expect(call[3]).toEqual(
+				expect.objectContaining({
+					pinToToday: true,
+					scheduleDate: undefined,
+				}),
+			);
+		}
+	});
+
+	it("按算法正常调度：批量新材料按 horizon 均摊 due，而不是全堆当天", async () => {
+		const files = [
+			new TFile("Inbox/Subscribed/a.md"),
+			new TFile("Inbox/Subscribed/b.md"),
+			new TFile("Inbox/Subscribed/c.md"),
+		];
+		const getOrCreateMaterial = vi.fn(async (file: TFile) => ({
+			uuid: `mat-${file.basename}`,
+		}));
+		const setReadingDeck = vi.fn(async () => true);
+		const ensureChunkScheduled = vi.fn(async () => true);
+		const anchorMs = new Date("2026-07-28T00:00:00").getTime();
+
+		await applyIncrementalReadingFolderSubscriptionCandidates({
+			candidates: files.map((file) => ({
+				file,
+				rule: {
+					id: "rule-1",
+					enabled: true,
+					folderPath: "Inbox/Subscribed",
+					deckId: "deck-1",
+				},
+				deckName: "专题 A",
+				hasChunkRecord: false,
+				isFullySubscribed: false,
+				needsSync: true,
+				syncGaps: ["missing_material", "missing_chunk"],
+				existsAlready: false,
+			})),
+			pinToToday: false,
+			initialScheduleSpread: {
+				enabled: true,
+				horizonDays: 3,
+				anchorMs,
+			},
+			getOrCreateMaterial,
+			setReadingDeck,
+			ensureChunkScheduled,
+		});
+
+		expect(ensureChunkScheduled).toHaveBeenCalledTimes(3);
+		const scheduleDates = ensureChunkScheduled.mock.calls.map((call) => {
+			const options = call[3] as {
+				pinToToday: boolean;
+				scheduleDate?: Date;
+			};
+			expect(options.pinToToday).toBe(false);
+			expect(options.scheduleDate).toBeInstanceOf(Date);
+			return options.scheduleDate!.getTime();
+		});
+		expect(new Set(scheduleDates).size).toBe(3);
+		expect(scheduleDates).toEqual([
+			anchorMs,
+			new Date("2026-07-29T00:00:00").getTime(),
+			new Date("2026-07-30T00:00:00").getTime(),
+		]);
 	});
 
 	it("应用阶段也会跳过非 Markdown 候选，避免误创建阅读点", async () => {

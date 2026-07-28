@@ -1,8 +1,6 @@
 # Weave Incremental Reading
 
-[中文](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.md#中文文档) | [English](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.md#english) | [日本語](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ja.md) | [한국어](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ko.md) | [繁體中文](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.zh-TW.md) | [Русский](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.ru.md)
-
-> Full bilingual documentation (Chinese first, then English) lives in **[README.md](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/blob/main/README.md)**. This file is the English-only mirror.
+[中文说明](README.md)
 
 <div align="center">
 
@@ -11,11 +9,6 @@
 Standalone Obsidian incremental reading — topics, reading points, calendar scheduling, and source resume
 
 </div>
-
----
-![QQ_1784229108205](https://github.com/user-attachments/assets/05b583f0-6485-45a9-9665-b7e4aa95f5ab)
-![QQ_1784229164256](https://github.com/user-attachments/assets/649226dd-db4c-4529-95dd-a412898dfe1a)
-![QQ20260717-031452-HD](https://github.com/user-attachments/assets/72411a43-638c-4ce8-80ff-8cf5fadbc8ae)
 
 **Weave Incremental Reading** (plugin ID: `weave-incremental-reading`) is a **standalone** Obsidian plugin for incremental reading.
 

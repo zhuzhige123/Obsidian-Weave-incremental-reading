@@ -102,6 +102,46 @@ export function revealLeaf(app: App, leaf: WorkspaceLeaf, focus = true): void {
 	}
 }
 
+type WorkspaceActiveLeafSource = {
+	activeLeaf?: WorkspaceLeaf | null;
+	getActiveLeaf?: () => WorkspaceLeaf | null;
+	getMostRecentLeaf?: () => WorkspaceLeaf | null;
+};
+
+/**
+ * Resolve the workspace's active leaf using public Obsidian APIs.
+ * Prefer `getMostRecentLeaf()` / `activeLeaf`; keep `getActiveLeaf` only as a
+ * defensive fallback for mocks or older hosts.
+ */
+export function resolveWorkspaceActiveLeaf(
+	workspace: WorkspaceActiveLeafSource | null | undefined,
+): WorkspaceLeaf | null {
+	if (!workspace) {
+		return null;
+	}
+
+	try {
+		if (typeof workspace.getMostRecentLeaf === "function") {
+			const recent = workspace.getMostRecentLeaf();
+			if (recent) {
+				return recent;
+			}
+		}
+
+		if (workspace.activeLeaf) {
+			return workspace.activeLeaf;
+		}
+
+		if (typeof workspace.getActiveLeaf === "function") {
+			return workspace.getActiveLeaf() || null;
+		}
+	} catch {
+		return null;
+	}
+
+	return null;
+}
+
 function resolveLinkFile(
 	app: App,
 	linkText: string,

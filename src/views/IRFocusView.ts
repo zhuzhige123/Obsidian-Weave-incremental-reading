@@ -58,10 +58,6 @@ export class IRFocusView extends ItemView {
 		return "book-open";
 	}
 
-	allowNoFile(): boolean {
-		return true;
-	}
-
 	getState(): Record<string, unknown> {
 		return {
 			deckPath: this.deckPath,

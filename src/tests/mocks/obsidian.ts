@@ -356,8 +356,12 @@ export class ItemView extends Component {
 	}
 
 	onPaneMenu = vi.fn();
-	setState = vi.fn(async () => undefined);
-	getState = vi.fn(() => ({}));
+	async setState(_state: unknown, _result: unknown): Promise<void> {
+		return undefined;
+	}
+	getState(): Record<string, unknown> {
+		return {};
+	}
 	allowNoFile = vi.fn(() => false);
 	addAction = vi.fn(
 		(_icon: string, _label: string, _callback: (...args: any[]) => void) => {
@@ -380,6 +384,29 @@ export class ItemView extends Component {
 			return button;
 		},
 	);
+}
+
+export class FileView extends ItemView {
+	file: TFile | null = null;
+
+	canAcceptExtension(_extension: string): boolean {
+		return false;
+	}
+
+	async onLoadFile(file: TFile): Promise<void> {
+		this.file = file;
+	}
+
+	async onUnloadFile(_file: TFile): Promise<void> {
+		this.file = null;
+	}
+
+	getState(): Record<string, unknown> {
+		return {
+			...super.getState(),
+			file: this.file?.path || "",
+		};
+	}
 }
 
 export class MarkdownView extends ItemView {
@@ -670,6 +697,7 @@ export default {
 	Notice,
 	Modal,
 	ItemView,
+	FileView,
 	MarkdownView,
 	Setting,
 	PluginSettingTab,

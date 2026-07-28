@@ -23,6 +23,8 @@ function createMemoryApp(
 		".obsidian/plugins",
 		".obsidian/plugins/weave",
 	]);
+	/** 模拟 vault.getFiles() 尚未收录、但 adapter 已可见的路径（导入竞态）。 */
+	const vaultGetFilesExclude = new Set<string>();
 
 	const ensureDir = (dir: string) => {
 		const normalized = normalizeTestPath(dir);
@@ -127,6 +129,11 @@ function createMemoryApp(
 		vault: {
 			configDir: ".obsidian",
 			adapter,
+			getFiles: vi.fn(() =>
+				Array.from(files.keys())
+					.filter((path) => !vaultGetFilesExclude.has(path))
+					.map((path) => ({ path, extension: path.split(".").pop() || "" })),
+			),
 		},
 		plugins: {
 			getPlugin: vi.fn(() => ({
@@ -135,7 +142,7 @@ function createMemoryApp(
 		},
 	} as any;
 
-	return { app, files, folders };
+	return { app, files, folders, vaultGetFilesExclude };
 }
 
 function buildMaterialRecord(id: string, sourcePath: string, title = id) {
@@ -1029,6 +1036,50 @@ body`,
 			relativePath: "weave Incremental reading/points/Topic One.irdeck",
 			absolutePath: `${v2Paths.ir.root}/points/Topic One.irdeck`,
 		});
+	});
+
+	it("prefers the concrete .irdeck file over same-basename index hits", async () => {
+		const v2Paths = getV2Paths("");
+		const { app } = createMemoryApp({
+			[v2Paths.ir.pointFilesIndex]: JSON.stringify({
+				schemaVersion: 1,
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				files: [
+					{
+						topicId: "topic-a",
+						topicName: "Topic A",
+						file: "points/Shared.irdeck",
+						pointCount: 0,
+						updatedAt: "2026-04-16T10:00:00.000Z",
+					},
+				],
+			}),
+			[`${v2Paths.ir.root}/points/Shared.irdeck`]: JSON.stringify({
+				schemaVersion: 1,
+				topicId: "topic-a",
+				topicName: "Topic A",
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				points: [],
+			}),
+			["Topics/Shared.irdeck"]: JSON.stringify({
+				schemaVersion: 1,
+				topicId: "topic-vault",
+				topicName: "Topic Vault",
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				points: [],
+			}),
+		});
+		const service = new IRPointStorageService(app);
+
+		const vaultExact = await service.getPointFileEntryByPath(
+			"Topics/Shared.irdeck",
+		);
+		expect(vaultExact?.topicId).toBe("topic-vault");
+
+		const indexedExact = await service.getPointFileEntryByPath(
+			`${v2Paths.ir.root}/points/Shared.irdeck`,
+		);
+		expect(indexedExact?.topicId).toBe("topic-a");
 	});
 
 	it("executes repeatable migration without duplicating points and relocates legacy reader state", async () => {
@@ -1964,5 +2015,84 @@ body`,
 		const pointFilePath = getIndexedPointFilePath(v2Paths, pointIndex);
 		const pointFile = JSON.parse(files.get(pointFilePath) || "{}");
 		expect(pointFile.points[0].userData.tags).toEqual(["from-chunk"]);
+	});
+
+	it("repairs index entries that point at vault root `/` without dropping the topic", async () => {
+		const v2Paths = getV2Paths("");
+		const { app, files } = createMemoryApp({}, [`${v2Paths.ir.root}/points`]);
+		files.set(
+			getPointFilesIndexPath(app),
+			JSON.stringify({
+				schemaVersion: IR_POINT_STORAGE_VERSION,
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				files: [
+					{
+						file: "/",
+						topicId: "topic-root-path",
+						topicName: "Imported Book",
+						pointCount: 0,
+						updatedAt: "2026-04-16T10:00:00.000Z",
+					},
+				],
+			}),
+		);
+
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const service = new IRPointStorageService(app);
+		await service.initialize();
+
+		const decks = await service.listPointDecks();
+		expect(decks["topic-root-path"]?.name).toBe("Imported Book");
+
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		expect(pointIndex.files).toHaveLength(1);
+		expect(pointIndex.files[0]?.file).toBe(
+			normalizeTestPath(`${v2Paths.ir.root}/points/Imported Book.irdeck`),
+		);
+		expect(pointIndex.files[0]?.file).not.toBe("/");
+		expect(
+			files.has(
+				normalizeTestPath(`${v2Paths.ir.root}/points/Imported Book.irdeck`),
+			),
+		).toBe(true);
+
+		const warnedAboutRoot = warnSpy.mock.calls.some((args) =>
+			String(args[0] || "").includes("跳过无法读取的专题路径"),
+		);
+		expect(warnedAboutRoot).toBe(false);
+		warnSpy.mockRestore();
+	});
+
+	it("keeps newly written .irdeck topics visible when vault.getFiles() lags behind adapter", async () => {
+		const v2Paths = getV2Paths("");
+		const { app, files, vaultGetFilesExclude } = createMemoryApp(
+			{},
+			[`${v2Paths.ir.root}/points`],
+		);
+		const service = new IRPointStorageService(app);
+
+		await service.upsertPointDeck({
+			id: "topic-lag",
+			path: "topic-lag",
+			name: "Lag Topic",
+			blockIds: [],
+			sourceFiles: [],
+			createdAt: "2026-04-16T10:00:00.000Z",
+			updatedAt: "2026-04-16T10:00:00.000Z",
+		} as any);
+
+		const deckPath = normalizeTestPath(
+			`${v2Paths.ir.root}/points/Lag Topic.irdeck`,
+		);
+		expect(files.has(deckPath)).toBe(true);
+		vaultGetFilesExclude.add(deckPath);
+
+		const refreshResult = await service.refreshPointFilesIndexFromVault();
+		expect(refreshResult.removed).toBe(0);
+
+		const decks = await service.listPointDecks();
+		expect(decks["topic-lag"]?.name).toBe("Lag Topic");
 	});
 });

@@ -856,14 +856,18 @@ export class IRPointStorageService {
 			? index.files
 					.filter((entry) => entry && typeof entry === "object")
 					.map((entry) => {
+						const rawFile = String(entry.file || "").trim();
 						const resolvedPath = this.resolveIndexedPointFilePath(entry.file);
+						const topicName =
+							String(entry.topicName || "").trim() || DEFAULT_TOPIC_NAME;
 						return {
 							topicId: String(entry.topicId || "").trim() || DEFAULT_TOPIC_ID,
-							topicName:
-								String(entry.topicName || "").trim() || DEFAULT_TOPIC_NAME,
+							topicName,
 							file:
 								resolvedPath?.absolutePath ||
-								this.buildDefaultPointFileAbsolutePath(DEFAULT_TOPIC_NAME),
+								(this.isUnusablePointFilePath(rawFile)
+									? normalizePath(rawFile) || "/"
+									: this.buildDefaultPointFileAbsolutePath(topicName)),
 							pointCount: Number.isFinite(entry.pointCount)
 								? Number(entry.pointCount)
 								: 0,
@@ -953,46 +957,70 @@ export class IRPointStorageService {
 			return null;
 		}
 
+		const inputBasename = normalizedInput.split("/").pop() || "";
 		const pointIndex = await this.readPointFilesIndex();
+		const basenameMatches: Array<{
+			topicId: string;
+			topicName: string;
+			relativePath: string;
+			absolutePath: string;
+		}> = [];
+
 		for (const entry of pointIndex.files || []) {
 			const resolvedPath = this.resolveIndexedPointFilePath(entry?.file);
 			if (!resolvedPath) {
 				continue;
 			}
 
-			if (
+			const catalogEntry = {
+				topicId: String(entry.topicId || "").trim() || DEFAULT_TOPIC_ID,
+				topicName: String(entry.topicName || "").trim() || DEFAULT_TOPIC_NAME,
+				relativePath: resolvedPath.relativePath,
+				absolutePath: resolvedPath.absolutePath,
+			};
+
+			const isExactPath =
 				normalizedInput === resolvedPath.absolutePath ||
 				normalizedInput === resolvedPath.relativePath ||
-				normalizedInput.endsWith(`/${resolvedPath.relativePath}`) ||
-				normalizedInput.split("/").pop() ===
-					resolvedPath.absolutePath.split("/").pop()
-			) {
-				return {
-					topicId: String(entry.topicId || "").trim() || DEFAULT_TOPIC_ID,
-					topicName: String(entry.topicName || "").trim() || DEFAULT_TOPIC_NAME,
-					relativePath: resolvedPath.relativePath,
-					absolutePath: resolvedPath.absolutePath,
-				};
+				(
+					// Suffix match only when the indexed path has a directory segment,
+					// so bare `Shared.irdeck` cannot claim every `.../Shared.irdeck`.
+					resolvedPath.relativePath.includes("/") &&
+					normalizedInput.endsWith(`/${resolvedPath.relativePath}`)
+				);
+			if (isExactPath) {
+				return catalogEntry;
+			}
+
+			const indexedBasename = resolvedPath.absolutePath.split("/").pop() || "";
+			if (inputBasename && inputBasename === indexedBasename) {
+				basenameMatches.push(catalogEntry);
 			}
 		}
 
-		if (!(await this.adapter.exists(normalizedInput))) {
-			return null;
+		// Prefer the concrete vault file when it exists. Basename index hits are
+		// only a last resort for short/legacy paths that are not on disk.
+		if (await this.adapter.exists(normalizedInput)) {
+			const fallbackFileData = await this.readPointFile(
+				normalizedInput,
+				DEFAULT_TOPIC_ID,
+				DEFAULT_TOPIC_NAME,
+			);
+			return {
+				topicId:
+					String(fallbackFileData.topicId || "").trim() || DEFAULT_TOPIC_ID,
+				topicName:
+					String(fallbackFileData.topicName || "").trim() || DEFAULT_TOPIC_NAME,
+				relativePath: normalizedInput,
+				absolutePath: normalizedInput,
+			};
 		}
 
-		const fallbackFileData = await this.readPointFile(
-			normalizedInput,
-			DEFAULT_TOPIC_ID,
-			DEFAULT_TOPIC_NAME,
-		);
-		return {
-			topicId:
-				String(fallbackFileData.topicId || "").trim() || DEFAULT_TOPIC_ID,
-			topicName:
-				String(fallbackFileData.topicName || "").trim() || DEFAULT_TOPIC_NAME,
-			relativePath: normalizedInput,
-			absolutePath: normalizedInput,
-		};
+		if (basenameMatches.length === 1) {
+			return basenameMatches[0];
+		}
+
+		return null;
 	}
 
 	private async listKnownPointFileDescriptors(): Promise<
@@ -1807,17 +1835,34 @@ export class IRPointStorageService {
 				this.resolveIndexedPointFilePath(entry?.file)?.absolutePath ||
 					String(entry?.file || "").trim(),
 			);
-			if (!resolvedPath) {
+			if (!resolvedPath || this.isUnusablePointFilePath(resolvedPath)) {
 				continue;
 			}
 			previousByPath.set(resolvedPath, entry);
+		}
+
+		const scannedPathSet = new Set(
+			scannedFiles
+				.map((path) => normalizePath(String(path || "").trim()))
+				.filter((path) => path && !this.isUnusablePointFilePath(path)),
+		);
+
+		// 保留「vault 枚举遗漏但 adapter 上仍可读」的索引条目，避免导入竞态删掉新建专题。
+		for (const [absolutePath, entry] of previousByPath.entries()) {
+			if (scannedPathSet.has(absolutePath)) {
+				continue;
+			}
+			if (await this.isIndexedPointFilePath(absolutePath)) {
+				scannedPathSet.add(absolutePath);
+				scannedFiles.push(absolutePath);
+			}
 		}
 
 		const nextEntries: IRPointFileIndex["files"] = [];
 		let added = 0;
 		let updated = 0;
 
-		for (const absolutePath of scannedFiles) {
+		for (const absolutePath of scannedPathSet) {
 			if (!(await this.isIndexedPointFilePath(absolutePath))) {
 				continue;
 			}
@@ -1838,7 +1883,7 @@ export class IRPointStorageService {
 			(index.files || []).length - nextEntries.length,
 		);
 		return this.commitPointFilesIndexRefresh(index, nextEntries, {
-			scanned: scannedFiles.length,
+			scanned: scannedPathSet.size,
 			added,
 			updated,
 			removed,
@@ -3093,8 +3138,14 @@ export class IRPointStorageService {
 		path: string,
 		fileData: IRPointFileData,
 	): Promise<void> {
+		const normalizedPath = normalizePath(String(path || "").trim());
+		if (this.isUnusablePointFilePath(normalizedPath)) {
+			throw new Error(
+				`IR 专题文件路径非法，拒绝写入: ${String(path || "").trim() || "(empty)"}`,
+			);
+		}
 		await this.writeJson(
-			path,
+			normalizedPath,
 			this.normalizePointFileData(
 				fileData,
 				fileData.topicId,
@@ -3102,7 +3153,7 @@ export class IRPointStorageService {
 			),
 		);
 		this.invalidatePointSnapshotListCache();
-		await this.syncPointFileIndexEntryFromData(path, fileData);
+		await this.syncPointFileIndexEntryFromData(normalizedPath, fileData);
 	}
 
 	private async syncPointFileIndexEntryFromData(
@@ -3110,7 +3161,7 @@ export class IRPointStorageService {
 		fileData: IRPointFileData,
 	): Promise<void> {
 		const normalizedPath = normalizePath(String(absolutePath || "").trim());
-		if (!normalizedPath) {
+		if (this.isUnusablePointFilePath(normalizedPath)) {
 			return;
 		}
 
@@ -4090,7 +4141,10 @@ export class IRPointStorageService {
 
 	private async isReadablePointFilePath(path: string): Promise<boolean> {
 		const normalized = normalizePath(String(path || "").trim());
-		if (!normalized || !(await this.adapter.exists(normalized))) {
+		if (
+			this.isUnusablePointFilePath(normalized) ||
+			!(await this.adapter.exists(normalized))
+		) {
 			return false;
 		}
 		if (await this.isAdapterDirectory(normalized)) {
@@ -4117,15 +4171,30 @@ export class IRPointStorageService {
 
 	private getPointFileParentDir(path: string): string {
 		const normalized = normalizePath(String(path || "").trim());
+		if (this.isUnusablePointFilePath(normalized)) {
+			return this.getPointsDir();
+		}
 		const parentDir = normalized.split("/").slice(0, -1).join("/");
+		if (this.isUnusablePointFilePath(parentDir)) {
+			return this.getPointsDir();
+		}
 		return parentDir || this.getPointsDir();
+	}
+
+	/**
+	 * Vault root / empty / `.` 不能作为 .irdeck 文件路径。
+	 * Obsidian 里 `normalizePath("/")` 可能仍为 `"/"`，且 `adapter.exists("/")` 为 true。
+	 */
+	private isUnusablePointFilePath(path: string | null | undefined): boolean {
+		const normalized = normalizePath(String(path || "").trim());
+		return !normalized || normalized === "/" || normalized === ".";
 	}
 
 	private resolveIndexedPointFilePath(
 		filePath: string | null | undefined,
 	): ResolvedPointFilePath | null {
 		const normalized = normalizePath(String(filePath || "").trim());
-		if (!normalized) {
+		if (this.isUnusablePointFilePath(normalized)) {
 			return null;
 		}
 		if (this.isLegacyIndexedPointFilePath(normalized)) {
@@ -4186,8 +4255,10 @@ export class IRPointStorageService {
 		topicName: string,
 		parentDir: string,
 	): Promise<{ relativePath: string; absolutePath: string }> {
-		const targetDir =
-			normalizePath(String(parentDir || "").trim()) || this.getPointsDir();
+		const normalizedParent = normalizePath(String(parentDir || "").trim());
+		const targetDir = this.isUnusablePointFilePath(normalizedParent)
+			? this.getPointsDir()
+			: normalizedParent || this.getPointsDir();
 		let ordinal = Math.max(
 			1,
 			this.getPointFileOrdinal(index, topicId, topicName),
@@ -4234,14 +4305,22 @@ export class IRPointStorageService {
 	): Promise<void> {
 		const normalizedSource = normalizePath(String(sourcePath || "").trim());
 		const normalizedTarget = normalizePath(String(targetPath || "").trim());
-		if (!normalizedSource || normalizedSource === normalizedTarget) {
+		if (
+			this.isUnusablePointFilePath(normalizedSource) ||
+			normalizedSource === normalizedTarget
+		) {
 			return;
 		}
 		if (this.shouldSkipVaultPointFileScanPath(normalizedSource)) {
 			return;
 		}
 		if (!(await this.isReadablePointFilePath(normalizedSource))) {
-			if (await this.adapter.exists(normalizedSource)) {
+			const fileName = normalizedSource.split("/").pop() || "";
+			// 仅对「看起来像专题文件」的路径告警；跳过 vault 根 `/` 等目录噪音。
+			if (
+				this.isPointFileName(fileName) &&
+				(await this.adapter.exists(normalizedSource))
+			) {
 				logger.warn(
 					`[IRPointStorageService] 跳过无法读取的专题路径，将在默认目录创建 .irdeck 文件: ${normalizedSource}`,
 				);
@@ -4358,6 +4437,7 @@ export class IRPointStorageService {
 
 			const topicName =
 				String(entry.topicName || "").trim() || DEFAULT_TOPIC_NAME;
+			const originalIndexedPath = normalizePath(String(entry.file || "").trim());
 			const draftEntry = { ...entry };
 			const { resolvedPath, changed: pathChanged } =
 				await this.reconcilePointFileIndexEntry(index, draftEntry);
@@ -4367,8 +4447,35 @@ export class IRPointStorageService {
 			}
 
 			if (!(await this.isIndexedPointFilePath(resolvedPath))) {
-				changed = true;
-				continue;
+				// 仅当原索引路径非法（如 `/`）时补建空专题文件；普通缺失文件仍视为已删除并丢弃。
+				if (this.isUnusablePointFilePath(originalIndexedPath)) {
+					const nowIso = new Date().toISOString();
+					const emptyData: IRPointFileData = {
+						schemaVersion: IR_POINT_STORAGE_VERSION,
+						topicId,
+						topicName,
+						updatedAt: nowIso,
+						deck: this.createDefaultPointDeckRecord(topicName, nowIso),
+						tagGroups: {
+							default: this.cloneTagGroup(DEFAULT_TAG_GROUP),
+						},
+						tagGroupProfiles: {
+							default: this.cloneTagGroupProfile(DEFAULT_TAG_GROUP_PROFILE),
+						},
+						points: [],
+					};
+					await this.writeJson(
+						resolvedPath,
+						this.normalizePointFileData(emptyData, topicId, topicName),
+					);
+					changed = true;
+					if (!(await this.isIndexedPointFilePath(resolvedPath))) {
+						continue;
+					}
+				} else {
+					changed = true;
+					continue;
+				}
 			}
 
 			if (draftEntry.topicName !== topicName) {
@@ -4711,6 +4818,31 @@ export class IRPointStorageService {
 		} catch (error) {
 			logger.debug(
 				"[IRPointStorageService] vault.getFiles() 枚举 .irdeck 失败，回退 adapter 扫描",
+				error,
+			);
+		}
+
+		// adapter.write 写入的新 .irdeck 可能尚未进入 vault.getFiles() 缓存。
+		// 合并索引中仍可在 adapter 读取的路径，避免导入后专题从目录/搜索中消失。
+		try {
+			const index = await this.loadPointFilesIndexSnapshot();
+			for (const entry of index.files || []) {
+				const absolutePath = this.resolveIndexedPointFilePath(
+					entry?.file,
+				)?.absolutePath;
+				if (
+					!absolutePath ||
+					this.shouldSkipVaultPointFileScanPath(absolutePath)
+				) {
+					continue;
+				}
+				if (await this.isIndexedPointFilePath(absolutePath)) {
+					paths.add(absolutePath);
+				}
+			}
+		} catch (error) {
+			logger.debug(
+				"[IRPointStorageService] 合并 point-files-index 可见专题路径失败",
 				error,
 			);
 		}

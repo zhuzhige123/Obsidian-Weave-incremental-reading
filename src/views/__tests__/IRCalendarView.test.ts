@@ -147,4 +147,34 @@ describe("IRCalendarView", () => {
 		await expect(restoreRace).resolves.toBe("resolved");
 		expect(loadComponentAsync).toHaveBeenCalledTimes(2);
 	});
+
+	it("does not mount after the view has closed during plugin-ready wait", async () => {
+		const leaf = {};
+		const workspace = {
+			on: vi.fn(() => ({ name: "layout-change" })),
+			offref: vi.fn(),
+		};
+		const plugin = {
+			app: { workspace },
+			dataStorage: {},
+		} as any;
+		const view = new IRCalendarView(leaf as any, plugin);
+		(view as any).app = plugin.app;
+
+		let resolveReady!: () => void;
+		const readyGate = new Promise<void>((resolve) => {
+			resolveReady = resolve;
+		});
+		vi.spyOn(view as any, "waitForPluginReady").mockReturnValue(readyGate);
+		vi.spyOn(view as any, "canUseIncrementalReading").mockReturnValue(true);
+
+		(view as any).isOpen = true;
+		const loadPromise = (view as any).loadComponentAsync();
+		await view.onClose();
+		resolveReady();
+		await loadPromise;
+
+		expect((view as any).component).toBeNull();
+		expect(view.contentEl.querySelector(".error")).toBeNull();
+	});
 });

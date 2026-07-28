@@ -1,12 +1,17 @@
 import {
-	ItemView,
+	FileView,
 	Notice,
 	Platform,
+	TFile,
 	type ViewStateResult,
 	WorkspaceLeaf,
 } from "obsidian";
 import type { WeavePlugin } from "../main";
 import { IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
+import {
+	IR_DECK_FILE_EXTENSION,
+	basenameWithoutExtension,
+} from "../utils/ir-internal-data-path";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 import { readString } from "../utils/unknown-record";
@@ -14,11 +19,20 @@ import { DeferredLeafRedirectController } from "./DeferredLeafRedirectController
 
 export const VIEW_TYPE_IRDECK = IR_RUNTIME.viewTypes.deck;
 
-export class IRDeckView extends ItemView {
+const IR_DECK_EXTENSION = IR_DECK_FILE_EXTENSION.replace(/^\./, "");
+
+/**
+ * `.irdeck` 文件入口视图。
+ * 按 Obsidian 惯例继承 FileView 绑定文件；实际 UI 延迟重定向到侧边栏月历，
+ * 并按该专题的 topicId 过滤阅读点。
+ */
+export class IRDeckView extends FileView {
 	private plugin: WeavePlugin;
-	private filePath = "";
+	/** Path cache for legacy workspace state before FileView binds `this.file`. */
+	private pendingPath = "";
 	private isOpen = false;
-	private redirecting = false;
+	/** Sticky after a successful redirect; cleared only on failure so we can retry. */
+	private redirectSettled = false;
 	private readonly redirectController: DeferredLeafRedirectController;
 
 	constructor(leaf: WorkspaceLeaf, plugin: WeavePlugin) {
@@ -27,7 +41,8 @@ export class IRDeckView extends ItemView {
 		this.redirectController = new DeferredLeafRedirectController({
 			workspace: plugin.app.workspace,
 			leaf,
-			shouldRedirect: () => this.isOpen && !!this.filePath && !this.redirecting,
+			shouldRedirect: () =>
+				this.isOpen && !!this.resolveBoundPath() && !this.redirectSettled,
 			onRedirect: () => {
 				void this.redirectToCalendar();
 			},
@@ -43,25 +58,27 @@ export class IRDeckView extends ItemView {
 			return "";
 		}
 
-		if (!this.filePath) {
-			return "IRDeck";
+		if (this.file) {
+			return this.file.basename || this.file.name || "IRDeck";
 		}
 
-		return this.filePath.split(/[\\/]/).pop() || "IRDeck";
+		return basenameWithoutExtension(this.pendingPath, "IRDeck");
 	}
 
 	getIcon(): string {
 		return "calendar";
 	}
 
-	allowNoFile(): boolean {
-		return true;
+	canAcceptExtension(extension: string): boolean {
+		return extension.toLowerCase() === IR_DECK_EXTENSION;
 	}
 
 	getState(): Record<string, unknown> {
+		const path = this.resolveBoundPath();
 		return {
-			filePath: this.filePath,
-			file: this.filePath,
+			...super.getState(),
+			// Keep filePath for older workspace layouts that read it explicitly.
+			...(path ? { filePath: path } : {}),
 		};
 	}
 
@@ -71,13 +88,32 @@ export class IRDeckView extends ItemView {
 	): Promise<void> {
 		await super.setState(state, result);
 
-		const incomingPath = readString(state?.filePath) || readString(state?.file);
+		const incomingPath =
+			this.file?.path ||
+			readString(state?.filePath) ||
+			readString(state?.file);
 		if (incomingPath) {
-			this.filePath = incomingPath;
+			this.pendingPath = incomingPath;
 		}
 
-		if (this.isOpen && this.filePath) {
+		if (this.isOpen && this.resolveBoundPath()) {
 			this.redirectController.request();
+		}
+	}
+
+	async onLoadFile(file: TFile): Promise<void> {
+		await super.onLoadFile(file);
+		this.pendingPath = file.path;
+
+		if (this.isOpen) {
+			this.redirectController.request();
+		}
+	}
+
+	async onUnloadFile(file: TFile): Promise<void> {
+		await super.onUnloadFile(file);
+		if (this.pendingPath === file.path) {
+			this.pendingPath = "";
 		}
 	}
 
@@ -90,6 +126,10 @@ export class IRDeckView extends ItemView {
 			text: i18n.t("views.irdeck.loading"),
 		});
 
+		if (this.file?.path) {
+			this.pendingPath = this.file.path;
+		}
+
 		this.redirectController.start();
 	}
 
@@ -98,15 +138,21 @@ export class IRDeckView extends ItemView {
 		this.redirectController.stop();
 	}
 
+	private resolveBoundPath(): string {
+		return this.file?.path || this.pendingPath;
+	}
+
 	private async redirectToCalendar(): Promise<void> {
-		if (!this.filePath || this.redirecting) {
+		const path = this.resolveBoundPath();
+		if (!path || this.redirectSettled) {
 			return;
 		}
 
-		this.redirecting = true;
+		this.redirectSettled = true;
 		try {
-			await this.plugin.openIRDeckCalendar(this.filePath, this.leaf);
+			await this.plugin.openIRDeckCalendar(path, this.leaf);
 		} catch (error) {
+			this.redirectSettled = false;
 			logger.error("[IRDeckView] 打开 IRDeck 月历失败:", error);
 			this.contentEl.empty();
 			this.contentEl.createDiv({
@@ -114,8 +160,6 @@ export class IRDeckView extends ItemView {
 				text: i18n.t("views.irdeck.openFailed"),
 			});
 			new Notice(i18n.t("views.irdeck.openFailed"));
-		} finally {
-			this.redirecting = false;
 		}
 	}
 }

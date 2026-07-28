@@ -51,12 +51,6 @@ const SEARCH_ENTRIES: readonly StandaloneIRSettingsSearchEntry[] = [
 		aliases: ["reading point folder", "markdown folder"],
 	},
 	{
-		tab: "basic",
-		nameKey: "irSettings.standalone.dataFolders.dataMgmtName",
-		descKey: "irSettings.standalone.dataFolders.dataMgmtDesc",
-		aliases: ["data management", "irdeck"],
-	},
-	{
 		tab: "core-scheduling",
 		nameKey: "irSettings.scheduleTitle",
 		aliases: ["core scheduling", "schedule", "daily cap"],

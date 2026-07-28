@@ -83,7 +83,18 @@
 
   .ir-obsidian-setting-slider-host :global(.setting-item) {
     border: none;
-    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0.65em 0;
+  }
+
+  .ir-obsidian-setting-slider-host :global(.setting-item-name) {
+    color: var(--text-normal);
+  }
+
+  .ir-obsidian-setting-slider-host :global(.setting-item-description) {
+    color: var(--text-muted);
   }
 
   .ir-obsidian-setting-slider-host :global(.ir-obsidian-setting-slider-value) {

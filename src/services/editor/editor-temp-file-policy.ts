@@ -13,117 +13,15 @@ export const DETACHED_EDITOR_TEMP_FILE_SUFFIX = ".md";
 
 const MODAL_EDITOR_PERMANENT_FILE_PATTERN =
 	/^modal-editor-permanent(?:-\d+)?\.md$/;
-const DETACHED_EDITOR_SOURCE_FILE_EXTENSIONS = new Set([
-	"md",
-	"markdown",
-	"txt",
-	"pdf",
-	"epub",
-	"canvas",
-	"png",
-	"jpg",
-	"jpeg",
-	"gif",
-	"webp",
-	"avif",
-	"svg",
-	"bmp",
-	"html",
-	"htm",
-	"xhtml",
-	"xml",
-	"json",
-	"csv",
-	"mp3",
-	"m4a",
-	"ogg",
-	"oga",
-	"wav",
-	"mp4",
-	"m4v",
-	"webm",
-	"mov",
-	"avi",
-	"mkv",
-]);
-
-function getParentFolder(path: string): string {
-	const lastSlash = path.lastIndexOf("/");
-	return lastSlash >= 0 ? path.slice(0, lastSlash) : "";
-}
-
-function inferExistingVaultPathKind(
-	app: App,
-	normalizedPath: string,
-): "file" | "folder" | null {
-	try {
-		const abstractFile = app.vault.getAbstractFileByPath?.(normalizedPath);
-		if (!abstractFile) return null;
-
-		if (
-			typeof (abstractFile as { extension?: unknown }).extension === "string"
-		) {
-			return "file";
-		}
-
-		if (Array.isArray((abstractFile as { children?: unknown }).children)) {
-			return "folder";
-		}
-
-		const ctorName = (abstractFile as { constructor?: { name?: string } })
-			.constructor?.name;
-		if (ctorName === "TFile") return "file";
-		if (ctorName === "TFolder") return "folder";
-	} catch { /* ignored */ }
-
-	return null;
-}
-
-function hasKnownVaultFileExtension(normalizedPath: string): boolean {
-	const fileName = normalizedPath.split("/").pop() || "";
-	const lastDot = fileName.lastIndexOf(".");
-	if (lastDot <= 0 || lastDot === fileName.length - 1) {
-		return false;
-	}
-
-	const extension = fileName.slice(lastDot + 1).toLowerCase();
-	return DETACHED_EDITOR_SOURCE_FILE_EXTENSIONS.has(extension);
-}
-
-function sanitizeDetachedEditorSourcePath(sourcePath?: string): string {
-	const rawSourcePath = (sourcePath || "").trim();
-	if (!rawSourcePath) {
-		return "";
-	}
-
-	const normalizedSourcePath = normalizePath(rawSourcePath)
-		.replace(/^['"]+|['"]+$/g, "")
-		.replace(/[?#].*$/, "")
-		.trim();
-
-	if (!normalizedSourcePath) {
-		return "";
-	}
-
-	if (/^[a-z]+:\/\//i.test(normalizedSourcePath)) {
-		return "";
-	}
-
-	if (/^[A-Za-z]:\//.test(normalizedSourcePath)) {
-		return "";
-	}
-
-	if (normalizedSourcePath.startsWith("../") || normalizedSourcePath === "..") {
-		return "";
-	}
-
-	return normalizedSourcePath;
-}
 
 export function getPluginEditorTempDir(app: App): string {
 	return normalizePath(getPluginPaths(app).cache.editorTemp);
 }
 
+/**
+ * Vault 可见的嵌入式编辑器临时目录。
+ * 始终落在可配置的 IR 数据根下（`{root}/editor`），尊重设置中的 weaveParentFolder。
+ */
 export function getVaultEditorTempDir(app: App): string {
 	return normalizePath(`${getV2PathsFromApp(app).root}/editor`);
 }
@@ -144,41 +42,16 @@ export function isDetachedEditorTempFilePath(path?: string | null): boolean {
 	return isDetachedEditorTempFileName(fileName);
 }
 
+/**
+ * DetachedLeafEditor 临时文件目录。
+ * 固定使用 IR 数据根下的 editor/，不跟源文件同目录（避免污染用户笔记树）。
+ * `sourcePath` 保留为兼容参数，不再影响落盘位置。
+ */
 export function resolveDetachedEditorTempFolder(
 	app: App,
-	sourcePath?: string,
+	_sourcePath?: string,
 ): string {
-	const normalizedSourcePath = sanitizeDetachedEditorSourcePath(sourcePath);
-	if (!normalizedSourcePath) {
-		// 嵌入式编辑器最终依赖 TFile + openFile，缓冲区必须放在 Vault 可见目录。
-		return getVaultEditorTempDir(app);
-	}
-
-	if (
-		!normalizedSourcePath ||
-		normalizedSourcePath === "." ||
-		normalizedSourcePath === "/"
-	) {
-		return getVaultEditorTempDir(app);
-	}
-
-	const existingPathKind = inferExistingVaultPathKind(
-		app,
-		normalizedSourcePath,
-	);
-	if (existingPathKind === "file") {
-		return getParentFolder(normalizedSourcePath);
-	}
-
-	if (existingPathKind === "folder") {
-		return normalizedSourcePath;
-	}
-
-	if (hasKnownVaultFileExtension(normalizedSourcePath)) {
-		return getParentFolder(normalizedSourcePath);
-	}
-
-	return normalizedSourcePath;
+	return getVaultEditorTempDir(app);
 }
 
 export function buildDetachedEditorTempFilePath(

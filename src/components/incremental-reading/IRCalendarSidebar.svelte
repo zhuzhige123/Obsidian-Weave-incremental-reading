@@ -55,6 +55,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   } from '../../services/incremental-reading/IRCalendarHistoryUtils';
   import { VIEW_TYPE_IR_CALENDAR } from '../../views/IRCalendarView';
   import { runIdleBatchedTasks } from '../../utils/idle-task-queue';
+  import { resolveWorkspaceActiveLeaf } from '../../utils/workspace-navigation';
   import {
     buildScheduleItemFromChunkData,
     buildScheduleItemFromEpubTask,
@@ -2520,7 +2521,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function isIRCalendarLeafActive(): boolean {
-    const activeView = plugin.app.workspace.activeLeaf?.view;
+    const activeView = resolveWorkspaceActiveLeaf(plugin.app.workspace)?.view;
     return activeView?.getViewType?.() === VIEW_TYPE_IR_CALENDAR;
   }
 
@@ -3704,7 +3705,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       new Notice(`Import finished: ${result.success} created.`);
     }
 
-    void refreshSidebarAfterDataUpdate({ includeProgress: false });
+    // 导入可能新建专题：必须全量重载，避免 priorityDateKeys 快路径只补阅读点、不刷新专题目录。
+    void refreshSidebarAfterDataUpdate({
+      includeProgress: false,
+      forceRecompute: true,
+    });
   }
 
   async function getStorage(): Promise<IRStorageService> {
@@ -3727,11 +3732,18 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       return;
     }
 
+    await refreshIrDeckCatalogFromStorage();
+  }
+
+	async function refreshIrDeckCatalogFromStorage(): Promise<void> {
     try {
       const storage = await getStorage();
-      irDecks = Object.values((await storage.getAllDecks()) || {});
+      const nextDecks = Object.values((await storage.getAllDecks()) || {});
+      if (nextDecks.length > 0) {
+        irDecks = nextDecks;
+      }
     } catch (error) {
-      logger.warn('[IRCalendarSidebar] Failed to load IR deck catalog:', error);
+      logger.warn('[IRCalendarSidebar] Failed to refresh IR deck catalog:', error);
     }
   }
 
@@ -3795,6 +3807,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     if (priorityDateKeys.length > 0 && !options.forceRecompute) {
       clearSelectedDateHydrationCompletedKeys(priorityDateKeys);
       await refreshPriorityCalendarDays(priorityDateKeys, { deckIds: options.deckIds });
+      // 快路径不跑 loadData，但仍可能新建/改名专题（导入、加阅读目标等），需刷新专题目录供搜索。
+      await refreshIrDeckCatalogFromStorage();
       await restoreExpandedMaterialSiblings(previouslyExpanded);
       syncContinueReadingSuggestionsModalVisibility();
       return;
@@ -5244,6 +5258,38 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     }
   }
 
+  /**
+   * 归档/搁置后立刻从月历日队列剔除，并强制重算刷新。
+   * 仅靠 recompute 快路径时，protectAgainstShrink 会把已失效项留在 materialsByDate。
+   */
+  async function evictInactiveMaterialFromSidebar(
+    material: ScheduleItem,
+    reason: 'archive_block' | 'suspend_block',
+    deckId: string
+  ): Promise<void> {
+    const affectedDateKeys = Array.from(
+      new Set(
+        [
+          formatDateKey(selectedDate),
+          ...collectScheduleItemDateKeys(material.id, materialsByDate, pinnedByDate),
+        ]
+          .map((key) => String(key || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    await removeLocalMaterialReferences(material.id);
+    clearSelectedDateHydrationCompletedKeys(affectedDateKeys);
+    getCalendarQueryService().invalidate();
+    getSharedIRProjectionRuntime(plugin.app).markStale();
+
+    await recomputeAndRefreshSidebar(reason, {
+      forceRecompute: true,
+      priorityDateKeys: affectedDateKeys,
+      deckIds: deckId ? [deckId] : undefined,
+    });
+  }
+
   async function suspendMaterial(material: ScheduleItem) {
     try {
       const scheduler = await getV4SchedulerService();
@@ -5253,7 +5299,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       new Notice(t('irSidebar.notices.suspended'));
       closePriorityMenu();
       closeSchedulingMenu();
-      await recomputeAndRefreshSidebar('suspend_block');
+      await evictInactiveMaterialFromSidebar(material, 'suspend_block', deckId);
     } catch (error) {
       logger.error('[IRCalendarSidebar] Recovered error message.', error);
       new Notice(t('irSidebar.notices.suspendFailed'));
@@ -5269,7 +5315,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       new Notice(t('irSidebar.notices.archived'));
       closePriorityMenu();
       closeSchedulingMenu();
-      await recomputeAndRefreshSidebar('archive_block');
+      await evictInactiveMaterialFromSidebar(material, 'archive_block', deckId);
     } catch (error) {
       logger.error('[IRCalendarSidebar] Recovered error message.', error);
       new Notice(t('irSidebar.notices.archiveFailed'));

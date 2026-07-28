@@ -20,12 +20,17 @@ describe("editor-temp-file-policy", () => {
 		expect(isDetachedEditorTempFilePath("notes/real-note.md")).toBe(false);
 	});
 
-	it("resolves detached editor temp folders from sourcePath and plugin configDir", () => {
+	it("always resolves detached editor temp folders under the IR data root editor dir", () => {
 		const defaultApp = {
 			vault: { configDir: ".obsidian" },
 		} as any;
 		const customApp = {
 			vault: { configDir: "custom-config" },
+			plugins: {
+				getPlugin: () => ({
+					settings: { weaveParentFolder: "My IR Data" },
+				}),
+			},
 		} as any;
 		const vaultEditorDir = `${DEFAULT_IR_DATA_ROOT}/editor`;
 
@@ -36,26 +41,29 @@ describe("editor-temp-file-policy", () => {
 			"custom-config/plugins/weave-incremental-reading/cache/editor-temp",
 		);
 		expect(getVaultEditorTempDir(defaultApp)).toBe(vaultEditorDir);
+		expect(getVaultEditorTempDir(customApp)).toBe("My IR Data/editor");
 		expect(resolveDetachedEditorTempFolder(defaultApp)).toBe(vaultEditorDir);
 		expect(
 			resolveDetachedEditorTempFolder(defaultApp, "notes/ch1/source.md"),
-		).toBe("notes/ch1");
+		).toBe(vaultEditorDir);
 		expect(
 			resolveDetachedEditorTempFolder(defaultApp, "library/book.pdf"),
-		).toBe("library");
+		).toBe(vaultEditorDir);
 		expect(
 			resolveDetachedEditorTempFolder(defaultApp, "library/book.epub"),
-		).toBe("library");
+		).toBe(vaultEditorDir);
 		expect(resolveDetachedEditorTempFolder(defaultApp, "notes/ch1")).toBe(
-			"notes/ch1",
+			vaultEditorDir,
+		);
+		expect(resolveDetachedEditorTempFolder(defaultApp, "source.md")).toBe(
+			vaultEditorDir,
 		);
 		expect(
-			resolveDetachedEditorTempFolder(defaultApp, "notes/archive.v1"),
-		).toBe("notes/archive.v1");
-		expect(resolveDetachedEditorTempFolder(defaultApp, "source.md")).toBe("");
+			resolveDetachedEditorTempFolder(customApp, "notes/ch1/source.md"),
+		).toBe("My IR Data/editor");
 	});
 
-	it("falls back to the safe vault editor directory for invalid source paths", () => {
+	it("keeps invalid source paths on the IR editor directory", () => {
 		const app = {
 			vault: { configDir: ".obsidian" },
 		} as any;

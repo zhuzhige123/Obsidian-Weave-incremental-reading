@@ -1528,6 +1528,8 @@ export class IRV4SchedulerService {
 			});
 		}
 
+		await this.storageService.markMarkdownSourceArchived(updatedBlock.sourcePath);
+
 		// 记录会话（归档）
 		await this.recordSession(
 			updatedBlock,

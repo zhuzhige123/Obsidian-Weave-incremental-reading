@@ -192,6 +192,37 @@
   border-bottom: none;
 }
 
+/*
+ * Native Obsidian Setting mounts use .setting-item too.
+ * Do not apply the custom card chrome above, or titles sit on panel borders
+ * and text/background layers collide inside standalone IR panels.
+ */
+.weave-settings [class*="ir-obsidian-setting-"] > .setting-item,
+.weave-settings [class*="ir-obsidian-setting-"] > .setting-item:last-child {
+  align-items: center;
+  gap: var(--size-4-4, 1rem);
+  padding: 0.65em 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.weave-settings [class*="ir-obsidian-setting-"] .setting-item-name {
+  color: var(--text-normal);
+}
+
+.weave-settings [class*="ir-obsidian-setting-"] .setting-item-description,
+.weave-settings [class*="ir-obsidian-setting-"] .setting-item-description * {
+  color: var(--text-muted);
+}
+
+.weave-settings .ir-obsidian-setting-toggle-host--compact > .setting-item,
+.weave-settings .ir-obsidian-setting-dropdown-host--compact > .setting-item {
+  padding: 0;
+  justify-content: flex-end;
+}
+
 .weave-settings .setting-info {
   flex: 1;
   min-width: 0;

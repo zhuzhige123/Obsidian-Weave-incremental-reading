@@ -1,10 +1,12 @@
 import type { EventRef, Workspace, WorkspaceLeaf } from "obsidian";
+import { resolveWorkspaceActiveLeaf } from "../utils/workspace-navigation";
 
 type WorkspaceLike = Pick<
 	Workspace,
 	"layoutReady" | "activeLeaf" | "on" | "offref" | "onLayoutReady"
 > & {
 	getActiveLeaf?: () => WorkspaceLeaf | null;
+	getMostRecentLeaf?: () => WorkspaceLeaf | null;
 };
 
 type DeferredLeafRedirectControllerOptions = {
@@ -68,7 +70,9 @@ export class DeferredLeafRedirectController {
 
 					this.request();
 				});
-			} catch { /* ignored */ }
+			} catch {
+				/* ignored */
+			}
 		}
 
 		this.request();
@@ -125,11 +129,6 @@ export class DeferredLeafRedirectController {
 	}
 
 	private isActiveLeaf(): boolean {
-		const activeLeaf =
-			typeof this.workspace.getActiveLeaf === "function"
-				? this.workspace.getActiveLeaf()
-				: null;
-
-		return activeLeaf === this.leaf;
+		return resolveWorkspaceActiveLeaf(this.workspace) === this.leaf;
 	}
 }

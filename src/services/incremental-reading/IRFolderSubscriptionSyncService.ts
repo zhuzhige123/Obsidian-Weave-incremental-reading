@@ -341,6 +341,7 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 export async function applyIncrementalReadingFolderSubscriptionCandidates(options: {
 	candidates: IRFolderSubscriptionCandidate[];
 	pinToToday: boolean;
+	/** 仅 pinToToday=false（按算法正常调度）时生效：批量新材料按 horizon 均摊 due */
 	initialScheduleSpread?: {
 		enabled: boolean;
 		horizonDays: number;
@@ -390,10 +391,12 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 			candidate.needsSync &&
 			isFolderSubscriptionPendingNewEntry(candidate.syncGaps),
 	);
+	// 「按算法正常调度」(pinToToday=false)：批量新材料按 horizon 均摊 due，避免全堆当天。
+	// 「添加到今天」(pinToToday=true)：全部钉今天，不做跨日摊开。
 	const spreadDateByPath = new Map<string, number>();
 	if (
-		pinToToday &&
-		options.initialScheduleSpread?.enabled &&
+		!pinToToday &&
+		options.initialScheduleSpread?.enabled !== false &&
 		pendingNewCandidates.length > 1
 	) {
 		const spread = spreadBunchedDueDates(

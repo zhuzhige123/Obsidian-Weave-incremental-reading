@@ -665,6 +665,60 @@ describe("IRStorageService.getChunkData", () => {
 	});
 });
 
+describe("IRStorageService.markMarkdownSourceArchived", () => {
+	it("为 md 源文件 YAML tags 追加 we_已归档，且重复调用保持幂等", async () => {
+		const frontmatter: Record<string, unknown> = {
+			"weave-reading-id": "tk-ir-1",
+			tags: ["已有标签"],
+		};
+		const sourceFile = Object.assign(Object.create(TFile.prototype), {
+			path: "notes/source.md",
+		}) as TFile;
+		const app = {
+			vault: {
+				getAbstractFileByPath: vi.fn((filePath: string) =>
+					filePath === "notes/source.md" ? sourceFile : null,
+				),
+			},
+			fileManager: {
+				processFrontMatter: vi.fn(
+					async (
+						_file: TFile,
+						updater: (fm: Record<string, unknown>) => void,
+					) => {
+						updater(frontmatter);
+					},
+				),
+			},
+		};
+		const service = new IRStorageService(app as any);
+		vi.spyOn(service as any, "initialize").mockResolvedValue(undefined);
+
+		await service.markMarkdownSourceArchived("notes/source.md");
+		expect(frontmatter.tags).toEqual(["已有标签", "we_已归档"]);
+
+		await service.markMarkdownSourceArchived("notes/source.md");
+		expect(frontmatter.tags).toEqual(["已有标签", "we_已归档"]);
+		expect(app.fileManager.processFrontMatter).toHaveBeenCalledTimes(2);
+	});
+
+	it("非 md 源路径不写 frontmatter", async () => {
+		const processFrontMatter = vi.fn();
+		const app = {
+			vault: {
+				getAbstractFileByPath: vi.fn(),
+			},
+			fileManager: { processFrontMatter },
+		};
+		const service = new IRStorageService(app as any);
+		vi.spyOn(service as any, "initialize").mockResolvedValue(undefined);
+
+		await service.markMarkdownSourceArchived("Books/demo.pdf");
+		expect(app.vault.getAbstractFileByPath).not.toHaveBeenCalled();
+		expect(processFrontMatter).not.toHaveBeenCalled();
+	});
+});
+
 describe("IRStorageService.readDeckNamesFromYAML", () => {
 	it("skips directory paths without attempting adapter.read", async () => {
 		const readMock = vi.fn();

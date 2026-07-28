@@ -1,5 +1,6 @@
 import type { App, View, WorkspaceLeaf } from "obsidian";
 import { readString } from "../../utils/unknown-record";
+import { resolveWorkspaceActiveLeaf } from "../../utils/workspace-navigation";
 import { deriveWebPageTitleFromUrl } from "../incremental-reading/ir-web-reading-point";
 import { OBSIDIAN_WEB_VIEWER_VIEW_TYPE } from "./obsidian-open-web-url";
 
@@ -14,10 +15,6 @@ type WebViewerViewLike = View & {
 	getDisplayText?: () => string;
 	url?: string;
 	title?: string;
-};
-
-type WorkspaceWithActiveLeaf = App["workspace"] & {
-	getActiveLeaf?: () => WorkspaceLeaf | null;
 };
 
 function asWebViewerView(view: View): WebViewerViewLike {
@@ -86,11 +83,7 @@ export function getWebViewerPageContextFromView(
 export function getActiveWebViewerPageContext(
 	app: App,
 ): WebViewerPageContext | null {
-	const workspace = app.workspace as WorkspaceWithActiveLeaf;
-	const activeLeaf =
-		typeof workspace.getActiveLeaf === "function"
-			? workspace.getActiveLeaf()
-			: null;
+	const activeLeaf = resolveWorkspaceActiveLeaf(app.workspace);
 	if (activeLeaf?.view?.getViewType?.() === OBSIDIAN_WEB_VIEWER_VIEW_TYPE) {
 		return getWebViewerPageContextFromView(activeLeaf.view);
 	}
