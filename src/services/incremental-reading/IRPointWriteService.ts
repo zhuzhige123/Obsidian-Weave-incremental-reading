@@ -290,6 +290,46 @@ export class IRPointWriteService {
 		return false;
 	}
 
+	/**
+	 * Batch-delete reading points with one coalesced point-storage write pass.
+	 * Used by multi-select remove/delete; single-item paths keep deletePoint().
+	 */
+	async deletePoints(inputs: IRPointDeleteInput[]): Promise<string[]> {
+		const uniqueInputs: IRPointDeleteInput[] = [];
+		const seen = new Set<string>();
+		for (const input of Array.isArray(inputs) ? inputs : []) {
+			const pointId = String(input?.id || "").trim();
+			if (!pointId || seen.has(pointId)) {
+				continue;
+			}
+			seen.add(pointId);
+			uniqueInputs.push({ ...input, id: pointId });
+		}
+		if (uniqueInputs.length === 0) {
+			return [];
+		}
+
+		const deleted = await this.storage.deleteLegacyPointsByIds(
+			uniqueInputs.map((input) => input.id),
+		);
+		const removedIds: string[] = [];
+		let softSuccess = false;
+		for (const input of uniqueInputs) {
+			if (deleted.has(input.id)) {
+				removedIds.push(input.id);
+				continue;
+			}
+			if (isIncrementalReadingPointId(input.id, input.kind)) {
+				softSuccess = true;
+				removedIds.push(input.id);
+			}
+		}
+		if (softSuccess) {
+			this.storage.invalidateScheduleRuntimeCaches();
+		}
+		return removedIds;
+	}
+
 	async updatePointTags(
 		target: IRPointWriteTarget,
 		tags: string[],

@@ -9,6 +9,7 @@ import type {
 } from "../../types/ir-types";
 import { logger } from "../../utils/logger";
 import { IRChunkFileService } from "./IRChunkFileService";
+import { isFolderSubscriptionChunkPendingAdmission } from "./IRFolderSubscriptionAdmissionService";
 import { IRStorageService } from "./IRStorageService";
 
 /** 将块文件状态映射到内部调度状态。 */
@@ -122,6 +123,9 @@ export class IRChunkScheduleAdapter {
 		const now = Date.now();
 
 		return schedulable.filter((_chunk) => {
+			if (isFolderSubscriptionChunkPendingAdmission(_chunk)) {
+				return false;
+			}
 			if (_chunk.scheduleStatus === "new") return true;
 			return _chunk.nextRepDate <= now;
 		});

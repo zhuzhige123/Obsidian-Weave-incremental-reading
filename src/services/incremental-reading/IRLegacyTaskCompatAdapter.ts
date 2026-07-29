@@ -189,6 +189,9 @@ function getPointMeta(snapshot: IRPointSnapshot) {
 					),
 			  }
 			: {}),
+		...(getPointMetadataBoolean(snapshot, "pendingFolderAdmission") === true
+			? { pendingFolderAdmission: true }
+			: {}),
 		...(getPointMetadataBoolean(snapshot, "externalDocument") !== undefined
 			? {
 					externalDocument: getPointMetadataBoolean(

@@ -244,9 +244,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     populateCalendarBackgroundWallMenu,
     populateCalendarFolderSubscriptionSyncMenu,
     populateCalendarMaterialImportMenu,
+    populateCalendarTodayBacklogRebalanceMenu,
     populateCalendarViewModeMenu
   } from './ir-calendar-tools-menu';
   import { IRDataManagementModalObsidian } from './IRDataManagementModalObsidian';
+  import {
+    rebalanceTodayReadingPointBacklog,
+    selectTodayBacklogRebalancePlan,
+  } from '../../services/incremental-reading/IRTodayBacklogRebalanceService';
   import { PremiumFeatureGuard, PREMIUM_FEATURES } from '../../services/premium/PremiumFeatureGuard';
   import { ensureIRPremiumFeature } from '../../services/premium/ir-premium';
 
@@ -704,9 +709,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     );
 
     const storage = await getStorage();
-    for (const materialId of normalizedIds) {
-      await storage.removeCalendarCompletion(materialId);
-    }
+    await storage.removeCalendarCompletions(Array.from(normalizedIds));
 
     await persistAuthoritativeDayQueuesAfterRemoval(Array.from(affectedDateKeys));
   }
@@ -3191,6 +3194,136 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       : undefined;
   }
 
+  /**
+   * 权威覆盖指定日的 materials（关闭 protectAgainstShrink）。
+   * 用于积压整理等「磁盘已变少、UI 必须跟着变少」的场景。
+   */
+  async function authoritativelyReplacePriorityDateMaterials(
+    dateKeys: string[]
+  ): Promise<void> {
+    const normalizedKeys = Array.from(
+      new Set(dateKeys.map((key) => String(key || '').trim()).filter(Boolean))
+    );
+    if (normalizedKeys.length === 0) {
+      return;
+    }
+
+    clearSelectedDateHydrationCompletedKeys(normalizedKeys);
+    getCalendarQueryService().invalidate();
+    getSharedIRProjectionRuntime(plugin.app).markStale();
+
+    const deckIds = getActiveDeckIdsForQuery();
+    const projection = await getSharedIRProjectionRuntime(plugin.app).hydratePriorityDatesFromProjection(
+      deckIds,
+      normalizedKeys
+    );
+    const incoming = new Map<string, ScheduleItem[]>();
+    for (const dateKey of normalizedKeys) {
+      incoming.set(dateKey, projection?.materialsByDate.get(dateKey) || []);
+    }
+    materialsByDate = mergeMaterialsByDate(materialsByDate, incoming, {
+      forceReplaceDateKeys: normalizedKeys,
+      protectAgainstShrink: false
+    });
+    syncCalendarDayCountsFromLoadedMaterials(normalizedKeys, { allowShrink: true });
+    for (const dateKey of normalizedKeys) {
+      lazyMetadataLoadedDateKeys.delete(dateKey);
+      if (isDateMaterialsLoadComplete(dateKey)) {
+        markSelectedDateHydrationComplete(dateKey);
+      }
+    }
+  }
+
+  async function rebalanceTodayBacklogFromToolsMenu(): Promise<void> {
+    try {
+      const storage = await getStorage();
+      await storage.initialize();
+      const ir =
+        plugin.getIncrementalReadingSettings?.() ??
+        plugin.settings?.incrementalReading ??
+        {};
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayDateKey = `${todayStart.getFullYear()}-${String(
+        todayStart.getMonth() + 1
+      ).padStart(2, '0')}-${String(todayStart.getDate()).padStart(2, '0')}`;
+      const chunks = Object.values((await storage.getAllChunkData()) || {});
+      const plan = selectTodayBacklogRebalancePlan({
+        chunks,
+        todayStartMs: todayStart.getTime(),
+        todayDateKey,
+        dailyTimeBudgetMinutes: Number(ir.dailyTimeBudgetMinutes) || 40,
+        dailyReadingPointCap: Number(ir.dailyReadingPointCap) || 15,
+        maxEstimatedMinutesPerItem: ir.maxEstimatedMinutesPerItem
+      });
+      const calendarTodayCount = getVisibleMaterialsForDate(todayDateKey).length;
+
+      if (plan.moveToPending.length === 0) {
+        if (calendarTodayCount > plan.todayOccupiedBefore) {
+          await recomputeAndBroadcastIRData(plugin.app, 'manual_reschedule', {
+            priorityDateKeys: [todayDateKey]
+          });
+          await authoritativelyReplacePriorityDateMaterials([todayDateKey]);
+          new Notice(
+            t('irSidebar.notices.rebalanceTodayBacklogNoneStale', {
+              before: plan.todayOccupiedBefore,
+              calendar: calendarTodayCount
+            }),
+            5000
+          );
+          return;
+        }
+        new Notice(t('irSidebar.notices.rebalanceTodayBacklogNone'));
+        return;
+      }
+
+      const confirmed = await showObsidianConfirm(
+        plugin.app,
+        t('irSidebar.notices.rebalanceTodayBacklogConfirm', {
+          before: plan.todayOccupiedBefore,
+          calendar: calendarTodayCount,
+          keep: plan.keep.length,
+          move: plan.moveToPending.length
+        }),
+        {
+          title: t('irSidebar.notices.rebalanceTodayBacklogConfirmTitle'),
+          confirmText: t('irSidebar.notices.rebalanceTodayBacklogConfirmAction'),
+          confirmClass: 'mod-warning'
+        }
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      const result = await rebalanceTodayReadingPointBacklog({
+        app: plugin.app,
+        storage,
+        todayStartMs: todayStart.getTime(),
+        dailyTimeBudgetMinutes: Number(ir.dailyTimeBudgetMinutes) || 40,
+        dailyReadingPointCap: Number(ir.dailyReadingPointCap) || 15,
+        maxEstimatedMinutesPerItem: ir.maxEstimatedMinutesPerItem
+      });
+
+      await recomputeAndRefreshSidebar('manual_reschedule', {
+        forceRecompute: true,
+        priorityDateKeys: [todayDateKey]
+      });
+      // recompute 快路径默认 protectAgainstShrink，会把已移入待放出的旧项留在今日列表。
+      await authoritativelyReplacePriorityDateMaterials([todayDateKey]);
+      new Notice(
+        t('irSidebar.notices.rebalanceTodayBacklogDone', {
+          kept: result.keptToday,
+          moved: result.movedToPending,
+          pinned: result.protectedPinned
+        }),
+        5000
+      );
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to rebalance today backlog:', error);
+      new Notice(t('irSidebar.notices.rebalanceTodayBacklogFailed'));
+    }
+  }
+
   function showMonthCalendarToolsMenu(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -3231,6 +3364,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     populateCalendarMaterialImportMenu(menu, {
       importTitle: t('irSidebar.header.importTitle'),
       onOpenImport: openImportModal
+    });
+
+    populateCalendarTodayBacklogRebalanceMenu(menu, {
+      rebalanceTitle: t('irSidebar.header.rebalanceTodayBacklogTitle'),
+      onRebalance: () => {
+        void rebalanceTodayBacklogFromToolsMenu();
+      }
     });
 
     if (shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)) {

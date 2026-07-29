@@ -195,6 +195,7 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 				},
 			],
 			pinToToday: true,
+			remainingTodaySlots: 10,
 			getOrCreateMaterial,
 			setReadingDeck,
 			ensureChunkScheduled,
@@ -216,12 +217,12 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 			expect.objectContaining({
 				readingMaterialId: "mat-1",
 				pinToToday: true,
-				scheduleDate: undefined,
+				pendingAdmission: false,
 			}),
 		);
 	});
 
-	it("添加到今天：批量新材料全部钉今天，不跨日摊开", async () => {
+	it("添加到今天：批量新材料全部钉今天，不进入待放出", async () => {
 		const files = [
 			new TFile("Inbox/Subscribed/a.md"),
 			new TFile("Inbox/Subscribed/b.md"),
@@ -232,7 +233,6 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 		}));
 		const setReadingDeck = vi.fn(async () => true);
 		const ensureChunkScheduled = vi.fn(async () => true);
-		const anchorMs = new Date("2026-07-28T00:00:00").getTime();
 
 		await applyIncrementalReadingFolderSubscriptionCandidates({
 			candidates: files.map((file) => ({
@@ -251,11 +251,7 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 				existsAlready: false,
 			})),
 			pinToToday: true,
-			initialScheduleSpread: {
-				enabled: true,
-				horizonDays: 3,
-				anchorMs,
-			},
+			remainingTodaySlots: 10,
 			getOrCreateMaterial,
 			setReadingDeck,
 			ensureChunkScheduled,
@@ -266,13 +262,13 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 			expect(call[3]).toEqual(
 				expect.objectContaining({
 					pinToToday: true,
-					scheduleDate: undefined,
+					pendingAdmission: false,
 				}),
 			);
 		}
 	});
 
-	it("按算法正常调度：批量新材料按 horizon 均摊 due，而不是全堆当天", async () => {
+	it("添加到今天：超出剩余名额的部分进入待放出", async () => {
 		const files = [
 			new TFile("Inbox/Subscribed/a.md"),
 			new TFile("Inbox/Subscribed/b.md"),
@@ -283,7 +279,54 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 		}));
 		const setReadingDeck = vi.fn(async () => true);
 		const ensureChunkScheduled = vi.fn(async () => true);
-		const anchorMs = new Date("2026-07-28T00:00:00").getTime();
+
+		await applyIncrementalReadingFolderSubscriptionCandidates({
+			candidates: files.map((file) => ({
+				file,
+				rule: {
+					id: "rule-1",
+					enabled: true,
+					folderPath: "Inbox/Subscribed",
+					deckId: "deck-1",
+				},
+				deckName: "专题 A",
+				hasChunkRecord: false,
+				isFullySubscribed: false,
+				needsSync: true,
+				syncGaps: ["missing_material", "missing_chunk"],
+				existsAlready: false,
+			})),
+			pinToToday: true,
+			remainingTodaySlots: 1,
+			getOrCreateMaterial,
+			setReadingDeck,
+			ensureChunkScheduled,
+		});
+
+		const optionsList = ensureChunkScheduled.mock.calls.map(
+			(call) =>
+				call[3] as {
+					pinToToday: boolean;
+					pendingAdmission?: boolean;
+				},
+		);
+		expect(optionsList.filter((o) => o.pinToToday && !o.pendingAdmission)).toHaveLength(
+			1,
+		);
+		expect(optionsList.filter((o) => o.pendingAdmission)).toHaveLength(2);
+	});
+
+	it("按算法正常调度：批量新材料入库待放出，不预填未来 due", async () => {
+		const files = [
+			new TFile("Inbox/Subscribed/a.md"),
+			new TFile("Inbox/Subscribed/b.md"),
+			new TFile("Inbox/Subscribed/c.md"),
+		];
+		const getOrCreateMaterial = vi.fn(async (file: TFile) => ({
+			uuid: `mat-${file.basename}`,
+		}));
+		const setReadingDeck = vi.fn(async () => true);
+		const ensureChunkScheduled = vi.fn(async () => true);
 
 		await applyIncrementalReadingFolderSubscriptionCandidates({
 			candidates: files.map((file) => ({
@@ -302,32 +345,29 @@ describe("scanIncrementalReadingFolderSubscriptions", () => {
 				existsAlready: false,
 			})),
 			pinToToday: false,
-			initialScheduleSpread: {
-				enabled: true,
-				horizonDays: 3,
-				anchorMs,
-			},
 			getOrCreateMaterial,
 			setReadingDeck,
 			ensureChunkScheduled,
 		});
 
 		expect(ensureChunkScheduled).toHaveBeenCalledTimes(3);
-		const scheduleDates = ensureChunkScheduled.mock.calls.map((call) => {
+		const optionsList = ensureChunkScheduled.mock.calls.map((call) => {
 			const options = call[3] as {
 				pinToToday: boolean;
+				pendingAdmission?: boolean;
+				sourceSequenceGroup?: string;
+				sourceSequenceOrder?: number;
 				scheduleDate?: Date;
 			};
 			expect(options.pinToToday).toBe(false);
-			expect(options.scheduleDate).toBeInstanceOf(Date);
-			return options.scheduleDate!.getTime();
+			expect(options.pendingAdmission).toBe(true);
+			expect(options.scheduleDate).toBeUndefined();
+			expect(String(options.sourceSequenceGroup || "")).toContain(
+				"folder-sub-",
+			);
+			return options.sourceSequenceOrder;
 		});
-		expect(new Set(scheduleDates).size).toBe(3);
-		expect(scheduleDates).toEqual([
-			anchorMs,
-			new Date("2026-07-29T00:00:00").getTime(),
-			new Date("2026-07-30T00:00:00").getTime(),
-		]);
+		expect(optionsList).toEqual([1, 2, 3]);
 	});
 
 	it("应用阶段也会跳过非 Markdown 候选，避免误创建阅读点", async () => {

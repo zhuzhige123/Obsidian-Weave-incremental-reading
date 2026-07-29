@@ -28,6 +28,11 @@ import {
 	applyIncrementalReadingFolderSubscriptionCandidates,
 	scanIncrementalReadingFolderSubscriptions,
 } from "./services/incremental-reading/IRFolderSubscriptionSyncService";
+import {
+	countTodayOccupiedReadingPoints,
+	sumTodayOccupiedReadingMinutes,
+} from "./services/incremental-reading/IRFolderSubscriptionAdmissionService";
+import { resolveRemainingDailyAdmissionQuota } from "./services/incremental-reading/IRDailyLoadAllocator";
 import { cleanupFolderSubscriptionNonMarkdownAutoSubscribedEntries } from "./services/incremental-reading/folder-subscription-non-md-cleanup";
 import { getSharedIRHostCriticalWorkGuard } from "./services/incremental-reading/IRHostCriticalWorkGuard";
 import { getSharedIRSourcePathRenameService } from "./services/incremental-reading/IRSourcePathRenameService";
@@ -872,6 +877,25 @@ export default class StandaloneIncrementalReadingPlugin
 		const pinToToday = folderSubscription?.initialScheduleMode !== "scheduled";
 		const irSettings = this.getIncrementalReadingSettings();
 		const todayStart = this.getIncrementalReadingTodayStart();
+		const endOfToday = new Date(todayStart);
+		endOfToday.setHours(23, 59, 59, 999);
+		const allChunks = Object.values(
+			(await storage.getAllChunkData()) || {},
+		) as import("./types/ir-types").IRChunkFileData[];
+		const remainingTodaySlots = resolveRemainingDailyAdmissionQuota({
+			dailyTimeBudgetMinutes: Number(irSettings.dailyTimeBudgetMinutes) || 40,
+			dailyReadingPointCap: Number(irSettings.dailyReadingPointCap) || 15,
+			todayOccupiedCount: countTodayOccupiedReadingPoints(
+				allChunks,
+				endOfToday.getTime(),
+			),
+			todayOccupiedMinutes: sumTodayOccupiedReadingMinutes(
+				allChunks,
+				endOfToday.getTime(),
+				irSettings.maxEstimatedMinutesPerItem,
+			),
+			maxEstimatedMinutesPerItem: irSettings.maxEstimatedMinutesPerItem,
+		}).admitCount;
 		const applyResult =
 			await applyIncrementalReadingFolderSubscriptionCandidates({
 				candidates: scanResult.candidates.map((candidate) => ({
@@ -882,12 +906,7 @@ export default class StandaloneIncrementalReadingPlugin
 						"",
 				})),
 				pinToToday,
-				// 仅「按算法正常调度」使用；「添加到今天」路径忽略该选项。
-				initialScheduleSpread: {
-					enabled: !pinToToday,
-					horizonDays: Number(irSettings.horizonSpreadDays) || 7,
-					anchorMs: todayStart.getTime(),
-				},
+				remainingTodaySlots,
 				getOrCreateMaterial: async (file, options) => {
 					const material =
 						await this.readingMaterialManager.ensureMaterialForFolderSubscription(

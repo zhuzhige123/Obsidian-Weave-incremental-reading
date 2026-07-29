@@ -317,21 +317,11 @@
     }
   }
 
-  // 处理每日新块上限变更
-  function handleDailyNewLimitChange(value: number) {
-    if (!Number.isNaN(value) && value >= 0 && value <= 50) {
+  // 处理每日阅读点上限变更（统一日容量：今日队列 / 订阅放出共用）
+  function handleDailyReadingPointCapChange(value: number) {
+    if (!Number.isNaN(value) && value >= 5 && value <= 40) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
-        incrementalReading.dailyNewLimit = value;
-      });
-      saveSettings();
-    }
-  }
-
-  // 处理每日复习上限变更
-  function handleDailyReviewLimitChange(value: number) {
-    if (!Number.isNaN(value) && value >= 0 && value <= 200) {
-      settingsEditor.updateIncrementalReading((incrementalReading) => {
-        incrementalReading.dailyReviewLimit = value;
+        incrementalReading.dailyReadingPointCap = value;
       });
       saveSettings();
     }
@@ -395,11 +385,8 @@
     void saveSettings();
   }
 
-  // 处理每日时间预算变更
+  // 处理每日时间预算变更（主闸门：今日队列 / 订阅放出共用）
   function handleTimeBudgetChange(value: number) {
-    if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
-      return;
-    }
     if (!Number.isNaN(value) && value >= 10 && value <= 120) {
       settingsEditor.updateIncrementalReading((incrementalReading) => {
         incrementalReading.dailyTimeBudgetMinutes = value;
@@ -442,18 +429,6 @@
       incrementalReading.readingTargetDefaultNoteBacked = enabled === true;
     });
     void saveSettings();
-  }
-
-  function handleDailyReadingPointCapChange(value: number) {
-    if (!ensurePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)) {
-      return;
-    }
-    if (!Number.isNaN(value) && value >= 5 && value <= 40) {
-      settingsEditor.updateIncrementalReading((incrementalReading) => {
-        incrementalReading.dailyReadingPointCap = value;
-      });
-      saveSettings();
-    }
   }
 
   function handleHorizonSmoothingChange(enabled: boolean) {
@@ -581,8 +556,8 @@
       <div class="incremental-reading-tab-content">
         <IRCoreSchedulingSettingsSection
           {settings}
-          {handleDailyNewLimitChange}
-          {handleDailyReviewLimitChange}
+          {handleTimeBudgetChange}
+          {handleDailyReadingPointCapChange}
           {handleLearnAheadDaysChange}
           {handleIntervalFactorChange}
           {handleReviewThresholdChange}
@@ -600,17 +575,14 @@
           {settings}
           strategyOptions={STRATEGY_OPTIONS}
           {handleStrategyDropdownChange}
-          {handleTimeBudgetChange}
           {handleFlowStretchChange}
           {handleLoadBasedDeferChange}
-          {handleDailyReadingPointCapChange}
           {handleHorizonSmoothingChange}
           {handleHorizonSpreadDaysChange}
           {handleMaxAppearancesChange}
           showSection={canUsePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}
           strategyTitle={premiumTitle(t('irSettings.strategyTitle'), PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}
           strategyLabel={premiumTitle(t('irSettings.strategyLabel'), PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}
-          timeBudgetLabel={premiumTitle(t('irSettings.timeBudgetLabel'), PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}
           maxAppearancesLabel={premiumTitle(t('irSettings.maxAppearancesLabel'), PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}
         />
         {#if shouldShowPremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS) && !canUsePremiumFeature(PREMIUM_FEATURES.SCHEDULING_STRATEGY_SETTINGS)}

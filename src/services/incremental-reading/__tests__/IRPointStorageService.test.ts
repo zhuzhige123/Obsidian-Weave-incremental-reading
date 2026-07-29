@@ -2095,4 +2095,93 @@ body`,
 		const decks = await service.listPointDecks();
 		expect(decks["topic-lag"]?.name).toBe("Lag Topic");
 	});
+
+	it("batch-deletes multiple points with one rewrite per topic file", async () => {
+		const v2Paths = getV2Paths("");
+		const pointFilePath = `${v2Paths.ir.root}/points/Batch Topic.irdeck`;
+		const { app, files } = createMemoryApp(
+			{
+				[pointFilePath]: JSON.stringify({
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					topicId: "topic-batch",
+					topicName: "Batch Topic",
+					updatedAt: "2026-04-16T12:00:00.000Z",
+					points: [
+						{
+							id: "point-a",
+							source: { type: "markdown", path: "Notes/A.md" },
+							trace: { locatorType: "markdown-block" },
+							relations: { topicIds: ["topic-batch"] },
+						},
+						{
+							id: "point-b",
+							source: { type: "markdown", path: "Notes/B.md" },
+							trace: { locatorType: "markdown-block" },
+							relations: {
+								topicIds: ["topic-batch"],
+								parentPointId: "point-a",
+							},
+						},
+						{
+							id: "point-c",
+							source: { type: "markdown", path: "Notes/C.md" },
+							trace: { locatorType: "markdown-block" },
+							relations: { topicIds: ["topic-batch"] },
+						},
+					],
+				}),
+			},
+			[`${v2Paths.ir.root}/points`],
+		);
+		files.set(
+			getPointFilesIndexPath(app),
+			JSON.stringify({
+				version: 1,
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				files: [
+					{
+						file: "weave Incremental reading/points/Batch Topic.irdeck",
+						topicId: "topic-batch",
+						topicName: "Batch Topic",
+						pointCount: 3,
+						pointIds: ["point-a", "point-b", "point-c"],
+						updatedAt: "2026-04-16T10:00:00.000Z",
+					},
+				],
+			}),
+		);
+
+		const service = new IRPointStorageService(app);
+		const writeSpy = vi.spyOn(app.vault.adapter, "write");
+
+		const deleted = await service.deletePointsByLegacyIds([
+			"point-a",
+			"point-c",
+			"missing",
+		]);
+
+		expect(Array.from(deleted).sort()).toEqual(["point-a", "point-c"]);
+
+		const pointFile = JSON.parse(
+			files.get(normalizeTestPath(pointFilePath)) || "{}",
+		);
+		expect(pointFile.points).toHaveLength(1);
+		expect(pointFile.points[0].id).toBe("point-b");
+		expect(pointFile.points[0].relations.parentPointId).toBeNull();
+
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		expect(pointIndex.files[0]).toMatchObject({
+			pointCount: 1,
+			pointIds: ["point-b"],
+		});
+
+		const pointFileWrites = writeSpy.mock.calls.filter((args) =>
+			normalizeTestPath(String(args[0] || "")).endsWith("Batch Topic.irdeck"),
+		);
+		// One coalesced rewrite for delete + parent-link cleanup (initialize may also touch it).
+		expect(pointFileWrites.length).toBeLessThanOrEqual(2);
+		writeSpy.mockRestore();
+	});
 });

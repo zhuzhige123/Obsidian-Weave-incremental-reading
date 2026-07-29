@@ -47,8 +47,6 @@ export function buildDefaultIncrementalReadingSettings(
 ): IncrementalReadingSettings {
 	return {
 		defaultIntervalFactor: 1.5,
-		dailyNewLimit: 20,
-		dailyReviewLimit: 50,
 		defaultSplitLevel: 2,
 		interleaveMode: true,
 		maxConsecutiveSameTopic: 3,
@@ -123,71 +121,106 @@ export function normalizeIncrementalReadingSettings(
 	weaveParentFolder?: string | null,
 ): IncrementalReadingSettings {
 	const defaults = buildDefaultIncrementalReadingSettings(weaveParentFolder);
+	const raw = (settings ?? {}) as Partial<IncrementalReadingSettings> & {
+		dailyNewLimit?: number;
+		dailyReviewLimit?: number;
+	};
+	const {
+		dailyNewLimit: legacyDailyNewLimit,
+		dailyReviewLimit: legacyDailyReviewLimit,
+		...restSettings
+	} = raw;
+
+	const hasExplicitCap = typeof restSettings.dailyReadingPointCap === "number";
+	let dailyReadingPointCap = hasExplicitCap
+		? Math.max(5, Math.min(40, Math.round(restSettings.dailyReadingPointCap!)))
+		: defaults.dailyReadingPointCap!;
+	if (!hasExplicitCap) {
+		const migratedCandidates: number[] = [];
+		if (
+			typeof legacyDailyNewLimit === "number" &&
+			Number.isFinite(legacyDailyNewLimit) &&
+			legacyDailyNewLimit !== 20
+		) {
+			migratedCandidates.push(legacyDailyNewLimit);
+		}
+		if (
+			typeof legacyDailyReviewLimit === "number" &&
+			Number.isFinite(legacyDailyReviewLimit) &&
+			legacyDailyReviewLimit !== 50
+		) {
+			migratedCandidates.push(Math.min(legacyDailyReviewLimit, 40));
+		}
+		if (migratedCandidates.length > 0) {
+			dailyReadingPointCap = Math.max(
+				5,
+				Math.min(40, Math.round(Math.max(...migratedCandidates))),
+			);
+		}
+	}
+
 	return {
 		...defaults,
-		...(settings ?? {}),
+		...restSettings,
 		// 已合并进 weaveParentFolder：不再单独持久化自定义 importFolder，读取时由 resolveIRImportFolder 从数据根推导
 		importFolder: "",
 		selectionQuickCreateLastFolder: String(
-			settings?.selectionQuickCreateLastFolder || "",
+			restSettings.selectionQuickCreateLastFolder || "",
 		).trim(),
 		readingTargetInboxDeckId: String(
-			settings?.readingTargetInboxDeckId || "",
+			restSettings.readingTargetInboxDeckId || "",
 		).trim(),
 		readingTargetLastDeckId: String(
-			settings?.readingTargetLastDeckId || "",
+			restSettings.readingTargetLastDeckId || "",
 		).trim(),
 		readingTargetAppendSourceBacklink:
-			settings?.readingTargetAppendSourceBacklink === true,
+			restSettings.readingTargetAppendSourceBacklink === true,
 		readingTargetDefaultNoteBacked:
-			settings?.readingTargetDefaultNoteBacked === true,
+			restSettings.readingTargetDefaultNoteBacked === true,
 		folderSubscription: normalizeIncrementalReadingFolderSubscriptionSettings(
-			settings?.folderSubscription,
+			restSettings.folderSubscription,
 		),
 		calendarSidebar: normalizeIRCalendarSidebarSettings(
-			settings?.calendarSidebar,
+			restSettings.calendarSidebar,
 		),
 		paragraphWorkbench: resolveParagraphWorkbenchDisplaySettings(
-			settings?.paragraphWorkbench,
+			restSettings.paragraphWorkbench,
 		),
-		tagSource: normalizeIRTagSourcePolicy(settings?.tagSource),
+		tagSource: normalizeIRTagSourcePolicy(restSettings.tagSource),
 		flowStretchPercent:
-			typeof settings?.flowStretchPercent === "number"
-				? Math.max(0, Math.min(40, Math.round(settings.flowStretchPercent)))
+			typeof restSettings.flowStretchPercent === "number"
+				? Math.max(0, Math.min(40, Math.round(restSettings.flowStretchPercent)))
 				: defaults.flowStretchPercent,
-		enableLoadBasedDefer: settings?.enableLoadBasedDefer !== false,
+		enableLoadBasedDefer: restSettings.enableLoadBasedDefer !== false,
 		maxEstimatedMinutesPerItem:
-			typeof settings?.maxEstimatedMinutesPerItem === "number"
+			typeof restSettings.maxEstimatedMinutesPerItem === "number"
 				? Math.max(
 						5,
-						Math.min(30, Math.round(settings.maxEstimatedMinutesPerItem)),
+						Math.min(30, Math.round(restSettings.maxEstimatedMinutesPerItem)),
 				  )
 				: defaults.maxEstimatedMinutesPerItem,
-		dailyReadingPointCap:
-			typeof settings?.dailyReadingPointCap === "number"
-				? Math.max(5, Math.min(40, Math.round(settings.dailyReadingPointCap)))
-				: defaults.dailyReadingPointCap,
+		dailyReadingPointCap,
 		dailyReadingPointStretchCap:
-			typeof settings?.dailyReadingPointStretchCap === "number"
+			typeof restSettings.dailyReadingPointStretchCap === "number"
 				? Math.max(
 						5,
-						Math.min(45, Math.round(settings.dailyReadingPointStretchCap)),
+						Math.min(45, Math.round(restSettings.dailyReadingPointStretchCap)),
 				  )
 				: defaults.dailyReadingPointStretchCap,
 		horizonSpreadDays:
-			typeof settings?.horizonSpreadDays === "number"
-				? Math.max(5, Math.min(14, Math.round(settings.horizonSpreadDays)))
+			typeof restSettings.horizonSpreadDays === "number"
+				? Math.max(5, Math.min(14, Math.round(restSettings.horizonSpreadDays)))
 				: defaults.horizonSpreadDays,
-		enableHorizonSmoothing: settings?.enableHorizonSmoothing !== false,
+		enableHorizonSmoothing: restSettings.enableHorizonSmoothing !== false,
 		interleaveProfile:
-			settings?.interleaveProfile === "off" ||
-			settings?.interleaveProfile === "soft" ||
-			settings?.interleaveProfile === "related-soft"
-				? settings.interleaveProfile
+			restSettings.interleaveProfile === "off" ||
+			restSettings.interleaveProfile === "soft" ||
+			restSettings.interleaveProfile === "related-soft"
+				? restSettings.interleaveProfile
 				: defaults.interleaveProfile,
 		maxTopicSharePercent:
-			typeof settings?.maxTopicSharePercent === "number"
-				? Math.max(40, Math.min(90, Math.round(settings.maxTopicSharePercent)))
+			typeof restSettings.maxTopicSharePercent === "number"
+				? Math.max(40, Math.min(90, Math.round(restSettings.maxTopicSharePercent)))
 				: defaults.maxTopicSharePercent,
 	};
 }

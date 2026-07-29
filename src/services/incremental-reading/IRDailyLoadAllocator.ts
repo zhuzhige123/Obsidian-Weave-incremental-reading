@@ -50,6 +50,9 @@ export const DEFAULT_MAX_ESTIMATED_MINUTES_PER_ITEM = 18;
 export const DEFAULT_HORIZON_SPREAD_DAYS = 7;
 
 export const DEFAULT_DAILY_READING_POINT_CAP = 15;
+export const DEFAULT_DAILY_TIME_BUDGET_MINUTES = 40;
+/** 无阅读史新材料的默认估时（分钟）；与计划侧无 stats 时的回退一致。 */
+export const DEFAULT_TYPICAL_NEW_ITEM_MINUTES = 5;
 export const MIN_FLOW_STRETCH_PERCENT = 0;
 export const MAX_FLOW_STRETCH_PERCENT = 40;
 
@@ -140,8 +143,89 @@ export function resolveScheduleItemLoadMinutes(
 	const raw =
 		Number(item.estimatedMinutes) ||
 		Number(item.explanation?.estimatedMinutes) ||
-		5;
+		DEFAULT_TYPICAL_NEW_ITEM_MINUTES;
 	return capItemLoadMinutes(raw, maxEstimatedMinutesPerItem);
+}
+
+/**
+ * 从阅读统计估算单条负载分钟；无史时回退典型新材料时长。
+ */
+export function estimateLoadMinutesFromReadingStats(
+	stats:
+		| {
+				impressions?: number;
+				effectiveReadingTimeSec?: number;
+		  }
+		| null
+		| undefined,
+	maxEstimatedMinutesPerItem?: number,
+): number {
+	const impressions = Number(stats?.impressions ?? 0);
+	const effectiveReadingTimeSec = Number(stats?.effectiveReadingTimeSec ?? 0);
+	let raw = DEFAULT_TYPICAL_NEW_ITEM_MINUTES;
+	if (impressions > 0 && effectiveReadingTimeSec > 0) {
+		raw = Math.max(0.5, effectiveReadingTimeSec / impressions / 60);
+	}
+	return capItemLoadMinutes(raw, maxEstimatedMinutesPerItem);
+}
+
+/**
+ * 新材料准入配额：时间预算为主闸门，条数上限为软顶。
+ * admitCount = min(剩余条数, floor(剩余分钟 / 典型单条分钟))
+ */
+export function resolveRemainingDailyAdmissionQuota(options: {
+	dailyTimeBudgetMinutes: number;
+	dailyReadingPointCap: number;
+	todayOccupiedCount: number;
+	todayOccupiedMinutes: number;
+	maxEstimatedMinutesPerItem?: number;
+	typicalNewItemMinutes?: number;
+}): {
+	remainingCountSlots: number;
+	remainingMinutes: number;
+	typicalNewItemMinutes: number;
+	admitCountByMinutes: number;
+	admitCount: number;
+} {
+	const budgetMinutes = Math.max(
+		1,
+		Math.round(
+			Number(options.dailyTimeBudgetMinutes) ||
+				DEFAULT_DAILY_TIME_BUDGET_MINUTES,
+		),
+	);
+	const countCap = clampDailyReadingPointCap(options.dailyReadingPointCap);
+	const maxPerItem = clampMaxEstimatedMinutesPerItem(
+		options.maxEstimatedMinutesPerItem,
+	);
+	const typicalNewItemMinutes = Math.max(
+		1,
+		Math.min(
+			maxPerItem,
+			Math.round(
+				Number(options.typicalNewItemMinutes) ||
+					DEFAULT_TYPICAL_NEW_ITEM_MINUTES,
+			),
+		),
+	);
+	const remainingCountSlots = Math.max(
+		0,
+		countCap - Math.max(0, options.todayOccupiedCount),
+	);
+	const remainingMinutes = Math.max(
+		0,
+		budgetMinutes - Math.max(0, options.todayOccupiedMinutes),
+	);
+	const admitCountByMinutes = Math.floor(
+		remainingMinutes / typicalNewItemMinutes,
+	);
+	return {
+		remainingCountSlots,
+		remainingMinutes,
+		typicalNewItemMinutes,
+		admitCountByMinutes,
+		admitCount: Math.min(remainingCountSlots, admitCountByMinutes),
+	};
 }
 
 export function capItemLoadMinutes(

@@ -232,10 +232,6 @@ export interface IRDeckSettings {
 	customSplitMarker?: string;
 	/** 默认间隔因子 */
 	defaultIntervalFactor: number;
-	/** 每日新块上限 */
-	dailyNewLimit: number;
-	/** 每日复习上限 */
-	dailyReviewLimit: number;
 	/** 是否启用交错学习 */
 	interleaveMode: boolean;
 }
@@ -262,9 +258,9 @@ export interface IRDeckStats {
 	questionCount: number;
 	/** 已完成提问数量（已勾选的提问） */
 	completedQuestionCount: number;
-	/** 今日可学习的新块数量（应用每日限制后） */
+	/** 今日可安排的新块数量（受每日阅读点上限裁剪后） */
 	todayNewCount?: number;
-	/** 今日可复习的到期块数量（应用每日限制后） */
+	/** 今日可安排的到期块数量（受每日阅读点上限裁剪后） */
 	todayDueCount?: number;
 	loadRatePercent?: number;
 }
@@ -419,6 +415,13 @@ export interface IRBlockMeta {
 	autoSubscribedAt?: string;
 	autoSubscribedFolderPath?: string;
 	autoSubscribedBadgeUntil?: string;
+	/**
+	 * 订阅文件夹「按算法正常调度」入库后的待放出标记。
+	 * 为 true 时不占今日/近端日历，直至每日按 reading-point cap 准入。
+	 */
+	pendingFolderAdmission?: boolean;
+	sourceSequenceGroup?: string;
+	sourceSequenceOrder?: number;
 	/** 用户手动改期后固定到的日期（YYYY-MM-DD），负载顺延不会移走该日条目。 */
 	manualSchedulePinnedDateKey?: string;
 }
@@ -1116,8 +1119,6 @@ export interface IRScheduleStrategy {
 	maxAppearancesPerBlockPerDay: number;
 	/** 每日时间预算（分钟） */
 	dailyTimeBudgetMinutes: number;
-	/** 每日复习数量上限 */
-	dailyReviewLimit: number;
 }
 
 /**
@@ -1129,7 +1130,6 @@ export const PROCESSING_STRATEGY: IRScheduleStrategy = {
 	crossDayMinIntervalHours: 6,
 	maxAppearancesPerBlockPerDay: 2,
 	dailyTimeBudgetMinutes: 40,
-	dailyReviewLimit: 50,
 };
 
 /**
@@ -1141,7 +1141,6 @@ export const READING_LIST_STRATEGY: IRScheduleStrategy = {
 	crossDayMinIntervalHours: 24,
 	maxAppearancesPerBlockPerDay: 1,
 	dailyTimeBudgetMinutes: 40,
-	dailyReviewLimit: 50,
 };
 
 /**
@@ -1279,8 +1278,6 @@ export const DEFAULT_IR_DECK_SETTINGS: IRDeckSettings = {
 	splitMode: "heading",
 	splitLevel: 2,
 	defaultIntervalFactor: 1.5, // 默认值 1.5
-	dailyNewLimit: 20,
-	dailyReviewLimit: 50,
 	interleaveMode: true, // 默认启用交错学习
 };
 

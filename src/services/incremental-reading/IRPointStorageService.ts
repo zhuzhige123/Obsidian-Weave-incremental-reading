@@ -2940,14 +2940,6 @@ export class IRPointStorageService {
 					typeof rawSettings?.defaultIntervalFactor === "number"
 						? rawSettings.defaultIntervalFactor
 						: fallback.settings.defaultIntervalFactor,
-				dailyNewLimit:
-					typeof rawSettings?.dailyNewLimit === "number"
-						? rawSettings.dailyNewLimit
-						: fallback.settings.dailyNewLimit,
-				dailyReviewLimit:
-					typeof rawSettings?.dailyReviewLimit === "number"
-						? rawSettings.dailyReviewLimit
-						: fallback.settings.dailyReviewLimit,
 				interleaveMode:
 					typeof rawSettings?.interleaveMode === "boolean"
 						? rawSettings.interleaveMode
@@ -5553,6 +5545,8 @@ export class IRPointStorageService {
 						chunkMeta.autoSubscribedBadgeUntil.trim()
 							? chunkMeta.autoSubscribedBadgeUntil.trim()
 							: undefined,
+					pendingFolderAdmission:
+						chunkMeta.pendingFolderAdmission === true ? true : undefined,
 					externalDocument: Boolean(chunkMeta.externalDocument) || undefined,
 					pointTitle:
 						typeof chunkMeta.pointTitle === "string" &&
@@ -5583,61 +5577,34 @@ export class IRPointStorageService {
 	}
 
 	async deletePointByLegacyId(pointId: string): Promise<boolean> {
-		await this.initialize();
-		const index = await this.readPointFilesIndex();
-		let deleted = false;
-
-		for (const entry of index.files) {
-			const absolutePath = this.resolveIndexedPointFilePath(
-				entry.file,
-			)?.absolutePath;
-			if (!absolutePath) {
-				continue;
-			}
-			const fileData = await this.readPointFile(
-				absolutePath,
-				entry.topicId,
-				entry.topicName,
-			);
-			const nextPoints = fileData.points.filter(
-				(point) => point.id !== pointId,
-			);
-			if (nextPoints.length === fileData.points.length) {
-				continue;
-			}
-
-			deleted = true;
-			entry.pointCount = nextPoints.length;
-			entry.updatedAt = new Date().toISOString();
-			await this.writeJson(absolutePath, {
-				...fileData,
-				points: nextPoints,
-				updatedAt: new Date().toISOString(),
-			});
+		const normalizedPointId = String(pointId || "").trim();
+		if (!normalizedPointId) {
+			return false;
 		}
-
-		if (deleted) {
-			await this.clearChildParentLinksForDeletedParent(pointId);
-			await this.writePointFilesIndex(index);
-			this.invalidatePointSnapshotListCache();
-		}
-
-		return deleted;
+		const deleted = await this.deletePointsByLegacyIds([normalizedPointId]);
+		return deleted.has(normalizedPointId);
 	}
 
 	/**
-	 * When a parent point is removed, clear stale `parentPointId` on children.
+	 * Batch-delete points by legacy id.
+	 * Reads/writes each topic `.irdeck` at most once (delete + parent-link cleanup together).
 	 */
-	private async clearChildParentLinksForDeletedParent(
-		deletedParentId: string,
-	): Promise<void> {
-		const normalizedParentId = String(deletedParentId || "").trim();
-		if (!normalizedParentId) {
-			return;
+	async deletePointsByLegacyIds(pointIds: string[]): Promise<Set<string>> {
+		await this.initialize();
+		const idsToDelete = new Set(
+			(Array.isArray(pointIds) ? pointIds : [])
+				.map((pointId) => String(pointId || "").trim())
+				.filter(Boolean),
+		);
+		if (idsToDelete.size === 0) {
+			return new Set();
 		}
 
 		const index = await this.readPointFilesIndex();
-		let touched = false;
+		const deletedIds = new Set<string>();
+		let filesChanged = false;
+		const updatedAt = new Date().toISOString();
+
 		for (const entry of index.files) {
 			const absolutePath = this.resolveIndexedPointFilePath(
 				entry.file,
@@ -5650,14 +5617,27 @@ export class IRPointStorageService {
 				entry.topicId,
 				entry.topicName,
 			);
-			let fileChanged = false;
-			const nextPoints = fileData.points.map((point) => {
+
+			const retainedPoints: typeof fileData.points = [];
+			let removedInFile = false;
+			for (const point of fileData.points) {
+				const pointId = String(point?.id || "").trim();
+				if (pointId && idsToDelete.has(pointId)) {
+					deletedIds.add(pointId);
+					removedInFile = true;
+					continue;
+				}
+				retainedPoints.push(point);
+			}
+
+			let parentLinksCleared = false;
+			const nextPoints = retainedPoints.map((point) => {
 				const childParent =
 					String(point.relations?.parentPointId || "").trim() || null;
-				if (childParent !== normalizedParentId) {
+				if (!childParent || !idsToDelete.has(childParent)) {
 					return point;
 				}
-				fileChanged = true;
+				parentLinksCleared = true;
 				return {
 					...point,
 					relations: {
@@ -5666,24 +5646,36 @@ export class IRPointStorageService {
 					},
 					timestamps: {
 						...point.timestamps,
-						updatedAt: new Date().toISOString(),
+						updatedAt,
 					},
 				};
 			});
-			if (!fileChanged) {
+
+			if (!removedInFile && !parentLinksCleared) {
 				continue;
 			}
-			touched = true;
-			entry.updatedAt = new Date().toISOString();
-			await this.persistPointFileData(absolutePath, {
+
+			filesChanged = true;
+			const nextPointIds = nextPoints
+				.map((point) => String(point?.id || "").trim())
+				.filter(Boolean);
+			entry.pointCount = nextPoints.length;
+			entry.pointIds = nextPointIds;
+			entry.updatedAt = updatedAt;
+			await this.writeJson(absolutePath, {
 				...fileData,
-				updatedAt: new Date().toISOString(),
 				points: nextPoints,
+				updatedAt,
 			});
 		}
-		if (touched) {
-			await this.writePointFilesIndex(index);
+
+		if (!filesChanged) {
+			return deletedIds;
 		}
+
+		await this.writePointFilesIndex(index);
+		this.invalidatePointSnapshotListCache();
+		return deletedIds;
 	}
 
 	async saveReaderState(

@@ -42,6 +42,11 @@ interface CalendarMaterialImportMenuOptions {
 	onOpenImport: () => void;
 }
 
+interface CalendarTodayBacklogRebalanceMenuOptions {
+	rebalanceTitle: string;
+	onRebalance: () => void;
+}
+
 interface CalendarMenuItemLike {
 	setTitle(title: string): this;
 	setIcon(icon: string): this;
@@ -161,6 +166,20 @@ export function populateCalendarMaterialImportMenu(
 			.setIcon("folder-input")
 			.onClick(() => {
 				options.onOpenImport();
+			});
+	});
+}
+
+export function populateCalendarTodayBacklogRebalanceMenu(
+	menu: CalendarMenuLike,
+	options: CalendarTodayBacklogRebalanceMenuOptions,
+): void {
+	menu.addItem((item) => {
+		item
+			.setTitle(options.rebalanceTitle)
+			.setIcon("list-restart")
+			.onClick(() => {
+				options.onRebalance();
 			});
 	});
 }

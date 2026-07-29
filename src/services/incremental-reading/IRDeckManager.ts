@@ -138,15 +138,13 @@ export class IRDeckManager {
 	 * 获取牌组及其统计
 	 */
 	async getDecksWithStats(options?: {
-		dailyNewLimit?: number;
-		dailyReviewLimit?: number;
+		dailyReadingPointCap?: number;
 		learnAheadDays?: number;
 	}): Promise<Array<{ deck: IRDeck; stats: IRDeckStats }>> {
 		const snapshot = await getSharedIRWorkspaceSnapshotService(
 			this.app,
 		).getDeckOverview({
-			dailyNewLimit: options?.dailyNewLimit ?? 20,
-			dailyReviewLimit: options?.dailyReviewLimit ?? 50,
+			dailyReadingPointCap: options?.dailyReadingPointCap ?? 15,
 			learnAheadDays: options?.learnAheadDays ?? 3,
 		});
 

@@ -47,6 +47,7 @@ import {
 import { parseYAMLFromContent, setCardProperty } from "../../utils/yaml-utils";
 import { getSharedIRCalendarDayIndexService } from "./IRCalendarDayIndexService";
 import { getSharedIRCalendarQueryService } from "./IRCalendarQueryService";
+import { isFolderSubscriptionChunkPendingAdmission } from "./IRFolderSubscriptionAdmissionService";
 import {
 	buildLegacyBlockFromPointSnapshot,
 	buildLegacyChunkFromPointSnapshot,
@@ -132,13 +133,25 @@ export class IRStorageService {
 		if (!normalizedPointId) {
 			return false;
 		}
+		const deleted = await this.deleteLegacyPointsByIds([normalizedPointId]);
+		return deleted.has(normalizedPointId);
+	}
+
+	/** 批量从 points 存储按 legacy id 删除，并只刷新一次调度相关缓存。 */
+	async deleteLegacyPointsByIds(pointIds: string[]): Promise<Set<string>> {
+		const normalizedIds = (Array.isArray(pointIds) ? pointIds : [])
+			.map((pointId) => String(pointId || "").trim())
+			.filter(Boolean);
+		if (normalizedIds.length === 0) {
+			return new Set();
+		}
 
 		await this.initialize();
 		const deleted =
-			await this.getPointStorageService().deletePointByLegacyId(
-				normalizedPointId,
+			await this.getPointStorageService().deletePointsByLegacyIds(
+				normalizedIds,
 			);
-		if (deleted) {
+		if (deleted.size > 0) {
 			this.invalidateScheduleRuntimeCaches();
 		}
 		return deleted;
@@ -996,8 +1009,8 @@ export class IRStorageService {
 		const idsToDelete = (await this.getBlocksByFile(filePath)).map(
 			(block) => block.id,
 		);
-		for (const id of idsToDelete) {
-			await this.getPointStorageService().deletePointByLegacyId(id);
+		if (idsToDelete.length > 0) {
+			await this.getPointStorageService().deletePointsByLegacyIds(idsToDelete);
 		}
 
 		// 级联删除：从所有牌组中移除这些内容块引用和文件引用
@@ -1933,19 +1946,35 @@ export class IRStorageService {
 		chunkId: string,
 		dateKey?: string,
 	): Promise<void> {
+		await this.removeCalendarCompletions([chunkId], dateKey);
+	}
+
+	/** 批量移除日历完成记录，只写一次 progress 文件。 */
+	async removeCalendarCompletions(
+		chunkIds: string[],
+		dateKey?: string,
+	): Promise<void> {
 		await this.initialize();
 
-		const normalizedChunkId = String(chunkId || "").trim();
-		if (!normalizedChunkId) {
+		const normalizedIds = new Set(
+			(Array.isArray(chunkIds) ? chunkIds : [])
+				.map((chunkId) => String(chunkId || "").trim())
+				.filter(Boolean),
+		);
+		if (normalizedIds.size === 0) {
 			return;
 		}
 
 		const state = await this.getCalendarProgressState();
 		const targetDateKeys = dateKey ? [dateKey] : Object.keys(state.byDate);
+		let changed = false;
 
 		for (const key of targetDateKeys) {
 			const current = Array.isArray(state.byDate[key]) ? state.byDate[key] : [];
-			const next = current.filter((id) => id !== normalizedChunkId);
+			const next = current.filter((id) => !normalizedIds.has(id));
+			if (next.length !== current.length) {
+				changed = true;
+			}
 			if (next.length > 0) {
 				state.byDate[key] = next;
 			} else {
@@ -1954,13 +1983,22 @@ export class IRStorageService {
 
 			if (state.displayOrderByDate[key]) {
 				const nextOrder = { ...state.displayOrderByDate[key] };
-				delete nextOrder[normalizedChunkId];
+				for (const id of normalizedIds) {
+					if (id in nextOrder) {
+						changed = true;
+						delete nextOrder[id];
+					}
+				}
 				if (Object.keys(nextOrder).length > 0) {
 					state.displayOrderByDate[key] = nextOrder;
 				} else {
 					delete state.displayOrderByDate[key];
 				}
 			}
+		}
+
+		if (!changed) {
+			return;
 		}
 
 		const store = {
@@ -2732,6 +2770,9 @@ export class IRStorageService {
 		const now = Date.now();
 
 		return Object.values(chunks).filter((_chunk) => {
+			if (isFolderSubscriptionChunkPendingAdmission(_chunk)) {
+				return false;
+			}
 			if (_chunk.scheduleStatus === "new") return true;
 			if (
 				_chunk.scheduleStatus === "done" ||
