@@ -226,7 +226,7 @@ export async function admitPendingFolderSubscriptionChunks(options: {
 	app: App;
 	todayStartMs: number;
 	todayDateKey: string;
-	dailyReadingPointCap: number;
+	dailyReadingPointCap?: number;
 	dailyTimeBudgetMinutes?: number;
 	maxEstimatedMinutesPerItem?: number;
 	typicalNewItemMinutes?: number;
@@ -246,7 +246,9 @@ export async function admitPendingFolderSubscriptionChunks(options: {
 
 	const selection = selectFolderSubscriptionAdmissionCandidates({
 		chunks,
-		dailyReadingPointCap: options.dailyReadingPointCap,
+		dailyReadingPointCap: clampDailyReadingPointCap(
+			options.dailyReadingPointCap,
+		),
 		dailyTimeBudgetMinutes:
 			options.dailyTimeBudgetMinutes ?? DEFAULT_DAILY_TIME_BUDGET_MINUTES,
 		endOfTodayMs: endOfToday.getTime(),

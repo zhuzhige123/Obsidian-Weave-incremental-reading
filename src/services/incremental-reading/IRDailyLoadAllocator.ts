@@ -166,7 +166,10 @@ export function estimateLoadMinutesFromReadingStats(
 	if (impressions > 0 && effectiveReadingTimeSec > 0) {
 		raw = Math.max(0.5, effectiveReadingTimeSec / impressions / 60);
 	}
-	return capItemLoadMinutes(raw, maxEstimatedMinutesPerItem);
+	return capItemLoadMinutes(
+		raw,
+		clampMaxEstimatedMinutesPerItem(maxEstimatedMinutesPerItem),
+	);
 }
 
 /**
