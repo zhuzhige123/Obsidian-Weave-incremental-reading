@@ -1,7 +1,7 @@
 {
   "name": "weave-incremental-reading",
   "private": true,
-  "version": "0.5.28",
+  "version": "0.5.29",
   "description": "Standalone incremental reading workflow with topics, reading points, calendar scheduling, and source tracing.",
   "license": "GPL-3.0-or-later"
 }
