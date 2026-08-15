@@ -1,29 +1,41 @@
 {
-	"extends": "@tsconfig/svelte/tsconfig.json",
-	"compilerOptions": {
-		"allowJs": true,
-		"checkJs": true,
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true,
-		"resolveJsonModule": true,
-		"allowArbitraryExtensions": true,
-		"skipLibCheck": true,
-		"sourceMap": true,
-		"strict": true,
-		"moduleResolution": "bundler",
-		"target": "ES2022",
-		"verbatimModuleSyntax": false,
-		"types": ["svelte", "node", "bun-types", "vitest/globals"]
-	},
-	"include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.svelte"],
-	"exclude": [
-		"src/demo/**",
-		"src/tests/**",
-		"src/test-integration.ts",
-		"dist/**",
-		"src/**/*.test.ts",
-		"src/**/*.spec.ts",
-		"src/**/__tests__/**",
-		"src/services/epub-integration/vendor/**"
-	]
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "verbatimModuleSyntax": false,
+    "types": [
+      "svelte",
+      "node"
+    ]
+  },
+  "include": [
+    "src/**/*.d.ts",
+    "src/**/*.ts",
+    "src/**/*.svelte"
+  ],
+  "exclude": [
+    "src/demo/**",
+    "src/tests/**",
+    "src/test-integration.ts",
+    "dist/**",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/__tests__/**",
+    "src/services/epub-integration/vendor/**"
+  ]
 }
