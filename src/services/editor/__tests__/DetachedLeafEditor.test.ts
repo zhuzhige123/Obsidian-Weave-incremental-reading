@@ -42,6 +42,10 @@ vi.mock("obsidian", () => {
 });
 
 import { TFile } from "obsidian";
+import {
+	clearActiveWeaveParentFolder,
+	setActiveWeaveParentFolder,
+} from "../../../config/paths";
 import { DetachedLeafEditor } from "../DetachedLeafEditor";
 
 function normalizeTestPath(path: string): string {
@@ -148,6 +152,7 @@ function createMemoryApp(options?: {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	clearActiveWeaveParentFolder();
 });
 
 describe("DetachedLeafEditor temp file placement", () => {
@@ -230,6 +235,40 @@ describe("DetachedLeafEditor temp file placement", () => {
 		const expectedPath =
 			"Custom IR Root/editor/weave-editor-ir-paragraph-workbench-4.md";
 		expect(files.get(normalizeTestPath(expectedPath))).toBe("pdf-note");
+		expect((editor as any).tempFile?.path).toBe(
+			normalizeTestPath(expectedPath),
+		);
+	});
+
+	it("uses explicit weaveParentFolder option even when app.plugins is empty", async () => {
+		const { app, files } = createMemoryApp();
+		const editor = new DetachedLeafEditor(app, document.createElement("div"), {
+			sessionId: "session-explicit",
+			weaveParentFolder: "显式IR根",
+			value: "explicit",
+		});
+
+		await (editor as any).prepareTempFile();
+
+		const expectedPath = "显式IR根/editor/weave-editor-session-explicit.md";
+		expect(files.get(normalizeTestPath(expectedPath))).toBe("explicit");
+		expect((editor as any).tempFile?.path).toBe(
+			normalizeTestPath(expectedPath),
+		);
+	});
+
+	it("uses registered weaveParentFolder when option is omitted", async () => {
+		setActiveWeaveParentFolder("登记IR根");
+		const { app, files } = createMemoryApp();
+		const editor = new DetachedLeafEditor(app, document.createElement("div"), {
+			sessionId: "session-registered",
+			value: "registered",
+		});
+
+		await (editor as any).prepareTempFile();
+
+		const expectedPath = "登记IR根/editor/weave-editor-session-registered.md";
+		expect(files.get(normalizeTestPath(expectedPath))).toBe("registered");
 		expect((editor as any).tempFile?.path).toBe(
 			normalizeTestPath(expectedPath),
 		);

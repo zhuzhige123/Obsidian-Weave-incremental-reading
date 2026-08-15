@@ -38,8 +38,83 @@ type AppWithPluginAccess = {
 	};
 	plugins?: {
 		getPlugin?: (pluginId: string) => PluginFolderSettings | null | undefined;
+		plugins?: Record<string, PluginFolderSettings | null | undefined>;
 	};
 };
+
+/**
+ * 运行时已登记的 IR 数据父目录（由主插件 load/save settings 写入）。
+ * 编辑器临时文件等路径解析优先使用该值，避免依赖 app.plugins 反射。
+ */
+let registeredWeaveParentFolder: string | undefined;
+
+/** 主插件在 loadSettings / saveSettings 后调用。 */
+export function setActiveWeaveParentFolder(parentFolder?: string): void {
+	registeredWeaveParentFolder = normalizeWeaveParentFolder(parentFolder);
+}
+
+/** 插件卸载时清理，避免热重载/测试串扰。 */
+export function clearActiveWeaveParentFolder(): void {
+	registeredWeaveParentFolder = undefined;
+}
+
+function readLooseProperty(value: unknown, key: string): unknown {
+	if (typeof value !== "object" || value === null) {
+		return undefined;
+	}
+	try {
+		return Reflect.get(value, key);
+	} catch {
+		return undefined;
+	}
+}
+
+function readLooseString(value: unknown, key: string): string | undefined {
+	const raw = readLooseProperty(value, key);
+	return typeof raw === "string" ? raw : undefined;
+}
+
+/**
+ * 解析用户配置的 IR 数据父文件夹。
+ * 优先级：主动登记值 → plugins.plugins[id] → getPlugin(id)
+ */
+export function resolveWeaveParentFolderFromApp(
+	app?: App | AppWithPluginAccess,
+): string {
+	if (registeredWeaveParentFolder !== undefined) {
+		return registeredWeaveParentFolder;
+	}
+
+	try {
+		const pluginId = getActivePluginId();
+		const pluginsContainer = readLooseProperty(app, "plugins");
+		const pluginsMap = readLooseProperty(pluginsContainer, "plugins");
+		const getPlugin = readLooseProperty(pluginsContainer, "getPlugin");
+
+		const fromMap =
+			pluginsMap && typeof pluginsMap === "object"
+				? (readLooseProperty(pluginsMap, pluginId) ??
+					readLooseProperty(pluginsMap, EMBEDDED_WEAVE_PLUGIN_ID))
+				: undefined;
+		const fromGetter =
+			typeof getPlugin === "function"
+				? ((Reflect.apply(getPlugin, pluginsContainer, [pluginId]) as
+						| PluginFolderSettings
+						| null
+						| undefined) ??
+					(Reflect.apply(getPlugin, pluginsContainer, [
+						EMBEDDED_WEAVE_PLUGIN_ID,
+					]) as PluginFolderSettings | null | undefined))
+				: undefined;
+		const plugin = fromMap ?? fromGetter;
+		const settings = readLooseProperty(plugin, "settings");
+		return normalizeWeaveParentFolder(
+			readLooseString(settings, "weaveParentFolder"),
+		);
+	} catch {
+		return "";
+	}
+}
 
 /**
  * Compatibility note: 旧 Weave 系列共用 Vault 数据根（`weave/`）。
@@ -208,17 +283,7 @@ export function getV2Paths(parentFolder?: string) {
 }
 
 export function getV2PathsFromApp(app?: App | AppWithPluginAccess) {
-	try {
-		const pluginHost = app as AppWithPluginAccess | undefined;
-		const pluginId = getActivePluginId();
-		const plugin =
-			pluginHost?.plugins?.getPlugin?.(pluginId) ??
-			pluginHost?.plugins?.getPlugin?.(EMBEDDED_WEAVE_PLUGIN_ID);
-		const parentFolder = plugin?.settings?.weaveParentFolder;
-		return getV2Paths(parentFolder);
-	} catch {
-		return getV2Paths(undefined);
-	}
+	return getV2Paths(resolveWeaveParentFolderFromApp(app));
 }
 
 export function getLegacyIRImportFolder(parentFolder?: string): string {

@@ -84,7 +84,7 @@ const SEARCH_ENTRIES: readonly StandaloneIRSettingsSearchEntry[] = [
 	{
 		tab: "about",
 		nameKey: "irSettings.standalone.tabs.about",
-		aliases: ["about", "version", "docs"],
+		aliases: ["about", "version", "website", "官网"],
 	},
 ];
 

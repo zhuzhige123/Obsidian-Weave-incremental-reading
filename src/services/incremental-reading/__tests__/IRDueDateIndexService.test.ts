@@ -109,4 +109,40 @@ describe("IRDueDateIndexService warmDiskCache", () => {
 			".obsidian/plugins/weave-incremental-reading/cache/incremental-reading/ir-due-date-index.json";
 		expect(store.has(diskPath)).toBe(true);
 	});
+
+	it("skips rewrite when rebuilt due-index payload matches disk", async () => {
+		const nextRep = Date.parse("2026-07-16T12:00:00.000Z");
+		const dateKey = formatDueDateKeyFromTimestamp(nextRep)!;
+		const diskPath =
+			".obsidian/plugins/weave-incremental-reading/cache/incremental-reading/ir-due-date-index.json";
+		const { app, store } = createMemoryApp({
+			[diskPath]: JSON.stringify(
+				{
+					version: "1.0.0",
+					updatedAt: "2026-01-01T00:00:00.000Z",
+					byDate: { [dateKey]: ["chunk-1"] },
+					byPointId: { "chunk-1": dateKey },
+				},
+				null,
+				2,
+			),
+		});
+		const service = new IRDueDateIndexService(app);
+		const write = (app.vault.adapter as any).write as ReturnType<typeof vi.fn>;
+		write.mockClear();
+
+		await service.rebuildFromWarmScheduleSources({
+			chunks: [
+				{
+					chunkId: "chunk-1",
+					nextRepDate: nextRep,
+				} as any,
+			],
+			pdfTasks: [],
+			epubTasks: [],
+		});
+
+		expect(write).not.toHaveBeenCalled();
+		expect(store.get(diskPath)).toContain('"chunk-1"');
+	});
 });

@@ -20,6 +20,7 @@ import { recomputeAndBroadcastIRData } from "./IRScheduleRefreshService";
 import { IRStorageService } from "./IRStorageService";
 import { IRV4SchedulerService } from "./IRV4SchedulerService";
 import type { ExistingChunkLike } from "./folder-subscription-sync-state";
+import { FOLDER_SUBSCRIPTION_PENDING_ADMISSION_NEXT_REP_DATE } from "./IRFolderSubscriptionAdmissionService";
 import { IR_WEB_CHUNK_META_URL_KEY } from "./ir-web-reading-point";
 
 export interface IRSelectionQuickCreatePreferencesLike {
@@ -54,6 +55,13 @@ export interface IREnsureExternalDocumentChunkScheduledOptions {
 	/** 指定排期日期（当天 0 点），优先于 pinToToday */
 	scheduleDate?: Date;
 	pinToToday?: boolean;
+	/**
+	 * 订阅文件夹「按算法正常调度」：入库待放出，不预填 due。
+	 * 与 pinToToday / scheduleDate 互斥；后两者优先。
+	 */
+	pendingAdmission?: boolean;
+	sourceSequenceGroup?: string;
+	sourceSequenceOrder?: number;
 	storage?: IRStorageService;
 	existingChunk?: IRChunkFileData | ExistingChunkLike | null;
 	/** 与笔记 YAML 中 weave-reading-id 一致，用于 point 存储与月历检索关联 */
@@ -482,6 +490,21 @@ export class IRHostSharedService {
 			? todayDateKey
 			: "";
 		const shouldPinSchedule = Boolean(scheduleDate) || pinToToday;
+		const pendingAdmission =
+			!shouldPinSchedule && options?.pendingAdmission === true;
+		const nextSourceSequenceGroup = String(
+			options?.sourceSequenceGroup || "",
+		).trim();
+		const nextSourceSequenceOrder =
+			typeof options?.sourceSequenceOrder === "number" &&
+			Number.isFinite(options.sourceSequenceOrder)
+				? Math.max(1, Math.round(options.sourceSequenceOrder))
+				: undefined;
+		const resolvedNextRepDate = shouldPinSchedule
+			? pinnedStartMs
+			: pendingAdmission
+			? FOLDER_SUBSCRIPTION_PENDING_ADMISSION_NEXT_REP_DATE
+			: now;
 		const deckTag = `#IR_deck_${deckName}`;
 
 		if (existing) {
@@ -494,6 +517,7 @@ export class IRHostSharedService {
 			const existingStatus = String(existing.scheduleStatus || "").trim();
 			const shouldResetDueAt =
 				shouldPinSchedule ||
+				pendingAdmission ||
 				existingStatus === "removed" ||
 				existingStatus === "done" ||
 				existingStatus === "suspended" ||
@@ -523,9 +547,9 @@ export class IRHostSharedService {
 			}
 			if (
 				shouldResetDueAt &&
-				existing.nextRepDate !== (shouldPinSchedule ? pinnedStartMs : now)
+				existing.nextRepDate !== resolvedNextRepDate
 			) {
-				existing.nextRepDate = shouldPinSchedule ? pinnedStartMs : now;
+				existing.nextRepDate = resolvedNextRepDate;
 				changed = true;
 			}
 			if (!existing.intervalDays) {
@@ -559,6 +583,33 @@ export class IRHostSharedService {
 				existingMeta.autoSubscribedFolderPath !== nextAutoSubscribedFolderPath
 			) {
 				existingMeta.autoSubscribedFolderPath = nextAutoSubscribedFolderPath;
+				changed = true;
+			}
+			if (pendingAdmission && existingMeta.pendingFolderAdmission !== true) {
+				existingMeta.pendingFolderAdmission = true;
+				changed = true;
+			}
+			if (
+				shouldPinSchedule &&
+				existingMeta.pendingFolderAdmission !== undefined
+			) {
+				existingMeta.pendingFolderAdmission = undefined;
+				changed = true;
+			}
+			if (
+				pendingAdmission &&
+				nextSourceSequenceGroup &&
+				existingMeta.sourceSequenceGroup !== nextSourceSequenceGroup
+			) {
+				existingMeta.sourceSequenceGroup = nextSourceSequenceGroup;
+				changed = true;
+			}
+			if (
+				pendingAdmission &&
+				typeof nextSourceSequenceOrder === "number" &&
+				existingMeta.sourceSequenceOrder !== nextSourceSequenceOrder
+			) {
+				existingMeta.sourceSequenceOrder = nextSourceSequenceOrder;
 				changed = true;
 			}
 			if (shouldPinSchedule && existingMeta.sourceSequenceLocked !== true) {
@@ -631,7 +682,7 @@ export class IRHostSharedService {
 		chunk.topicTag = deckTag;
 		chunk.deckTag = deckTag;
 		chunk.updatedAt = now;
-		chunk.nextRepDate = shouldPinSchedule ? pinnedStartMs : now;
+		chunk.nextRepDate = resolvedNextRepDate;
 		chunk.meta = {
 			...DEFAULT_IR_BLOCK_META,
 			...(chunk.meta || {}),
@@ -640,6 +691,13 @@ export class IRHostSharedService {
 			...(nextWebUrl ? { [IR_WEB_CHUNK_META_URL_KEY]: nextWebUrl } : {}),
 			...(nextWebSelectionExcerpt ? { notes: nextWebSelectionExcerpt } : {}),
 			...(readingMaterialId ? { readingMaterialId } : {}),
+			...(pendingAdmission ? { pendingFolderAdmission: true } : {}),
+			...(pendingAdmission && nextSourceSequenceGroup
+				? { sourceSequenceGroup: nextSourceSequenceGroup }
+				: {}),
+			...(pendingAdmission && typeof nextSourceSequenceOrder === "number"
+				? { sourceSequenceOrder: nextSourceSequenceOrder }
+				: {}),
 			...(shouldPinSchedule && pinnedDateKey
 				? {
 						sourceSequenceLocked: true,

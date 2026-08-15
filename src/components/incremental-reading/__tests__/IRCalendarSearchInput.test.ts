@@ -1,4 +1,5 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
+import { TFolder } from "obsidian";
 import { t } from "../../../utils/i18n";
 import IRCalendarSearchInput from "../IRCalendarSearchInput.svelte";
 
@@ -71,6 +72,65 @@ describe("IRCalendarSearchInput", () => {
 		expect(
 			container.querySelector(".weave-card-search-dropdown-panel"),
 		).not.toBeInTheDocument();
+	});
+
+	it("mounts official SearchComponent for the main search and folder suggestion panel", async () => {
+		const root = new TFolder("/");
+		const notes = new TFolder("Notes");
+		root.children.push(notes);
+
+		const { container } = render(IRCalendarSearchInput, {
+			props: {
+				app: {
+					vault: {
+						getRoot: () => root,
+					},
+				} as any,
+			},
+		});
+
+		const mainHost = container.querySelector(".weave-ir-search-host");
+		expect(mainHost).toBeTruthy();
+		expect(mainHost?.querySelector(".search-input-container")).toBeTruthy();
+		expect(mainHost?.querySelector(".search-input-clear-button")).toBeTruthy();
+
+		const input = container.querySelector(
+			".weave-ir-search-host .search-input",
+		) as HTMLInputElement;
+		await fireEvent.focus(input);
+
+		await waitFor(() => {
+			expect(
+				document.body.querySelector(".floating-menu.card-search-floating-menu"),
+			).toBeInTheDocument();
+		});
+
+		const folderOption = Array.from(
+			document.body.querySelectorAll(".dropdown-item"),
+		).find((element) =>
+			element.textContent?.includes(t("management.cardSearch.options.folder")),
+		);
+		expect(folderOption).toBeTruthy();
+		await fireEvent.mouseDown(folderOption!);
+
+		await waitFor(() => {
+			const panel = document.body.querySelector(
+				".floating-menu.card-search-floating-menu .search-suggestion-panel",
+			);
+			expect(panel).toBeInTheDocument();
+			expect(panel?.querySelector(".suggestion-search-input")).toBeNull();
+			expect(
+				panel?.querySelector(
+					".weave-ir-suggestion-search-host .search-input-container",
+				),
+			).toBeTruthy();
+			expect(
+				panel?.querySelector(
+					".weave-ir-suggestion-search-host .search-input-clear-button",
+				),
+			).toBeTruthy();
+			expect(panel?.textContent).toContain("Notes");
+		});
 	});
 
 	it("opens a tag list like topics and filters it from the main search input", async () => {

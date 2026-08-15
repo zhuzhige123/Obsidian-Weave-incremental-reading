@@ -4,6 +4,7 @@ import {
 	collectMarkdownFilesForFolderSubscriptionRules,
 	isFolderSubscriptionMarkdownFile,
 	isFolderSubscriptionMarkdownPath,
+	resolveMarkdownFilesForFolderSubscriptionPaths,
 } from "../folder-subscription-vault-scan";
 
 function createFile(path: string, extension: string): TFile {
@@ -153,5 +154,33 @@ describe("collectMarkdownFilesForFolderSubscriptionRules", () => {
 		]);
 
 		expect(files.map((file) => file.path)).toEqual(["note.md"]);
+	});
+});
+
+describe("resolveMarkdownFilesForFolderSubscriptionPaths", () => {
+	it("resolves existing markdown paths and ignores missing or non-md", () => {
+		const article = createMarkdownFile("Inbox/article.md");
+		const image = createFile("Inbox/cover.png", "png");
+		const byPath: Record<string, TFile> = {
+			"Inbox/article.md": article,
+			"Inbox/cover.png": image,
+		};
+
+		const app = {
+			vault: {
+				configDir: ".obsidian",
+				getAbstractFileByPath: vi.fn((path: string) => byPath[path] || null),
+			},
+		} as any;
+
+		const files = resolveMarkdownFilesForFolderSubscriptionPaths(app, [
+			"Inbox/article.md",
+			"Inbox/article.md",
+			"Inbox/cover.png",
+			"Inbox/missing.md",
+			".obsidian/plugins/x/readme.md",
+		]);
+
+		expect(files.map((file) => file.path)).toEqual(["Inbox/article.md"]);
 	});
 });

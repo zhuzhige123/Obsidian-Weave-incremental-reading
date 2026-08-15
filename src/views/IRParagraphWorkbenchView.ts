@@ -4,6 +4,7 @@ import type { WeavePlugin } from "../main";
 import { IR_RUNTIME } from "../services/incremental-reading/ir-runtime";
 import type { ParagraphWorkbenchOpenInput } from "../services/incremental-reading/paragraph-workbench/types";
 import { labelParagraphWorkbenchSurface } from "../services/incremental-reading/paragraph-workbench/paragraph-workbench-maturity";
+import { renderBouncingBallsLoading } from "../utils/bouncing-balls-loading";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 import { getViewSurfaceTokens } from "../utils/view-location-utils";
@@ -84,9 +85,9 @@ export class IRParagraphWorkbenchView extends ItemView {
 		contentEl.empty();
 		contentEl.addClass("weave-ir-paragraph-workbench-view");
 		this.applySurfaceContext();
-		contentEl.createDiv({
-			cls: "weave-calendar-loading",
-			text: i18n.t("irViews.workbench.loading"),
+		renderBouncingBallsLoading(contentEl, {
+			message: i18n.t("irViews.workbench.loading"),
+			className: "weave-calendar-loading",
 		});
 		void this.loadComponentAsync();
 	}

@@ -1,0 +1,218 @@
+/* Weave bouncing-balls loading placeholder (shared with main plugin feel). */
+
+.bouncing-balls-loader {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1.5rem;
+	padding: 3rem 2rem;
+	width: 100%;
+	height: 100%;
+	min-height: 220px;
+	box-sizing: border-box;
+}
+
+.bouncing-balls-loader--compact {
+	gap: 0.5rem;
+	padding: 0;
+	width: auto;
+	height: auto;
+	min-height: 0;
+}
+
+.bouncing-balls-loader__wrapper {
+	width: 200px;
+	height: 60px;
+	position: relative;
+	z-index: 1;
+}
+
+.bouncing-balls-loader--compact .bouncing-balls-loader__wrapper {
+	width: 84px;
+	height: 28px;
+}
+
+.bouncing-balls-loader__circle {
+	width: 20px;
+	height: 20px;
+	position: absolute;
+	border-radius: 50%;
+	background-color: var(--interactive-accent);
+	left: 15%;
+	transform-origin: 50%;
+	animation: weave-bouncing-circle 0.5s alternate infinite ease;
+}
+
+.bouncing-balls-loader--compact .bouncing-balls-loader__circle {
+	width: 10px;
+	height: 10px;
+	animation-name: weave-bouncing-circle-compact;
+}
+
+.bouncing-balls-loader__circle:nth-child(2) {
+	left: 45%;
+	animation-delay: 0.2s;
+}
+
+.bouncing-balls-loader__circle:nth-child(3) {
+	left: auto;
+	right: 15%;
+	animation-delay: 0.3s;
+}
+
+.bouncing-balls-loader__shadow {
+	width: 20px;
+	height: 4px;
+	border-radius: 50%;
+	background-color: color-mix(in srgb, var(--text-muted) 35%, transparent);
+	position: absolute;
+	top: 62px;
+	transform-origin: 50%;
+	z-index: -1;
+	left: 15%;
+	filter: blur(1px);
+	animation: weave-bouncing-shadow 0.5s alternate infinite ease;
+}
+
+.bouncing-balls-loader--compact .bouncing-balls-loader__shadow {
+	width: 10px;
+	height: 2px;
+	top: 30px;
+	animation-name: weave-bouncing-shadow-compact;
+}
+
+.bouncing-balls-loader__shadow:nth-child(4) {
+	left: 45%;
+	animation-delay: 0.2s;
+}
+
+.bouncing-balls-loader__shadow:nth-child(5) {
+	left: auto;
+	right: 15%;
+	animation-delay: 0.3s;
+}
+
+.bouncing-balls-loader__message {
+	font-size: var(--font-ui-small, 0.875rem);
+	color: var(--text-muted);
+	font-weight: 500;
+	text-align: center;
+	line-height: 1.45;
+	max-width: min(280px, 100%);
+	animation: weave-bouncing-message-pulse 2s ease-in-out infinite;
+}
+
+.bouncing-balls-loader--compact .bouncing-balls-loader__message {
+	font-size: var(--font-ui-smaller, 0.75rem);
+}
+
+@keyframes weave-bouncing-circle {
+	0% {
+		top: 60px;
+		height: 5px;
+		border-radius: 50px 50px 25px 25px;
+		transform: scaleX(1.7);
+	}
+
+	40% {
+		height: 20px;
+		border-radius: 50%;
+		transform: scaleX(1);
+	}
+
+	100% {
+		top: 0%;
+	}
+}
+
+@keyframes weave-bouncing-circle-compact {
+	0% {
+		top: 28px;
+		height: 3px;
+		border-radius: 50px 50px 25px 25px;
+		transform: scaleX(1.7);
+	}
+
+	40% {
+		height: 10px;
+		border-radius: 50%;
+		transform: scaleX(1);
+	}
+
+	100% {
+		top: 0%;
+	}
+}
+
+@keyframes weave-bouncing-shadow {
+	0% {
+		transform: scaleX(1.5);
+	}
+
+	40% {
+		transform: scaleX(1);
+		opacity: 0.7;
+	}
+
+	100% {
+		transform: scaleX(0.2);
+		opacity: 0.4;
+	}
+}
+
+@keyframes weave-bouncing-shadow-compact {
+	0% {
+		transform: scaleX(1.5);
+	}
+
+	40% {
+		transform: scaleX(1);
+		opacity: 0.7;
+	}
+
+	100% {
+		transform: scaleX(0.2);
+		opacity: 0.4;
+	}
+}
+
+@keyframes weave-bouncing-message-pulse {
+	0%,
+	100% {
+		opacity: 0.6;
+	}
+
+	50% {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bouncing-balls-loader__circle,
+	.bouncing-balls-loader__shadow,
+	.bouncing-balls-loader__message {
+		animation: none;
+	}
+
+	.bouncing-balls-loader__circle {
+		top: 20px;
+		height: 20px;
+		border-radius: 50%;
+		transform: none;
+	}
+
+	.bouncing-balls-loader--compact .bouncing-balls-loader__circle {
+		top: 9px;
+		height: 10px;
+	}
+
+	.bouncing-balls-loader__shadow {
+		opacity: 0.45;
+		transform: none;
+	}
+
+	.bouncing-balls-loader__message {
+		opacity: 0.85;
+	}
+}

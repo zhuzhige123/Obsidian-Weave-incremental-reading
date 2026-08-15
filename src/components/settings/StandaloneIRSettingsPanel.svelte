@@ -29,6 +29,8 @@
   const QQ_PUBLIC_GROUP_URL = "https://qm.qq.com/q/9uyMPAFLXO";
   const OTHER_GROUPS_DOCS_URL =
     "https://iwi05cktlph.feishu.cn/wiki/GJiZwgcU8icgF9k8p3pcVAjcngg";
+  const WEAVE_WEBSITE_URL =
+    "https://zhuzhige123.github.io/obsidian-weave-website/#pricing";
 
   interface Props {
     plugin: IncrementalReadingSettingsHost;
@@ -87,11 +89,24 @@
 
   let pluginVersion = $derived.by(() => plugin.manifest?.version || "-");
   let pluginDisplayName = $derived.by(() => plugin.manifest?.name ?? "Weave Incremental Reading");
+  let pluginDisplayVersion = $derived.by(() =>
+    pluginVersion === "-" ? pluginVersion : `v${pluginVersion}`,
+  );
   let supportedFormats = $derived([
     t("irSettings.standalone.supportedFormats.markdown"),
     t("irSettings.standalone.supportedFormats.pdfBookmark"),
     t("irSettings.standalone.supportedFormats.epubSource"),
     t("irSettings.standalone.supportedFormats.canvas"),
+  ]);
+  let aboutOverviewItems = $derived.by(() => [
+    {
+      label: t("irSettings.standalone.about.supportedFormats"),
+      value: supportedFormats.join(" / "),
+    },
+    {
+      label: t("irSettings.standalone.about.overview"),
+      value: t("irSettings.standalone.about.overviewValue"),
+    },
   ]);
   type ContactLinkItem = {
     kind: "link";
@@ -107,8 +122,8 @@
   let contactItems = $derived<ContactItem[]>([
     {
       kind: "link",
-      label: t("irSettings.standalone.about.contacts.docs"),
-      href: "https://iwi05cktlph.feishu.cn/wiki/CGhIwP51giW3BVknZq2c8r6Wnef",
+      label: t("irSettings.standalone.about.contacts.website"),
+      href: WEAVE_WEBSITE_URL,
     },
     {
       kind: "link",
@@ -389,42 +404,46 @@
       <section class="standalone-ir-settings-section standalone-ir-settings-section--about">
         <div class="standalone-ir-settings-group">
           <div class="standalone-ir-settings-group-header">
-            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-cyan">{t("irSettings.standalone.about.pluginInfoTitle")}</h3>
-            <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.about.pluginInfoDesc")}</p>
+            <h3 class="standalone-ir-settings-group-title with-accent-bar accent-cyan">{t("irSettings.standalone.about.panelTitle")}</h3>
+            <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.about.panelDescription")}</p>
           </div>
 
           <div class="standalone-ir-about-overview-list">
-            <div class="standalone-ir-about-overview-section-label">{t("irSettings.standalone.about.basicInfoSection")}</div>
-
+            <div class="standalone-ir-about-overview-section-label">{t("irSettings.standalone.about.pluginInfo")}</div>
             <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.name")}</div>
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.pluginName")}</div>
               <div class="standalone-ir-about-overview-value">{pluginDisplayName}</div>
             </div>
-
             <div class="standalone-ir-about-overview-item">
               <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.version")}</div>
-              <div class="standalone-ir-about-overview-value">v{pluginVersion}</div>
+              <div class="standalone-ir-about-overview-value">{pluginDisplayVersion}</div>
+            </div>
+            <div class="standalone-ir-about-overview-item">
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.series")}</div>
+              <div class="standalone-ir-about-overview-value">{t("irSettings.standalone.about.seriesValue")}</div>
+            </div>
+            <div class="standalone-ir-about-overview-item">
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.platform")}</div>
+              <div class="standalone-ir-about-overview-value">{t("irSettings.standalone.about.platformValue")}</div>
+            </div>
+            <div class="standalone-ir-about-overview-item">
+              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.licensedDevices")}</div>
+              <div class="standalone-ir-about-overview-value">{t("irSettings.standalone.about.licensedDevicesValue")}</div>
             </div>
 
-            <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.positioning")}</div>
-              <div class="standalone-ir-about-overview-value">{t("irSettings.standalone.about.positioningValue")}</div>
+            <div class="standalone-ir-about-overview-section-label standalone-ir-about-overview-section-label--separated">
+              {t("irSettings.standalone.about.capabilityOverview")}
             </div>
-
-            <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.collaboration")}</div>
-              <div class="standalone-ir-about-overview-value">{t("irSettings.standalone.about.collaborationValue")}</div>
-            </div>
-
-            <div class="standalone-ir-about-overview-section-label standalone-ir-about-overview-section-label--separated">{t("irSettings.standalone.about.capabilitiesSection")}</div>
-            <div class="standalone-ir-about-overview-item">
-              <div class="standalone-ir-about-overview-label">{t("irSettings.standalone.about.supportScope")}</div>
-              <div class="standalone-ir-about-overview-value">{supportedFormats.join(" / ")}</div>
-            </div>
+            {#each aboutOverviewItems as item}
+              <div class="standalone-ir-about-overview-item">
+                <div class="standalone-ir-about-overview-label">{item.label}</div>
+                <div class="standalone-ir-about-overview-value">{item.value}</div>
+              </div>
+            {/each}
           </div>
         </div>
 
-        <div class="standalone-ir-settings-group">
+        <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
           <div class="standalone-ir-settings-group-header">
             <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.about.contactsTitle")}</h3>
           </div>
@@ -511,10 +530,14 @@
     min-width: 0;
   }
 
+  .standalone-ir-settings-section--about > .standalone-ir-settings-group {
+    gap: var(--standalone-ir-space-1);
+  }
+
   .standalone-ir-settings-group--panel {
     padding: var(--standalone-ir-space-4);
     border: 1px solid var(--background-modifier-border);
-    border-radius: var(--standalone-ir-radius-l);
+    border-radius: 18px;
     background: color-mix(in oklab, var(--background-primary), var(--background-secondary) 26%);
     gap: var(--standalone-ir-space-3);
   }
@@ -527,6 +550,11 @@
     display: flex;
     flex-direction: column;
     gap: var(--standalone-ir-space-1);
+  }
+
+  .standalone-ir-settings-section--about .standalone-ir-settings-group-header {
+    gap: 0.35rem;
+    padding-bottom: 0.4rem;
   }
 
   .standalone-ir-settings-group-title {
@@ -730,13 +758,13 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--background-modifier-border);
-    border-radius: var(--standalone-ir-radius-m);
+    border-radius: var(--radius-m, 12px);
     background: var(--background-secondary);
     overflow: hidden;
   }
 
   .standalone-ir-about-overview-section-label {
-    padding: var(--standalone-ir-space-3) var(--standalone-ir-space-4);
+    padding: 0.75rem 1.25rem;
     color: var(--text-muted);
     font-size: var(--standalone-ir-font-size-desc);
     font-weight: 600;
@@ -751,8 +779,8 @@
   .standalone-ir-about-overview-item {
     display: grid;
     grid-template-columns: minmax(7.5rem, 10rem) minmax(0, 1fr);
-    gap: var(--standalone-ir-space-4);
-    padding: var(--standalone-ir-space-4) var(--standalone-ir-space-4);
+    gap: 1rem;
+    padding: 1rem 1.25rem;
   }
 
   .standalone-ir-about-overview-item + .standalone-ir-about-overview-item {
@@ -762,17 +790,19 @@
   .standalone-ir-about-overview-label {
     color: var(--text-normal);
     font-weight: 600;
+    font-size: var(--standalone-ir-font-size-label);
     line-height: 1.5;
   }
 
   .standalone-ir-about-overview-value {
     color: var(--text-muted);
+    font-size: var(--standalone-ir-font-size-desc);
     line-height: 1.65;
   }
 
   .standalone-ir-about-links {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--standalone-ir-space-1) var(--standalone-ir-space-3);
     width: 100%;
   }
@@ -785,9 +815,9 @@
     width: 100%;
     height: auto;
     min-height: 0;
-    padding: var(--standalone-ir-space-2) var(--standalone-ir-space-2);
+    padding: 0.4rem 0.45rem;
     border: none;
-    border-radius: var(--clickable-icon-radius, var(--standalone-ir-radius-s));
+    border-radius: var(--radius-m, 8px);
     background: transparent;
     color: var(--text-muted);
     font: inherit;

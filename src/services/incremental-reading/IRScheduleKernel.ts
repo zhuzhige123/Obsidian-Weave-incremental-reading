@@ -29,6 +29,7 @@ import type { IRDailyLoadDayStats } from "./IRDailyLoadAllocator";
 import type { IREpubBookmarkTask } from "./IREpubBookmarkTaskService";
 import { IREpubBookmarkTaskService } from "./IREpubBookmarkTaskService";
 import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
+import { admitPendingFolderSubscriptionChunks, isFolderSubscriptionChunkPendingAdmission } from "./IRFolderSubscriptionAdmissionService";
 import type { IRPdfBookmarkTask } from "./IRPdfBookmarkTaskService";
 import { IRPdfBookmarkTaskService } from "./IRPdfBookmarkTaskService";
 import { IRPlanGeneratorService } from "./IRPlanGeneratorService";
@@ -524,6 +525,29 @@ export class IRScheduleKernel {
 
 		const planningSettings = this.getPlanningSettingsSnapshot();
 		const leanSchedule = options?.leanSchedule === true;
+		const todayStart = new Date();
+		todayStart.setHours(0, 0, 0, 0);
+		const todayDateKey = `${todayStart.getFullYear()}-${String(
+			todayStart.getMonth() + 1,
+		).padStart(2, "0")}-${String(todayStart.getDate()).padStart(2, "0")}`;
+		try {
+			await admitPendingFolderSubscriptionChunks({
+				app: this.app,
+				storage: this.storage,
+				todayStartMs: todayStart.getTime(),
+				todayDateKey,
+				dailyReadingPointCap: planningSettings.dailyReadingPointCap,
+				dailyTimeBudgetMinutes: planningSettings.dailyTimeBudgetMinutes,
+				maxEstimatedMinutesPerItem:
+					planningSettings.maxEstimatedMinutesPerItem,
+				deckIds: requestedDeckIds,
+			});
+		} catch (error) {
+			logger.warn(
+				"[IRScheduleKernel] 订阅文件夹每日准入失败，继续使用现有调度候选:",
+				error,
+			);
+		}
 		const readingMaterials = leanSchedule
 			? []
 			: await this.getReadingMaterials();
@@ -534,8 +558,7 @@ export class IRScheduleKernel {
 		const { chunks, pdfTasks, epubTasks } = await this.loadScheduleCandidates();
 
 		const candidates: IRPlannedScheduleItem[] = [];
-		const now = new Date();
-		now.setHours(0, 0, 0, 0);
+		const now = todayStart;
 		const nowMs = now.getTime();
 
 		for (const chunk of chunks) {
@@ -943,6 +966,12 @@ export class IRScheduleKernel {
 	): IRPlannedScheduleItem | null {
 		const scheduleStatus = String(chunk.scheduleStatus || "new");
 		if (!includeInactive && this.isInactiveScheduleStatus(scheduleStatus)) {
+			return null;
+		}
+		if (
+			!includeInactive &&
+			isFolderSubscriptionChunkPendingAdmission(chunk)
+		) {
 			return null;
 		}
 

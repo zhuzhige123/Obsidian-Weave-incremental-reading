@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { App } from "obsidian";
+  import { SearchComponent } from "obsidian";
   import { untrack } from "svelte";
   import { FolderSuggest } from "../../utils/FolderSuggest";
 
@@ -25,10 +26,73 @@
 
   let draft = $state(untrack(() => value));
   let inputEl = $state<HTMLInputElement | null>(null);
+  let searchHostEl = $state<HTMLDivElement | null>(null);
+  let searchComponent: SearchComponent | null = null;
+  let suppressSearchChange = false;
   let suggest: FolderSuggest | null = null;
+
+  function syncSearchComponentValue(nextValue: string): void {
+    if (!searchComponent) {
+      return;
+    }
+    if (searchComponent.getValue() === nextValue) {
+      return;
+    }
+    suppressSearchChange = true;
+    searchComponent.setValue(nextValue);
+    suppressSearchChange = false;
+  }
 
   $effect(() => {
     draft = value;
+    syncSearchComponentValue(value);
+  });
+
+  $effect(() => {
+    const host = searchHostEl;
+    if (!host) {
+      return;
+    }
+
+    host.replaceChildren();
+    const search = new SearchComponent(host);
+    searchComponent = search;
+    inputEl = search.inputEl;
+
+    untrack(() => {
+      search.setPlaceholder(placeholder || "");
+      search.setValue(draft || "");
+    });
+
+    search.onChange((nextValue) => {
+      if (suppressSearchChange) {
+        return;
+      }
+      draft = nextValue;
+      onInput?.(nextValue);
+    });
+
+    search.inputEl.spellcheck = false;
+    search.inputEl.addEventListener("focus", handleFocus);
+    search.inputEl.addEventListener("blur", handleBlur);
+    search.inputEl.addEventListener("keydown", handleKeydown);
+
+    return () => {
+      search.inputEl.removeEventListener("focus", handleFocus);
+      search.inputEl.removeEventListener("blur", handleBlur);
+      search.inputEl.removeEventListener("keydown", handleKeydown);
+      if (inputEl === search.inputEl) {
+        inputEl = null;
+      }
+      if (searchComponent === search) {
+        searchComponent = null;
+      }
+      host.replaceChildren();
+    };
+  });
+
+  $effect(() => {
+    searchComponent?.setPlaceholder(placeholder || "");
   });
 
   $effect(() => {
@@ -68,32 +132,15 @@
     if (event.key === "Escape") {
       const resetValue = savedValue;
       draft = resetValue;
+      syncSearchComponentValue(resetValue);
       onInput?.(resetValue);
       inputEl?.blur();
     }
   }
-
-  function handleInput(event: Event): void {
-    const nextValue = (event.currentTarget as HTMLInputElement).value;
-    draft = nextValue;
-    onInput?.(nextValue);
-  }
 </script>
 
 <div class="folder-search-input-host {className}">
-  <div class="search-input-container">
-    <input
-      bind:this={inputEl}
-      type="search"
-      spellcheck="false"
-      {placeholder}
-      value={draft}
-      oninput={handleInput}
-      onfocus={handleFocus}
-      onblur={handleBlur}
-      onkeydown={handleKeydown}
-    />
-  </div>
+  <div class="folder-search-component-host" bind:this={searchHostEl}></div>
 </div>
 
 <style>
@@ -102,12 +149,19 @@
     max-width: 100%;
   }
 
-  .folder-search-input-host .search-input-container {
+  .folder-search-component-host {
     width: 100%;
     max-width: 100%;
   }
 
-  .folder-search-input-host input[type="search"] {
+  .folder-search-component-host :global(.search-input-container) {
     width: 100%;
+    max-width: 100%;
+  }
+
+  .folder-search-component-host :global(.search-input-clear-button) {
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
 </style>

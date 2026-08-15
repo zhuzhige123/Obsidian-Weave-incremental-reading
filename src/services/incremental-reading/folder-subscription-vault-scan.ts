@@ -140,6 +140,39 @@ export function collectMarkdownFilesForFolderSubscriptionRules(
 	return collected;
 }
 
+/**
+ * 将 vault 事件收集到的路径解析为仍存在的 Markdown TFile（去重）。
+ * 用于 file-change 增量同步，避免整棵订阅树重扫。
+ */
+export function resolveMarkdownFilesForFolderSubscriptionPaths(
+	app: App,
+	filePaths: string[],
+): TFile[] {
+	const seenPaths = new Set<string>();
+	const collected: TFile[] = [];
+
+	for (const rawPath of filePaths) {
+		const normalizedPath = normalizePath(String(rawPath || "").trim());
+		if (!normalizedPath || seenPaths.has(normalizedPath)) {
+			continue;
+		}
+		if (!isFolderSubscriptionMarkdownPath(normalizedPath)) {
+			continue;
+		}
+		if (isPathInsideVaultConfigDir(app, normalizedPath)) {
+			continue;
+		}
+		const file = app.vault.getAbstractFileByPath(normalizedPath);
+		if (!isFolderSubscriptionMarkdownFile(file)) {
+			continue;
+		}
+		seenPaths.add(normalizedPath);
+		collected.push(file);
+	}
+
+	return collected;
+}
+
 function hasFolderChildren(
 	file: TAbstractFile,
 ): file is TAbstractFile & { children: TAbstractFile[] } {

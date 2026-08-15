@@ -1,6 +1,8 @@
 <script lang="ts">
+  import BouncingBallsLoader from '../../ui/BouncingBallsLoader.svelte';
   import ObsidianIcon from '../../ui/ObsidianIcon.svelte';
   import IRCalendarMaterialList from '../IRCalendarMaterialList.svelte';
+  import type { ActiveDayReadingListEmptyKind } from '../ir-calendar-selected-date-hydrate';
   import type { IRCalendarMaterialListProps } from '../ir-calendar-sidebar-types';
   import type { ScheduleItem } from '../../../services/incremental-reading/IRCalendarScheduleItem';
 
@@ -17,9 +19,11 @@
     hasActiveSearch: boolean;
     unfilteredSelectedMaterials: ScheduleItem[];
     activeReadingTagFilter: string;
+    activeDayEmptyKind?: ActiveDayReadingListEmptyKind;
     materialListProps: IRCalendarMaterialListProps;
     onClearSearch: () => void;
     onClearTagFilter: () => void;
+    onShowCompletedReadingPoints?: () => void;
   }
 
   let {
@@ -35,9 +39,11 @@
     hasActiveSearch,
     unfilteredSelectedMaterials,
     activeReadingTagFilter,
+    activeDayEmptyKind = 'none',
     materialListProps,
     onClearSearch,
     onClearTagFilter,
+    onShowCompletedReadingPoints,
   }: Props = $props();
 </script>
 
@@ -50,8 +56,13 @@
       aria-valuemin={showReadingListProgress ? 0 : undefined}
       aria-valuemax={showReadingListProgress ? 100 : undefined}
       aria-valuenow={showReadingListProgress ? calendarListLoadProgressPercent : undefined}
+      aria-label={calendarListLoadingMessage}
     >
-      <ObsidianIcon name="loader" size={20} />
+      <BouncingBallsLoader
+        compact
+        showMessage={false}
+        class="loading-state__bounce"
+      />
       <span class="loading-state__message">{calendarListLoadingMessage}</span>
       {#if showReadingListProgress}
         <div class="calendar-load-progress loading-state__progress" aria-hidden="true">
@@ -97,6 +108,27 @@
       <button type="button" class="clickable-icon clear-tag-filter-btn" onclick={onClearTagFilter}>
         {t('irSidebar.calendar.clearTagFilter')}
       </button>
+    </div>
+  {:else if activeDayEmptyKind === 'completed_hidden'}
+    <div class="loading-state history-empty-state" role="status">
+      <ObsidianIcon name="check-circle" size={20} />
+      <span>{t('irSidebar.calendar.completedHiddenEmpty')}</span>
+      <span class="history-empty-state__hint">{t('irSidebar.calendar.completedHiddenEmptyHint')}</span>
+      {#if onShowCompletedReadingPoints}
+        <button
+          type="button"
+          class="clickable-icon clear-tag-filter-btn"
+          onclick={onShowCompletedReadingPoints}
+        >
+          {t('irSidebar.calendar.showCompletedReadingPoints')}
+        </button>
+      {/if}
+    </div>
+  {:else if activeDayEmptyKind === 'day_empty'}
+    <div class="loading-state history-empty-state" role="status">
+      <ObsidianIcon name="calendar" size={20} />
+      <span>{t('irSidebar.calendar.dayEmpty')}</span>
+      <span class="history-empty-state__hint">{t('irSidebar.calendar.dayEmptyHint')}</span>
     </div>
   {/if}
 </div>

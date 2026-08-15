@@ -7,7 +7,6 @@ import type {
 } from "../../types/plugin-settings.d";
 import { readString } from "../../utils/unknown-record";
 import { extractAllTags } from "../../utils/yaml-utils";
-import { spreadBunchedDueDates } from "./IRHorizonLoadPlanner";
 import {
 	getActiveIncrementalReadingFolderSubscriptionRules,
 	resolveIncrementalReadingFolderSubscriptionRuleForFile,
@@ -22,6 +21,7 @@ import {
 import {
 	collectMarkdownFilesForFolderSubscriptionRules,
 	isFolderSubscriptionMarkdownExtension,
+	resolveMarkdownFilesForFolderSubscriptionPaths,
 } from "./folder-subscription-vault-scan";
 import { IR_RUNTIME } from "./ir-runtime";
 
@@ -218,6 +218,13 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 	existingChunks?: ExistingChunkLike[];
 	existingMaterials?: ExistingMaterialLike[];
 	deckNameById?: Record<string, string>;
+	/**
+	 * file-change 增量：只评估这些文件，跳过订阅文件夹整树 walk。
+	 * 传入 path 列表时内部解析为仍存在的 Markdown TFile。
+	 */
+	limitToFilePaths?: string[];
+	/** 已解析的 TFile 列表；与 limitToFilePaths 二选一，优先使用本字段。 */
+	limitToFiles?: TFile[];
 }): Promise<IRFolderSubscriptionScanResult> {
 	const {
 		app,
@@ -225,13 +232,31 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 		existingChunks = [],
 		existingMaterials = [],
 		deckNameById = {},
+		limitToFilePaths,
+		limitToFiles,
 	} = options;
 	const activeRules =
 		getActiveIncrementalReadingFolderSubscriptionRules(settings);
-	const markdownFiles = collectMarkdownFilesForFolderSubscriptionRules(
-		app,
-		activeRules,
-	);
+	const incrementalMode =
+		Array.isArray(limitToFiles) || Array.isArray(limitToFilePaths);
+	const markdownFiles = incrementalMode
+		? (Array.isArray(limitToFiles)
+				? limitToFiles.filter((file) =>
+						isFolderSubscriptionMarkdownExtension(file.extension),
+				  )
+				: resolveMarkdownFilesForFolderSubscriptionPaths(
+						app,
+						limitToFilePaths || [],
+				  )
+		  ).filter((file) =>
+				Boolean(
+					resolveIncrementalReadingFolderSubscriptionRuleForFile(
+						file.path,
+						activeRules,
+					),
+				),
+		  )
+		: collectMarkdownFilesForFolderSubscriptionRules(app, activeRules);
 
 	if (activeRules.length === 0 || markdownFiles.length === 0) {
 		return {
@@ -341,12 +366,12 @@ export async function scanIncrementalReadingFolderSubscriptions(options: {
 export async function applyIncrementalReadingFolderSubscriptionCandidates(options: {
 	candidates: IRFolderSubscriptionCandidate[];
 	pinToToday: boolean;
-	/** 仅 pinToToday=false（按算法正常调度）时生效：批量新材料按 horizon 均摊 due */
-	initialScheduleSpread?: {
-		enabled: boolean;
-		horizonDays: number;
-		anchorMs: number;
-	};
+	/**
+	 * 今日剩余可准入名额（时间 ∩ 条数）。
+	 * 「添加到今天」：先占满剩余，超额进待放出。
+	 * 「按算法正常调度」不依赖此字段（全部待放出，由每日准入消化）。
+	 */
+	remainingTodaySlots?: number;
 	getOrCreateMaterial: (
 		file: TFile,
 		options: {
@@ -366,7 +391,10 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 			autoSubscribedAt: string;
 			autoSubscribedFolderPath: string;
 			pinToToday: boolean;
-			scheduleDate?: Date;
+			/** 入库待放出，不预填未来 due；由每日 cap 剩余名额准入 */
+			pendingAdmission?: boolean;
+			sourceSequenceGroup?: string;
+			sourceSequenceOrder?: number;
 			existingChunk?: ExistingChunkLike | null;
 			readingMaterialId: string;
 		},
@@ -386,33 +414,28 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 	const updatedFiles: string[] = [];
 	const unchangedFiles: string[] = [];
 
-	const pendingNewCandidates = candidates.filter(
-		(candidate) =>
-			candidate.needsSync &&
-			isFolderSubscriptionPendingNewEntry(candidate.syncGaps),
-	);
-	// 「按算法正常调度」(pinToToday=false)：批量新材料按 horizon 均摊 due，避免全堆当天。
-	// 「添加到今天」(pinToToday=true)：全部钉今天，不做跨日摊开。
-	const spreadDateByPath = new Map<string, number>();
-	if (
-		!pinToToday &&
-		options.initialScheduleSpread?.enabled !== false &&
-		pendingNewCandidates.length > 1
-	) {
-		const spread = spreadBunchedDueDates(
-			pendingNewCandidates.map(() => ({
-				nextRepDate: options.initialScheduleSpread?.anchorMs ?? Date.now(),
-			})),
-			Math.max(1, options.initialScheduleSpread?.horizonDays ?? 7),
-			options.initialScheduleSpread?.anchorMs ?? Date.now(),
-		);
-		pendingNewCandidates.forEach((candidate, index) => {
-			const spreadMs = spread[index]?.nextRepDate;
-			if (spreadMs) {
-				spreadDateByPath.set(candidate.file.path, spreadMs);
-			}
-		});
+	// 单一日容量：
+	// - 「按算法正常调度」：全部待放出
+	// - 「添加到今天」：先用尽剩余名额钉今天，超额进待放出
+	const admissionBatchId = `folder-sub-${Date.now()}`;
+	const pendingNewOrderByPath = new Map<string, number>();
+	let pendingNewOrder = 0;
+	for (const candidate of candidates) {
+		if (
+			!candidate.needsSync ||
+			!isFolderSubscriptionPendingNewEntry(candidate.syncGaps)
+		) {
+			continue;
+		}
+		pendingNewOrder += 1;
+		pendingNewOrderByPath.set(candidate.file.path, pendingNewOrder);
 	}
+
+	const remainingTodaySlots = Math.max(
+		0,
+		Math.floor(Number(options.remainingTodaySlots) || 0),
+	);
+	let pinSlotsLeft = pinToToday ? remainingTodaySlots : 0;
 
 	for (const candidate of candidates) {
 		if (!candidate.needsSync) {
@@ -444,11 +467,25 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 				: candidate.hasChunkRecord
 				? ""
 				: new Date().toISOString();
-		const spreadMs = spreadDateByPath.get(candidate.file.path);
-		const scheduleDate =
-			typeof spreadMs === "number" && Number.isFinite(spreadMs)
-				? new Date(spreadMs)
-				: undefined;
+		const isPendingNew = isFolderSubscriptionPendingNewEntry(
+			candidate.syncGaps,
+		);
+		let shouldPinToToday = false;
+		let pendingAdmission = false;
+		if (isPendingNew) {
+			if (!pinToToday) {
+				pendingAdmission = true;
+			} else if (pinSlotsLeft > 0) {
+				shouldPinToToday = true;
+				pinSlotsLeft -= 1;
+			} else {
+				pendingAdmission = true;
+			}
+		} else if (pinToToday) {
+			shouldPinToToday = true;
+		}
+		const sequenceOrder = pendingNewOrderByPath.get(candidate.file.path);
+		const needsSequenceMeta = pendingAdmission || shouldPinToToday;
 		const changed = await ensureChunkScheduled(
 			candidate.file,
 			deckId,
@@ -458,8 +495,12 @@ export async function applyIncrementalReadingFolderSubscriptionCandidates(option
 				autoSubscribedFolderPath: String(
 					candidate.rule.folderPath || "",
 				).trim(),
-				pinToToday: pinToToday && !scheduleDate,
-				scheduleDate,
+				pinToToday: shouldPinToToday,
+				pendingAdmission,
+				sourceSequenceGroup: needsSequenceMeta
+					? `${admissionBatchId}:${String(candidate.rule.id || deckId).trim()}`
+					: undefined,
+				sourceSequenceOrder: needsSequenceMeta ? sequenceOrder : undefined,
 				existingChunk: candidate.existingChunk,
 				readingMaterialId: material.uuid,
 			},

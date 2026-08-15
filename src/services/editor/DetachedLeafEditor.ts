@@ -11,6 +11,9 @@ import {
 	asMarkdownViewInternal,
 	readMarkdownViewScope,
 } from "../../types/markdown-view-internal";
+import {
+	setActiveWeaveParentFolder,
+} from "../../config/paths";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { i18n } from "../../utils/i18n";
 import { logger } from "../../utils/logger";
@@ -29,6 +32,11 @@ export interface DetachedEditorOptions {
 	placeholder?: string;
 	/** @deprecated 不再影响临时文件落盘；临时文件固定写入可配置 IR 数据根下的 editor/ */
 	sourcePath?: string;
+	/**
+	 * 显式 IR 数据父目录（plugin.settings.weaveParentFolder）。
+	 * 传入后临时文件必定落在 `{dataRoot}/editor`，不依赖 app.plugins 反射。
+	 */
+	weaveParentFolder?: string;
 	sessionId?: string;
 	onSubmit?: (editor: DetachedLeafEditor) => void;
 	onEscape?: (editor: DetachedLeafEditor) => void;
@@ -269,8 +277,19 @@ export class DetachedLeafEditor extends Component {
 
 	private async prepareTempFile() {
 		const sessionId = this.options.sessionId || Date.now().toString();
-		// 固定写入 {IR 数据根}/editor/，尊重设置中的 weaveParentFolder，不跟源文件同目录。
-		const folderPath = resolveDetachedEditorTempFolder(this.app);
+		if (this.options.weaveParentFolder !== undefined) {
+			setActiveWeaveParentFolder(this.options.weaveParentFolder);
+		}
+		// 固定写入 {IR 数据根}/editor/，优先用显式传入的 weaveParentFolder。
+		const folderPath = resolveDetachedEditorTempFolder(
+			this.app,
+			undefined,
+			this.options.weaveParentFolder,
+		);
+		logger.debug("[DetachedLeafEditor] 临时目录解析:", {
+			folderPath,
+			weaveParentFolder: this.options.weaveParentFolder ?? null,
+		});
 		const preferredPath = buildDetachedEditorTempFilePath(
 			folderPath,
 			`weave-editor-${sessionId}.md`,

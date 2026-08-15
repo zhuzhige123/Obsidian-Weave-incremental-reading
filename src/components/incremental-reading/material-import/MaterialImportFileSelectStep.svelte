@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { App } from 'obsidian';
+  import { SearchComponent, type App } from 'obsidian';
   import { untrack } from 'svelte';
   import ObsidianIcon from '../../ui/ObsidianIcon.svelte';
   import { tr } from '../../../utils/i18n';
@@ -37,6 +37,9 @@
   let treeData = $state<MaterialImportTreeNode[]>([]);
   let searchQuery = $state('');
   let searchFullTreeReady = $state(false);
+  let searchHostEl = $state<HTMLDivElement | null>(null);
+  let searchComponent: SearchComponent | null = null;
+  let suppressSearchChange = false;
 
   const selectedCount = $derived.by(() => treeHelpers.countSelectedFiles(treeData));
   const filteredTreeData = $derived.by(() => {
@@ -49,6 +52,19 @@
     treeData = treeHelpers.buildTreeChildren(app.vault.getRoot(), false, false);
     searchQuery = '';
     searchFullTreeReady = false;
+    syncSearchComponentValue('');
+  }
+
+  function syncSearchComponentValue(nextValue: string): void {
+    if (!searchComponent) {
+      return;
+    }
+    if (searchComponent.getValue() === nextValue) {
+      return;
+    }
+    suppressSearchChange = true;
+    searchComponent.setValue(nextValue);
+    suppressSearchChange = false;
   }
 
   function handleToggleSelect(node: MaterialImportTreeNode): void {
@@ -72,6 +88,45 @@
     if (open) {
       initializeTree();
     }
+  });
+
+  $effect(() => {
+    const host = searchHostEl;
+    if (!host || !open) {
+      return;
+    }
+
+    host.replaceChildren();
+    const search = new SearchComponent(host);
+    searchComponent = search;
+
+    untrack(() => {
+      search.setPlaceholder(t('irImport.search.placeholder'));
+      search.setValue(searchQuery || '');
+    });
+
+    search.onChange((nextValue) => {
+      if (suppressSearchChange) {
+        return;
+      }
+      searchQuery = nextValue;
+    });
+    search.inputEl.spellcheck = false;
+
+    return () => {
+      if (searchComponent === search) {
+        searchComponent = null;
+      }
+      host.replaceChildren();
+    };
+  });
+
+  $effect(() => {
+    syncSearchComponentValue(searchQuery);
+  });
+
+  $effect(() => {
+    searchComponent?.setPlaceholder(t('irImport.search.placeholder'));
   });
 
   $effect(() => {
@@ -152,18 +207,7 @@
 
 <div class="step-content">
   <div class="search-bar">
-    <ObsidianIcon name="search" size={16} />
-    <input
-      type="text"
-      placeholder={t('irImport.search.placeholder')}
-      bind:value={searchQuery}
-      class="search-input"
-    />
-    {#if searchQuery}
-      <button class="clickable-icon btn-icon-sm" onclick={() => searchQuery = ''}>
-        <ObsidianIcon name="x" size={14} />
-      </button>
-    {/if}
+    <div class="weave-ir-search-host" bind:this={searchHostEl}></div>
   </div>
 
   <div class="toolbar">

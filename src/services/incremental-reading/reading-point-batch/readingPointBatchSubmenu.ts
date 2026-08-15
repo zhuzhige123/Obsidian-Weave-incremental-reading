@@ -127,7 +127,35 @@ export async function populateReadingPointBatchSubmenu(
 	});
 }
 
-async function populateBatchTopicSubmenu(
+/** Shared entry for toolbar / menu callers that run a batch delete or remove. */
+export async function runBatchMenuAction(
+	action: () => Promise<IRReadingPointBatchResult>,
+	onApplied: (() => void) | undefined,
+	operation: "delete" | "remove" | "move-topic",
+): Promise<void> {
+	try {
+		const result = await action();
+		if (result.success > 0) {
+			onApplied?.();
+		}
+	} catch (error) {
+		logger.error(`[readingPointBatchSubmenu] batch ${operation} failed`, error);
+		const noticeKey =
+			operation === "delete"
+				? "irSidebar.notices.deleteFailed"
+				: operation === "remove"
+					? "irSidebar.notices.removeFailed"
+					: null;
+		new Notice(
+			noticeKey
+				? i18n.t(noticeKey)
+				: resolveReadingPointSaveErrorMessage(error),
+			3500,
+		);
+	}
+}
+
+export async function populateBatchTopicSubmenu(
 	submenu: Menu,
 	app: App,
 	targets: ScheduleItem[],
@@ -181,32 +209,5 @@ async function populateBatchTopicSubmenu(
 				.setIcon("alert-triangle")
 				.setDisabled(true);
 		});
-	}
-}
-
-async function runBatchMenuAction(
-	action: () => Promise<IRReadingPointBatchResult>,
-	onApplied: (() => void) | undefined,
-	operation: "delete" | "remove" | "move-topic",
-): Promise<void> {
-	try {
-		const result = await action();
-		if (result.success > 0) {
-			onApplied?.();
-		}
-	} catch (error) {
-		logger.error(`[readingPointBatchSubmenu] batch ${operation} failed`, error);
-		const noticeKey =
-			operation === "delete"
-				? "irSidebar.notices.deleteFailed"
-				: operation === "remove"
-				? "irSidebar.notices.removeFailed"
-				: null;
-		new Notice(
-			noticeKey
-				? i18n.t(noticeKey)
-				: resolveReadingPointSaveErrorMessage(error),
-			3500,
-		);
 	}
 }

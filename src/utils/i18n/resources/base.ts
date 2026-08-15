@@ -33,6 +33,19 @@ export const standaloneBaseTranslations: Record<
 		about: {
 			license: {
 				title: "许可证信息",
+				purchaseLink: "购买永久授权码",
+				purchaseOptionMainland: "中国大陆购买",
+				purchaseOptionPaypal: "PayPal（国际）",
+				purchaseOptionPaypalReader: "EPUB 阅读器激活码",
+				purchaseOptionPaypalSeries: "Weave 系列激活码",
+				purchaseOptionCommunityPromo: "社区宣传兑换",
+				purchaseCommunityPromoTitle: "通过社区宣传兑换激活码",
+				purchaseCommunityPromoBody:
+					"目前插件暂时无法以 PayPal 的方式进行支付购买插件激活码。用户可通过以视频制作或文章撰写的方式，在 Obsidian 论坛、Reddit、Discord 以及其他平台进行宣传，以此通过邮件方式联系开发者并兑换 Weave 系列主激活码或 Weave EPUB Reader 独立激活码；根据实际情况可兑换更多。认为视频制作质量或宣传文章质量足以兑换激活码即可，没有严格标准。",
+				purchaseCommunityPromoEmail: "邮件联系开发者",
+				purchaseCommunityPromoClose: "关闭",
+				purchaseOptionEmailSupport:
+					"无法以上述途径购买时，可通过邮箱联系开发者：{email}",
 				statusActive: "高级功能已激活",
 				statusInactive: "高级功能未激活",
 				manage: "管理",
@@ -201,6 +214,19 @@ export const standaloneBaseTranslations: Record<
 		about: {
 			license: {
 				title: "License Information",
+				purchaseLink: "Buy lifetime license",
+				purchaseOptionMainland: "Mainland China",
+				purchaseOptionPaypal: "PayPal (international)",
+				purchaseOptionPaypalReader: "EPUB Reader activation",
+				purchaseOptionPaypalSeries: "Weave series activation",
+				purchaseOptionCommunityPromo: "Earn via community promotion",
+				purchaseCommunityPromoTitle: "Redeem an activation code via community promotion",
+				purchaseCommunityPromoBody:
+					"PayPal is temporarily unavailable for purchasing plugin activation codes. Users can promote Weave by creating videos or writing articles on the Obsidian forum, Reddit, Discord, and other platforms, then contact the developer by email to redeem a Weave series primary activation code or a Weave EPUB Reader standalone activation code. Additional codes may be available depending on the situation. If you believe the quality of your video production or promotional article is sufficient to redeem a code, that is enough—there is no strict standard.",
+				purchaseCommunityPromoEmail: "Email the developer",
+				purchaseCommunityPromoClose: "Close",
+				purchaseOptionEmailSupport:
+					"Can't purchase via the options above? Email the developer: {email}",
 				statusActive: "Premium Features Activated",
 				statusInactive: "Premium Features Not Activated",
 				manage: "Manage",

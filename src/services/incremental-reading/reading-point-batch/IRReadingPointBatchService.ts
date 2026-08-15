@@ -62,21 +62,7 @@ export class IRReadingPointBatchService {
 			}
 		}
 
-		return await this.runDestructiveBatch(
-			targets,
-			async (material) => {
-				const writeTarget = resolveScheduleItemWriteTarget(material);
-				const removed = await this.pointWrite.deletePoint({
-					id: writeTarget.id,
-					kind: writeTarget.kind,
-				});
-				if (!removed) {
-					throw new Error(`remove-failed:${material.id}`);
-				}
-				return material.id;
-			},
-			"remove",
-		);
+		return await this.runCoalescedDestructiveBatch(targets, "remove");
 	}
 
 	async batchDelete(
@@ -102,15 +88,49 @@ export class IRReadingPointBatchService {
 
 		await this.scheduler.initialize();
 
-		return await this.runDestructiveBatch(
-			targets,
-			async (material) => {
+		const result: IRReadingPointBatchResult = {
+			total: targets.length,
+			success: 0,
+			failed: 0,
+			skipped: 0,
+		};
+		const resolved: Array<{ materialId: string; block: IRBlockV4 }> = [];
+
+		for (const material of targets) {
+			try {
 				const block = await this.callbacks.resolveBlockV4(material);
-				await this.scheduler.deleteBlockV4(block, true);
-				return material.id;
-			},
-			"delete",
-		);
+				resolved.push({ materialId: material.id, block });
+			} catch (error) {
+				result.failed++;
+				logger.error(
+					`[IRReadingPointBatchService] delete resolve failed: ${material.id}`,
+					error,
+				);
+			}
+		}
+
+		if (resolved.length === 0) {
+			this.showResultNotice("delete", result);
+			return result;
+		}
+
+		try {
+			await this.scheduler.deleteBlocksV4(
+				resolved.map((entry) => entry.block),
+				true,
+			);
+			result.success = resolved.length;
+			await this.callbacks.onBatchRemoved?.(
+				resolved.map((entry) => entry.materialId),
+			);
+		} catch (error) {
+			result.failed += resolved.length;
+			result.success = 0;
+			logger.error("[IRReadingPointBatchService] batch delete failed", error);
+		}
+
+		this.showResultNotice("delete", result);
+		return result;
 	}
 
 	async batchMoveTopic(
@@ -166,9 +186,8 @@ export class IRReadingPointBatchService {
 		return result;
 	}
 
-	private async runDestructiveBatch(
+	private async runCoalescedDestructiveBatch(
 		targets: ScheduleItem[],
-		action: (material: ScheduleItem) => Promise<string>,
 		operation: "remove" | "delete",
 	): Promise<IRReadingPointBatchResult> {
 		const result: IRReadingPointBatchResult = {
@@ -177,28 +196,42 @@ export class IRReadingPointBatchService {
 			failed: 0,
 			skipped: 0,
 		};
-		const removedIds: string[] = [];
 
-		for (const material of targets) {
-			try {
-				const removedId = await action(material);
-				removedIds.push(removedId);
-				result.success++;
-			} catch (error) {
-				result.failed++;
-				logger.error(
-					`[IRReadingPointBatchService] ${operation} failed: ${material.id}`,
-					error,
-				);
+		const writeTargets = targets.map((material) => ({
+			materialId: material.id,
+			writeTarget: resolveScheduleItemWriteTarget(material),
+		}));
+
+		try {
+			const deletedIds = new Set(
+				await this.pointWrite.deletePoints(
+					writeTargets.map((entry) => ({
+						id: entry.writeTarget.id,
+						kind: entry.writeTarget.kind,
+					})),
+				),
+			);
+
+			const removedIds: string[] = [];
+			for (const entry of writeTargets) {
+				if (deletedIds.has(entry.writeTarget.id)) {
+					removedIds.push(entry.materialId);
+					result.success++;
+				} else {
+					result.failed++;
+				}
 			}
 
-			if ((result.success + result.failed) % 10 === 0) {
-				await yieldToMainThread();
+			if (removedIds.length > 0) {
+				await this.callbacks.onBatchRemoved?.(removedIds);
 			}
-		}
-
-		if (removedIds.length > 0) {
-			await this.callbacks.onBatchRemoved?.(removedIds);
+		} catch (error) {
+			result.failed = targets.length;
+			result.success = 0;
+			logger.error(
+				`[IRReadingPointBatchService] ${operation} batch failed`,
+				error,
+			);
 		}
 
 		this.showResultNotice(operation, result);

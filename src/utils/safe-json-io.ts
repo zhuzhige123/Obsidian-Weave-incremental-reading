@@ -98,21 +98,28 @@ export async function safeWriteJson(
 	content: string,
 	app?: { vault: { configDir: string } },
 ): Promise<void> {
-	// 尝试备份当前版本
+	// 内容不变则跳过写盘，避免无意义抬高 mtime（云同步 last-write-wins 冲突）。
 	try {
 		if (await adapter.exists(filePath)) {
 			const current = await adapter.read(filePath);
+			if (current === content) {
+				return;
+			}
 			// 只有当前内容是有效 JSON 时才备份（避免备份已损坏的文件）
-			JSON.parse(current);
-			const backupDir = getBackupDir(app);
-			await DirectoryUtils.ensureDirRecursive(
-				adapter as DataAdapter,
-				backupDir,
-			);
-			await adapter.write(toBackupPath(filePath, app), current);
+			try {
+				JSON.parse(current);
+				const backupDir = getBackupDir(app);
+				await DirectoryUtils.ensureDirRecursive(
+					adapter as DataAdapter,
+					backupDir,
+				);
+				await adapter.write(toBackupPath(filePath, app), current);
+			} catch {
+				// 备份失败不影响正常写入
+			}
 		}
 	} catch {
-		// 备份失败不影响正常写入
+		// 存在性/读取失败时继续尝试写入
 	}
 
 	// 正常写入

@@ -39,6 +39,7 @@ import {
 	IREpubBookmarkTaskService,
 	isEpubBookmarkTaskId,
 } from "./IREpubBookmarkTaskService";
+import { admitPendingFolderSubscriptionChunks, isFolderSubscriptionPendingAdmission } from "./IRFolderSubscriptionAdmissionService";
 import { applyLoadDeferralsFromPlan } from "./IRLoadDeferService";
 import {
 	IRPdfBookmarkTaskService,
@@ -417,6 +418,27 @@ export class IRV4SchedulerService {
 		await this.initialize();
 
 		const advSettings = this.getAdvancedSettingsSnapshot();
+		try {
+			const todayStart = new Date();
+			todayStart.setHours(0, 0, 0, 0);
+			const todayDateKey = `${todayStart.getFullYear()}-${String(
+				todayStart.getMonth() + 1,
+			).padStart(2, "0")}-${String(todayStart.getDate()).padStart(2, "0")}`;
+			await admitPendingFolderSubscriptionChunks({
+				app: this.app,
+				todayStartMs: todayStart.getTime(),
+				todayDateKey,
+				dailyReadingPointCap: advSettings.dailyReadingPointCap,
+				dailyTimeBudgetMinutes: advSettings.dailyTimeBudgetMinutes,
+				maxEstimatedMinutesPerItem: advSettings.maxEstimatedMinutesPerItem,
+				deckIds: deckPath ? [deckPath] : undefined,
+			});
+		} catch (error) {
+			logger.warn(
+				"[IRV4SchedulerService] 订阅文件夹每日准入失败，继续构建队列:",
+				error,
+			);
+		}
 		const markActive = options?.markActive ?? true;
 		const timeBudgetMinutes =
 			options?.timeBudgetMinutes ?? advSettings.dailyTimeBudgetMinutes ?? 40;
@@ -438,9 +460,12 @@ export class IRV4SchedulerService {
 			options.preloadedBlocks.length > 0
 				? options.preloadedBlocks
 				: null;
-		const chunkBlocks = preloadedBlocks
+		const chunkBlocksRaw = preloadedBlocks
 			? preloadedBlocks
 			: await this.storageAdapterV4.getBlocksByDeckV4(deckPath);
+		const chunkBlocks = chunkBlocksRaw.filter(
+			(block) => !isFolderSubscriptionPendingAdmission(block.meta),
+		);
 
 		let pdfTaskBlocks: IRBlockV4[] = [];
 		let epubTaskBlocks: IRBlockV4[] = [];
@@ -1892,6 +1917,94 @@ export class IRV4SchedulerService {
 
 		logger.info(
 			`[IRV4SchedulerService] deleteBlockV4: ${blockV4.id}, deleteFile=${deleteChunkFile}`,
+		);
+	}
+
+	/**
+	 * Batch-delete content blocks with one coalesced point-storage write pass.
+	 * Single-item calls keep deleteBlockV4 for full legacy cleanup.
+	 */
+	async deleteBlocksV4(
+		blocks: IRBlockV4[],
+		deleteChunkFile = true,
+	): Promise<void> {
+		const uniqueBlocks: IRBlockV4[] = [];
+		const seen = new Set<string>();
+		for (const block of Array.isArray(blocks) ? blocks : []) {
+			const blockId = String(block?.id || "").trim();
+			if (!blockId || seen.has(blockId)) {
+				continue;
+			}
+			seen.add(blockId);
+			uniqueBlocks.push(block);
+		}
+		if (uniqueBlocks.length === 0) {
+			return;
+		}
+		if (uniqueBlocks.length === 1) {
+			await this.deleteBlockV4(uniqueBlocks[0], deleteChunkFile);
+			return;
+		}
+
+		await this.initialize();
+
+		const pointIds = uniqueBlocks.map((block) => block.id);
+		await new IRPointWriteService(this.app).deletePoints(
+			pointIds.map((id) => ({ id })),
+		);
+
+		const deletedIdSet = new Set(pointIds);
+		const chunkBlocks = uniqueBlocks.filter(
+			(block) =>
+				!isPdfBookmarkTaskId(block.id) && !isEpubBookmarkTaskId(block.id),
+		);
+
+		if (deleteChunkFile) {
+			for (const block of chunkBlocks) {
+				if (!block.sourcePath) {
+					continue;
+				}
+				try {
+					const file = this.app.vault.getAbstractFileByPath(block.sourcePath);
+					if (file instanceof TFile) {
+						await this.app.fileManager.trashFile(file);
+						logger.debug(
+							`[IRV4SchedulerService] 已删除 chunk 文件: ${block.sourcePath}`,
+						);
+					}
+				} catch (error) {
+					logger.warn(
+						`[IRV4SchedulerService] 删除 chunk 文件失败: ${block.sourcePath}`,
+						error,
+					);
+				}
+			}
+		}
+
+		if (chunkBlocks.length > 0) {
+			try {
+				const sources = await this.storageService.getAllSources();
+				for (const source of Object.values(sources)) {
+					const currentIds = Array.isArray(source.chunkIds)
+						? source.chunkIds
+						: [];
+					if (!currentIds.some((id) => deletedIdSet.has(id))) {
+						continue;
+					}
+					source.chunkIds = currentIds.filter((id) => !deletedIdSet.has(id));
+					source.updatedAt = Date.now();
+					await this.storageService.saveSource(source);
+				}
+			} catch (error) {
+				logger.warn(
+					"[IRV4SchedulerService] 批量更新 source chunkIds 失败:",
+					error,
+				);
+			}
+		}
+
+		logger.info(
+			`[IRV4SchedulerService] deleteBlocksV4: ${uniqueBlocks.length} blocks, deleteFile=${deleteChunkFile}`,
 		);
 	}
 

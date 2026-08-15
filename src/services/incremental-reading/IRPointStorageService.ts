@@ -199,6 +199,7 @@ const POINT_FILES_INDEX_DEFAULT: IRPointFileIndex = {
 };
 const runtimeBaselineByApp = new WeakMap<App, Promise<void>>();
 const runtimeBaselineInProgressByApp = new WeakMap<App, boolean>();
+const deferredVaultMutationsByApp = new WeakMap<App, Promise<void>>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -444,6 +445,10 @@ export class IRPointStorageService {
 		this.initialized = true;
 	}
 
+	/**
+	 * 启动只读基线：建目录、刷新专题索引。不改写 vault `.irdeck` 真相文件，
+	 * 避免打开 Obsidian 时抬高 mtime 干扰云同步 last-write-wins。
+	 */
 	async ensureRuntimeBaseline(): Promise<void> {
 		const inflight = runtimeBaselineByApp.get(this.app);
 		if (inflight) {
@@ -473,73 +478,6 @@ export class IRPointStorageService {
 						},
 					);
 				}
-				const inspection = await this.inspectMigrationStatus();
-				const hasAutoMigrationWork =
-					inspection.pendingEmbeddedSourceCount > 0 ||
-					inspection.pendingPdfTaskCount > 0 ||
-					inspection.pendingEpubTaskCount > 0 ||
-					inspection.pendingChunkPointCount > 0 ||
-					inspection.pendingLegacyBlockCount > 0 ||
-					inspection.pendingReaderStateFileCount > 0 ||
-					inspection.legacyMaterialRecordFileCount > 0 ||
-					inspection.legacyMaterialsIndexFileCount > 0 ||
-					inspection.legacyMaterialsFileCount > 0 ||
-					inspection.emptyLegacyMaterialDirCount > 0 ||
-					inspection.legacyRegistryFileCount > 0 ||
-					inspection.legacyTopicStoreFileCount > 0;
-				if (!hasAutoMigrationWork && inspection.legacyReaderStateCount <= 0) {
-					// 仍继续执行来源路径规范化与 legacy-block 统一
-				} else {
-					logger.info(
-						"[IRPointStorageService] 检测到旧增量阅读数据，开始自动迁移到新 points 存储",
-						{
-							pendingCount: inspection.pendingCount,
-							legacyReaderStateCount: inspection.legacyReaderStateCount,
-							pendingItems: inspection.pendingItems,
-						},
-					);
-
-					const report = await this.executeMigration();
-					if (report.summary.failures.length > 0) {
-						logger.warn(
-							"[IRPointStorageService] 自动迁移存在失败项，请在数据管理中查看迁移报告",
-							{
-								failureCount: report.summary.failures.length,
-							},
-						);
-					}
-				}
-
-				const pathNormalization =
-					await this.normalizeAllPointSourcePathsOnDisk();
-				if (pathNormalization.filesUpdated > 0) {
-					logger.info(
-						"[IRPointStorageService] 已自动规范化阅读点来源路径",
-						pathNormalization,
-					);
-				}
-
-				const { getSharedIRLegacyPointUnificationService } = await import(
-					"./IRLegacyPointUnificationService"
-				);
-				const unifyResult = await getSharedIRLegacyPointUnificationService(
-					this.app,
-				).migrateLegacyBlockPointsToChunkFormat();
-				if (unifyResult.migrated > 0) {
-					logger.info(
-						"[IRPointStorageService] 已自动统一 legacy-block 为 chunk-entry",
-						unifyResult,
-					);
-				}
-				if (unifyResult.failed > 0) {
-					logger.warn(
-						"[IRPointStorageService] legacy-block 自动统一存在失败项",
-						{
-							failed: unifyResult.failed,
-							errors: unifyResult.errors,
-						},
-					);
-				}
 			} finally {
 				runtimeBaselineInProgressByApp.delete(this.app);
 			}
@@ -550,6 +488,95 @@ export class IRPointStorageService {
 			await task;
 		} catch (error) {
 			runtimeBaselineByApp.delete(this.app);
+			throw error;
+		}
+	}
+
+	/**
+	 * 用户打开 IR UI / 数据管理时才执行的 vault 维护（可能改写 `.irdeck`）。
+	 * 与 {@link ensureRuntimeBaseline} 分离，防止冷启动云同步竞态。
+	 */
+	async runDeferredVaultMutations(): Promise<void> {
+		const inflight = deferredVaultMutationsByApp.get(this.app);
+		if (inflight) {
+			await inflight;
+			return;
+		}
+
+		const task = (async () => {
+			await this.ensureRuntimeBaseline();
+			const inspection = await this.inspectMigrationStatus();
+			const hasAutoMigrationWork =
+				inspection.pendingEmbeddedSourceCount > 0 ||
+				inspection.pendingPdfTaskCount > 0 ||
+				inspection.pendingEpubTaskCount > 0 ||
+				inspection.pendingChunkPointCount > 0 ||
+				inspection.pendingLegacyBlockCount > 0 ||
+				inspection.pendingReaderStateFileCount > 0 ||
+				inspection.legacyMaterialRecordFileCount > 0 ||
+				inspection.legacyMaterialsIndexFileCount > 0 ||
+				inspection.legacyMaterialsFileCount > 0 ||
+				inspection.emptyLegacyMaterialDirCount > 0 ||
+				inspection.legacyRegistryFileCount > 0 ||
+				inspection.legacyTopicStoreFileCount > 0;
+			if (hasAutoMigrationWork || inspection.legacyReaderStateCount > 0) {
+				logger.info(
+					"[IRPointStorageService] 检测到旧增量阅读数据，开始自动迁移到新 points 存储",
+					{
+						pendingCount: inspection.pendingCount,
+						legacyReaderStateCount: inspection.legacyReaderStateCount,
+						pendingItems: inspection.pendingItems,
+					},
+				);
+
+				const report = await this.executeMigration();
+				if (report.summary.failures.length > 0) {
+					logger.warn(
+						"[IRPointStorageService] 自动迁移存在失败项，请在数据管理中查看迁移报告",
+						{
+							failureCount: report.summary.failures.length,
+						},
+					);
+				}
+			}
+
+			const pathNormalization =
+				await this.normalizeAllPointSourcePathsOnDisk();
+			if (pathNormalization.filesUpdated > 0) {
+				logger.info(
+					"[IRPointStorageService] 已自动规范化阅读点来源路径",
+					pathNormalization,
+				);
+			}
+
+			const { getSharedIRLegacyPointUnificationService } = await import(
+				"./IRLegacyPointUnificationService"
+			);
+			const unifyResult = await getSharedIRLegacyPointUnificationService(
+				this.app,
+			).migrateLegacyBlockPointsToChunkFormat();
+			if (unifyResult.migrated > 0) {
+				logger.info(
+					"[IRPointStorageService] 已自动统一 legacy-block 为 chunk-entry",
+					unifyResult,
+				);
+			}
+			if (unifyResult.failed > 0) {
+				logger.warn(
+					"[IRPointStorageService] legacy-block 自动统一存在失败项",
+					{
+						failed: unifyResult.failed,
+						errors: unifyResult.errors,
+					},
+				);
+			}
+		})();
+
+		deferredVaultMutationsByApp.set(this.app, task);
+		try {
+			await task;
+		} catch (error) {
+			deferredVaultMutationsByApp.delete(this.app);
 			throw error;
 		}
 	}
@@ -1848,7 +1875,7 @@ export class IRPointStorageService {
 		);
 
 		// 保留「vault 枚举遗漏但 adapter 上仍可读」的索引条目，避免导入竞态删掉新建专题。
-		for (const [absolutePath, entry] of previousByPath.entries()) {
+		for (const absolutePath of previousByPath.keys()) {
 			if (scannedPathSet.has(absolutePath)) {
 				continue;
 			}
@@ -2940,14 +2967,6 @@ export class IRPointStorageService {
 					typeof rawSettings?.defaultIntervalFactor === "number"
 						? rawSettings.defaultIntervalFactor
 						: fallback.settings.defaultIntervalFactor,
-				dailyNewLimit:
-					typeof rawSettings?.dailyNewLimit === "number"
-						? rawSettings.dailyNewLimit
-						: fallback.settings.dailyNewLimit,
-				dailyReviewLimit:
-					typeof rawSettings?.dailyReviewLimit === "number"
-						? rawSettings.dailyReviewLimit
-						: fallback.settings.dailyReviewLimit,
 				interleaveMode:
 					typeof rawSettings?.interleaveMode === "boolean"
 						? rawSettings.interleaveMode
@@ -5553,6 +5572,8 @@ export class IRPointStorageService {
 						chunkMeta.autoSubscribedBadgeUntil.trim()
 							? chunkMeta.autoSubscribedBadgeUntil.trim()
 							: undefined,
+					pendingFolderAdmission:
+						chunkMeta.pendingFolderAdmission === true ? true : undefined,
 					externalDocument: Boolean(chunkMeta.externalDocument) || undefined,
 					pointTitle:
 						typeof chunkMeta.pointTitle === "string" &&
@@ -5583,61 +5604,34 @@ export class IRPointStorageService {
 	}
 
 	async deletePointByLegacyId(pointId: string): Promise<boolean> {
-		await this.initialize();
-		const index = await this.readPointFilesIndex();
-		let deleted = false;
-
-		for (const entry of index.files) {
-			const absolutePath = this.resolveIndexedPointFilePath(
-				entry.file,
-			)?.absolutePath;
-			if (!absolutePath) {
-				continue;
-			}
-			const fileData = await this.readPointFile(
-				absolutePath,
-				entry.topicId,
-				entry.topicName,
-			);
-			const nextPoints = fileData.points.filter(
-				(point) => point.id !== pointId,
-			);
-			if (nextPoints.length === fileData.points.length) {
-				continue;
-			}
-
-			deleted = true;
-			entry.pointCount = nextPoints.length;
-			entry.updatedAt = new Date().toISOString();
-			await this.writeJson(absolutePath, {
-				...fileData,
-				points: nextPoints,
-				updatedAt: new Date().toISOString(),
-			});
+		const normalizedPointId = String(pointId || "").trim();
+		if (!normalizedPointId) {
+			return false;
 		}
-
-		if (deleted) {
-			await this.clearChildParentLinksForDeletedParent(pointId);
-			await this.writePointFilesIndex(index);
-			this.invalidatePointSnapshotListCache();
-		}
-
-		return deleted;
+		const deleted = await this.deletePointsByLegacyIds([normalizedPointId]);
+		return deleted.has(normalizedPointId);
 	}
 
 	/**
-	 * When a parent point is removed, clear stale `parentPointId` on children.
+	 * Batch-delete points by legacy id.
+	 * Reads/writes each topic `.irdeck` at most once (delete + parent-link cleanup together).
 	 */
-	private async clearChildParentLinksForDeletedParent(
-		deletedParentId: string,
-	): Promise<void> {
-		const normalizedParentId = String(deletedParentId || "").trim();
-		if (!normalizedParentId) {
-			return;
+	async deletePointsByLegacyIds(pointIds: string[]): Promise<Set<string>> {
+		await this.initialize();
+		const idsToDelete = new Set(
+			(Array.isArray(pointIds) ? pointIds : [])
+				.map((pointId) => String(pointId || "").trim())
+				.filter(Boolean),
+		);
+		if (idsToDelete.size === 0) {
+			return new Set();
 		}
 
 		const index = await this.readPointFilesIndex();
-		let touched = false;
+		const deletedIds = new Set<string>();
+		let filesChanged = false;
+		const updatedAt = new Date().toISOString();
+
 		for (const entry of index.files) {
 			const absolutePath = this.resolveIndexedPointFilePath(
 				entry.file,
@@ -5650,14 +5644,27 @@ export class IRPointStorageService {
 				entry.topicId,
 				entry.topicName,
 			);
-			let fileChanged = false;
-			const nextPoints = fileData.points.map((point) => {
+
+			const retainedPoints: typeof fileData.points = [];
+			let removedInFile = false;
+			for (const point of fileData.points) {
+				const pointId = String(point?.id || "").trim();
+				if (pointId && idsToDelete.has(pointId)) {
+					deletedIds.add(pointId);
+					removedInFile = true;
+					continue;
+				}
+				retainedPoints.push(point);
+			}
+
+			let parentLinksCleared = false;
+			const nextPoints = retainedPoints.map((point) => {
 				const childParent =
 					String(point.relations?.parentPointId || "").trim() || null;
-				if (childParent !== normalizedParentId) {
+				if (!childParent || !idsToDelete.has(childParent)) {
 					return point;
 				}
-				fileChanged = true;
+				parentLinksCleared = true;
 				return {
 					...point,
 					relations: {
@@ -5666,24 +5673,36 @@ export class IRPointStorageService {
 					},
 					timestamps: {
 						...point.timestamps,
-						updatedAt: new Date().toISOString(),
+						updatedAt,
 					},
 				};
 			});
-			if (!fileChanged) {
+
+			if (!removedInFile && !parentLinksCleared) {
 				continue;
 			}
-			touched = true;
-			entry.updatedAt = new Date().toISOString();
-			await this.persistPointFileData(absolutePath, {
+
+			filesChanged = true;
+			const nextPointIds = nextPoints
+				.map((point) => String(point?.id || "").trim())
+				.filter(Boolean);
+			entry.pointCount = nextPoints.length;
+			entry.pointIds = nextPointIds;
+			entry.updatedAt = updatedAt;
+			await this.writeJson(absolutePath, {
 				...fileData,
-				updatedAt: new Date().toISOString(),
 				points: nextPoints,
+				updatedAt,
 			});
 		}
-		if (touched) {
-			await this.writePointFilesIndex(index);
+
+		if (!filesChanged) {
+			return deletedIds;
 		}
+
+		await this.writePointFilesIndex(index);
+		this.invalidatePointSnapshotListCache();
+		return deletedIds;
 	}
 
 	async saveReaderState(

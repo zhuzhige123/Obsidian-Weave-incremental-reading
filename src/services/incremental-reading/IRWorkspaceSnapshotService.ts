@@ -22,8 +22,7 @@ import {
 import { IRStorageService } from "./IRStorageService";
 
 type DeckOverviewOptions = {
-	dailyNewLimit?: number;
-	dailyReviewLimit?: number;
+	dailyReadingPointCap?: number;
 	learnAheadDays?: number;
 	dailyTimeBudgetMinutes?: number;
 	loadRateDays?: number;
@@ -147,8 +146,7 @@ export class IRWorkspaceSnapshotService {
 
 	private buildDeckOverviewCacheKey(options: DeckOverviewOptions): string {
 		return JSON.stringify({
-			dailyNewLimit: options.dailyNewLimit ?? 20,
-			dailyReviewLimit: options.dailyReviewLimit ?? 50,
+			dailyReadingPointCap: options.dailyReadingPointCap ?? 15,
 			learnAheadDays: options.learnAheadDays ?? 3,
 			dailyTimeBudgetMinutes: options.dailyTimeBudgetMinutes ?? 30,
 			loadRateDays: options.loadRateDays ?? 3,
@@ -177,8 +175,7 @@ export class IRWorkspaceSnapshotService {
 			Math.max(options.learnAheadDays ?? 3, 1),
 			14,
 		);
-		const dailyNewLimit = options.dailyNewLimit ?? 20;
-		const dailyReviewLimit = options.dailyReviewLimit ?? 50;
+		const dailyReadingPointCap = options.dailyReadingPointCap ?? 15;
 		const dailyBudget = options.dailyTimeBudgetMinutes ?? 30;
 		const loadRateDays = Math.max(1, options.loadRateDays ?? 3);
 		const projectedSummary = await getProjectedScheduleSummary(this.app, {
@@ -343,8 +340,8 @@ export class IRWorkspaceSnapshotService {
 				fileCount: deckFiles.size,
 				questionCount,
 				completedQuestionCount,
-				todayNewCount: Math.min(newCount, dailyNewLimit),
-				todayDueCount: Math.min(dueToday, dailyReviewLimit),
+				todayNewCount: Math.min(newCount, dailyReadingPointCap),
+				todayDueCount: Math.min(dueToday, dailyReadingPointCap),
 				loadRatePercent:
 					dailyBudget > 0
 						? this.calculateDeckLoadRatePercent({

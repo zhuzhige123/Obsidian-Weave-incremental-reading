@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { vaultStorage } from '../../utils/vault-local-storage';
-  import { Menu, TFolder, type App } from 'obsidian';
+  import { Menu, SearchComponent, TFolder, type App } from 'obsidian';
   import EnhancedIcon from '../ui/EnhancedIcon.svelte';
   import FloatingMenu from '../ui/FloatingMenu.svelte';
   import { ICON_NAMES } from '../../icons/index.js';
@@ -69,6 +69,9 @@
 
   let inputRef: HTMLInputElement | null = $state(null);
   let containerRef: HTMLDivElement | null = $state(null);
+  let searchHostEl: HTMLDivElement | null = $state(null);
+  let searchComponent: SearchComponent | null = null;
+  let suppressSearchChange = false;
   let searchHistory = $state<string[]>([]);
   let menuShown = $state(false);
   let showDropdown = $state(false);
@@ -77,6 +80,9 @@
   let activeSuggestionPanel = $state<'folder' | 'source' | 'tag' | null>(null);
   let suggestionQuery = $state('');
   let suggestionInputRef: HTMLInputElement | null = $state(null);
+  let suggestionSearchHostEl: HTMLDivElement | null = $state(null);
+  let suggestionSearchComponent: SearchComponent | null = null;
+  let suppressSuggestionSearchChange = false;
   let t = $derived($tr);
   let resolvedPlaceholder = $derived(placeholder || t('management.cardSearch.defaultPlaceholder'));
 
@@ -142,6 +148,71 @@
     closeActiveMenu();
   }
 
+  function syncSearchComponentValue(nextValue: string): void {
+    if (!searchComponent) {
+      return;
+    }
+    if (searchComponent.getValue() === nextValue) {
+      return;
+    }
+    suppressSearchChange = true;
+    searchComponent.setValue(nextValue);
+    suppressSearchChange = false;
+  }
+
+  function syncSuggestionSearchComponentValue(nextValue: string): void {
+    if (!suggestionSearchComponent) {
+      return;
+    }
+    if (suggestionSearchComponent.getValue() === nextValue) {
+      return;
+    }
+    suppressSuggestionSearchChange = true;
+    suggestionSearchComponent.setValue(nextValue);
+    suppressSuggestionSearchChange = false;
+  }
+
+  function getSuggestionSearchPlaceholder(): string {
+    return activeSuggestionPanel === 'folder'
+      ? t('management.cardSearch.searchFolderPlaceholder')
+      : t('management.cardSearch.searchSourcePlaceholder');
+  }
+
+  function getSuggestionSearchClearLabel(): string {
+    return t('management.cardSearch.clearSuggestionSearch');
+  }
+
+  function writeSearchValue(nextValue: string, options?: { notify?: boolean; clearNotify?: boolean }): void {
+    value = nextValue;
+    syncSearchComponentValue(nextValue);
+    if (options?.notify !== false) {
+      onSearch?.(nextValue);
+    }
+    if (options?.clearNotify && !nextValue) {
+      onClear?.();
+    }
+  }
+
+  function handleSearchComponentChange(nextValue: string): void {
+    if (suppressSearchChange) {
+      return;
+    }
+    value = nextValue;
+    onSearch?.(nextValue);
+    if (!nextValue) {
+      onClear?.();
+    }
+    checkAndShowSuggestions();
+  }
+
+  function handleSearchComponentClearClick(): void {
+    closeActiveMenu();
+    showDropdown = false;
+    window.setTimeout(() => {
+      inputRef?.focus();
+    }, 0);
+  }
+
   function handleSearchHistorySelect(historyItem: string, e: MouseEvent) {
     if ((e.target as HTMLElement).closest('.dropdown-item-remove')) {
       e.preventDefault();
@@ -149,8 +220,7 @@
     }
 
     e.preventDefault();
-    value = historyItem;
-    onSearch?.(value);
+    writeSearchValue(historyItem);
     handleDropdownClose();
   }
 
@@ -177,8 +247,135 @@
     }
 
     return () => {
+      showDropdown = false;
       closeActiveMenu();
     };
+  });
+
+  $effect(() => {
+    const host = searchHostEl;
+    if (!host) {
+      return;
+    }
+
+    host.replaceChildren();
+    const search = new SearchComponent(host);
+    searchComponent = search;
+    inputRef = search.inputEl;
+
+    untrack(() => {
+      search.setPlaceholder(resolvedPlaceholder || '');
+      search.setValue(value || '');
+    });
+
+    search.onChange((nextValue) => {
+      handleSearchComponentChange(nextValue);
+    });
+    search.inputEl.spellcheck = false;
+    search.inputEl.setAttribute('enterkeyhint', 'search');
+    search.inputEl.addEventListener('focus', handleInputFocus);
+    search.inputEl.addEventListener('keydown', handleKeydown);
+    search.clearButtonEl.addEventListener('click', handleSearchComponentClearClick);
+
+    untrack(() => {
+      search.clearButtonEl.setAttribute(
+        'aria-label',
+        t('management.cardSearch.clearSearch')
+      );
+      search.clearButtonEl.setAttribute(
+        'title',
+        t('management.cardSearch.clearSearch')
+      );
+    });
+
+    return () => {
+      search.inputEl.removeEventListener('focus', handleInputFocus);
+      search.inputEl.removeEventListener('keydown', handleKeydown);
+      search.clearButtonEl.removeEventListener('click', handleSearchComponentClearClick);
+      if (inputRef === search.inputEl) {
+        inputRef = null;
+      }
+      if (searchComponent === search) {
+        searchComponent = null;
+      }
+      host.replaceChildren();
+    };
+  });
+
+  $effect(() => {
+    syncSearchComponentValue(value || '');
+  });
+
+  $effect(() => {
+    searchComponent?.setPlaceholder(resolvedPlaceholder || '');
+  });
+
+  function handleSuggestionSearchClearClick(): void {
+    window.setTimeout(() => {
+      suggestionInputRef?.focus();
+    }, 0);
+  }
+
+  $effect(() => {
+    const host = suggestionSearchHostEl;
+    const panel = activeSuggestionPanel;
+    if (!host || (panel !== 'folder' && panel !== 'source')) {
+      return;
+    }
+
+    host.replaceChildren();
+    const search = new SearchComponent(host);
+    suggestionSearchComponent = search;
+    suggestionInputRef = search.inputEl;
+
+    untrack(() => {
+      search.setPlaceholder(getSuggestionSearchPlaceholder());
+      search.setValue(suggestionQuery || '');
+      search.clearButtonEl.setAttribute('aria-label', getSuggestionSearchClearLabel());
+      search.clearButtonEl.setAttribute('title', getSuggestionSearchClearLabel());
+    });
+
+    search.onChange((nextValue) => {
+      if (suppressSuggestionSearchChange) {
+        return;
+      }
+      suggestionQuery = nextValue;
+    });
+    search.inputEl.spellcheck = false;
+    search.clearButtonEl.addEventListener('click', handleSuggestionSearchClearClick);
+
+    return () => {
+      search.clearButtonEl.removeEventListener('click', handleSuggestionSearchClearClick);
+      if (suggestionInputRef === search.inputEl) {
+        suggestionInputRef = null;
+      }
+      if (suggestionSearchComponent === search) {
+        suggestionSearchComponent = null;
+      }
+      host.replaceChildren();
+    };
+  });
+
+  $effect(() => {
+    syncSuggestionSearchComponentValue(suggestionQuery || '');
+  });
+
+  $effect(() => {
+    if (!suggestionSearchComponent) {
+      return;
+    }
+    if (activeSuggestionPanel !== 'folder' && activeSuggestionPanel !== 'source') {
+      return;
+    }
+    suggestionSearchComponent.setPlaceholder(getSuggestionSearchPlaceholder());
+    suggestionSearchComponent.clearButtonEl.setAttribute(
+      'aria-label',
+      getSuggestionSearchClearLabel()
+    );
+    suggestionSearchComponent.clearButtonEl.setAttribute(
+      'title',
+      getSuggestionSearchClearLabel()
+    );
   });
 
   $effect(() => {
@@ -215,16 +412,6 @@
     }
     
     saveSearchHistory();
-  }
-
-  // 处理输入
-  function handleInput(e: Event) {
-    const target = e.target as HTMLInputElement;
-    value = target.value;
-    onSearch?.(value);
-    
-    // 检测是否输入了搜索前缀
-    checkAndShowSuggestions();
   }
 
   function getCurrentSearchToken(): string {
@@ -613,7 +800,7 @@
     const newValue = joined + trimmedAfter;
     const newCursorPos = joined.length;
     
-    value = newValue;
+    writeSearchValue(newValue);
     
     window.setTimeout(() => {
       if (inputRef) {
@@ -621,17 +808,6 @@
         inputRef.setSelectionRange(newCursorPos, newCursorPos);
       }
     }, 0);
-    
-    onSearch?.(value);
-  }
-
-  // 清除搜索
-  function handleClear() {
-    closeActiveMenu();
-    value = '';
-    onClear?.();
-    onSearch?.('');
-    inputRef?.focus();
   }
 
   // 显示排序菜单（独立菜单，从排序图标触发）
@@ -674,23 +850,17 @@
   function insertPrefix(prefix: string) {
     if (!inputRef) return;
     
-    // 如果搜索框为空或以空格结尾，直接添加
-    if (!value || value.endsWith(' ')) {
-      value = value + prefix;
-    } else {
-      // 否则先加空格再添加
-      value = value + ' ' + prefix;
-    }
+    const nextValue = !value || value.endsWith(' ')
+      ? `${value}${prefix}`
+      : `${value} ${prefix}`;
+    writeSearchValue(nextValue);
     
-    // 聚焦并将光标移到末尾
     window.setTimeout(() => {
       if (inputRef) {
         inputRef.focus();
-        inputRef.setSelectionRange(value.length, value.length);
+        inputRef.setSelectionRange(nextValue.length, nextValue.length);
       }
     }, 0);
-    
-    onSearch?.(value);
   }
 
   // 处理回车
@@ -711,37 +881,11 @@
 </script>
 
 <div class="card-search-container" bind:this={containerRef}>
-  <div class="search-input-wrapper">
-    <div class="search-icon">
-      <EnhancedIcon name={ICON_NAMES.SEARCH} size={16} />
-    </div>
-    
-    <input
-      bind:this={inputRef}
-      type="text"
-      class="search-input"
-      placeholder={resolvedPlaceholder}
-      value={value}
-      oninput={handleInput}
-      onkeydown={handleKeydown}
-      onfocus={handleInputFocus}
-    />
-    
+  <div class="search-row">
+    <div class="weave-ir-search-host" bind:this={searchHostEl}></div>
+
     {#if value && matchCount >= 0}
       <span class="match-count">{matchCount}{totalCount >= 0 ? `/${totalCount}` : ''}</span>
-    {/if}
-
-    {#if value}
-      <div
-        class="clickable-icon clear-button"
-        role="button"
-        tabindex="-1"
-        onclick={handleClear}
-        onkeydown={(e) => { if (e.key === 'Enter') handleClear(); }}
-        aria-label={t('management.cardSearch.clearSearch')}
-      >
-        <EnhancedIcon name={ICON_NAMES.TIMES} size={14} />
-      </div>
     {/if}
 
     {#if showSortButton}
@@ -858,28 +1002,10 @@
             {/if}
           {:else}
             <div class="suggestion-search-box">
-              <input
-                bind:this={suggestionInputRef}
-                type="text"
-                class="suggestion-search-input"
-                placeholder={activeSuggestionPanel === 'folder'
-                  ? t('management.cardSearch.searchFolderPlaceholder')
-                  : t('management.cardSearch.searchSourcePlaceholder')}
-                bind:value={suggestionQuery}
-              />
-              {#if suggestionQuery}
-                <button
-                  type="button"
-                  class="clickable-icon suggestion-search-clear"
-                  onclick={() => {
-                    suggestionQuery = '';
-                    suggestionInputRef?.focus();
-                  }}
-                  aria-label={t('management.cardSearch.clearSuggestionSearch')}
-                >
-                  <EnhancedIcon name={ICON_NAMES.TIMES} size={12} />
-                </button>
-              {/if}
+              <div
+                class="weave-ir-search-host weave-ir-suggestion-search-host"
+                bind:this={suggestionSearchHostEl}
+              ></div>
             </div>
             {#if getSuggestionItems().length === 0}
               <div class="dropdown-empty-state">
@@ -912,44 +1038,38 @@
   .card-search-container {
     position: relative;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
-  .search-input-wrapper {
-    position: relative;
+  .search-row {
     display: flex;
     align-items: center;
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    padding: 0 8px;
-    transition: all 0.2s ease;
-    z-index: 1;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
-  .search-input-wrapper:focus-within {
-    border-color: var(--interactive-accent);
-    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+  .weave-ir-search-host {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
   }
 
-  .search-icon {
-    display: flex;
-    align-items: center;
-    color: var(--text-muted);
-    margin-right: 8px;
+  .weave-ir-search-host :global(.search-input-container) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
-  .search-input {
-    flex: 1;
-    border: none;
-    background: transparent;
-    padding: 8px 4px;
-    font-size: 14px;
-    color: var(--text-normal);
-    outline: none;
-  }
-
-  .search-input::placeholder {
-    color: var(--text-faint);
+  .weave-ir-search-host :global(.search-input-clear-button) {
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
 
   .match-count {
@@ -958,24 +1078,6 @@
     white-space: nowrap;
     flex-shrink: 0;
     padding: 0 4px;
-  }
-
-  .clear-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 4px;
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-  }
-
-  .clear-button:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
   }
 
   .filter-button {
@@ -1088,48 +1190,23 @@
   }
 
   .suggestion-search-box {
-    position: relative;
     padding: 6px 12px 8px;
   }
 
-  .suggestion-search-input {
+  .weave-ir-suggestion-search-host {
     width: 100%;
-    min-height: 36px;
-    padding: 8px 34px 8px 12px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 10px;
-    background: var(--background-primary);
-    color: var(--text-normal);
-    font-size: 0.875rem;
-    outline: none;
+    max-width: 100%;
   }
 
-  .suggestion-search-input:focus {
-    border-color: var(--interactive-accent);
-    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+  .weave-ir-suggestion-search-host :global(.search-input-container) {
+    width: 100%;
+    max-width: 100%;
   }
 
-  .suggestion-search-clear {
-    position: absolute;
-    top: 50%;
-    right: 20px;
-    transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: none;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text-faint);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-
-  .suggestion-search-clear:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
+  .weave-ir-suggestion-search-host :global(.search-input-clear-button) {
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
 
   .dropdown-item-remove {

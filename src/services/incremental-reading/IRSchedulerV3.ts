@@ -782,11 +782,6 @@ export class IRSchedulerV3 {
 				break;
 			}
 
-			// 检查数量预算
-			if (queue.length >= this.strategy.dailyReviewLimit) {
-				break;
-			}
-
 			queue.push(block);
 			totalMinutes += estimatedMinutes;
 		}

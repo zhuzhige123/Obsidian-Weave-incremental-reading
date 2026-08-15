@@ -5,8 +5,8 @@
 
   interface Props {
     settings: { incrementalReading?: IncrementalReadingSettings };
-    handleDailyNewLimitChange: (value: number) => void;
-    handleDailyReviewLimitChange: (value: number) => void;
+    handleTimeBudgetChange: (value: number) => void;
+    handleDailyReadingPointCapChange: (value: number) => void;
     handleLearnAheadDaysChange: (value: number) => void;
     handleIntervalFactorChange: (value: number) => void;
     handleReviewThresholdChange: (value: number) => void;
@@ -15,8 +15,8 @@
 
   let {
     settings,
-    handleDailyNewLimitChange,
-    handleDailyReviewLimitChange,
+    handleTimeBudgetChange,
+    handleDailyReadingPointCapChange,
     handleLearnAheadDaysChange,
     handleIntervalFactorChange,
     handleReviewThresholdChange,
@@ -31,25 +31,25 @@
 
   <div class="group-content">
     <ObsidianSettingSlider
-      name={t('irSettings.dailyNewLabel')}
-      desc={t('irSettings.dailyNewDesc')}
-      min={0}
-      max={50}
-      step={5}
-      value={settings.incrementalReading?.dailyNewLimit ?? 20}
-      onChange={handleDailyNewLimitChange}
-      formatValue={(value) => String(value)}
+      name={t('irSettings.timeBudgetLabel')}
+      desc={t('irSettings.timeBudgetDesc')}
+      min={10}
+      max={120}
+      step={10}
+      value={settings.incrementalReading?.dailyTimeBudgetMinutes ?? 40}
+      onChange={handleTimeBudgetChange}
+      formatValue={(value) => `${value}${t('irSettings.unitMinutes')}`}
     />
 
     <ObsidianSettingSlider
-      name={t('irSettings.dailyReviewLabel')}
-      desc={t('irSettings.dailyReviewDesc')}
-      min={0}
-      max={200}
-      step={10}
-      value={settings.incrementalReading?.dailyReviewLimit ?? 50}
-      onChange={handleDailyReviewLimitChange}
-      formatValue={(value) => String(value)}
+      name={t('irSettings.dailyReadingPointCapLabel')}
+      desc={t('irSettings.dailyReadingPointCapDesc')}
+      min={5}
+      max={40}
+      step={1}
+      value={settings.incrementalReading?.dailyReadingPointCap ?? 15}
+      onChange={handleDailyReadingPointCapChange}
+      formatValue={(value) => `${value}${t('irSettings.unitItems')}`}
     />
 
     <ObsidianSettingSlider

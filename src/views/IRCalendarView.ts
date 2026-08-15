@@ -24,6 +24,7 @@ import {
 	getDefaultIRPremiumFeaturePreviewId,
 	requestIRPremiumFeaturePreview,
 } from "../services/premium/ir-premium";
+import { renderBouncingBallsLoading } from "../utils/bouncing-balls-loading";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 import { getViewSurfaceTokens } from "../utils/view-location-utils";
@@ -119,19 +120,15 @@ export class IRCalendarView extends ItemView {
 			this.applySurfaceContext();
 		});
 
-		this.subscribePremiumState();
+		// Skip the store's immediate emission so we don't race a second loading
+		// placeholder against the initial onOpen path (duplicate text).
+		this.subscribePremiumState({ skipInitial: true });
 		if (!this.canUseIncrementalReading()) {
 			this.renderPremiumLock(contentEl);
 			return;
 		}
 
-		// 显示加载占位符
-		contentEl.createDiv({
-			cls: "weave-calendar-loading",
-			text: i18n.t("irViews.calendar.loading"),
-		});
-
-		// 异步加载组件
+		this.renderLoadingPlaceholder(i18n.t("irViews.calendar.loading"));
 		void this.loadComponentAsync();
 	}
 
@@ -185,10 +182,15 @@ export class IRCalendarView extends ItemView {
 		);
 	}
 
-	private subscribePremiumState(): void {
+	private subscribePremiumState(options?: { skipInitial?: boolean }): void {
 		this.premiumUnsubscribe?.();
+		let skipInitial = options?.skipInitial === true;
 		this.premiumUnsubscribe =
 			PremiumFeatureGuard.getInstance().isPremiumActive.subscribe(() => {
+				if (skipInitial) {
+					skipInitial = false;
+					return;
+				}
 				if (!this.isOpen) {
 					return;
 				}
@@ -208,17 +210,21 @@ export class IRCalendarView extends ItemView {
 			return;
 		}
 
-		contentEl.createDiv({
-			cls: "weave-calendar-loading",
-			text: i18n.t("irViews.calendar.loading"),
-		});
+		this.renderLoadingPlaceholder(i18n.t("irViews.calendar.loading"));
 		await this.loadComponentAsync();
 	}
 
+	private renderLoadingPlaceholder(message: string): void {
+		renderBouncingBallsLoading(this.contentEl, {
+			message,
+			className: "weave-calendar-loading",
+		});
+	}
+
 	private renderPremiumLock(container: HTMLElement): void {
-		container.createDiv({
-			cls: "weave-calendar-loading",
-			text: i18n.t("irViews.calendar.loadingFeatureHelp"),
+		renderBouncingBallsLoading(container, {
+			message: i18n.t("irViews.calendar.loadingFeatureHelp"),
+			className: "weave-calendar-loading",
 		});
 		requestIRPremiumFeaturePreview(
 			this.app,
@@ -240,6 +246,16 @@ export class IRCalendarView extends ItemView {
 			await this.waitForPluginReady();
 			if (!this.isCurrentLoad(loadGeneration)) {
 				return;
+			}
+
+			// 工作区恢复直接打开日历时不会走 activateIRCalendarView；此处补齐懒创建默认专题与 vault 维护。
+			if (
+				typeof this.plugin.ensureIRUserWorkspaceReady === "function"
+			) {
+				await this.plugin.ensureIRUserWorkspaceReady();
+				if (!this.isCurrentLoad(loadGeneration)) {
+					return;
+				}
 			}
 
 			if (this.component) {

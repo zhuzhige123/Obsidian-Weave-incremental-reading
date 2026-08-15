@@ -177,4 +177,41 @@ describe("IRCalendarView", () => {
 		expect((view as any).component).toBeNull();
 		expect(view.contentEl.querySelector(".error")).toBeNull();
 	});
+
+	it("calls ensureIRUserWorkspaceReady after plugin ready before mount", async () => {
+		const leaf = {};
+		const workspace = {
+			on: vi.fn(() => ({ name: "layout-change" })),
+			offref: vi.fn(),
+		};
+		let resolveWorkspace!: () => void;
+		const workspaceGate = new Promise<void>((resolve) => {
+			resolveWorkspace = resolve;
+		});
+		const ensureIRUserWorkspaceReady = vi.fn(() => workspaceGate);
+		const plugin = {
+			app: { workspace },
+			dataStorage: {},
+			ensureIRUserWorkspaceReady,
+		} as any;
+		const view = new IRCalendarView(leaf as any, plugin);
+		(view as any).app = plugin.app;
+
+		vi.spyOn(view as any, "waitForPluginReady").mockResolvedValue(undefined);
+		vi.spyOn(view as any, "canUseIncrementalReading").mockReturnValue(true);
+
+		(view as any).isOpen = true;
+		const loadPromise = (view as any).loadComponentAsync();
+
+		await vi.waitFor(() => {
+			expect(ensureIRUserWorkspaceReady).toHaveBeenCalledTimes(1);
+		});
+		expect((view as any).component).toBeNull();
+
+		await view.onClose();
+		resolveWorkspace();
+		await loadPromise;
+
+		expect((view as any).component).toBeNull();
+	});
 });

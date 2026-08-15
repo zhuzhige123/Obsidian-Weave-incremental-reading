@@ -5,7 +5,9 @@ import {
 	PATHS,
 	WEAVE_DATA,
 	getPluginPaths,
-	getV2PathsFromApp,
+	getV2Paths,
+	normalizeWeaveParentFolder,
+	resolveWeaveParentFolderFromApp,
 } from "../../config/paths";
 
 export const DETACHED_EDITOR_TEMP_FILE_PREFIX = "weave-editor-";
@@ -18,12 +20,21 @@ export function getPluginEditorTempDir(app: App): string {
 	return normalizePath(getPluginPaths(app).cache.editorTemp);
 }
 
+function resolveEditorParentFolder(app: App, parentFolder?: string): string {
+	if (parentFolder !== undefined) {
+		return normalizeWeaveParentFolder(parentFolder);
+	}
+	return resolveWeaveParentFolderFromApp(app);
+}
+
 /**
  * Vault 可见的嵌入式编辑器临时目录。
- * 始终落在可配置的 IR 数据根下（`{root}/editor`），尊重设置中的 weaveParentFolder。
+ * 始终落在可配置的 IR 数据根下（`{root}/editor`）。
+ * 优先使用显式传入的 `parentFolder`（plugin.settings.weaveParentFolder）。
  */
-export function getVaultEditorTempDir(app: App): string {
-	return normalizePath(`${getV2PathsFromApp(app).root}/editor`);
+export function getVaultEditorTempDir(app: App, parentFolder?: string): string {
+	const parent = resolveEditorParentFolder(app, parentFolder);
+	return normalizePath(`${getV2Paths(parent).root}/editor`);
 }
 
 export function isDetachedEditorTempFileName(name: string): boolean {
@@ -45,13 +56,14 @@ export function isDetachedEditorTempFilePath(path?: string | null): boolean {
 /**
  * DetachedLeafEditor 临时文件目录。
  * 固定使用 IR 数据根下的 editor/，不跟源文件同目录（避免污染用户笔记树）。
- * `sourcePath` 保留为兼容参数，不再影响落盘位置。
+ * `sourcePath` 保留为兼容参数；`parentFolder` 应由调用方传入设置值。
  */
 export function resolveDetachedEditorTempFolder(
 	app: App,
 	_sourcePath?: string,
+	parentFolder?: string,
 ): string {
-	return getVaultEditorTempDir(app);
+	return getVaultEditorTempDir(app, parentFolder);
 }
 
 export function buildDetachedEditorTempFilePath(

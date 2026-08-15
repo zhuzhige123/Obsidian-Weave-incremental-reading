@@ -11,17 +11,14 @@
     settings: { incrementalReading?: IncrementalReadingSettings };
     strategyOptions: StrategyOption[];
     handleStrategyDropdownChange: (value: string) => void;
-    handleTimeBudgetChange: (value: number) => void;
     handleFlowStretchChange: (value: number) => void;
     handleLoadBasedDeferChange: (enabled: boolean) => void;
-    handleDailyReadingPointCapChange: (value: number) => void;
     handleHorizonSmoothingChange: (enabled: boolean) => void;
     handleHorizonSpreadDaysChange: (value: number) => void;
     handleMaxAppearancesChange: (value: number) => void;
     showSection?: boolean;
     strategyTitle?: string;
     strategyLabel?: string;
-    timeBudgetLabel?: string;
     maxAppearancesLabel?: string;
   }
 
@@ -29,17 +26,14 @@
     settings,
     strategyOptions,
     handleStrategyDropdownChange,
-    handleTimeBudgetChange,
     handleFlowStretchChange,
     handleLoadBasedDeferChange,
-    handleDailyReadingPointCapChange,
     handleHorizonSmoothingChange,
     handleHorizonSpreadDaysChange,
     handleMaxAppearancesChange,
     showSection = true,
     strategyTitle,
     strategyLabel,
-    timeBudgetLabel,
     maxAppearancesLabel
   }: Props = $props();
 
@@ -71,17 +65,6 @@
     </div>
 
     <ObsidianSettingSlider
-      name={timeBudgetLabel ?? t('irSettings.timeBudgetLabel')}
-      desc={t('irSettings.timeBudgetDesc')}
-      min={10}
-      max={120}
-      step={10}
-      value={settings.incrementalReading?.dailyTimeBudgetMinutes ?? 40}
-      onChange={handleTimeBudgetChange}
-      formatValue={(value) => `${value}${t('irSettings.unitMinutes')}`}
-    />
-
-    <ObsidianSettingSlider
       name={t('irSettings.flowStretchLabel')}
       desc={t('irSettings.flowStretchDesc')}
       min={0}
@@ -98,17 +81,6 @@
       desc={t('irSettings.enableLoadDeferDesc')}
       value={settings.incrementalReading?.enableLoadBasedDefer !== false}
       onChange={handleLoadBasedDeferChange}
-    />
-
-    <ObsidianSettingSlider
-      name={t('irSettings.dailyReadingPointCapLabel')}
-      desc={t('irSettings.dailyReadingPointCapDesc')}
-      min={5}
-      max={40}
-      step={1}
-      value={settings.incrementalReading?.dailyReadingPointCap ?? 15}
-      onChange={handleDailyReadingPointCapChange}
-      formatValue={(value) => `${value}${t('irSettings.unitItems')}`}
     />
 
     <ObsidianSettingToggle

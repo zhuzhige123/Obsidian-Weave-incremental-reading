@@ -16,6 +16,8 @@
 		app: App;
 		active?: boolean;
 		sourcePath?: string;
+		/** 显式 IR 数据父目录，避免临时文件落到默认根之外/之内错位 */
+		weaveParentFolder?: string;
 		value?: string;
 		sessionId?: string;
 		fontScale?: number;
@@ -28,6 +30,7 @@
 		app,
 		active = false,
 		sourcePath = "",
+		weaveParentFolder = "",
 		value = "",
 		sessionId = "ir-paragraph-workbench",
 		fontScale = 100,
@@ -125,6 +128,7 @@
 		const shouldMount = active;
 		const container = hostEl;
 		const path = sourcePath;
+		const parentFolder = weaveParentFolder;
 		const id = sessionId;
 		const initialValue = untrack(() => value);
 
@@ -141,6 +145,7 @@
 			value: initialValue,
 			// sourcePath 仅用于换源时重建编辑器；临时文件固定写入 IR 数据根/editor/
 			sourcePath: path,
+			weaveParentFolder: parentFolder,
 			sessionId: id,
 			onChange: () => {
 				scheduleChangeEmit(instance.value);

@@ -12,6 +12,7 @@ vi.mock("../../../../utils/obsidian-confirm", () => ({
 vi.mock("../../IRPointWriteService", () => ({
 	IRPointWriteService: class {
 		deletePoint = vi.fn();
+		deletePoints = vi.fn(async () => []);
 	},
 }));
 
@@ -19,6 +20,7 @@ vi.mock("../../IRV4SchedulerService", () => ({
 	IRV4SchedulerService: class {
 		initialize = vi.fn(async () => undefined);
 		deleteBlockV4 = vi.fn(async () => undefined);
+		deleteBlocksV4 = vi.fn(async () => undefined);
 	},
 }));
 
@@ -78,6 +80,34 @@ describe("IRReadingPointBatchService", () => {
 
 		expect(result).toEqual({ total: 1, success: 0, failed: 0, skipped: 0 });
 		expect(onBatchRemoved).not.toHaveBeenCalled();
+	});
+
+	it("batch-removes with one deletePoints call instead of per-item deletes", async () => {
+		const { showObsidianConfirm } = await import(
+			"../../../../utils/obsidian-confirm"
+		);
+		vi.mocked(showObsidianConfirm).mockResolvedValueOnce(true);
+
+		const onBatchRemoved = vi.fn(async () => undefined);
+		const service = new IRReadingPointBatchService(app, {
+			resolveBlockV4: vi.fn(),
+			onBatchRemoved,
+		});
+		const deletePoints = vi.fn(async () => ["point-1", "point-2"]);
+		(service as any).pointWrite.deletePoints = deletePoints;
+
+		const result = await service.batchRemove([
+			makeMaterial("point-1"),
+			makeMaterial("point-2"),
+		]);
+
+		expect(deletePoints).toHaveBeenCalledTimes(1);
+		expect(deletePoints).toHaveBeenCalledWith([
+			{ id: "point-1", kind: undefined },
+			{ id: "point-2", kind: undefined },
+		]);
+		expect(onBatchRemoved).toHaveBeenCalledWith(["point-1", "point-2"]);
+		expect(result).toEqual({ total: 2, success: 2, failed: 0, skipped: 0 });
 	});
 
 	it("counts unchanged topic moves as skipped rather than success", async () => {

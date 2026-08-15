@@ -87,18 +87,6 @@ export interface IncrementalReadingSettings {
 	defaultIntervalFactor?: number;
 
 	/**
-	 * 每日新块上限
-	 * 范围: 0-50, 默认: 20
-	 */
-	dailyNewLimit?: number;
-
-	/**
-	 * 每日复习上限
-	 * 范围: 0-200, 默认: 50
-	 */
-	dailyReviewLimit?: number;
-
-	/**
 	 * 默认拆分标题级别
 	 * 范围: 1-6, 默认: 2 (##)
 	 */
@@ -182,7 +170,7 @@ export interface IncrementalReadingSettings {
 	scheduleStrategy?: "processing" | "reading-list";
 
 	/**
-	 * 每日时间预算（分钟）
+	 * 每日时间预算（分钟）——日负荷主闸门。
 	 * 范围: 10-120, 默认: 40
 	 */
 	dailyTimeBudgetMinutes?: number;
@@ -207,7 +195,8 @@ export interface IncrementalReadingSettings {
 	maxEstimatedMinutesPerItem?: number;
 
 	/**
-	 * 每日阅读点上限（条数）
+	 * 每日阅读点上限（条数软顶）
+	 * 与时间预算共同约束：实际入队/放出 = 剩余分钟 ∩ 剩余条数。
 	 * 范围: 5-40, 默认: 15
 	 */
 	dailyReadingPointCap?: number;
@@ -303,8 +292,6 @@ export interface IncrementalReadingSettings {
  */
 export const DEFAULT_IR_SETTINGS: IncrementalReadingSettings = {
 	defaultIntervalFactor: 1.5,
-	dailyNewLimit: 20,
-	dailyReviewLimit: 50,
 	defaultSplitLevel: 2,
 	interleaveMode: true,
 	maxConsecutiveSameTopic: 3,

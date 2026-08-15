@@ -12,6 +12,7 @@ import {
 	IR_DECK_FILE_EXTENSION,
 	basenameWithoutExtension,
 } from "../utils/ir-internal-data-path";
+import { renderBouncingBallsLoading } from "../utils/bouncing-balls-loading";
 import { i18n } from "../utils/i18n";
 import { logger } from "../utils/logger";
 import { readString } from "../utils/unknown-record";
@@ -121,9 +122,9 @@ export class IRDeckView extends FileView {
 		this.isOpen = true;
 		this.contentEl.empty();
 		this.contentEl.addClass("weave-irdeck-view");
-		this.contentEl.createDiv({
-			cls: "weave-irdeck-loading",
-			text: i18n.t("views.irdeck.loading"),
+		renderBouncingBallsLoading(this.contentEl, {
+			message: i18n.t("views.irdeck.loading"),
+			className: "weave-irdeck-loading",
 		});
 
 		if (this.file?.path) {

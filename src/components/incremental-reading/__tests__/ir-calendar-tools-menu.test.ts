@@ -4,6 +4,7 @@ import {
 	populateCalendarFolderSubscriptionSyncMenu,
 	populateCalendarMaterialImportMenu,
 	populateCalendarPointDeckScanMenu,
+	populateCalendarTodayBacklogRebalanceMenu,
 	populateCalendarViewModeMenu,
 } from "../ir-calendar-tools-menu";
 
@@ -137,5 +138,20 @@ describe("populateCalendarMaterialImportMenu", () => {
 
 		menu.findItemByTitle("导入阅读材料")?.trigger();
 		expect(onOpenImport).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("populateCalendarTodayBacklogRebalanceMenu", () => {
+	it("提供整理今日积压入口", () => {
+		const menu = new Menu() as TrackingMenu;
+		const onRebalance = vi.fn();
+
+		populateCalendarTodayBacklogRebalanceMenu(menu, {
+			rebalanceTitle: "整理今日积压…",
+			onRebalance,
+		});
+
+		menu.findItemByTitle("整理今日积压…")?.trigger();
+		expect(onRebalance).toHaveBeenCalledTimes(1);
 	});
 });

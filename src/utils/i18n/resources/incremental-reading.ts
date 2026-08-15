@@ -48,6 +48,7 @@ const zhIrSidebar = {
 		backgroundWallPickerPlaceholder: "选择一张图片作为日历背景墙...",
 		backgroundWallTitle: "日历背景墙",
 		importTitle: "导入阅读材料",
+		rebalanceTodayBacklogTitle: "整理今日积压…",
 		nextMonth: "下个月",
 		prevMonth: "上个月",
 		topicPrefix: "专题",
@@ -210,6 +211,16 @@ const zhIrSidebar = {
 		noDecksAvailable: "暂无可用的增量阅读专题",
 		openFailed: "打开失败",
 		prioritySetFailed: "设置优先级失败",
+		rebalanceTodayBacklogConfirm:
+			"今天共有 {before} 条可整理的到期/积压阅读点（月历今日列表当前显示 {calendar} 条）。\n将按当前「每日时间预算 ∩ 每日阅读点上限」保留约 {keep} 条在今天，其余 {move} 条移入待放出队列，之后按日容量逐步放出。\n手动钉在今天的阅读点不会被移动。\n若月历条数明显更多，多半是视图未收缩的残留，开始整理后会同步刷新。",
+		rebalanceTodayBacklogConfirmTitle: "整理今日积压",
+		rebalanceTodayBacklogConfirmAction: "开始整理",
+		rebalanceTodayBacklogDone:
+			"已整理今日积压：保留 {kept} 条，移入待放出 {moved} 条（其中手动钉住 {pinned} 条未动）",
+		rebalanceTodayBacklogNone: "今日积压已在日容量内，无需整理",
+		rebalanceTodayBacklogNoneStale:
+			"存储侧今日可整理项已在日容量内（{before} 条）；月历仍显示 {calendar} 条，已强制同步视图",
+		rebalanceTodayBacklogFailed: "整理今日积压失败",
 		removeFailed: "移除失败",
 		removed: "已移除",
 		reviewTimeSet: "复习时间已设置为：{time}",
@@ -256,6 +267,11 @@ const zhIrSidebar = {
 		dayLoadInfoTitle: "查看选中日期的负载与顺延提示",
 		tagFilterNoMatch: "没有匹配标签 #{tag} 的阅读点",
 		clearTagFilter: "清除标签筛选",
+		dayEmpty: "这一天没有安排阅读材料",
+		dayEmptyHint: "可通过工具栏添加阅读目标，或从其他日期调整安排。",
+		completedHiddenEmpty: "今日阅读点已全部完成（已隐藏已完成项）",
+		completedHiddenEmptyHint: "可暂时显示已完成项，或关闭「隐藏今日已完成」。",
+		showCompletedReadingPoints: "显示已完成",
 		dateMonthDay: "{month}月{day}日",
 		dateFull: "{year}年{month}月{day}日",
 		untitledPoint: "未命名阅读点",
@@ -402,6 +418,7 @@ const enIrSidebar = {
 			"Choose an image to use as the calendar background wall...",
 		backgroundWallTitle: "Calendar background wall",
 		importTitle: "Import reading materials",
+		rebalanceTodayBacklogTitle: "Rebalance today’s backlog…",
 		nextMonth: "Next month",
 		prevMonth: "Previous month",
 		topicPrefix: "Topic",
@@ -568,6 +585,16 @@ const enIrSidebar = {
 		noDecksAvailable: "No incremental-reading topics are available",
 		openFailed: "Open failed",
 		prioritySetFailed: "Failed to set priority",
+		rebalanceTodayBacklogConfirm:
+			"Today has {before} rebalanceable due/backlogged reading points (calendar today list currently shows {calendar}).\nAbout {keep} will stay today under the current time budget ∩ reading-point cap; the other {move} will move into the pending-release queue and be admitted gradually.\nItems manually pinned to today are kept.\nIf the calendar count is much higher, it is usually a stale unshrunk list; starting rebalance will refresh the view.",
+		rebalanceTodayBacklogConfirmTitle: "Rebalance today’s backlog",
+		rebalanceTodayBacklogConfirmAction: "Rebalance",
+		rebalanceTodayBacklogDone:
+			"Backlog rebalanced: kept {kept}, moved {moved} to pending release ({pinned} manually pinned untouched)",
+		rebalanceTodayBacklogNone: "Today’s backlog already fits the daily capacity",
+		rebalanceTodayBacklogNoneStale:
+			"Storage already fits daily capacity ({before} today); calendar still showed {calendar} and was force-synced",
+		rebalanceTodayBacklogFailed: "Failed to rebalance today’s backlog",
 		removeFailed: "Failed to remove",
 		removed: "Removed",
 		reviewTimeSet: "Review time set to: {time}",
@@ -615,6 +642,14 @@ const enIrSidebar = {
 		dayLoadInfoTitle: "View load and defer hints for the selected day",
 		tagFilterNoMatch: "No reading points match tag #{tag}",
 		clearTagFilter: "Clear tag filter",
+		dayEmpty: "No reading materials scheduled for this day",
+		dayEmptyHint:
+			"Add a reading target from the toolbar, or reschedule items from another day.",
+		completedHiddenEmpty:
+			"All of today's reading points are complete (completed items are hidden)",
+		completedHiddenEmptyHint:
+			"Temporarily show completed items, or turn off “Hide today's completed”.",
+		showCompletedReadingPoints: "Show completed",
 		dateMonthDay: "{month}/{day}",
 		dateFull: "{year}-{month}-{day}",
 		untitledPoint: "Untitled reading point",
@@ -985,10 +1020,10 @@ export const incrementalReadingTranslationOverrides: Record<
 			autoSubscribeBulkConfirmTitle: "确认批量新增阅读材料",
 			autoSubscribeAddRule: "新增订阅规则",
 			autoSubscribeInitialScheduleDesc:
-				"决定订阅文件夹自动初次添加的阅读点，是直接进入今天，还是先按正常调度安排。",
+				"决定订阅文件夹自动初次添加的阅读点，是直接进入今天，还是先进入阅读队列、按每日上限逐步放出。",
 			autoSubscribeInitialScheduleLabel: "初次添加方式",
 			autoSubscribeInitialScheduleScheduledDesc:
-				"新自动加入的阅读点先按正常调度进入队列，不强行插入今天。",
+				"新自动加入的阅读点先进入待读队列，不强行插入今天；每天按「每日阅读点上限」逐步放出。",
 			autoSubscribeInitialScheduleScheduledLabel: "按算法正常调度",
 			autoSubscribeInitialScheduleTodayDesc:
 				"新自动加入的阅读点直接安排到今天，适合把订阅文件夹当作当天收件箱处理。",
@@ -1025,10 +1060,6 @@ export const incrementalReadingTranslationOverrides: Record<
 			agingMediumLabel: "中",
 			agingStrengthDesc: "控制长期未处理内容被重新拉回前列的力度。",
 			agingStrengthLabel: "沉底内容回拉强度",
-			dailyNewDesc: "限制每天进入队列的新阅读块数量。",
-			dailyNewLabel: "每日新块上限",
-			dailyReviewDesc: "限制每天可处理的复习块数量。",
-			dailyReviewLabel: "每日复习上限",
 			deleteBtn: "删除",
 			followAsk: "每次询问",
 			followAskDesc: "命中标签组时先询问是否跟随该组设置。",
@@ -1107,7 +1138,8 @@ export const incrementalReadingTranslationOverrides: Record<
 			tagSourcePresetWeaveTags: "weave_tags",
 			tagSourceSwitchToTagsWarning:
 				"已切换为 Obsidian tags。若笔记同时有 weave_tags，IR 会优先读取 tags；请确认不会把无关图谱标签用于调度。",
-			timeBudgetDesc: "估算你每天愿意投入在增量阅读上的时间。",
+			timeBudgetDesc:
+				"主闸门：估算你每天愿意投入的阅读时间。加大后，在条数软顶内可多排今日材料、多放出订阅新材料。",
 			timeBudgetLabel: "每日时间预算",
 			flowStretchLabel: "心流 stretch",
 			flowStretchDesc:
@@ -1117,7 +1149,7 @@ export const incrementalReadingTranslationOverrides: Record<
 				"开启后，当日待读总量超过 stretch 上限时，按优先级将尾部项推到后续日期。",
 			dailyReadingPointCapLabel: "每日阅读点上限",
 			dailyReadingPointCapDesc:
-				"限制单日列表中的阅读点条数，避免「条数很多但分钟很少」仍显示不合理。",
+				"条数软顶：防止短文刷屏。实际入队/放出 = 剩余时间 ∩ 剩余条数；只加时间不够时再调此项。",
 			enableHorizonSmoothingLabel: "跨日平滑分配",
 			enableHorizonSmoothingDesc:
 				"将扎堆到期的阅读点分散到未来数天，避免今日堆积、次日骤降。",
@@ -1323,10 +1355,10 @@ export const incrementalReadingTranslationOverrides: Record<
 			autoSubscribeBulkConfirmTitle: "Confirm bulk import of reading materials",
 			autoSubscribeAddRule: "Add subscription rule",
 			autoSubscribeInitialScheduleDesc:
-				"Choose whether reading points auto-added from the subscribed folder should go to today immediately or enter the normal scheduling flow first.",
+				"Choose whether reading points auto-added from the subscribed folder should go to today immediately, or enter the reading queue and be released gradually by the daily cap.",
 			autoSubscribeInitialScheduleLabel: "Initial scheduling mode",
 			autoSubscribeInitialScheduleScheduledDesc:
-				"New auto-added reading points enter the queue through the normal scheduling algorithm instead of being forced into today.",
+				"New auto-added reading points enter a pending queue instead of today, and are released each day up to the daily reading-point cap.",
 			autoSubscribeInitialScheduleScheduledLabel: "Use normal scheduling",
 			autoSubscribeInitialScheduleTodayDesc:
 				"New auto-added reading points are placed into today immediately, suitable when the subscribed folder acts as a daily inbox.",
@@ -1364,11 +1396,6 @@ export const incrementalReadingTranslationOverrides: Record<
 			agingStrengthDesc:
 				"Controls how strongly long-unprocessed items are pulled back to the front.",
 			agingStrengthLabel: "Resurfacing strength",
-			dailyNewDesc:
-				"Caps how many new reading blocks can enter the queue each day.",
-			dailyNewLabel: "Daily new-item limit",
-			dailyReviewDesc: "Caps how many review blocks can be processed each day.",
-			dailyReviewLabel: "Daily review limit",
 			deleteBtn: "Delete",
 			followAsk: "Ask every time",
 			followAskDesc: "Ask before following the matched tag group.",
@@ -1462,7 +1489,7 @@ export const incrementalReadingTranslationOverrides: Record<
 			tagSourceSwitchToTagsWarning:
 				"Switched to Obsidian tags. If notes also have weave_tags, IR prefers tags — confirm unrelated graph tags will not drive scheduling.",
 			timeBudgetDesc:
-				"Estimate how much time you want to spend on incremental reading each day.",
+				"Primary gate: how much reading time you want each day. Raising it admits more of today’s queue and folder-subscription releases within the count soft cap.",
 			timeBudgetLabel: "Daily time budget",
 			flowStretchLabel: "Flow stretch",
 			flowStretchDesc:
@@ -1472,7 +1499,7 @@ export const incrementalReadingTranslationOverrides: Record<
 				"When today’s due load exceeds the stretch ceiling, defer lower-priority items to later dates by priority.",
 			dailyReadingPointCapLabel: "Daily reading-point cap",
 			dailyReadingPointCapDesc:
-				"Limits how many reading points appear on one day, even when estimated minutes still look low.",
+				"Count soft cap against short-item floods. Actual queue/admission = remaining minutes ∩ remaining count; raise this only when time alone is not enough.",
 			enableHorizonSmoothingLabel: "Horizon smoothing",
 			enableHorizonSmoothingDesc:
 				"Spread bunched due items across upcoming days to avoid cliffs like “many today, few tomorrow”.",

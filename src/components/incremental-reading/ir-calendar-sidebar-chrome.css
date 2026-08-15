@@ -341,6 +341,10 @@
 
 .ir-calendar-sidebar .calendar-search-panel {
   margin: 0 0 10px;
+  padding-inline-end: var(--size-4-3);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .ir-calendar-sidebar .calendar-search-panel__pending {

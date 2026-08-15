@@ -24,6 +24,7 @@ export type ExistingChunkLike = {
 		autoSubscribedFolderPath?: string;
 		externalDocument?: boolean;
 		readingMaterialId?: string;
+		pendingFolderAdmission?: boolean;
 	} & Record<string, unknown>;
 };
 
@@ -53,6 +54,10 @@ function isChunkScheduleInactive(chunk: ExistingChunkLike): boolean {
 		.toLowerCase();
 	if (status === "removed" || status === "done" || status === "suspended") {
 		return true;
+	}
+	// 待放出仍算已完整订阅（有有效调度记录），只是尚未进入近端日历。
+	if (chunk.meta?.pendingFolderAdmission === true) {
+		return false;
 	}
 	return !Number(chunk.nextRepDate || 0);
 }

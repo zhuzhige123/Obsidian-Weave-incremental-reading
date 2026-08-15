@@ -1,4 +1,9 @@
-import { DEFAULT_IR_DATA_ROOT } from "../../../config/paths";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+	DEFAULT_IR_DATA_ROOT,
+	clearActiveWeaveParentFolder,
+	setActiveWeaveParentFolder,
+} from "../../../config/paths";
 import {
 	getPluginEditorTempDir,
 	getVaultEditorTempDir,
@@ -9,6 +14,10 @@ import {
 } from "../editor-temp-file-policy";
 
 describe("editor-temp-file-policy", () => {
+	afterEach(() => {
+		clearActiveWeaveParentFolder();
+	});
+
 	it("detects detached editor temp files by path", () => {
 		expect(isDetachedEditorTempFilePath("weave-editor-123.md")).toBe(true);
 		expect(isDetachedEditorTempFilePath("notes/weave-editor-session.md")).toBe(
@@ -62,6 +71,42 @@ describe("editor-temp-file-policy", () => {
 			resolveDetachedEditorTempFolder(customApp, "notes/ch1/source.md"),
 		).toBe("My IR Data/editor");
 	});
+
+	it("uses explicit parentFolder without needing app.plugins", () => {
+		const bareApp = {
+			vault: { configDir: ".obsidian" },
+		} as any;
+
+		expect(getVaultEditorTempDir(bareApp, "自定义IR")).toBe("自定义IR/editor");
+		expect(
+			resolveDetachedEditorTempFolder(bareApp, "notes/a.md", "自定义IR"),
+		).toBe("自定义IR/editor");
+	});
+
+	it("prefers registered weaveParentFolder over missing getPlugin", () => {
+		setActiveWeaveParentFolder("Registered IR");
+		const bareApp = {
+			vault: { configDir: ".obsidian" },
+		} as any;
+
+		expect(getVaultEditorTempDir(bareApp)).toBe("Registered IR/editor");
+	});
+
+	it("resolves weaveParentFolder via plugins.plugins map", () => {
+		const app = {
+			vault: { configDir: ".obsidian" },
+			plugins: {
+				plugins: {
+					"weave-incremental-reading": {
+						settings: { weaveParentFolder: "Map IR Root" },
+					},
+				},
+			},
+		} as any;
+
+		expect(getVaultEditorTempDir(app)).toBe("Map IR Root/editor");
+	});
+
 
 	it("keeps invalid source paths on the IR editor directory", () => {
 		const app = {

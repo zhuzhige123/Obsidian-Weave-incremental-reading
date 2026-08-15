@@ -114,7 +114,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import type { IRPointParentProgress } from '../../services/incremental-reading/IRPointParentRelation';
   import { buildLegacyChunkFromPointSnapshot } from '../../services/incremental-reading/IRLegacyTaskCompatAdapter';
   import { IRReadingPointBatchService } from '../../services/incremental-reading/reading-point-batch/IRReadingPointBatchService';
-  import { populateReadingPointBatchSubmenu } from '../../services/incremental-reading/reading-point-batch/readingPointBatchSubmenu';
+  import {
+    populateBatchTopicSubmenu,
+    populateReadingPointBatchSubmenu,
+    runBatchMenuAction,
+  } from '../../services/incremental-reading/reading-point-batch/readingPointBatchSubmenu';
   import { resolveScheduleItemWriteTarget } from '../../services/incremental-reading/reading-point-batch/resolveScheduleItemWriteTarget';
   import { IRAnalyticsModalObsidian } from './IRAnalyticsModalObsidian';
   import {
@@ -180,6 +184,11 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     isSameCalendarDay as isSameDay,
     type IRCalendarViewMode,
   } from './ir-calendar-date';
+  import {
+    resolveActiveDayReadingListEmptyKind,
+    shouldKickSelectedDateHydrate,
+    shouldShowSelectedDateMaterialsPending,
+  } from './ir-calendar-selected-date-hydrate';
   import IRCalendarTopToolbar from './ir-calendar-sidebar/IRCalendarTopToolbar.svelte';
   import IRCalendarMonthHeader from './ir-calendar-sidebar/IRCalendarMonthHeader.svelte';
   import IRCalendarMonthGrid from './ir-calendar-sidebar/IRCalendarMonthGrid.svelte';
@@ -240,9 +249,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     populateCalendarBackgroundWallMenu,
     populateCalendarFolderSubscriptionSyncMenu,
     populateCalendarMaterialImportMenu,
+    populateCalendarTodayBacklogRebalanceMenu,
     populateCalendarViewModeMenu
   } from './ir-calendar-tools-menu';
   import { IRDataManagementModalObsidian } from './IRDataManagementModalObsidian';
+  import {
+    rebalanceTodayReadingPointBacklog,
+    selectTodayBacklogRebalancePlan,
+  } from '../../services/incremental-reading/IRTodayBacklogRebalanceService';
   import { PremiumFeatureGuard, PREMIUM_FEATURES } from '../../services/premium/PremiumFeatureGuard';
   import { ensureIRPremiumFeature } from '../../services/premium/ir-premium';
 
@@ -700,9 +714,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     );
 
     const storage = await getStorage();
-    for (const materialId of normalizedIds) {
-      await storage.removeCalendarCompletion(materialId);
-    }
+    await storage.removeCalendarCompletions(Array.from(normalizedIds));
 
     await persistAuthoritativeDayQueuesAfterRemoval(Array.from(affectedDateKeys));
   }
@@ -3187,6 +3199,136 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       : undefined;
   }
 
+  /**
+   * 权威覆盖指定日的 materials（关闭 protectAgainstShrink）。
+   * 用于积压整理等「磁盘已变少、UI 必须跟着变少」的场景。
+   */
+  async function authoritativelyReplacePriorityDateMaterials(
+    dateKeys: string[]
+  ): Promise<void> {
+    const normalizedKeys = Array.from(
+      new Set(dateKeys.map((key) => String(key || '').trim()).filter(Boolean))
+    );
+    if (normalizedKeys.length === 0) {
+      return;
+    }
+
+    clearSelectedDateHydrationCompletedKeys(normalizedKeys);
+    getCalendarQueryService().invalidate();
+    getSharedIRProjectionRuntime(plugin.app).markStale();
+
+    const deckIds = getActiveDeckIdsForQuery();
+    const projection = await getSharedIRProjectionRuntime(plugin.app).hydratePriorityDatesFromProjection(
+      deckIds,
+      normalizedKeys
+    );
+    const incoming = new Map<string, ScheduleItem[]>();
+    for (const dateKey of normalizedKeys) {
+      incoming.set(dateKey, projection?.materialsByDate.get(dateKey) || []);
+    }
+    materialsByDate = mergeMaterialsByDate(materialsByDate, incoming, {
+      forceReplaceDateKeys: normalizedKeys,
+      protectAgainstShrink: false
+    });
+    syncCalendarDayCountsFromLoadedMaterials(normalizedKeys, { allowShrink: true });
+    for (const dateKey of normalizedKeys) {
+      lazyMetadataLoadedDateKeys.delete(dateKey);
+      if (isDateMaterialsLoadComplete(dateKey)) {
+        markSelectedDateHydrationComplete(dateKey);
+      }
+    }
+  }
+
+  async function rebalanceTodayBacklogFromToolsMenu(): Promise<void> {
+    try {
+      const storage = await getStorage();
+      await storage.initialize();
+      const ir =
+        plugin.getIncrementalReadingSettings?.() ??
+        plugin.settings?.incrementalReading ??
+        {};
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayDateKey = `${todayStart.getFullYear()}-${String(
+        todayStart.getMonth() + 1
+      ).padStart(2, '0')}-${String(todayStart.getDate()).padStart(2, '0')}`;
+      const chunks = Object.values((await storage.getAllChunkData()) || {});
+      const plan = selectTodayBacklogRebalancePlan({
+        chunks,
+        todayStartMs: todayStart.getTime(),
+        todayDateKey,
+        dailyTimeBudgetMinutes: Number(ir.dailyTimeBudgetMinutes) || 40,
+        dailyReadingPointCap: Number(ir.dailyReadingPointCap) || 15,
+        maxEstimatedMinutesPerItem: ir.maxEstimatedMinutesPerItem
+      });
+      const calendarTodayCount = getVisibleMaterialsForDate(todayDateKey).length;
+
+      if (plan.moveToPending.length === 0) {
+        if (calendarTodayCount > plan.todayOccupiedBefore) {
+          await recomputeAndBroadcastIRData(plugin.app, 'manual_reschedule', {
+            priorityDateKeys: [todayDateKey]
+          });
+          await authoritativelyReplacePriorityDateMaterials([todayDateKey]);
+          new Notice(
+            t('irSidebar.notices.rebalanceTodayBacklogNoneStale', {
+              before: plan.todayOccupiedBefore,
+              calendar: calendarTodayCount
+            }),
+            5000
+          );
+          return;
+        }
+        new Notice(t('irSidebar.notices.rebalanceTodayBacklogNone'));
+        return;
+      }
+
+      const confirmed = await showObsidianConfirm(
+        plugin.app,
+        t('irSidebar.notices.rebalanceTodayBacklogConfirm', {
+          before: plan.todayOccupiedBefore,
+          calendar: calendarTodayCount,
+          keep: plan.keep.length,
+          move: plan.moveToPending.length
+        }),
+        {
+          title: t('irSidebar.notices.rebalanceTodayBacklogConfirmTitle'),
+          confirmText: t('irSidebar.notices.rebalanceTodayBacklogConfirmAction'),
+          confirmClass: 'mod-warning'
+        }
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      const result = await rebalanceTodayReadingPointBacklog({
+        app: plugin.app,
+        storage,
+        todayStartMs: todayStart.getTime(),
+        dailyTimeBudgetMinutes: Number(ir.dailyTimeBudgetMinutes) || 40,
+        dailyReadingPointCap: Number(ir.dailyReadingPointCap) || 15,
+        maxEstimatedMinutesPerItem: ir.maxEstimatedMinutesPerItem
+      });
+
+      await recomputeAndRefreshSidebar('manual_reschedule', {
+        forceRecompute: true,
+        priorityDateKeys: [todayDateKey]
+      });
+      // recompute 快路径默认 protectAgainstShrink，会把已移入待放出的旧项留在今日列表。
+      await authoritativelyReplacePriorityDateMaterials([todayDateKey]);
+      new Notice(
+        t('irSidebar.notices.rebalanceTodayBacklogDone', {
+          kept: result.keptToday,
+          moved: result.movedToPending,
+          pinned: result.protectedPinned
+        }),
+        5000
+      );
+    } catch (error) {
+      logger.warn('[IRCalendarSidebar] Failed to rebalance today backlog:', error);
+      new Notice(t('irSidebar.notices.rebalanceTodayBacklogFailed'));
+    }
+  }
+
   function showMonthCalendarToolsMenu(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -3227,6 +3369,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     populateCalendarMaterialImportMenu(menu, {
       importTitle: t('irSidebar.header.importTitle'),
       onOpenImport: openImportModal
+    });
+
+    populateCalendarTodayBacklogRebalanceMenu(menu, {
+      rebalanceTitle: t('irSidebar.header.rebalanceTodayBacklogTitle'),
+      onRebalance: () => {
+        void rebalanceTodayBacklogFromToolsMenu();
+      }
     });
 
     if (shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)) {
@@ -3528,17 +3677,26 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   function selectDay(date: Date) {
     closeSchedulingMenu();
     markInteractionPressure();
+    // 取消旧日后台 reconcile 后，必须立刻 kick 选中日补洞，避免残缺队列长期停摆。
     cancelPendingCalendarReconcile();
     const key = formatDateKey(date);
     clearSelectedDateHydrationCompletedKeys([key]);
     selectedDate = new Date(date);
-    if (isPastCalendarDate(selectedDate, today)) {
+    const isPast = isPastCalendarDate(selectedDate, today);
+    if (isPast) {
       exitBatchSelectionMode();
     }
     const done = calendarProgressByDate[key] || [];
     processedChunkIds = new Set(done);
-    if (isPastCalendarDate(selectedDate, today)) {
+    if (isPast) {
       void mergePriorityDatesFromLocalCache([key], getActiveDeckIdsForQuery());
+    } else if (
+      shouldKickSelectedDateHydrate({
+        isPastDate: false,
+        loadSatisfied: isPriorityDateLoadSatisfied(key),
+      })
+    ) {
+      void ensureSelectedDateMaterialsLoaded(key);
     }
     void ensureDoneItemsVisibleForDate(key);
     syncContinueReadingSuggestionsModalVisibility();
@@ -5514,6 +5672,26 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       .filter((item): item is ScheduleItem => Boolean(item));
   }
 
+  function runBatchToolbarDestructive(
+    operation: "delete" | "remove",
+  ): void {
+    const targets = getBatchActionTargets();
+    if (targets.length === 0) {
+      new Notice(t('irSidebar.batch.selectItemsFirst'));
+      return;
+    }
+
+    const batchService = getReadingPointBatchService();
+    void runBatchMenuAction(
+      () =>
+        operation === "delete"
+          ? batchService.batchDelete(targets)
+          : batchService.batchRemove(targets),
+      applyBatchOperationResult,
+      operation,
+    );
+  }
+
   function showBatchActionsMenu(event: MouseEvent): void {
     const targets = getBatchActionTargets();
     if (targets.length === 0) {
@@ -5521,14 +5699,15 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       return;
     }
 
+    // Toolbar already exposes delete/remove; open move-topic list directly.
     const menu = new Menu();
-    void populateReadingPointBatchSubmenu(menu, {
-      app: plugin.app,
+    void populateBatchTopicSubmenu(
+      menu,
+      plugin.app,
       targets,
-      batchService: getReadingPointBatchService(),
-      onApplied: applyBatchOperationResult,
-      selectionHelpers: false
-    });
+      getReadingPointBatchService(),
+      applyBatchOperationResult,
+    );
     menu.showAtPosition({ x: event.clientX, y: event.clientY });
   }
 
@@ -8123,17 +8302,21 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let selectedHistoryCompletedCount = $derived(
     isSelectedDatePast ? unfilteredSelectedMaterials.length : 0
   );
-  let showSelectedDateMaterialsPending = $derived(
-    !isSelectedDatePast &&
-    !hasActiveSearch &&
-    unfilteredSelectedMaterials.length === 0 &&
-    !isPriorityDateLoadSatisfied(formatDateKey(selectedDate)) &&
-    (
-      priorityDatesReconcilePending ||
-      calendarDataPhase === 'cold_start_blocking' ||
-      getScheduledCountForDateKey(formatDateKey(selectedDate)) > 0
-    )
-  );
+  let showSelectedDateMaterialsPending = $derived.by(() => {
+    const dateKey = formatDateKey(selectedDate);
+    const heatmapCount = calendarDayCountsByDate.get(dateKey) ?? 0;
+    const scheduledCount = getScheduledCountForDateKey(dateKey);
+    return shouldShowSelectedDateMaterialsPending({
+      isPastDate: isSelectedDatePast,
+      hasActiveSearch,
+      materialsEmpty: unfilteredSelectedMaterials.length === 0,
+      loadSatisfied: isPriorityDateLoadSatisfied(dateKey),
+      reconcilePending: priorityDatesReconcilePending,
+      isColdStartBlocking: calendarDataPhase === 'cold_start_blocking',
+      // 热力与可见计数取大：列表子集时 scheduledCount 会偏小，仍靠 kick hydrate，不靠阻塞 spinner。
+      expectedMaterialSignal: Math.max(heatmapCount, scheduledCount),
+    });
+  });
   let showTodayAllDoneHeaderChip = $derived(
     !hasActiveSearch &&
     isSameDay(selectedDate, today) &&
@@ -8153,6 +8336,18 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       showHistoryHydrationPending
   );
   let showReadingListLoading = $derived(isLoading || showReadingListPreparing);
+  let activeDayReadingListEmptyKind = $derived(
+    resolveActiveDayReadingListEmptyKind({
+      isPastDate: isSelectedDatePast,
+      hasActiveSearch,
+      isLoading: showReadingListLoading,
+      displayedCount: displayedMaterials.length,
+      unfilteredCount: unfilteredSelectedMaterials.length,
+      activeTagFilter: activeReadingTagFilter,
+      hideTodayCompleted: hideTodayCompletedReadingPoints,
+      isToday: isSameDay(selectedDate, today),
+    })
+  );
   let showDayLoadInfoButton = $derived(
     !isSelectedDatePast &&
     !hasActiveSearch &&
@@ -8238,10 +8433,19 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   });
 
   $effect(() => {
-    if (!showSelectedDateMaterialsPending || isSelectedDatePreparing) {
+    if (hasActiveSearch || isSelectedDatePreparing) {
       return;
     }
     const dateKey = formatDateKey(selectedDate);
+    const isPast = isPastCalendarDate(selectedDate, today);
+    if (
+      !shouldKickSelectedDateHydrate({
+        isPastDate: isPast,
+        loadSatisfied: isPriorityDateLoadSatisfied(dateKey),
+      })
+    ) {
+      return;
+    }
     void ensureSelectedDateMaterialsLoaded(dateKey);
   });
 
@@ -8380,9 +8584,13 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     {hasActiveSearch}
     {unfilteredSelectedMaterials}
     {activeReadingTagFilter}
+    activeDayEmptyKind={activeDayReadingListEmptyKind}
     {materialListProps}
     onClearSearch={clearSearch}
     onClearTagFilter={() => { activeReadingTagFilter = ''; }}
+    onShowCompletedReadingPoints={() => {
+      void setHideTodayCompletedReadingPointsEnabled(false);
+    }}
   />
 
   {#if activeReadingTimer}
@@ -8399,6 +8607,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       selectedCount={batchSelectedIds.size}
       onSelectAllDisplayed={selectAllDisplayedMaterials}
       onClearSelection={clearBatchSelection}
+      onBatchDelete={() => runBatchToolbarDestructive('delete')}
+      onBatchRemove={() => runBatchToolbarDestructive('remove')}
       onShowBatchActionsMenu={showBatchActionsMenu}
       onExitSelectionMode={exitBatchSelectionMode}
     />

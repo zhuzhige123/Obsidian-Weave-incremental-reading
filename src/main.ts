@@ -12,7 +12,11 @@ import { IRDataManagementModalObsidian } from "./components/incremental-reading/
 import { dispatchOpenIRTutorial } from "./components/incremental-reading/tutorial/ir-tutorial-events";
 import { StandaloneIRSettingsTab } from "./components/settings/StandaloneIRSettingsTab";
 import { STANDALONE_IR_SETTINGS_NAVIGATE_EVENT } from "./components/settings/standalone-ir-settings-search";
-import { resolveIRImportFolder } from "./config/paths";
+import {
+	clearActiveWeaveParentFolder,
+	resolveIRImportFolder,
+	setActiveWeaveParentFolder,
+} from "./config/paths";
 import type { SelectionToIRSubmitPayload } from "./modals/SelectionToIRModal";
 import {
 	type EpubHostIRCapabilities,
@@ -24,9 +28,15 @@ import {
 import { createAnchorManager } from "./services/incremental-reading/AnchorManager";
 import {
 	type ExistingChunkLike,
+	type ExistingMaterialLike,
 	applyIncrementalReadingFolderSubscriptionCandidates,
 	scanIncrementalReadingFolderSubscriptions,
 } from "./services/incremental-reading/IRFolderSubscriptionSyncService";
+import {
+	countTodayOccupiedReadingPoints,
+	sumTodayOccupiedReadingMinutes,
+} from "./services/incremental-reading/IRFolderSubscriptionAdmissionService";
+import { resolveRemainingDailyAdmissionQuota } from "./services/incremental-reading/IRDailyLoadAllocator";
 import { cleanupFolderSubscriptionNonMarkdownAutoSubscribedEntries } from "./services/incremental-reading/folder-subscription-non-md-cleanup";
 import { getSharedIRHostCriticalWorkGuard } from "./services/incremental-reading/IRHostCriticalWorkGuard";
 import { getSharedIRSourcePathRenameService } from "./services/incremental-reading/IRSourcePathRenameService";
@@ -69,6 +79,7 @@ import {
 } from "./services/incremental-reading/ReadingMaterialStorage";
 import { replaceSelectionInMarkdownContent } from "./services/incremental-reading/SelectionQuickCreateSourceTransform";
 import { shouldTriggerFolderSubscriptionResyncForVaultEvent } from "./services/incremental-reading/folder-subscription-event-trigger";
+import { resolveMarkdownFilesForFolderSubscriptionPaths } from "./services/incremental-reading/folder-subscription-vault-scan";
 import { IR_RUNTIME } from "./services/incremental-reading/ir-runtime";
 import {
 	buildDefaultIncrementalReadingSettings,
@@ -223,6 +234,8 @@ export default class StandaloneIncrementalReadingPlugin
 	private incrementalReadingFolderSubscriptionResyncTimer: number | null = null;
 	private incrementalReadingFolderSubscriptionSyncPromise: Promise<number> | null =
 		null;
+	/** file-change debounce 窗口内待增量同步的 md 路径（避免整树重扫）。 */
+	private pendingFolderSubscriptionResyncPaths = new Set<string>();
 	private deferredStartupPromise: Promise<void> | null = null;
 	private unregisterPremiumFeaturePreviewHost: (() => void) | null = null;
 	private unregisterWeaveSettingsLayoutObserver: (() => void) | null = null;
@@ -396,7 +409,7 @@ export default class StandaloneIncrementalReadingPlugin
 	private async runDeferredStartupTasks(): Promise<void> {
 		try {
 			await this.initializeReadingMaterialServices();
-			await this.ensureDefaultIRDeckExists();
+			// 启动只读基线：不创建默认专题、不自动迁移改写 .irdeck（避免云同步 mtime 竞态）。
 			void getSharedIRPointStorageService(this.app).ensureRuntimeBaseline();
 			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
 				async () => {
@@ -419,13 +432,7 @@ export default class StandaloneIncrementalReadingPlugin
 					}
 				},
 			);
-			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
-				async () => {
-					await this.syncIncrementalReadingFolderSubscriptionFromSettings({
-						trigger: "startup",
-					});
-				},
-			);
+			// 启动时不做文件夹订阅 apply 写入；仅由用户打开 IR / 设置变更 / 手动同步触发。
 		} catch (error) {
 			logger.warn("[Standalone IR] 后台启动任务失败", error);
 		}
@@ -448,7 +455,9 @@ export default class StandaloneIncrementalReadingPlugin
 			window.clearTimeout(this.incrementalReadingFolderSubscriptionResyncTimer);
 			this.incrementalReadingFolderSubscriptionResyncTimer = null;
 		}
+		this.pendingFolderSubscriptionResyncPaths.clear();
 		unregisterEpubHost(this.app);
+		clearActiveWeaveParentFolder();
 	}
 
 	private registerWorkspaceViews(): void {
@@ -577,6 +586,7 @@ export default class StandaloneIncrementalReadingPlugin
 			this.normalizeIRCalendarSidebarSettings(
 				this.settings.incrementalReading.calendarSidebar,
 			);
+		setActiveWeaveParentFolder(this.settings.weaveParentFolder);
 		if (licenseSettingsChanged) {
 			await this.saveData(this.settings);
 		}
@@ -596,6 +606,7 @@ export default class StandaloneIncrementalReadingPlugin
 		PremiumFeatureGuard.getInstance().setPremiumFeaturesPreview(
 			this.settings.showPremiumFeaturesPreview ?? false,
 		);
+		setActiveWeaveParentFolder(this.settings.weaveParentFolder);
 		await this.saveData(this.settings);
 		await this.refreshPremiumState();
 	}
@@ -683,6 +694,7 @@ export default class StandaloneIncrementalReadingPlugin
 
 	async syncIncrementalReadingFolderSubscriptionFromSettings(options?: {
 		trigger?: "startup" | "settings" | "file-change" | "manual";
+		filePaths?: string[];
 	}): Promise<number> {
 		const previous =
 			this.incrementalReadingFolderSubscriptionSyncPromise ??
@@ -705,9 +717,14 @@ export default class StandaloneIncrementalReadingPlugin
 
 	private async performIncrementalReadingFolderSubscriptionSync(options?: {
 		trigger?: "startup" | "settings" | "file-change" | "manual";
+		filePaths?: string[];
 	}): Promise<number> {
 		await this.ensureDeferredStartupComplete();
 		const trigger = options?.trigger ?? "manual";
+		// 启动路径禁止向 vault 写入阅读点，避免「设置已同步、专题尚未同步」时本地补写抬高 mtime。
+		if (trigger === "startup") {
+			return 0;
+		}
 		if (
 			!PremiumFeatureGuard.getInstance().canUseFeature(
 				PREMIUM_FEATURES.FOLDER_SUBSCRIPTION,
@@ -723,14 +740,36 @@ export default class StandaloneIncrementalReadingPlugin
 		const storage = new IRStorageService(this.app);
 		await storage.initialize();
 
-		const cleanupResult =
-			await cleanupFolderSubscriptionNonMarkdownAutoSubscribedEntries(
-				this.app,
-				{
-					storage,
-					readingMaterialStorage: this.readingMaterialStorage,
-				},
-			);
+		const useIncrementalFileChange =
+			trigger === "file-change" && Array.isArray(options?.filePaths);
+		const incrementalFiles = useIncrementalFileChange
+			? resolveMarkdownFilesForFolderSubscriptionPaths(
+					this.app,
+					options?.filePaths || [],
+			  )
+			: null;
+
+		// 非 md 误导入清理只在全量同步路径执行；file-change 增量不需要扫全库 chunk。
+		const cleanupResult = useIncrementalFileChange
+			? {
+					scanned: 0,
+					deletedChunks: 0,
+					deletedMaterials: 0,
+					deletedChunkIds: [] as string[],
+					deletedMaterialIds: [] as string[],
+					skippedAsSessionComplete: true as const,
+			  }
+			: await cleanupFolderSubscriptionNonMarkdownAutoSubscribedEntries(
+					this.app,
+					{
+						storage,
+						readingMaterialStorage: this.readingMaterialStorage,
+					},
+			  );
+
+		if (useIncrementalFileChange && (!incrementalFiles || incrementalFiles.length === 0)) {
+			return cleanupResult.deletedChunks;
+		}
 
 		const decks = Object.values(await storage.getAllDecks()).filter(
 			(deck) => !deck.archivedAt,
@@ -752,21 +791,41 @@ export default class StandaloneIncrementalReadingPlugin
 				deckById.has(String(rule.deckId || "").trim()),
 			),
 		};
-		const chunks = Object.values(await storage.getAllChunkData());
-		const materials = this.readingMaterialStorage
-			.getAllMaterials()
-			.map((material) => ({
-				uuid: material.uuid,
-				filePath: material.filePath,
-				readingDeckId: material.readingDeckId,
-				topicId: material.topicId,
-			}));
+
+		let chunks: ExistingChunkLike[];
+		let materials: ExistingMaterialLike[];
+		if (incrementalFiles) {
+			chunks = [];
+			for (const file of incrementalFiles) {
+				const fileChunks = await storage.getChunksByFilePath(file.path);
+				for (const chunk of fileChunks) {
+					chunks.push(chunk as unknown as ExistingChunkLike);
+				}
+			}
+			materials = this.collectFolderSubscriptionMaterialsForFiles(
+				incrementalFiles,
+			);
+		} else {
+			chunks = Object.values(await storage.getAllChunkData()) as unknown as ExistingChunkLike[];
+			materials = this.readingMaterialStorage
+				.getAllMaterials()
+				.map((material) => ({
+					uuid: material.uuid,
+					filePath: material.filePath,
+					readingDeckId: material.readingDeckId,
+					topicId: material.topicId,
+				}));
+		}
+
 		const scanResult = await scanIncrementalReadingFolderSubscriptions({
 			app: this.app,
 			settings: subscriptionSettingsForScan,
-			existingChunks: chunks as unknown as ExistingChunkLike[],
+			existingChunks: chunks,
 			existingMaterials: materials,
 			deckNameById,
+			...(incrementalFiles
+				? { limitToFiles: incrementalFiles }
+				: {}),
 		});
 
 		if (scanResult.activeRuleCount === 0) {
@@ -779,7 +838,7 @@ export default class StandaloneIncrementalReadingPlugin
 			return cleanupResult.deletedChunks;
 		}
 
-		if (scanResult.pendingCount > 0 && trigger !== "file-change") {
+		if (scanResult.pendingCount > 0) {
 			const threshold = Number(
 				folderSubscription?.importConfirmThreshold ?? 20,
 			);
@@ -823,6 +882,23 @@ export default class StandaloneIncrementalReadingPlugin
 		const pinToToday = folderSubscription?.initialScheduleMode !== "scheduled";
 		const irSettings = this.getIncrementalReadingSettings();
 		const todayStart = this.getIncrementalReadingTodayStart();
+		const endOfToday = new Date(todayStart);
+		endOfToday.setHours(23, 59, 59, 999);
+		const allChunks = Object.values((await storage.getAllChunkData()) || {});
+		const remainingTodaySlots = resolveRemainingDailyAdmissionQuota({
+			dailyTimeBudgetMinutes: Number(irSettings.dailyTimeBudgetMinutes) || 40,
+			dailyReadingPointCap: Number(irSettings.dailyReadingPointCap) || 15,
+			todayOccupiedCount: countTodayOccupiedReadingPoints(
+				allChunks,
+				endOfToday.getTime(),
+			),
+			todayOccupiedMinutes: sumTodayOccupiedReadingMinutes(
+				allChunks,
+				endOfToday.getTime(),
+				irSettings.maxEstimatedMinutesPerItem,
+			),
+			maxEstimatedMinutesPerItem: irSettings.maxEstimatedMinutesPerItem,
+		}).admitCount;
 		const applyResult =
 			await applyIncrementalReadingFolderSubscriptionCandidates({
 				candidates: scanResult.candidates.map((candidate) => ({
@@ -833,12 +909,7 @@ export default class StandaloneIncrementalReadingPlugin
 						"",
 				})),
 				pinToToday,
-				// 仅「按算法正常调度」使用；「添加到今天」路径忽略该选项。
-				initialScheduleSpread: {
-					enabled: !pinToToday,
-					horizonDays: Number(irSettings.horizonSpreadDays) || 7,
-					anchorMs: todayStart.getTime(),
-				},
+				remainingTodaySlots,
 				getOrCreateMaterial: async (file, options) => {
 					const material =
 						await this.readingMaterialManager.ensureMaterialForFolderSubscription(
@@ -906,6 +977,55 @@ export default class StandaloneIncrementalReadingPlugin
 		return changedCount;
 	}
 
+	/**
+	 * file-change 增量：只收集待评估文件相关的材料索引，避免 getAllMaterials 全量投影。
+	 */
+	private collectFolderSubscriptionMaterialsForFiles(
+		files: TFile[],
+	): ExistingMaterialLike[] {
+		const byId = new Map<string, ExistingMaterialLike>();
+		const pushMaterial = (material: {
+			uuid?: string;
+			filePath?: string;
+			readingDeckId?: string;
+			topicId?: string;
+		} | null): void => {
+			if (!material) {
+				return;
+			}
+			const uuid = String(material.uuid || "").trim();
+			if (!uuid || byId.has(uuid)) {
+				return;
+			}
+			byId.set(uuid, {
+				uuid,
+				filePath: material.filePath,
+				readingDeckId: material.readingDeckId,
+				topicId: material.topicId,
+			});
+		};
+
+		for (const file of files) {
+			pushMaterial(this.readingMaterialStorage.getMaterialByPath(file.path));
+			try {
+				const yamlReadingId = String(
+					this.app.metadataCache?.getFileCache?.(file)?.frontmatter?.[
+						"weave-reading-id"
+					] || "",
+				).trim();
+				if (yamlReadingId) {
+					pushMaterial(
+						this.readingMaterialStorage.getMaterialById(yamlReadingId),
+					);
+				}
+			} catch {
+				/* ignored */
+			}
+		}
+
+		return [...byId.values()];
+	}
+
 	getIRCalendarSidebarSettings(): IRCalendarSidebarSettings {
 		if (!this.irCalendarSidebarSettingsCache) {
 			this.irCalendarSidebarSettingsCache =
@@ -951,6 +1071,8 @@ export default class StandaloneIncrementalReadingPlugin
 			state?: Record<string, unknown>;
 		} = {},
 	): Promise<void> {
+		await this.ensureIRUserWorkspaceReady();
+
 		const { workspace } = this.app;
 		let leaf: WorkspaceLeaf | null =
 			workspace.getLeavesOfType(VIEW_TYPE_IR_CALENDAR)[0] || null;
@@ -1260,6 +1382,17 @@ export default class StandaloneIncrementalReadingPlugin
 		markServiceReady("readingMaterialManager");
 	}
 
+	/**
+	 * 用户首次打开 IR 界面时再准备可写工作区：
+	 * - 懒创建默认专题（避免「打开 Obsidian 但同步未完成」时空库误建抬高 mtime）
+	 * - 显式跑一次性 vault 维护（迁移/路径规范化/legacy 统一）
+	 */
+	async ensureIRUserWorkspaceReady(): Promise<void> {
+		await this.ensureDeferredStartupComplete();
+		await this.ensureDefaultIRDeckExists();
+		await getSharedIRPointStorageService(this.app).runDeferredVaultMutations();
+	}
+
 	private async ensureDefaultIRDeckExists(): Promise<void> {
 		const pointStorage = new IRPointStorageService(this.app);
 		if (await pointStorage.hasAnyVaultPointDeck()) {
@@ -1439,23 +1572,34 @@ export default class StandaloneIncrementalReadingPlugin
 			if (!shouldResync) {
 				return;
 			}
-			this.scheduleIncrementalReadingFolderSubscriptionResync();
+			this.scheduleIncrementalReadingFolderSubscriptionResync(file.path);
 		} catch (error) {
 			logger.warn("[Standalone IR] 订阅文件夹变更处理失败:", error);
 		}
 	}
 
-	private scheduleIncrementalReadingFolderSubscriptionResync(): void {
+	private scheduleIncrementalReadingFolderSubscriptionResync(
+		filePath?: string,
+	): void {
+		const normalizedPath = normalizePath(String(filePath || "").trim());
+		if (normalizedPath) {
+			this.pendingFolderSubscriptionResyncPaths.add(normalizedPath);
+		}
 		if (this.incrementalReadingFolderSubscriptionResyncTimer !== null) {
 			window.clearTimeout(this.incrementalReadingFolderSubscriptionResyncTimer);
 		}
 		this.incrementalReadingFolderSubscriptionResyncTimer = window.setTimeout(
 			() => {
 				this.incrementalReadingFolderSubscriptionResyncTimer = null;
+				const pendingPaths = [
+					...this.pendingFolderSubscriptionResyncPaths,
+				];
+				this.pendingFolderSubscriptionResyncPaths.clear();
 				getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
 					async () => {
 						await this.syncIncrementalReadingFolderSubscriptionFromSettings({
 							trigger: "file-change",
+							filePaths: pendingPaths,
 						});
 					},
 				);
@@ -1646,7 +1790,17 @@ export default class StandaloneIncrementalReadingPlugin
 				});
 			}
 
-			if (!options.recompute || !hasIndexChanges) {
+			if (!options.recompute) {
+				return;
+			}
+
+			// vault_change：即便索引元数据未变，.irdeck 内日程字段也可能被云同步覆盖，
+			// 必须失效投影缓存并从 vault 重建，避免 UI 卡在旧 schedule/due/day cache。
+			const hasVaultPathTouches =
+				options.trigger === "vault_change" &&
+				((options.changedPaths?.length ?? 0) > 0 ||
+					(options.removedPaths?.length ?? 0) > 0);
+			if (!hasIndexChanges && !hasVaultPathTouches) {
 				return;
 			}
 

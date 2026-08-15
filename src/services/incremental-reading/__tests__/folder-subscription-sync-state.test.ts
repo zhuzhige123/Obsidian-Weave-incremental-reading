@@ -72,4 +72,28 @@ describe("evaluateFolderSubscriptionSyncState", () => {
 		expect(state.isFullySubscribed).toBe(true);
 		expect(state.needsSync).toBe(false);
 	});
+
+	it("待放出（pendingFolderAdmission）不算调度失效，视为完整订阅", () => {
+		const state = evaluateFolderSubscriptionSyncState({
+			targetDeckId: "deck-a",
+			existingMaterial: {
+				uuid: "tk-ir-1",
+				readingDeckId: "deck-a",
+			},
+			existingChunk: {
+				filePath: "Inbox/note.md",
+				deckIds: ["deck-a"],
+				topicIds: ["deck-a"],
+				scheduleStatus: "new",
+				nextRepDate: Date.UTC(2099, 0, 1),
+				meta: {
+					readingMaterialId: "tk-ir-1",
+					pendingFolderAdmission: true,
+				},
+			},
+		});
+
+		expect(state.isFullySubscribed).toBe(true);
+		expect(state.syncGaps).not.toContain("chunk_schedule_inactive");
+	});
 });

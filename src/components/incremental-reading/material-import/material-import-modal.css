@@ -183,20 +183,26 @@
   .material-import-modal .search-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
     padding: 10px 20px;
     border-bottom: 1px solid var(--background-modifier-border);
-    color: var(--text-muted);
     flex-shrink: 0;
   }
 
-  .material-import-modal .search-input {
+  .material-import-modal .search-bar .weave-ir-search-host {
     flex: 1;
-    border: none;
-    background: transparent;
-    color: var(--text-normal);
-    font-size: 14px;
-    outline: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .material-import-modal .search-bar .weave-ir-search-host .search-input-container {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .material-import-modal .search-bar .weave-ir-search-host .search-input-clear-button {
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
 
   .material-import-modal .toolbar {

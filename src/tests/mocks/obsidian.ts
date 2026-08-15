@@ -666,6 +666,55 @@ export const setIcon = vi.fn((element: HTMLElement, iconName: string) => {
 	element.setAttribute("data-icon", iconName);
 });
 
+export class SearchComponent {
+	inputEl: HTMLInputElement;
+	clearButtonEl: HTMLElement;
+	private _onChange: ((value: string) => void) | null = null;
+
+	constructor(containerEl: HTMLElement) {
+		const root = document.createElement("div");
+		root.className = "search-input-container";
+		this.inputEl = document.createElement("input");
+		this.inputEl.className = "search-input";
+		this.inputEl.type = "search";
+		this.clearButtonEl = document.createElement("div");
+		this.clearButtonEl.className = "search-input-clear-button";
+		root.appendChild(this.inputEl);
+		root.appendChild(this.clearButtonEl);
+		containerEl.appendChild(root);
+		this.clearButtonEl.addEventListener("click", () => {
+			this.setValue("");
+			this._onChange?.("");
+		});
+		this.inputEl.addEventListener("input", () => {
+			this._onChange?.(this.inputEl.value);
+		});
+	}
+
+	getValue(): string {
+		return this.inputEl.value;
+	}
+
+	setValue(value: string): this {
+		this.inputEl.value = value;
+		return this;
+	}
+
+	setPlaceholder(placeholder: string): this {
+		this.inputEl.placeholder = placeholder;
+		return this;
+	}
+
+	onChange(callback: (value: string) => void): this {
+		this._onChange = callback;
+		return this;
+	}
+
+	onChanged(): void {
+		this._onChange?.(this.inputEl.value);
+	}
+}
+
 export const requestUrl = vi.fn();
 
 export const getLanguage = vi.fn(() => {
@@ -706,6 +755,7 @@ export default {
 	AbstractInputSuggest,
 	Menu,
 	MenuItem,
+	SearchComponent,
 	WorkspaceLeaf,
 	normalizePath,
 	moment,

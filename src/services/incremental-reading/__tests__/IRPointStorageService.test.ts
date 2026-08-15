@@ -2095,4 +2095,192 @@ body`,
 		const decks = await service.listPointDecks();
 		expect(decks["topic-lag"]?.name).toBe("Lag Topic");
 	});
+
+	it("batch-deletes multiple points with one rewrite per topic file", async () => {
+		const v2Paths = getV2Paths("");
+		const pointFilePath = `${v2Paths.ir.root}/points/Batch Topic.irdeck`;
+		const { app, files } = createMemoryApp(
+			{
+				[pointFilePath]: JSON.stringify({
+					schemaVersion: IR_POINT_STORAGE_VERSION,
+					topicId: "topic-batch",
+					topicName: "Batch Topic",
+					updatedAt: "2026-04-16T12:00:00.000Z",
+					points: [
+						{
+							id: "point-a",
+							source: { type: "markdown", path: "Notes/A.md" },
+							trace: { locatorType: "markdown-block" },
+							relations: { topicIds: ["topic-batch"] },
+						},
+						{
+							id: "point-b",
+							source: { type: "markdown", path: "Notes/B.md" },
+							trace: { locatorType: "markdown-block" },
+							relations: {
+								topicIds: ["topic-batch"],
+								parentPointId: "point-a",
+							},
+						},
+						{
+							id: "point-c",
+							source: { type: "markdown", path: "Notes/C.md" },
+							trace: { locatorType: "markdown-block" },
+							relations: { topicIds: ["topic-batch"] },
+						},
+					],
+				}),
+			},
+			[`${v2Paths.ir.root}/points`],
+		);
+		files.set(
+			getPointFilesIndexPath(app),
+			JSON.stringify({
+				version: 1,
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				files: [
+					{
+						file: "weave Incremental reading/points/Batch Topic.irdeck",
+						topicId: "topic-batch",
+						topicName: "Batch Topic",
+						pointCount: 3,
+						pointIds: ["point-a", "point-b", "point-c"],
+						updatedAt: "2026-04-16T10:00:00.000Z",
+					},
+				],
+			}),
+		);
+
+		const service = new IRPointStorageService(app);
+		const writeSpy = vi.spyOn(app.vault.adapter, "write");
+
+		const deleted = await service.deletePointsByLegacyIds([
+			"point-a",
+			"point-c",
+			"missing",
+		]);
+
+		expect(Array.from(deleted).sort()).toEqual(["point-a", "point-c"]);
+
+		const pointFile = JSON.parse(
+			files.get(normalizeTestPath(pointFilePath)) || "{}",
+		);
+		expect(pointFile.points).toHaveLength(1);
+		expect(pointFile.points[0].id).toBe("point-b");
+		expect(pointFile.points[0].relations.parentPointId).toBeNull();
+
+		const pointIndex = JSON.parse(
+			files.get(getPointFilesIndexPath(app)) || "{}",
+		);
+		expect(pointIndex.files[0]).toMatchObject({
+			pointCount: 1,
+			pointIds: ["point-b"],
+		});
+
+		const pointFileWrites = writeSpy.mock.calls.filter((args) =>
+			normalizeTestPath(String(args[0] || "")).endsWith("Batch Topic.irdeck"),
+		);
+		// One coalesced rewrite for delete + parent-link cleanup (initialize may also touch it).
+		expect(pointFileWrites.length).toBeLessThanOrEqual(2);
+		writeSpy.mockRestore();
+	});
+
+	it("ensureRuntimeBaseline does not rewrite vault .irdeck files", async () => {
+		const v2Paths = getV2Paths("");
+		const pointPath = `${v2Paths.ir.root}/points/历史专题.irdeck`;
+		const original = JSON.stringify(
+			{
+				schemaVersion: 1,
+				topicId: "topic-history",
+				topicName: "历史专题",
+				updatedAt: "2026-04-16T10:00:00.000Z",
+				points: [
+					{
+						id: "point-1",
+						kind: "chunk",
+						source: {
+							type: "markdown",
+							path: "Notes/a.md",
+						},
+						schedule: { status: "new" },
+						relations: { topicIds: ["topic-history"] },
+						userData: { title: "p1", tags: [] },
+						stats: {},
+						audit: {
+							createdAt: "2026-04-16T10:00:00.000Z",
+							updatedAt: "2026-04-16T10:00:00.000Z",
+						},
+					},
+				],
+			},
+			null,
+			2,
+		);
+		const { app, files } = createMemoryApp({
+			[pointPath]: original,
+		});
+		const service = new IRPointStorageService(app);
+		const writeSpy = vi.spyOn(app.vault.adapter, "write");
+
+		await service.ensureRuntimeBaseline();
+
+		const irdeckWrites = writeSpy.mock.calls.filter((args) =>
+			normalizeTestPath(String(args[0] || "")).endsWith(".irdeck"),
+		);
+		expect(irdeckWrites).toHaveLength(0);
+		expect(files.get(normalizeTestPath(pointPath))).toBe(original);
+		writeSpy.mockRestore();
+	});
+
+	it("runDeferredVaultMutations can normalize invalid source paths on disk", async () => {
+		const v2Paths = getV2Paths("");
+		const pointPath = `${v2Paths.ir.root}/points/历史专题.irdeck`;
+		const { app, files } = createMemoryApp({
+			[pointPath]: JSON.stringify(
+				{
+					schemaVersion: 1,
+					topicId: "topic-history",
+					topicName: "历史专题",
+					updatedAt: "2026-04-16T10:00:00.000Z",
+					points: [
+						{
+							id: "point-bad-path",
+							kind: "chunk",
+							source: {
+								type: "markdown",
+								// Absolute-looking path that sanitizer clears/normalizes.
+								path: "/Notes/absolute.md",
+							},
+							trace: {
+								locatorType: "markdown-heading",
+								locator: { sourcePath: "/Notes/absolute.md" },
+							},
+							schedule: { status: "new" },
+							relations: { topicIds: ["topic-history"] },
+							userData: { title: "bad", tags: [] },
+							stats: {},
+							audit: {
+								createdAt: "2026-04-16T10:00:00.000Z",
+								updatedAt: "2026-04-16T10:00:00.000Z",
+							},
+						},
+					],
+				},
+				null,
+				2,
+			),
+		});
+		const service = new IRPointStorageService(app);
+		const normalizeSpy = vi.spyOn(service, "normalizeAllPointSourcePathsOnDisk");
+
+		await service.runDeferredVaultMutations();
+
+		expect(normalizeSpy).toHaveBeenCalled();
+		const after = JSON.parse(
+			files.get(normalizeTestPath(pointPath)) || "{}",
+		);
+		// Either cleared or rewritten; file must remain readable and topic intact.
+		expect(after.topicId).toBe("topic-history");
+		normalizeSpy.mockRestore();
+	});
 });

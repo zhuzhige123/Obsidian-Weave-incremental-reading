@@ -49,6 +49,25 @@ function normalizePointIdList(ids: string[] | undefined): string[] {
 	);
 }
 
+/** 比较 due-index 有效载荷时忽略 updatedAt，避免冷启动重建无意义抬高 mtime。 */
+function serializeDueDateIndexPayload(store: IRDueDateIndexStore): string {
+	const byDateKeys = Object.keys(store.byDate || {}).sort();
+	const byDate: Record<string, string[]> = {};
+	for (const key of byDateKeys) {
+		byDate[key] = normalizePointIdList(store.byDate[key]).sort();
+	}
+	const byPointIdKeys = Object.keys(store.byPointId || {}).sort();
+	const byPointId: Record<string, string> = {};
+	for (const key of byPointIdKeys) {
+		byPointId[key] = String(store.byPointId[key] || "").trim();
+	}
+	return JSON.stringify({
+		version: store.version,
+		byDate,
+		byPointId,
+	});
+}
+
 /**
  * nextRepDate 倒排索引：dateKey → pointIds，持久化于插件 cache。
  * 月历某日 due 查询 O(k) 而非全库扫描。
@@ -318,6 +337,32 @@ export class IRDueDateIndexService {
 	private async writeDiskStore(store: IRDueDateIndexStore): Promise<void> {
 		const diskPath = this.getDiskPath();
 		const adapter = this.app.vault.adapter;
+		const nextPayload = serializeDueDateIndexPayload(store);
+		try {
+			if (await adapter.exists(diskPath)) {
+				const raw = await adapter.read(diskPath);
+				const existing = JSON.parse(raw) as Partial<IRDueDateIndexStore>;
+				if (
+					existing?.version === DUE_DATE_INDEX_VERSION &&
+					serializeDueDateIndexPayload({
+						version: DUE_DATE_INDEX_VERSION,
+						updatedAt: String(existing.updatedAt || ""),
+						byDate:
+							existing.byDate && typeof existing.byDate === "object"
+								? existing.byDate
+								: {},
+						byPointId:
+							existing.byPointId && typeof existing.byPointId === "object"
+								? existing.byPointId
+								: {},
+					}) === nextPayload
+				) {
+					return;
+				}
+			}
+		} catch {
+			// 读取失败时继续写入
+		}
 		await DirectoryUtils.ensureDirForFile(adapter, diskPath);
 		await adapter.write(diskPath, JSON.stringify(store, null, 2));
 	}
