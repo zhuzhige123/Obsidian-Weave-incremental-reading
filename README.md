@@ -2,7 +2,7 @@
 
 [中文](#中文文档) | [English](README.en.md)
 
-<div align="center">
+
 
 <img width="1536" height="1024" alt="weave-series-banner-og" src="https://github.com/user-attachments/assets/3de85cb0-601e-4e82-b130-8e2cda5e99f4" />
 
