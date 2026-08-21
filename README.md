@@ -4,9 +4,9 @@
 
 <div align="center">
 
+---
 
 ![weave-series-banner-og](https://github.com/user-attachments/assets/c352b193-d8c9-443b-94bb-8d03f91b9eff)
-
 ![weave-series-banner-trinity](https://github.com/user-attachments/assets/8f748341-bb83-4cf9-b020-d8cd18a2aa92)
 
 ![weave-plugin-banner-ir](https://github.com/user-attachments/assets/b5c93a45-8f2a-4d19-af3e-5c8f7454b03e)
