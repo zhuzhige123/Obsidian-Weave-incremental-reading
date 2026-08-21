@@ -4,6 +4,8 @@
 
 <div align="center">
 
+<img width="1536" height="1024" alt="weave-series-banner-og" src="https://github.com/user-attachments/assets/3de85cb0-601e-4e82-b130-8e2cda5e99f4" />
+
 ![weave-series-banner-trinity](https://github.com/user-attachments/assets/8f748341-bb83-4cf9-b020-d8cd18a2aa92)
 
 ![weave-plugin-banner-ir](https://github.com/user-attachments/assets/b5c93a45-8f2a-4d19-af3e-5c8f7454b03e)
