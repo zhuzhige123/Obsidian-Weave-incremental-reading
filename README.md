@@ -4,6 +4,10 @@
 
 <div align="center">
 
+![weave-series-banner-trinity](https://github.com/user-attachments/assets/b43fa752-adff-4a72-aab7-ece2117790fe)
+
+![weave-plugin-banner-ir](https://github.com/user-attachments/assets/b5c93a45-8f2a-4d19-af3e-5c8f7454b03e)
+
 **把「以后再看」变成可持续推进的阅读队列**
 
 Standalone incremental reading for Obsidian — topics, reading points, calendar scheduling, and source resume
