@@ -4,7 +4,7 @@
 
 
 
-<img width="1536" height="1024" alt="weave-series-banner-og" src="https://github.com/user-attachments/assets/3de85cb0-601e-4e82-b130-8e2cda5e99f4" />
+![weave-series-banner-og](https://github.com/user-attachments/assets/a52c0875-9296-4dfd-bf94-114a225f2972)
 
 ![weave-series-banner-trinity](https://github.com/user-attachments/assets/8f748341-bb83-4cf9-b020-d8cd18a2aa92)
 
