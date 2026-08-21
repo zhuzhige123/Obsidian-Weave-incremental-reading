@@ -3,8 +3,10 @@
 [中文](#中文文档) | [English](README.en.md)
 
 <div align="center">
+   
+![weave-series-banner-og](https://github.com/user-attachments/assets/a52c0875-9296-4dfd-bf94-114a225f2972)
 
-![weave-series-banner-trinity](https://github.com/user-attachments/assets/b43fa752-adff-4a72-aab7-ece2117790fe)
+![weave-series-banner-trinity](https://github.com/user-attachments/assets/8f748341-bb83-4cf9-b020-d8cd18a2aa92)
 
 ![weave-plugin-banner-ir](https://github.com/user-attachments/assets/b5c93a45-8f2a-4d19-af3e-5c8f7454b03e)
 
@@ -18,11 +20,9 @@ Standalone incremental reading for Obsidian — topics, reading points, calendar
 
 ## 中文文档
 
-**Weave Incremental Reading**（插件 ID：`weave-incremental-reading`）是一款**独立**的 Obsidian 增量阅读插件。
+**Obsidian Weave**插件系列包含**Weave Deck**，**Weave epub reader**，**Weave incremental reading**三款插件，有且仅有三款。该系列完全服务于obsidian，围绕在obsidian中长期学习而诞生。
+而**Weave Incremental Reading**插件旨在帮你把散落在 Markdown、内容块链接、PDF（配合 [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)）、Canvas、网页、EPUB 等处的材料，整理成可排期、可续读、可回跳的**阅读点队列**，再用**专题**与**日历**长期推进——而不是让内容停在「收藏了就算读过了」。
 
-它帮你把散落在 Markdown、内容块链接、PDF（配合 [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)）、Canvas、网页、EPUB 等处的材料，整理成可排期、可续读、可回跳的**阅读点队列**，再用**专题**与**日历**长期推进——而不是让内容停在「收藏了就算读过了」。
-
-本插件可单独使用，**不依赖** Weave 主插件。需要 EPUB 库内阅读或记忆牌组制卡时，再按需安装系列中的其它插件。
 
 ---
 
