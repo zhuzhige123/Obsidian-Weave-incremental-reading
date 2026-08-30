@@ -7,7 +7,7 @@
 ![weave-series-banner-og](https://github.com/user-attachments/assets/a52c0875-9296-4dfd-bf94-114a225f2972)
 
 
-![weave-plugin-banner-ir](https://github.com/user-attachments/assets/f3467d62-0ac0-4587-b6ee-56cb40850fed)
+![weave-series-banner-og](https://github.com/user-attachments/assets/86b1adbd-d1e2-411f-842d-24402a3c054d)
 
 
 ![weave-plugin-banner-ir1](https://github.com/user-attachments/assets/93ae9bdd-84d8-4f7e-b0f9-6ede5924a518)
