@@ -5,7 +5,7 @@ import {
 } from "../ir-calendar-scheduling-menu-types";
 
 describe("sortSchedulingMenuActionsByDueDate", () => {
-	test("puts postpone immediately after normal and sorts others by due date", () => {
+	test("sorts arrange actions by due date and keeps postpone last", () => {
 		const sorted = sortSchedulingMenuActionsByDueDate(
 			IRCALENDAR_SCHEDULING_MENU_ACTIONS,
 			{
@@ -16,10 +16,10 @@ describe("sortSchedulingMenuActionsByDueDate", () => {
 			},
 		);
 
-		expect(sorted).toEqual(["intensive", "normal", "postpone", "slow"]);
+		expect(sorted).toEqual(["intensive", "normal", "slow", "postpone"]);
 	});
 
-	test("reorders intensive and slow by due date while keeping postpone after normal", () => {
+	test("reorders intensive and slow by due date while keeping postpone last", () => {
 		const sorted = sortSchedulingMenuActionsByDueDate(
 			IRCALENDAR_SCHEDULING_MENU_ACTIONS,
 			{
@@ -30,6 +30,6 @@ describe("sortSchedulingMenuActionsByDueDate", () => {
 			},
 		);
 
-		expect(sorted).toEqual(["slow", "normal", "postpone", "intensive"]);
+		expect(sorted).toEqual(["slow", "normal", "intensive", "postpone"]);
 	});
 });

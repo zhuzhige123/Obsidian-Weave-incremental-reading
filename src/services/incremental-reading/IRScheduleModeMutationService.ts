@@ -17,6 +17,8 @@ import {
 import {
 	type IRScheduleMenuAction,
 	type IRScheduleModePreviewInput,
+	POSTPONE_MENU_DAYS,
+	canPostponeBlock,
 	computePostponeAdjustedBlock,
 	computeScheduleModeAdjustedBlock,
 } from "./IRScheduleModePreviewService";
@@ -29,11 +31,13 @@ export function buildScheduleModePreviewInput(
 	app: App,
 	block: IRBlockV4,
 	tagGroupIntervalFactor = 1,
+	postponeContextDate?: Date | string | number | null,
 ): IRScheduleModePreviewInput {
 	return {
 		block,
 		advancedSettings: readAdvancedScheduleSettingsSnapshot(app),
 		tagGroupIntervalFactor,
+		postponeContextDate,
 	};
 }
 
@@ -44,7 +48,12 @@ export function computeScheduleMenuActionBlock(
 	input: IRScheduleModePreviewInput,
 ): IRBlockV4 {
 	if (action === "postpone") {
-		return computePostponeAdjustedBlock(beforeBlock, 2);
+		if (!canPostponeBlock(beforeBlock)) {
+			throw new Error("postpone_limit_reached");
+		}
+		return computePostponeAdjustedBlock(beforeBlock, POSTPONE_MENU_DAYS, {
+			contextDate: input.postponeContextDate,
+		});
 	}
 	return computeScheduleModeAdjustedBlock(beforeBlock, action, input);
 }

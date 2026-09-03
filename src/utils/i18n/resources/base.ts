@@ -34,14 +34,14 @@ export const standaloneBaseTranslations: Record<
 			license: {
 				title: "许可证信息",
 				purchaseLink: "购买永久授权码",
-				purchaseOptionMainland: "中国大陆购买",
-				purchaseOptionPaypal: "PayPal（国际）",
-				purchaseOptionPaypalReader: "EPUB 阅读器激活码",
-				purchaseOptionPaypalSeries: "Weave 系列激活码",
+				purchaseOptionMainland: "适用于微信/支付宝",
+				purchaseOptionPaypal: "国际通用支付",
+				purchaseOptionPaypalReader: "适用于国际通用支付方式  Weave Epub Reader插件",
+				purchaseOptionPaypalSeries: "适用于国际通用支付方式  Weave 系列全家桶",
 				purchaseOptionCommunityPromo: "社区宣传兑换",
 				purchaseCommunityPromoTitle: "通过社区宣传兑换激活码",
 				purchaseCommunityPromoBody:
-					"目前插件暂时无法以 PayPal 的方式进行支付购买插件激活码。用户可通过以视频制作或文章撰写的方式，在 Obsidian 论坛、Reddit、Discord 以及其他平台进行宣传，以此通过邮件方式联系开发者并兑换 Weave 系列主激活码或 Weave EPUB Reader 独立激活码；根据实际情况可兑换更多。认为视频制作质量或宣传文章质量足以兑换激活码即可，没有严格标准。",
+					"用户可通过以视频制作或文章撰写的方式，在 Obsidian 论坛、Reddit、Discord 以及其他平台进行宣传，以此通过邮件方式联系开发者并兑换 Weave 系列主激活码或 Weave EPUB Reader 独立激活码；根据实际情况可兑换更多。认为视频制作质量或宣传文章质量足以兑换激活码即可，没有严格标准。",
 				purchaseCommunityPromoEmail: "邮件联系开发者",
 				purchaseCommunityPromoClose: "关闭",
 				purchaseOptionEmailSupport:
@@ -108,7 +108,13 @@ export const standaloneBaseTranslations: Record<
 					unknownError: "发生未知错误，请稍后重试",
 					tooManyAttempts: "尝试次数过多，请稍后再试",
 					remainingAttempts: "剩余尝试次数：{count}",
-					deviceReplaced: "已自动替换一台旧设备的激活记录",
+					deviceReplaced: "已自动替换一台最久未登录设备的激活记录",
+					deviceMerged: "已合并本机旧设备标识，未额外占用设备位",
+					activatedDevices: "已激活设备：{used}/{max}",
+					deviceSeatHintSuite:
+						"系列激活码：按 Obsidian 安装计台，同机全家桶与多库只占 1 台。",
+					deviceSeatHintStandalone:
+						"独立增量阅读激活码：按 Obsidian 安装计台（多库不加台）；与系列码额度分开计算。",
 				},
 				statusCard: {
 					activated: "已激活",
@@ -124,6 +130,9 @@ export const standaloneBaseTranslations: Record<
 					sharedLicenseCount: "共享授权数",
 					licenseSource: "授权来源",
 					deviceUsage: "激活设备",
+					deviceRule: "设备规则",
+					deviceSeatHint:
+						"设备 = 一个 Obsidian 安装（不含库数量；同机多插件只占 1）。满额时新设备激活会自动挤掉最久未登录的设备。",
 					activatedAt: "激活时间",
 					expiresAt: "到期时间",
 					expired: "已过期",
@@ -215,14 +224,14 @@ export const standaloneBaseTranslations: Record<
 			license: {
 				title: "License Information",
 				purchaseLink: "Buy lifetime license",
-				purchaseOptionMainland: "Mainland China",
-				purchaseOptionPaypal: "PayPal (international)",
-				purchaseOptionPaypalReader: "EPUB Reader activation",
-				purchaseOptionPaypalSeries: "Weave series activation",
+				purchaseOptionMainland: "WeChat / Alipay",
+				purchaseOptionPaypal: "International payment",
+				purchaseOptionPaypalReader: "International payment — Weave EPUB Reader",
+				purchaseOptionPaypalSeries: "International payment — Weave series bundle",
 				purchaseOptionCommunityPromo: "Earn via community promotion",
 				purchaseCommunityPromoTitle: "Redeem an activation code via community promotion",
 				purchaseCommunityPromoBody:
-					"PayPal is temporarily unavailable for purchasing plugin activation codes. Users can promote Weave by creating videos or writing articles on the Obsidian forum, Reddit, Discord, and other platforms, then contact the developer by email to redeem a Weave series primary activation code or a Weave EPUB Reader standalone activation code. Additional codes may be available depending on the situation. If you believe the quality of your video production or promotional article is sufficient to redeem a code, that is enough—there is no strict standard.",
+					"Users can promote Weave by creating videos or writing articles on the Obsidian forum, Reddit, Discord, and other platforms, then contact the developer by email to redeem a Weave series primary activation code or a Weave EPUB Reader standalone activation code. Additional codes may be available depending on the situation. If you believe the quality of your video production or promotional article is sufficient to redeem a code, that is enough—there is no strict standard.",
 				purchaseCommunityPromoEmail: "Email the developer",
 				purchaseCommunityPromoClose: "Close",
 				purchaseOptionEmailSupport:
@@ -294,7 +303,14 @@ export const standaloneBaseTranslations: Record<
 					tooManyAttempts: "Too many attempts. Please try again later.",
 					remainingAttempts: "Remaining attempts: {count}",
 					deviceReplaced:
-						"An older device activation was replaced automatically",
+						"An older, least recently used device activation was replaced automatically",
+					deviceMerged:
+						"This install's previous device id was merged; no extra seat was used",
+					activatedDevices: "Activated devices: {used}/{max}",
+					deviceSeatHintSuite:
+						"Series code: seats are per Obsidian install. The full suite and multiple vaults on one install count as one.",
+					deviceSeatHintStandalone:
+						"Standalone incremental-reading code: seats are per Obsidian install (vaults do not add seats); pool is separate from series codes.",
 				},
 				statusCard: {
 					activated: "Activated",
@@ -310,6 +326,9 @@ export const standaloneBaseTranslations: Record<
 					sharedLicenseCount: "Shared licenses",
 					licenseSource: "License source",
 					deviceUsage: "Activated devices",
+					deviceRule: "Device rule",
+					deviceSeatHint:
+						"A device is one Obsidian install (vaults do not count; multiple Weave plugins on the same install share one seat). When full, activating on a new install replaces the least recently used device.",
 					activatedAt: "Activated at",
 					expiresAt: "Expires at",
 					expired: "Expired",

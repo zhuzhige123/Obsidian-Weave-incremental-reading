@@ -11,6 +11,27 @@ export interface LicenseDeviceStats {
 	max: number;
 }
 
+/** Seat pool: suite codes vs standalone IR codes. */
+export type LicenseDevicePoolKind = "suite" | "standalone-ir" | "unknown";
+
+export function resolveLicenseDevicePoolKind(
+	license: LicenseInfo | null | undefined,
+): LicenseDevicePoolKind {
+	if (!license?.isActivated) {
+		return "unknown";
+	}
+	if (isWeavePrimaryLicense(license)) {
+		return "suite";
+	}
+	if (
+		license.issuedProductId === "weave-incremental-reading" ||
+		Boolean(license.entitlements?.includes("ir-premium"))
+	) {
+		return "standalone-ir";
+	}
+	return "unknown";
+}
+
 export function isWeavePrimaryLicense(
 	license: LicenseInfo | null | undefined,
 ): boolean {

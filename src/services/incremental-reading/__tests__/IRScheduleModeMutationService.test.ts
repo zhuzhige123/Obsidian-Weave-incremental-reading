@@ -57,6 +57,58 @@ describe("IRScheduleModeMutationService", () => {
 		expect(afterBlock.status).toBe("queued");
 	});
 
+	it("postpone uses calendar context and keeps intervalDays", () => {
+		const beforeBlock = createBlock({
+			intervalDays: 8,
+			nextRepDate: Date.parse("2099-01-01"),
+		});
+		const today = new Date();
+		const y = today.getFullYear();
+		const m = String(today.getMonth() + 1).padStart(2, "0");
+		const d = String(today.getDate()).padStart(2, "0");
+		const input = buildScheduleModePreviewInput(
+			{} as any,
+			beforeBlock,
+			1,
+			`${y}-${m}-${d}`,
+		);
+		const afterBlock = computeScheduleMenuActionBlock(
+			beforeBlock,
+			"postpone",
+			input,
+		);
+		expect(afterBlock.intervalDays).toBe(8);
+		expect(afterBlock.meta?.manualPostponeCount).toBe(1);
+		const expected = new Date(y, today.getMonth(), today.getDate() + 2);
+		expected.setHours(0, 0, 0, 0);
+		expect(afterBlock.nextRepDate).toBe(expected.getTime());
+	});
+
+	it("rejects postpone when limit is reached", () => {
+		const beforeBlock = createBlock({
+			intervalDays: 8,
+			meta: { tagGroup: "default", manualPostponeCount: 2 },
+		});
+		const input = buildScheduleModePreviewInput({} as any, beforeBlock, 1);
+		expect(() =>
+			computeScheduleMenuActionBlock(beforeBlock, "postpone", input),
+		).toThrow("postpone_limit_reached");
+	});
+
+	it("clears postpone count on arrange actions", () => {
+		const beforeBlock = createBlock({
+			intervalDays: 8,
+			meta: { tagGroup: "default", manualPostponeCount: 2 },
+		});
+		const input = buildScheduleModePreviewInput({} as any, beforeBlock, 1);
+		const afterBlock = computeScheduleMenuActionBlock(
+			beforeBlock,
+			"normal",
+			input,
+		);
+		expect(afterBlock.meta?.manualPostponeCount).toBeUndefined();
+	});
+
 	it("persists via L0 mutator with skipInvalidate", async () => {
 		const beforeBlock = createBlock();
 		const afterBlock = createBlock({

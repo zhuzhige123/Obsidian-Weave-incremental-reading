@@ -73,6 +73,32 @@
       : t('irSidebar.calendar.historySchedulePending');
   }
 
+  function getCompletedScheduleHint(material: { nextRepDate?: number }): string {
+    const nextRepDate = Number(material.nextRepDate || 0);
+    if (nextRepDate > 0) {
+      return t('irSidebar.calendar.completedNextDueHint', {
+        when: formatSiblingDueDate(nextRepDate),
+      });
+    }
+    return t('irSidebar.calendar.historyScheduleCompleted');
+  }
+
+  function getTimerButtonTitle(materialId: string): string {
+    if (isMaterialScheduleCompleted(materialId)) {
+      return t('irSidebar.calendar.timerDisabledCompleted');
+    }
+    return getReadingTimerButtonTitle(materialId);
+  }
+
+  function getTimerButtonAriaLabel(materialId: string): string {
+    if (isMaterialScheduleCompleted(materialId)) {
+      return t('irSidebar.calendar.timerDisabledCompleted');
+    }
+    return isTimerRunningForBlock(materialId)
+      ? t('irSidebar.controls.pauseReadingTimer')
+      : t('irSidebar.controls.startTimer');
+  }
+
   function formatParentProgressBadge(progress: {
     percent: number;
   }): string {
@@ -208,13 +234,24 @@
                 aria-hidden="true"
               ></span>
             </span>
+          {:else if isMaterialScheduleCompleted(material.id)}
+            <button
+              type="button"
+              class="schedule-checkbox schedule-checkbox--completed"
+              aria-label={getCompletedScheduleHint(material)}
+              title={getCompletedScheduleHint(material)}
+              onclick={(event) => openSchedulingMenu(event, material)}
+            >
+              <span class="checkbox-box checked" aria-hidden="true"></span>
+            </button>
           {:else}
             <button
+              type="button"
               class="schedule-checkbox"
               aria-label={t('irSidebar.controls.schedule')}
               onclick={(event) => openSchedulingMenu(event, material)}
             >
-              <span class="checkbox-box" class:checked={processedChunkIds.has(material.id)} aria-hidden="true"></span>
+              <span class="checkbox-box" aria-hidden="true"></span>
             </button>
           {/if}
         {/if}
@@ -224,9 +261,10 @@
           class="clickable-icon reading-timer-btn"
           class:active={isTimerRunningForBlock(material.id)}
           class:tracked={!isTimerRunningForBlock(material.id) && getDisplayedTimerSeconds(material.id) > 0}
-          aria-label={isTimerRunningForBlock(material.id) ? t('irSidebar.controls.pauseReadingTimer') : t('irSidebar.controls.startTimer')}
-          title={getReadingTimerButtonTitle(material.id)}
-          disabled={timerBusyBlockId === material.id}
+          class:is-completed-locked={isMaterialScheduleCompleted(material.id)}
+          aria-label={getTimerButtonAriaLabel(material.id)}
+          title={getTimerButtonTitle(material.id)}
+          disabled={timerBusyBlockId === material.id || isMaterialScheduleCompleted(material.id)}
           onclick={() => {
             void toggleReadingTimer(material);
           }}
@@ -329,13 +367,24 @@
                       aria-hidden="true"
                     ></span>
                   </span>
+                {:else if isMaterialScheduleCompleted(sibling.id)}
+                  <button
+                    type="button"
+                    class="schedule-checkbox schedule-checkbox--completed"
+                    aria-label={getCompletedScheduleHint(sibling)}
+                    title={getCompletedScheduleHint(sibling)}
+                    onclick={(event) => openSchedulingMenu(event, sibling)}
+                  >
+                    <span class="checkbox-box checked" aria-hidden="true"></span>
+                  </button>
                 {:else}
                   <button
+                    type="button"
                     class="schedule-checkbox"
                     aria-label={t('irSidebar.controls.schedule')}
                     onclick={(event) => openSchedulingMenu(event, sibling)}
                   >
-                    <span class="checkbox-box" class:checked={processedChunkIds.has(sibling.id)} aria-hidden="true"></span>
+                    <span class="checkbox-box" aria-hidden="true"></span>
                   </button>
                 {/if}
               {/if}
@@ -345,9 +394,10 @@
                 class="clickable-icon reading-timer-btn"
                 class:active={isTimerRunningForBlock(sibling.id)}
                 class:tracked={!isTimerRunningForBlock(sibling.id) && getDisplayedTimerSeconds(sibling.id) > 0}
-                aria-label={isTimerRunningForBlock(sibling.id) ? t('irSidebar.controls.pauseReadingTimer') : t('irSidebar.controls.startTimer')}
-                title={getReadingTimerButtonTitle(sibling.id)}
-                disabled={timerBusyBlockId === sibling.id}
+                class:is-completed-locked={isMaterialScheduleCompleted(sibling.id)}
+                aria-label={getTimerButtonAriaLabel(sibling.id)}
+                title={getTimerButtonTitle(sibling.id)}
+                disabled={timerBusyBlockId === sibling.id || isMaterialScheduleCompleted(sibling.id)}
                 onclick={() => {
                   void toggleReadingTimer(sibling);
                 }}
@@ -591,6 +641,14 @@
     pointer-events: none;
   }
 
+  .schedule-checkbox--completed {
+    cursor: help;
+  }
+
+  .schedule-checkbox--completed:hover .checkbox-box {
+    border-color: var(--interactive-accent);
+  }
+
   .reading-item.history-readonly .item-title:not(.processed) .item-title-text,
   .sibling-item.history-readonly .sibling-title-text {
     color: var(--text-muted);
@@ -655,6 +713,11 @@
   .reading-timer-btn:disabled {
     opacity: 0.55;
     cursor: wait;
+  }
+
+  .reading-timer-btn:disabled.is-completed-locked {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .reading-timer-chip {

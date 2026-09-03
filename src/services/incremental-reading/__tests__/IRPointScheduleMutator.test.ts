@@ -73,7 +73,49 @@ vi.mock("../IRScheduleIndexService", () => ({
 	}),
 }));
 
-import { IRPointScheduleMutator } from "../IRPointScheduleMutator";
+import { IRPointScheduleMutator, applyScheduleMutationToBlock } from "../IRPointScheduleMutator";
+
+describe("applyScheduleMutationToBlock", () => {
+	it("keeps postpone/pin fields in meta only", () => {
+		const next = applyScheduleMutationToBlock(
+			{
+				id: "pdf::bookmark::1",
+				nextRepDate: 1000,
+				intervalDays: 3,
+				status: "queued",
+				priorityUi: 5,
+				priorityEff: 5,
+				meta: { tagGroup: "default" },
+			} as any,
+			{
+				nextRepDate: 2000,
+				scheduleStatus: "queued",
+				manualSchedulePinnedDateKey: "2026-09-05",
+				manualPostponeCount: 1,
+			},
+		);
+
+		expect(next.nextRepDate).toBe(2000);
+		expect(next.status).toBe("queued");
+		expect(next.meta?.manualSchedulePinnedDateKey).toBe("2026-09-05");
+		expect(next.meta?.manualPostponeCount).toBe(1);
+		expect((next as any).manualPostponeCount).toBeUndefined();
+		expect((next as any).manualSchedulePinnedDateKey).toBeUndefined();
+		expect((next as any).scheduleStatus).toBeUndefined();
+	});
+
+	it("clears postpone count when set to 0", () => {
+		const next = applyScheduleMutationToBlock(
+			{
+				id: "chunk-1",
+				nextRepDate: 1000,
+				meta: { tagGroup: "default", manualPostponeCount: 2 },
+			} as any,
+			{ manualPostponeCount: 0 },
+		);
+		expect(next.meta?.manualPostponeCount).toBeUndefined();
+	});
+});
 
 describe("IRPointScheduleMutator", () => {
 	beforeEach(() => {

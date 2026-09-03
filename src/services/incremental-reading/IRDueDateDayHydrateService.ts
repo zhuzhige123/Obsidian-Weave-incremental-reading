@@ -4,6 +4,7 @@ import {
 	shouldExcludeScheduleItemBySource,
 } from "../../utils/ir-internal-data-path";
 import { logger } from "../../utils/logger";
+import { getIrEpubStorageService } from "../epub-integration/ir-epub-storage-access";
 import { filterScheduleItemsForCalendarDate } from "./IRCalendarCommittedDueMaterials";
 import type { IRCalendarDaySummary } from "./IRCalendarDayIndexService";
 import {
@@ -155,6 +156,30 @@ export async function hydratePriorityDatesFromDueIndex(
 	const todayKey =
 		String(options.todayKey || "").trim() || getLocalTodayDateKey();
 
+	let epubStorage: ReturnType<typeof getIrEpubStorageService> | null = null;
+	const resolveEpubScheduleItem = async (
+		task: Parameters<typeof buildScheduleItemFromEpubTask>[0],
+	): Promise<ScheduleItem> => {
+		try {
+			if (!epubStorage) {
+				epubStorage = getIrEpubStorageService(app);
+			}
+			return await buildScheduleItemFromEpubTask(task, {
+				resolveFilePath: async (input) =>
+					(await epubStorage!.resolveSourceFilePath(
+						String(input?.sourceId || "").trim() || undefined,
+						String(input?.epubFilePath || "").trim() || undefined,
+					)) || String(input?.epubFilePath || "").trim(),
+			});
+		} catch (error) {
+			logger.debug(
+				"[IRDueDateDayHydrate] epub source path resolve failed; using stored path",
+				error,
+			);
+			return buildScheduleItemFromEpubTask(task);
+		}
+	};
+
 	const warmSources = await scheduleIndex.peekWarmScheduleSources();
 	const chunksById = new Map(
 		(warmSources?.chunks || []).map((chunk) => [
@@ -198,7 +223,7 @@ export async function hydratePriorityDatesFromDueIndex(
 		} else if (pdfById.has(normalizedId)) {
 			item = buildScheduleItemFromPdfTask(pdfById.get(normalizedId)!);
 		} else if (epubById.has(normalizedId)) {
-			item = await buildScheduleItemFromEpubTask(epubById.get(normalizedId)!);
+			item = await resolveEpubScheduleItem(epubById.get(normalizedId)!);
 		} else if (!allowPointSnapshotFallback) {
 			skippedSnapshotFallback += 1;
 			resolvedCache.set(normalizedId, null);
@@ -219,7 +244,7 @@ export async function hydratePriorityDatesFromDueIndex(
 							buildLegacyPdfTaskFromPointSnapshot(snapshot),
 						);
 					} else if (kind === "epub") {
-						item = await buildScheduleItemFromEpubTask(
+						item = await resolveEpubScheduleItem(
 							buildLegacyEpubTaskFromPointSnapshot(snapshot),
 						);
 					} else {

@@ -266,6 +266,10 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 		const service = new IRV4SchedulerService(app);
 		await (service as any).initialize();
 		const block = createDefaultIRBlockV4("legacy-block-1", "notes/legacy.md");
+		block.meta = {
+			...(block.meta || {}),
+			manualPostponeCount: 2,
+		};
 		const nextRepDate = block.nextRepDate + 86_400_000;
 
 		await service.manualRescheduleBlockWithPreviewV4(
@@ -283,7 +287,14 @@ describe("IRV4SchedulerService bookmark deck fallback", () => {
 			block,
 			expect.objectContaining({
 				nextRepDate,
+				meta: expect.objectContaining({
+					manualSchedulePinnedDateKey: expect.any(String),
+				}),
 			}),
 		);
+		const persisted = persistSpy.mock.calls[0]?.[2] as {
+			meta?: { manualPostponeCount?: number };
+		};
+		expect(persisted.meta?.manualPostponeCount).toBeUndefined();
 	});
 });

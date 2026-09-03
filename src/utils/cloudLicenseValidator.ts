@@ -15,6 +15,7 @@ export interface CloudActivationResult {
 	devices_count?: number;
 	max_devices?: number;
 	replaced_old_device?: boolean;
+	merged_previous_device?: boolean;
 	expires_at?: string;
 	error?: string;
 	is_network_error?: boolean;
@@ -75,6 +76,9 @@ export class CloudLicenseValidator {
 		deviceFingerprint: string,
 		email: string,
 		platform: string,
+		options?: {
+			previousDeviceFingerprint?: string;
+		},
 	): Promise<CloudActivationResult> {
 		if (!this.isConfigured()) {
 			return {
@@ -85,6 +89,9 @@ export class CloudLicenseValidator {
 		}
 
 		try {
+			const previousDeviceFingerprint = String(
+				options?.previousDeviceFingerprint || "",
+			).trim();
 			const response = await requestUrl({
 				url: `${this.apiBaseUrl}/activate`,
 				method: "POST",
@@ -94,6 +101,9 @@ export class CloudLicenseValidator {
 					device_fingerprint: deviceFingerprint,
 					email: email.toLowerCase().trim(),
 					platform,
+					...(previousDeviceFingerprint
+						? { previous_device_fingerprint: previousDeviceFingerprint }
+						: {}),
 				}),
 				throw: false,
 			});
@@ -128,6 +138,7 @@ export class CloudLicenseValidator {
 				max_devices:
 					typeof data.max_devices === "number" ? data.max_devices : undefined,
 				replaced_old_device: Boolean(data.replaced_old_device),
+				merged_previous_device: Boolean(data.merged_previous_device),
 				expires_at:
 					typeof data.expires_at === "string" ? data.expires_at : undefined,
 			};

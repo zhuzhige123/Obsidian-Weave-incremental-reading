@@ -14,7 +14,7 @@ export const licenseUiTranslationOverrides: Record<
 					helpFormatBody:
 						"激活码是一段较长的字符串，通常约 500-800 个字符，由两部分组成，并用点号分隔。",
 					helpInputTips:
-						"请完整复制激活码，包括所有字符\n激活码区分大小写，请确保准确输入\n如果激活码很长，建议使用粘贴功能\n激活码只能在授权设备上使用",
+						"请完整复制激活码，包括所有字符\n激活码区分大小写，请确保准确输入\n如果激活码很长，建议使用粘贴功能\n激活码只能在授权设备上使用\n设备按 Obsidian 安装计算，不限库；满额时新设备激活会自动挤掉最久未登录的设备",
 					helpTroubleshootingTips:
 						"如果提示格式错误，请检查是否完整复制了激活码\n如果提示已过期，请联系支持获取新的激活码\n如果提示设备不匹配，可能需要进行设备迁移\n如果多次尝试失败，请等待 15 分钟后再试",
 				},
@@ -22,6 +22,9 @@ export const licenseUiTranslationOverrides: Record<
 					currentProductLicense: "当前产品授权",
 					currentProductLicenseCount: "当前产品授权数",
 					deviceUsage: "激活设备",
+					deviceRule: "设备规则",
+					deviceSeatHint:
+						"设备 = 一个 Obsidian 安装（不含库数量；同机多插件只占 1）。满额时新设备激活会自动挤掉最久未登录的设备。",
 					epubReader: "EPUB 阅读器",
 					licenseSource: "授权来源",
 					relatedProduct: "关联产品",
@@ -55,7 +58,7 @@ export const licenseUiTranslationOverrides: Record<
 					helpFormatBody:
 						"An activation code is a long string, typically 500-800 characters, made of two parts separated by a period.",
 					helpInputTips:
-						"Copy the full activation code, including all characters\nActivation codes are case-sensitive\nIf the code is very long, pasting is recommended\nThe activation code can only be used on authorized devices",
+						"Copy the full activation code, including all characters\nActivation codes are case-sensitive\nIf the code is very long, pasting is recommended\nThe activation code can only be used on authorized devices\nDevices are counted per Obsidian install, not per vault. When full, activating on a new install replaces the least recently used device",
 					helpTroubleshootingTips:
 						"If you see a format error, make sure the full activation code was copied\nIf the code has expired, contact support for a new one\nIf the device does not match, you may need a device migration\nIf repeated attempts fail, wait 15 minutes before trying again",
 				},
@@ -63,6 +66,9 @@ export const licenseUiTranslationOverrides: Record<
 					currentProductLicense: "Current product license",
 					currentProductLicenseCount: "Current product licenses",
 					deviceUsage: "Activated devices",
+					deviceRule: "Device rule",
+					deviceSeatHint:
+						"A device is one Obsidian install (vaults do not count; multiple Weave plugins on the same install share one seat). When full, activating on a new install replaces the least recently used device.",
 					epubReader: "EPUB Reader",
 					licenseSource: "License source",
 					relatedProduct: "Related product",

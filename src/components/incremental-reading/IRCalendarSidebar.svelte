@@ -18,7 +18,10 @@
   import { IRPointTagService, normalizeReadingPointTags, resolveReadingPointTags } from '../../services/incremental-reading/IRPointTagService';
   import { IRV4SchedulerService } from '../../services/incremental-reading/IRV4SchedulerService';
 import {
+  POSTPONE_MAX_COUNT,
+  canPostponeBlock,
   computeAllScheduleMenuBlocks,
+  getManualPostponeCount,
   scheduleItemToPreviewBlockV4,
 } from '../../services/incremental-reading/IRScheduleModePreviewService';
 import {
@@ -97,7 +100,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   import { MaterialImportModalObsidian } from './MaterialImportModalObsidian';
   import { AddReadingTargetModalObsidian } from './AddReadingTargetModalObsidian';
   import { canEditReadingPointLink, resolveReadingPointOpenLink } from '../../services/incremental-reading/reading-point-edit/IRReadingPointEditLinkResolver';
-  import { tryOpenReadingPointFromScheduleItem, openResolvedResumeLink } from '../../services/incremental-reading/reading-point-edit/IRReadingPointOpenNavigation';
+  import { tryOpenReadingPointFromScheduleItem, openResolvedResumeLinkWithMarkdownFocus } from '../../services/incremental-reading/reading-point-edit/IRReadingPointOpenNavigation';
   import {
     closeActiveReadingPointPrompt,
     openReadingPointTagsPrompt,
@@ -252,7 +255,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     populateCalendarTodayBacklogRebalanceMenu,
     populateCalendarViewModeMenu
   } from './ir-calendar-tools-menu';
-  import { IRDataManagementModalObsidian } from './IRDataManagementModalObsidian';
   import {
     rebalanceTodayReadingPointBacklog,
     selectTodayBacklogRebalancePlan,
@@ -471,6 +473,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   let schedulingMenuTarget = $state<ScheduleItem | null>(null);
   let schedulingMenuDateKey = $state<string>('');
   let schedulingMenuTagGroupIntervalFactor = $state(1);
+  let schedulingMenuPostponeCount = $state(0);
   let schedulingMenuPreparedBlocks = $state<Record<IRCalendarSchedulingAction, IRBlockV4> | null>(null);
 
   let priorityMenuAnchor = $state<HTMLElement | null>(null);
@@ -1648,6 +1651,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   ): Promise<void> {
     if (isPastCalendarDate(selectedDate, today)) {
       new Notice(t('irSidebar.calendar.historyReadOnlyNotice'));
+      return;
+    }
+    if (processedChunkIds.has(material.id)) {
+      new Notice(t('irSidebar.calendar.timerDisabledCompleted'));
       return;
     }
     if (!ensurePremiumFeature(PREMIUM_FEATURES.READING_TIMER)) {
@@ -3454,8 +3461,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   }
 
   function openIRDataManagementModal(): void {
-    const modal = new IRDataManagementModalObsidian(plugin.app, { plugin });
-    modal.open();
+    void plugin.openDataManagementModal();
   }
 
   async function scanVaultIncrementalReadingDeckFiles(): Promise<void> {
@@ -4429,7 +4435,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       if (!filePath) {
         const recoveredPath = await tryResolveRenamedChunkSource(material);
         if (recoveredPath) {
-          await openResolvedResumeLink(plugin.app, recoveredPath);
+          await openResolvedResumeLinkWithMarkdownFocus(plugin.app, recoveredPath);
           return;
         }
 
@@ -4444,7 +4450,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
 
         const recoveredPath = await tryResolveRenamedChunkSource(material, filePath);
         if (recoveredPath) {
-          await openResolvedResumeLink(plugin.app, recoveredPath);
+          await openResolvedResumeLinkWithMarkdownFocus(plugin.app, recoveredPath);
           return;
         }
 
@@ -4453,7 +4459,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       }
 
       const rawLink = await resolveScheduleItemOpenResumeLink(material, filePath);
-      await openResolvedResumeLink(plugin.app, rawLink);
+      await openResolvedResumeLinkWithMarkdownFocus(plugin.app, rawLink, filePath);
       logger.debug('[IRCalendarSidebar] Recovered debug message.', rawLink);
     } catch (error) {
       logger.error('[IRCalendarSidebar] Failed to open block.', error);
@@ -4962,23 +4968,30 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
   });
   let schedulingPreviewLoadToken = 0;
 
-  let schedulingConfig = $derived(
-    IRCALENDAR_SCHEDULING_MENU_ACTIONS.map((action) => ({
-      action,
-      label: t(`irSidebar.scheduling.${action}`),
-      color:
-        action === 'intensive' ? 'var(--weave-error, #ef4444)'
-        : action === 'normal' ? 'var(--weave-success, #10b981)'
-        : action === 'slow' ? 'var(--weave-warning, #f59e0b)'
-        : 'var(--text-muted, #6b7280)',
-      intervalMultiplier:
-        action === 'intensive' ? 0.5
-        : action === 'normal' ? 1.0
-        : action === 'slow' ? 1.8
-        : 0,
-      isPostpone: action === 'postpone',
-    }))
-  );
+  let schedulingConfig = $derived.by(() => {
+    const postponeCount = Math.max(0, Math.round(Number(schedulingMenuPostponeCount || 0)) || 0);
+    const postponeDisabled = postponeCount >= POSTPONE_MAX_COUNT;
+    return IRCALENDAR_SCHEDULING_MENU_ACTIONS.map((action) => {
+      const isPostpone = action === 'postpone';
+      return {
+        action,
+        label: t(`irSidebar.scheduling.${action}`),
+        color:
+          action === 'intensive' ? 'var(--weave-error, #ef4444)'
+          : action === 'normal' ? 'var(--weave-success, #10b981)'
+          : action === 'slow' ? 'var(--weave-warning, #f59e0b)'
+          : 'var(--text-muted, #6b7280)',
+        intervalMultiplier:
+          action === 'intensive' ? 0.5
+          : action === 'normal' ? 1.0
+          : action === 'slow' ? 1.8
+          : 0,
+        isPostpone,
+        disabled: isPostpone ? postponeDisabled : false,
+        metaText: isPostpone ? `${postponeCount}/${POSTPONE_MAX_COUNT}` : undefined,
+      };
+    });
+  });
 
   let schedulingMenuDisplayConfig = $derived.by(() => {
     const configByAction = new Map(schedulingConfig.map((cfg) => [cfg.action, cfg]));
@@ -5017,6 +5030,14 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     event.preventDefault();
     event.stopPropagation();
 
+    const cfg = schedulingConfig.find((item) => item.action === action);
+    if (cfg?.disabled) {
+      if (action === 'postpone') {
+        new Notice(t('irSidebar.scheduling.postponeLimitReached', { max: POSTPONE_MAX_COUNT }));
+      }
+      return;
+    }
+
     const context = captureSchedulingMenuContext();
     if (!context) {
       logger.warn('[IRCalendarSidebar] Scheduling action ignored: missing menu target');
@@ -5044,6 +5065,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     schedulingMenuTarget = null;
     schedulingMenuAnchor = null;
     schedulingMenuDateKey = '';
+    schedulingMenuPostponeCount = 0;
     schedulingPreviewFocusAction = 'normal';
     schedulingPreviewLoadToken += 1;
     resetSchedulingMenuPreviewState();
@@ -5055,9 +5077,30 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     openSchedulingMenuForAnchor(event.currentTarget as HTMLElement, material);
   }
 
+  function notifyAlreadyScheduled(material: ScheduleItem): void {
+    const nextRepDate = Number(material.nextRepDate || 0);
+    if (nextRepDate > 0) {
+      new Notice(
+        t('irSidebar.calendar.alreadyScheduledNextDueNotice', {
+          when: formatSiblingDueDate(nextRepDate),
+          date: new Date(nextRepDate).toLocaleDateString(),
+        })
+      );
+      return;
+    }
+    new Notice(t('irSidebar.calendar.alreadyScheduledNotice'));
+  }
+
   function openSchedulingMenuForAnchor(anchor: HTMLElement, material: ScheduleItem) {
     if (isPastCalendarDate(selectedDate, today)) {
       new Notice(t('irSidebar.calendar.historyReadOnlyNotice'));
+      return;
+    }
+
+    // 当日进度里已完成的阅读点不可再次调度，否则会在已安排间隔上重复累计。
+    if (processedChunkIds.has(material.id)) {
+      notifyAlreadyScheduled(material);
+      closeSchedulingMenu();
       return;
     }
 
@@ -5070,6 +5113,10 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     schedulingMenuTarget = material;
     schedulingMenuAnchor = anchor;
     schedulingMenuDateKey = formatDateKey(selectedDate);
+    schedulingMenuPostponeCount = Math.max(
+      0,
+      Math.round(Number(material.manualPostponeCount || 0)) || 0
+    );
     schedulingMenuOpen = true;
     const loadToken = ++schedulingPreviewLoadToken;
     applySchedulingMenuDatesSync(material);
@@ -5204,6 +5251,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         block: originalBlock,
         advancedSettings,
         tagGroupIntervalFactor: profile.intervalFactorBase,
+        postponeContextDate: resolveSchedulingPostponeContextDate(),
       });
 
       const entries = await Promise.allSettled(
@@ -5254,6 +5302,20 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       : t('irSidebar.controls.unscheduled');
   }
 
+  function resolveSchedulingPostponeContextDate(
+    pinnedKey?: string | null
+  ): string {
+    const fromPinned = String(pinnedKey || '').trim();
+    if (fromPinned) {
+      return fromPinned;
+    }
+    const fromMenu = String(schedulingMenuDateKey || '').trim();
+    if (fromMenu) {
+      return fromMenu;
+    }
+    return formatDateKey(selectedDate);
+  }
+
   function buildSchedulingMenuDatesAndPreviews(
     material: ScheduleItem,
     block: IRBlockV4,
@@ -5267,6 +5329,7 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       block,
       advancedSettings,
       tagGroupIntervalFactor,
+      postponeContextDate: resolveSchedulingPostponeContextDate(),
     });
     const title = material.displayName || material.title || material.id;
     const dates = {
@@ -5308,6 +5371,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       if (loadToken !== schedulingPreviewLoadToken) {
         return;
       }
+
+      schedulingMenuPostponeCount = getManualPostponeCount(block);
 
       let tagGroupIntervalFactor = 1;
       try {
@@ -7391,7 +7456,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     target: ScheduleItem,
     action: IRCalendarSchedulingAction,
     preparedBlocks: Record<IRCalendarSchedulingAction, IRBlockV4> | null,
-    tagGroupIntervalFactor: number
+    tagGroupIntervalFactor: number,
+    pinnedKey?: string | null
   ): IRBlockV4 {
     if (preparedBlocks?.[action]) {
       return preparedBlocks[action];
@@ -7400,7 +7466,12 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     return computeScheduleMenuActionBlock(
       previewBlock,
       action,
-      buildScheduleModePreviewInput(plugin.app, previewBlock, tagGroupIntervalFactor)
+      buildScheduleModePreviewInput(
+        plugin.app,
+        previewBlock,
+        tagGroupIntervalFactor,
+        resolveSchedulingPostponeContextDate(pinnedKey)
+      )
     );
   }
 
@@ -7424,6 +7495,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       scheduleStatus,
       nextRepDate,
       nextReviewDate: nextRepDate > 0 ? new Date(nextRepDate) : null,
+      manualSchedulePinnedDateKey: updatedBlock.meta?.manualSchedulePinnedDateKey,
+      manualPostponeCount: getManualPostponeCount(updatedBlock) || undefined,
     };
 
     const nextCompletedIds = [...new Set([...(calendarProgressByDate[pinnedKey] || []), target.id])];
@@ -7482,7 +7555,12 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       const afterBlock = computeScheduleMenuActionBlock(
         beforeBlock,
         action,
-        buildScheduleModePreviewInput(plugin.app, beforeBlock, tagGroupIntervalFactor)
+        buildScheduleModePreviewInput(
+          plugin.app,
+          beforeBlock,
+          tagGroupIntervalFactor,
+          resolveSchedulingPostponeContextDate(pinnedKey)
+        )
       );
 
       await persistScheduleMenuActionL0(plugin.app, beforeBlock, afterBlock);
@@ -7531,12 +7609,31 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
       closeSchedulingMenu();
       return;
     }
+    if (processedChunkIds.has(target.id)) {
+      notifyAlreadyScheduled(target);
+      closeSchedulingMenu();
+      return;
+    }
 
     try {
       const cfg = schedulingConfig.find(c => c.action === action);
       if (!cfg) return;
 
       const isPostpone = Boolean((cfg as any).isPostpone);
+      if (isPostpone && (cfg.disabled || schedulingMenuPostponeCount >= POSTPONE_MAX_COUNT)) {
+        new Notice(t('irSidebar.scheduling.postponeLimitReached', { max: POSTPONE_MAX_COUNT }));
+        return;
+      }
+
+      const previewBlock = scheduleItemToPreviewBlockV4({
+        ...target,
+        manualPostponeCount: schedulingMenuPostponeCount || undefined,
+      });
+      if (isPostpone && !canPostponeBlock(previewBlock)) {
+        new Notice(t('irSidebar.scheduling.postponeLimitReached', { max: POSTPONE_MAX_COUNT }));
+        return;
+      }
+
       const tagGroupIntervalFactor =
         schedulingMenuTarget?.id === target.id ? schedulingMenuTagGroupIntervalFactor : 1;
       const preparedBlocks =
@@ -7551,7 +7648,8 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
         target,
         action,
         preparedBlocks,
-        tagGroupIntervalFactor
+        tagGroupIntervalFactor,
+        pinnedKey
       );
       const deckId = target.deckId ? resolveCanonicalDeckId(target.deckId) : '';
       const updatedPinnedSlice = applySchedulingOptimisticUi({
@@ -8515,7 +8613,6 @@ import { getSharedIRScheduleImpactPreviewCoordinator } from '../../services/incr
     bind:calendarToolsTriggerEl
     onAddReadingTarget={() => openAddReadingTargetModal()}
     onScanTopics={() => { void scanVaultIncrementalReadingDeckFiles(); }}
-    onOpenTutorial={() => openIRTutorial()}
     onToggleDayLoadPopover={toggleDayLoadPopover}
     onToggleSearchPanel={toggleSearchPanel}
     onShowMonthCalendarToolsMenu={showMonthCalendarToolsMenu}

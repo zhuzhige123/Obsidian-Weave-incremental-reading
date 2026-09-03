@@ -1209,6 +1209,7 @@ const zhIrCommands: TranslationKey = {
 	updateFolderSubscription: "更新订阅文件夹",
 	addReadingTarget: "添加阅读目标到增量阅读",
 	addReadingTargetFromSelection: "将选中文本添加到增量阅读",
+	toggleMarkdownBlockFocusMode: "切换 Markdown 聚焦阅读",
 	openTutorial: "打开增量阅读教程",
 	defaultDeckName: "默认专题",
 	defaultIrName: "增量阅读",
@@ -1227,6 +1228,7 @@ const enIrCommands: TranslationKey = {
 	updateFolderSubscription: "Update subscribed folders",
 	addReadingTarget: "Add reading target to incremental reading",
 	addReadingTargetFromSelection: "Add selected text to incremental reading",
+	toggleMarkdownBlockFocusMode: "Toggle Markdown focused reading",
 	openTutorial: "Open incremental reading tutorial",
 	defaultDeckName: "Default topic",
 	defaultIrName: "Incremental reading",
@@ -1311,6 +1313,8 @@ const zhIrNotices: TranslationKey = {
 	pointCreatedWithoutReplace: "阅读点已创建，但未能自动替换源文档选区",
 	pointCreated: "阅读点已创建",
 	createPointFailed: "创建阅读点失败，请重试",
+	markdownBlockFocusModeEnabled: "已启用 Markdown 聚焦阅读",
+	markdownBlockFocusModeDisabled: "已关闭 Markdown 聚焦阅读",
 };
 
 const enIrNotices: TranslationKey = {
@@ -1343,6 +1347,8 @@ const enIrNotices: TranslationKey = {
 		"Reading point created, but the source selection could not be replaced automatically",
 	pointCreated: "Reading point created",
 	createPointFailed: "Failed to create reading point. Please try again.",
+	markdownBlockFocusModeEnabled: "Markdown focused reading enabled",
+	markdownBlockFocusModeDisabled: "Markdown focused reading disabled",
 };
 
 const zhIrMain: TranslationKey = {

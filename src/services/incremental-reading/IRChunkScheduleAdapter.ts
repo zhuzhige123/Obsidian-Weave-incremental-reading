@@ -68,6 +68,8 @@ type ChunkScheduleUpdates = Partial<
 > & {
 	/** 设为 null 表示清除用户手动固定日期。 */
 	manualSchedulePinnedDateKey?: string | null;
+	/** 设为 0 / null 表示清零手动推迟次数。 */
+	manualPostponeCount?: number | null;
 };
 
 const TERMINAL_CHUNK_STATUSES = new Set<ChunkFileStatus>([
@@ -339,6 +341,18 @@ export class IRChunkScheduleAdapter {
 				chunk.meta.manualSchedulePinnedDateKey = pinnedDateKey;
 			} else {
 				chunk.meta.manualSchedulePinnedDateKey = undefined;
+			}
+		}
+		if (updates.manualPostponeCount !== undefined) {
+			chunk.meta = { ...(chunk.meta || {}) };
+			const count = Math.max(
+				0,
+				Math.round(Number(updates.manualPostponeCount || 0)) || 0,
+			);
+			if (count > 0) {
+				chunk.meta.manualPostponeCount = count;
+			} else {
+				chunk.meta.manualPostponeCount = undefined;
 			}
 		}
 		chunk.updatedAt = Date.now();

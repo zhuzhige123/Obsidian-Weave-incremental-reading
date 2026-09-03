@@ -26,7 +26,9 @@ import { sanitizeCloudLicenseUserMessage } from "./activation-privacy";
 import { CloudLicenseValidator } from "./cloudLicenseValidator";
 import {
 	DEVICE_FINGERPRINT_VERSION,
+	collectStableDeviceComponents,
 	generateStableDeviceFingerprint,
+	sha256Hex,
 } from "./device-fingerprint";
 import {
 	isActivationAttempt,
@@ -83,149 +85,8 @@ export class LicenseManager {
 
 	/** app 未注入时的兜底指纹（测试或极早期初始化）。 */
 	private async generateDeviceFingerprintWithoutApp(): Promise<string> {
-		const components = await this.collectDeviceComponents();
-		const fingerprint = components.join("|");
-		return this.sha256(fingerprint);
-	}
-
-	/**
-	 * 收集设备特征信息
-	 */
-	private async collectDeviceComponents(): Promise<string[]> {
-		const components: string[] = [];
-
-		// 基础浏览器信息
-		components.push(getRuntimePlatformLabel());
-		components.push(navigator.language || "unknown");
-		components.push(navigator.languages?.join(",") || "unknown");
-		components.push(Platform.isMobile ? "mobile-ui" : "desktop-ui");
-
-		// 屏幕信息
-		components.push(`${screen.width}x${screen.height}`);
-		components.push(`${screen.colorDepth}bit`);
-		components.push(`${screen.pixelDepth}px`);
-		components.push(`${window.devicePixelRatio || 1}dpr`);
-
-		// 时区和地区信息
-		components.push(new Date().getTimezoneOffset().toString());
-		components.push(
-			Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown",
-		);
-
-		// 硬件信息
-		components.push(navigator.hardwareConcurrency?.toString() || "0");
-		components.push(navigator.maxTouchPoints?.toString() || "0");
-
-		// 内存信息（如果可用）
-		const memory = navigator.deviceMemory;
-		if (memory) {
-			components.push(`${memory}GB`);
-		}
-
-		// 网络信息（如果可用）
-		const connection = navigator.connection;
-		if (connection) {
-			components.push(connection.effectiveType || "unknown");
-			components.push(String(connection.downlink ?? "unknown"));
-		}
-
-		// Obsidian 特有信息
-		const obsidianApp = window.app;
-		if (obsidianApp) {
-			components.push(obsidianApp.appId || "obsidian");
-			// 移除 vault.adapter.path，避免路径变化触发设备变更
-		}
-
-		// 平台信息：只用 Obsidian Platform API，禁止 Node/Electron require("os")
-		components.push(Platform.isDesktopApp ? "desktop" : "mobile");
-		if (Platform.isMacOS) {
-			components.push("macos");
-		} else if (Platform.isWin) {
-			components.push("windows");
-		} else if (Platform.isLinux) {
-			components.push("linux");
-		} else if (Platform.isIosApp) {
-			components.push("ios");
-		} else if (Platform.isAndroidApp) {
-			components.push("android");
-		} else {
-			components.push("unknown-os");
-		}
-
-		// Canvas指纹（轻量级）
-		try {
-			const canvas = activeDocument.body.createEl("canvas");
-			try {
-				const ctx = canvas.getContext("2d");
-				if (ctx) {
-					ctx.textBaseline = "top";
-					ctx.font = "14px Arial";
-					ctx.fillText("Weave Device Fingerprint", 2, 2);
-					components.push(canvas.toDataURL().substring(0, 50));
-				}
-			} finally {
-				canvas.remove();
-			}
-		} catch {
-			components.push("no-canvas");
-		}
-
-		// WebGL信息（如果可用）
-		try {
-			const canvas = activeDocument.body.createEl("canvas");
-			try {
-				const gl = canvas.getContext("webgl");
-				if (gl) {
-					const renderer = gl.getParameter(gl.RENDERER) as unknown;
-					const vendor = gl.getParameter(gl.VENDOR) as unknown;
-					components.push(
-						typeof renderer === "string" ? renderer : "unknown-renderer",
-					);
-					components.push(
-						typeof vendor === "string" ? vendor : "unknown-vendor",
-					);
-				}
-			} finally {
-				canvas.remove();
-			}
-		} catch {
-			components.push("no-webgl");
-		}
-
-		// 音频上下文指纹（轻量级）
-		try {
-			const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
-			if (!AudioContextCtor) {
-				throw new Error("AudioContext unavailable");
-			}
-			const audioContext = new AudioContextCtor();
-			const oscillator = audioContext.createOscillator();
-			const analyser = audioContext.createAnalyser();
-			const gainNode = audioContext.createGain();
-
-			oscillator.connect(analyser);
-			analyser.connect(gainNode);
-			gainNode.connect(audioContext.destination);
-
-			components.push(audioContext.sampleRate.toString());
-			components.push(analyser.frequencyBinCount.toString());
-
-			void audioContext.close();
-		} catch {
-			components.push("no-audio");
-		}
-
-		return components.filter((_c) => _c && _c !== "undefined");
-	}
-
-	/**
-	 * SHA256 哈希函数
-	 */
-	private async sha256(message: string): Promise<string> {
-		const msgBuffer = new TextEncoder().encode(message);
-		const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-		const hashArray = Array.from(new Uint8Array(hashBuffer));
-		return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+		const fingerprint = (await collectStableDeviceComponents(null)).join("|");
+		return sha256Hex(fingerprint);
 	}
 
 	/**
@@ -411,6 +272,7 @@ export class LicenseManager {
 		email: string,
 		options?: {
 			targetProduct?: LicensedProduct;
+			previousDeviceFingerprint?: string;
 		},
 	): Promise<{
 		success: boolean;
@@ -419,6 +281,7 @@ export class LicenseManager {
 		cloudInfo?: {
 			isFirstActivation?: boolean;
 			replacedOldDevice?: boolean;
+			mergedPreviousDevice?: boolean;
 			devicesUsed?: number;
 			devicesMax?: number;
 		};
@@ -432,6 +295,9 @@ export class LicenseManager {
 
 			// 生成设备指纹
 			const deviceFingerprint = await this.generateDeviceFingerprint();
+			const previousDeviceFingerprint = String(
+				options?.previousDeviceFingerprint || "",
+			).trim();
 
 			// 本地RSA签名验证（必须通过）
 			const validation = await this.validateActivationCode(
@@ -465,6 +331,10 @@ export class LicenseManager {
 				deviceFingerprint,
 				sanitizedEmail,
 				getRuntimePlatformLabel(),
+				previousDeviceFingerprint &&
+					previousDeviceFingerprint !== deviceFingerprint
+					? { previousDeviceFingerprint }
+					: undefined,
 			);
 
 			if (!cloudResult.success) {
@@ -514,6 +384,7 @@ export class LicenseManager {
 				cloudInfo: {
 					isFirstActivation: (cloudResult.devices_count ?? 1) <= 1,
 					replacedOldDevice: cloudResult.replaced_old_device,
+					mergedPreviousDevice: cloudResult.merged_previous_device,
 					devicesUsed: cloudResult.devices_count,
 					devicesMax: maxDevices,
 				},
@@ -638,26 +509,54 @@ export class LicenseManager {
 				warnings.push(`许可证将在${daysUntilExpiry}天后过期`);
 			}
 
-			// 验证设备指纹
+			// 验证设备指纹（版本升级或指纹实际变化时合并旧位，避免多占一台）
 			const currentFingerprint = await this.generateDeviceFingerprint();
-
-			if (
+			let pendingPreviousFingerprint = "";
+			const storedFingerprint = String(
+				normalizedLicense.deviceFingerprint || "",
+			).trim();
+			const needsFingerprintMigration =
 				!normalizedLicense.fingerprintVersion ||
-				normalizedLicense.fingerprintVersion < DEVICE_FINGERPRINT_VERSION
-			) {
+				normalizedLicense.fingerprintVersion < DEVICE_FINGERPRINT_VERSION ||
+				(storedFingerprint.length > 0 &&
+					storedFingerprint !== currentFingerprint);
+
+			if (needsFingerprintMigration) {
 				logger.debug("迁移设备指纹到跨插件稳定版本...");
 				normalizedLicense.deviceFingerprint = currentFingerprint;
 				normalizedLicense.fingerprintVersion = DEVICE_FINGERPRINT_VERSION;
-				if (normalizedLicense.cloudSync) {
-					normalizedLicense.cloudSync = {
-						...normalizedLicense.cloudSync,
-						lastValidatedAt: "",
-					};
+				if (
+					storedFingerprint &&
+					storedFingerprint !== currentFingerprint
+				) {
+					pendingPreviousFingerprint = storedFingerprint;
+					if (normalizedLicense.cloudSync) {
+						normalizedLicense.cloudSync = {
+							...normalizedLicense.cloudSync,
+							lastValidatedAt: "",
+						};
+					}
+					this.cloudValidator.clearCache();
 				}
-				this.cloudValidator.clearCache();
 				warnings.push(
-					"设备指纹已更新；主插件与增量阅读将共用同一设备位。若设备数仍异常，请重新激活一次",
+					"设备指纹已更新；主插件与增量阅读将共用同一设备位",
 				);
+			}
+
+			if (
+				pendingPreviousFingerprint &&
+				normalizedLicense.boundEmail &&
+				isCloudLicenseConfigured()
+			) {
+				const merge = await this.reconcileCloudDeviceRegistration(
+					normalizedLicense,
+					currentFingerprint,
+					pendingPreviousFingerprint,
+					warnings,
+				);
+				if (!merge.ok && merge.error) {
+					warnings.push(merge.error);
+				}
 			}
 
 			if (normalizedLicense.boundEmail && isCloudLicenseConfigured()) {
@@ -667,6 +566,32 @@ export class LicenseManager {
 					warnings,
 				);
 				if (!cloudCheck.ok) {
+					const notRegistered =
+						typeof cloudCheck.error === "string" &&
+						(cloudCheck.error.includes("未登记") ||
+							cloudCheck.error.toLowerCase().includes("not registered"));
+					if (notRegistered) {
+						const reconcile = await this.reconcileCloudDeviceRegistration(
+							normalizedLicense,
+							currentFingerprint,
+							pendingPreviousFingerprint,
+							warnings,
+						);
+						if (reconcile.ok) {
+							const retry = await this.performCloudValidation(
+								normalizedLicense,
+								currentFingerprint,
+								warnings,
+							);
+							if (retry.ok) {
+								Object.assign(licenseInfo, normalizedLicense);
+								return {
+									isValid: true,
+									warnings: warnings.length > 0 ? warnings : undefined,
+								};
+							}
+						}
+					}
 					return { isValid: false, error: cloudCheck.error };
 				}
 			}
@@ -768,6 +693,72 @@ export class LicenseManager {
 	 */
 	isTrialVersion(licenseInfo: LicenseInfo): boolean {
 		return !licenseInfo.isActivated || licenseInfo.activationCode === "";
+	}
+
+	/**
+	 * 云端已有邮箱绑定但本机指纹未登记 / 指纹算法升级时：用 previous 合并座位后重新登记。
+	 */
+	private async reconcileCloudDeviceRegistration(
+		licenseInfo: LicenseInfo,
+		currentFingerprint: string,
+		previousDeviceFingerprint: string,
+		warnings: string[],
+	): Promise<{ ok: boolean; error?: string }> {
+		if (!licenseInfo.boundEmail || !licenseInfo.activationCode) {
+			return { ok: false };
+		}
+
+		try {
+			const previous = String(previousDeviceFingerprint || "").trim();
+			const cloudResult = await this.cloudValidator.activate(
+				licenseInfo.activationCode,
+				currentFingerprint,
+				licenseInfo.boundEmail,
+				getRuntimePlatformLabel(),
+				previous && previous !== currentFingerprint
+					? { previousDeviceFingerprint: previous }
+					: undefined,
+			);
+
+			if (!cloudResult.success) {
+				return {
+					ok: false,
+					error: cloudResult.error || "云端设备登记失败",
+				};
+			}
+
+			const nowIso = new Date().toISOString();
+			licenseInfo.deviceFingerprint = currentFingerprint;
+			licenseInfo.fingerprintVersion = DEVICE_FINGERPRINT_VERSION;
+			licenseInfo.cloudSync = {
+				status: "synced",
+				syncedAt: licenseInfo.cloudSync?.syncedAt || nowIso,
+				lastValidatedAt: nowIso,
+				devicesUsed:
+					cloudResult.devices_count ?? licenseInfo.cloudSync?.devicesUsed,
+				devicesMax:
+					cloudResult.max_devices ??
+					licenseInfo.cloudSync?.devicesMax ??
+					licenseInfo.maxDevices,
+			};
+
+			if (cloudResult.merged_previous_device) {
+				warnings.push("本机设备标识已合并，不会额外占用设备位");
+			} else if (cloudResult.replaced_old_device) {
+				warnings.push("本机已重新登记，并自动替换了最久未使用的设备");
+			} else {
+				warnings.push("本机设备标识已更新并完成云端登记");
+			}
+
+			logger.info("增量阅读许可证云端设备已自动重新登记");
+			return { ok: true };
+		} catch (error) {
+			logger.error("云端设备重新登记失败:", error);
+			return {
+				ok: false,
+				error: error instanceof Error ? error.message : "云端设备重新登记失败",
+			};
+		}
 	}
 
 	/**

@@ -7,15 +7,15 @@ export const CURRENT_PLUGIN_VERSION = manifest.version;
 export const CURRENT_PLUGIN_DISPLAY_VERSION = `v${CURRENT_PLUGIN_VERSION}`;
 
 /** Permanent Weave / IR license purchase page (ldxp storefront, Mainland China). */
-export const LIFETIME_LICENSE_PURCHASE_URL = "https://pay.ldxp.cn/item/ned9pw";
+export const LIFETIME_LICENSE_PURCHASE_URL = "https://pay.ldxp.cn/shop/4IRQ543S";
 
-/** PayPal checkout for EPUB Reader activation (international). */
+/** International checkout for EPUB Reader activation (Waffo storefront). */
 export const LIFETIME_LICENSE_PAYPAL_READER_PURCHASE_URL =
-	"https://www.paypal.com/ncp/payment/9MUPK6PMA6SCJ";
+	"https://pancake.waffo.ai/store/obsidian-weave-z0o9emwu/product/PROD_1kbSye1i2mi2RjUpfmRhag?type=onetime&currency=USD";
 
-/** PayPal checkout for Weave series activation (international). */
+/** International checkout for Weave series bundle (Waffo storefront). */
 export const WEAVE_SERIES_PAYPAL_PURCHASE_URL =
-	"https://www.paypal.com/ncp/payment/4B86NBDFWEDEJ";
+	"https://pancake.waffo.ai/store/obsidian-weave-z0o9emwu/product/PROD_0VsgIaepp0QoBwAlvca5nO?type=onetime&currency=USD";
 
 export const LEGACY_WEAVE_PRODUCT_IDS = new Set<string>([
 	"weave",

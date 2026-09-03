@@ -66,6 +66,35 @@ const SEARCH_ENTRIES: readonly StandaloneIRSettingsSearchEntry[] = [
 		aliases: ["folder subscription", "clipping folder"],
 	},
 	{
+		tab: "basic",
+		nameKey: "irSettings.markdownBlockFocusModeTitle",
+		aliases: ["markdown focused reading", "阅读体验", "聚焦阅读", "专注阅读"],
+	},
+	{
+		tab: "basic",
+		nameKey: "irSettings.markdownBlockFocusModeLabel",
+		descKey: "irSettings.markdownBlockFocusModeDesc",
+		aliases: [
+			"focus mode",
+			"markdown focus",
+			"block focus",
+			"聚焦模式",
+			"专注模式",
+			"opacity",
+		],
+	},
+	{
+		tab: "core-scheduling",
+		nameKey: "irSettings.readingTargetTitle",
+		aliases: [
+			"reading point defaults",
+			"new reading point",
+			"inbox",
+			"note-backed",
+			"新增阅读点",
+		],
+	},
+	{
 		tab: "advanced",
 		nameKey: "irSettings.advancedTitle",
 		aliases: ["advanced scheduling", "tag groups"],

@@ -131,6 +131,8 @@ export interface IRPlannedScheduleItem {
 	sourceSequenceLocked?: boolean;
 	sourceSequenceAnchorDateKey?: string;
 	manualSchedulePinnedDateKey?: string;
+	/** 用户手动推迟次数（未处理先挪开）。 */
+	manualPostponeCount?: number;
 	explanation: IRScheduleExplanation;
 }
 
@@ -216,6 +218,7 @@ export function readSequenceMeta(
 	sourceSequenceLocked?: boolean;
 	sourceSequenceAnchorDateKey?: string;
 	manualSchedulePinnedDateKey?: string;
+	manualPostponeCount?: number;
 } {
 	const sourceSequenceGroup =
 		typeof record?.sourceSequenceGroup === "string" &&
@@ -241,12 +244,18 @@ export function readSequenceMeta(
 		record.manualSchedulePinnedDateKey.trim()
 			? record.manualSchedulePinnedDateKey.trim()
 			: undefined;
+	const rawPostponeCount = Number(record?.manualPostponeCount || 0);
+	const manualPostponeCount =
+		Number.isFinite(rawPostponeCount) && rawPostponeCount > 0
+			? Math.round(rawPostponeCount)
+			: undefined;
 	return {
 		sourceSequenceGroup,
 		sourceSequenceOrder,
 		sourceSequenceLocked,
 		sourceSequenceAnchorDateKey,
 		manualSchedulePinnedDateKey,
+		manualPostponeCount,
 	};
 }
 

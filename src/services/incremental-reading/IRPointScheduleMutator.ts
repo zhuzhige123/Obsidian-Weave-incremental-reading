@@ -24,6 +24,8 @@ export interface PointScheduleMutation {
 	priorityUi?: number;
 	priorityEff?: number;
 	manualSchedulePinnedDateKey?: string | null;
+	/** 设为 0 / null 表示清零手动推迟次数。 */
+	manualPostponeCount?: number | null;
 }
 
 export interface PointScheduleMutateOptions {
@@ -38,6 +40,61 @@ export interface PointScheduleMutateResult {
 	previousNextRepDate?: number;
 	nextRepDate?: number;
 	scheduleFingerprint?: string;
+}
+
+/**
+ * 将调度 mutation 合成完整 block：顶层只保留 block 字段，meta 字段只进 meta。
+ * PDF/EPUB/legacy 共用，避免把 manualPostponeCount 等摊到顶层。
+ */
+export function applyScheduleMutationToBlock(
+	block: IRBlockV4,
+	changes: PointScheduleMutation,
+): IRBlockV4 {
+	const nextMeta = { ...(block.meta || {}) };
+
+	if (changes.manualSchedulePinnedDateKey !== undefined) {
+		const pinned = String(changes.manualSchedulePinnedDateKey || "").trim();
+		if (pinned) {
+			nextMeta.manualSchedulePinnedDateKey = pinned;
+		} else {
+			delete nextMeta.manualSchedulePinnedDateKey;
+		}
+	}
+
+	if (changes.manualPostponeCount !== undefined) {
+		const count = Math.max(
+			0,
+			Math.round(Number(changes.manualPostponeCount || 0)) || 0,
+		);
+		if (count > 0) {
+			nextMeta.manualPostponeCount = count;
+		} else {
+			delete nextMeta.manualPostponeCount;
+		}
+	}
+
+	const nextBlock: IRBlockV4 = {
+		...block,
+		meta: nextMeta,
+	};
+
+	if (changes.nextRepDate !== undefined) {
+		nextBlock.nextRepDate = changes.nextRepDate;
+	}
+	if (changes.intervalDays !== undefined) {
+		nextBlock.intervalDays = changes.intervalDays;
+	}
+	if (changes.scheduleStatus !== undefined) {
+		nextBlock.status = changes.scheduleStatus;
+	}
+	if (changes.priorityUi !== undefined) {
+		nextBlock.priorityUi = changes.priorityUi;
+	}
+	if (changes.priorityEff !== undefined) {
+		nextBlock.priorityEff = changes.priorityEff;
+	}
+
+	return nextBlock;
 }
 
 /**
@@ -77,11 +134,13 @@ export class IRPointScheduleMutator {
 				: Number(block.nextRepDate || 0) || undefined;
 
 		if (isPdfBookmarkTaskId(pointId)) {
-			const nextBlock = { ...block, ...changes } as IRBlockV4;
-			await this.pdfService.updateTaskFromBlock(nextBlock);
+			await this.pdfService.updateTaskFromBlock(
+				applyScheduleMutationToBlock(block, changes),
+			);
 		} else if (isEpubBookmarkTaskId(pointId)) {
-			const nextBlock = { ...block, ...changes } as IRBlockV4;
-			await this.epubService.updateTaskFromBlock(nextBlock);
+			await this.epubService.updateTaskFromBlock(
+				applyScheduleMutationToBlock(block, changes),
+			);
 		} else {
 			await this.mutateMarkdownPointSchedule(pointId, block, changes);
 		}
@@ -137,6 +196,9 @@ export class IRPointScheduleMutator {
 			...(changes.manualSchedulePinnedDateKey !== undefined
 				? { manualSchedulePinnedDateKey: changes.manualSchedulePinnedDateKey }
 				: {}),
+			...(changes.manualPostponeCount !== undefined
+				? { manualPostponeCount: changes.manualPostponeCount }
+				: {}),
 		};
 
 		const chunk = await this.storage.getChunkData(pointId);
@@ -149,8 +211,9 @@ export class IRPointScheduleMutator {
 
 		const legacyBlock = await this.storage.getBlock(pointId);
 		if (legacyBlock) {
-			const updatedBlock = { ...block, ...changes } as IRBlockV4;
-			await this.storageAdapterV4.saveBlockV4(updatedBlock);
+			await this.storageAdapterV4.saveBlockV4(
+				applyScheduleMutationToBlock(block, changes),
+			);
 			this.storage.invalidateScheduleRuntimeCaches({ skipScheduleIndex: true });
 			return;
 		}
@@ -211,6 +274,12 @@ export async function persistBlockScheduleState(
 			scheduleStatus: after.status,
 			priorityUi: after.priorityUi,
 			priorityEff: after.priorityEff,
+			manualSchedulePinnedDateKey:
+				after.meta?.manualSchedulePinnedDateKey ?? null,
+			manualPostponeCount:
+				after.meta?.manualPostponeCount != null
+					? Number(after.meta.manualPostponeCount) || 0
+					: 0,
 		},
 		{
 			...options,

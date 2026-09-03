@@ -2,9 +2,12 @@ import { TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import {
+	collectScheduleItemVaultSourcePathCandidates,
 	evaluateScheduleItemSourceMissing,
+	extractVaultPathCandidateFromResumeLink,
 	isVaultSourcePathPresent,
 	resolveScheduleItemVaultSourcePath,
+	resolveVaultSourcePathIfPresent,
 	shouldCheckScheduleItemSourceExistence,
 } from "../ir-calendar-source-existence";
 
@@ -22,20 +25,42 @@ function makeMaterial(overrides: Partial<ScheduleItem> = {}): ScheduleItem {
 	};
 }
 
-function makeApp(pathsPresent: string[] = []) {
-	const present = new Set(pathsPresent.map((p) => p.replace(/\\/g, "/")));
+function makeApp(options?: {
+	pathsPresent?: string[];
+	linkpathMap?: Record<string, string>;
+}) {
+	const present = new Set(
+		(options?.pathsPresent || []).map((p) => p.replace(/\\/g, "/")),
+	);
+	const linkpathMap = new Map(
+		Object.entries(options?.linkpathMap || {}).map(([key, value]) => [
+			key.replace(/\\/g, "/"),
+			value.replace(/\\/g, "/"),
+		]),
+	);
+
+	const fileFor = (path: string) => {
+		const normalized = String(path || "").replace(/\\/g, "/");
+		if (!present.has(normalized)) {
+			return null;
+		}
+		return new TFile(normalized);
+	};
+
 	return {
 		metadataCache: {
 			getCache: () => null,
+			getFirstLinkpathDest: (linkPath: string) => {
+				const key = String(linkPath || "").replace(/\\/g, "/");
+				const mapped = linkpathMap.get(key);
+				if (mapped) {
+					return fileFor(mapped);
+				}
+				return fileFor(key);
+			},
 		},
 		vault: {
-			getAbstractFileByPath: (path: string) => {
-				const normalized = String(path || "").replace(/\\/g, "/");
-				if (!present.has(normalized)) {
-					return null;
-				}
-				return new TFile(normalized);
-			},
+			getAbstractFileByPath: (path: string) => fileFor(path),
 		},
 	} as any;
 }
@@ -119,6 +144,33 @@ describe("resolveScheduleItemVaultSourcePath", () => {
 	});
 });
 
+describe("extractVaultPathCandidateFromResumeLink / candidates", () => {
+	it("extracts wikilink and epub protocol file paths", () => {
+		expect(extractVaultPathCandidateFromResumeLink("[[Notes/A.md#^x]]")).toBe(
+			"Notes/A.md",
+		);
+		expect(
+			extractVaultPathCandidateFromResumeLink(
+				"[EPUB](obsidian://weave-epub?vault=Vault&file=Books%2Fdemo.epub&cfi=epubcfi(/6/2))",
+			),
+		).toBe("Books/demo.epub");
+		expect(extractVaultPathCandidateFromResumeLink("https://example.com")).toBe(
+			"",
+		);
+	});
+
+	it("collects sourceFile, basename, and resumeLink candidates", () => {
+		expect(
+			collectScheduleItemVaultSourcePathCandidates(
+				makeMaterial({
+					sourceFile: "Old/Note.md",
+					resumeLink: "[[New/Note.md#^block]]",
+				}),
+			),
+		).toEqual(["Old/Note.md", "Note.md", "New/Note.md"]);
+	});
+});
+
 describe("isVaultSourcePathPresent / evaluateScheduleItemSourceMissing", () => {
 	it("treats empty path as missing for checkable items", () => {
 		const app = makeApp();
@@ -130,7 +182,7 @@ describe("isVaultSourcePathPresent / evaluateScheduleItemSourceMissing", () => {
 	});
 
 	it("reports present and missing paths", () => {
-		const app = makeApp(["Notes/Present.md"]);
+		const app = makeApp({ pathsPresent: ["Notes/Present.md"] });
 		expect(isVaultSourcePathPresent(app, "Notes/Present.md")).toBe(true);
 		expect(isVaultSourcePathPresent(app, "Notes/Gone.md")).toBe(false);
 
@@ -156,8 +208,68 @@ describe("isVaultSourcePathPresent / evaluateScheduleItemSourceMissing", () => {
 		});
 	});
 
+	it("soft-resolves moved files via linkpath basename", () => {
+		const app = makeApp({
+			pathsPresent: ["Archive/Present.md"],
+			linkpathMap: { "Present.md": "Archive/Present.md" },
+		});
+
+		expect(resolveVaultSourcePathIfPresent(app, "Present.md")).toBe(
+			"Archive/Present.md",
+		);
+		expect(
+			evaluateScheduleItemSourceMissing(
+				app,
+				makeMaterial({ sourceFile: "Old/Present.md" }),
+			),
+		).toEqual({
+			checkable: true,
+			missing: false,
+			path: "Old/Present.md",
+		});
+	});
+
+	it("treats empty sourceFile as present when resumeLink resolves", () => {
+		const app = makeApp({ pathsPresent: ["Notes/FromLink.md"] });
+		expect(
+			evaluateScheduleItemSourceMissing(
+				app,
+				makeMaterial({
+					sourceFile: "",
+					resumeLink: "[[Notes/FromLink.md#^b]]",
+				}),
+			),
+		).toEqual({
+			checkable: true,
+			missing: false,
+			path: "Notes/FromLink.md",
+		});
+	});
+
+	it("soft-resolves stale sourceFile via resumeLink file path", () => {
+		const app = makeApp({ pathsPresent: ["Books/current.epub"] });
+		const material = makeMaterial({
+			id: "epubbm-1",
+			sourceType: "epub",
+			sourceFile: "Books/stale.epub",
+			resumeLink:
+				"[EPUB](obsidian://weave-epub?vault=Vault&file=Books%2Fcurrent.epub)",
+		});
+		expect(collectScheduleItemVaultSourcePathCandidates(material)).toEqual([
+			"Books/stale.epub",
+			"stale.epub",
+			"Books/current.epub",
+			"current.epub",
+		]);
+		expect(evaluateScheduleItemSourceMissing(app, material)).toEqual({
+			checkable: true,
+			missing: false,
+			path: "Books/stale.epub",
+		});
+	});
+
 	it("reuses pathExistsCache for repeated paths", () => {
-		const app = makeApp(["Shared/A.md"]);
+		const app = makeApp({ pathsPresent: ["Shared/A.md"] });
 		const cache = new Map<string, boolean>();
 		const spy = vi.spyOn(app.vault, "getAbstractFileByPath");
 

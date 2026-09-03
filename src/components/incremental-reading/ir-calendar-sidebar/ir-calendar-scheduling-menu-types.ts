@@ -1,18 +1,25 @@
 import type { ScheduleItem } from "../../../services/incremental-reading/IRCalendarScheduleItem";
 import type { PreviewDetails } from "../ir-schedule-impact-preview-types";
 
-export const IRCALENDAR_SCHEDULING_MENU_ACTIONS = [
+export const IRCALENDAR_SCHEDULING_ARRANGE_ACTIONS = [
 	"intensive",
 	"normal",
-	"postpone",
 	"slow",
+] as const;
+
+export const IRCALENDAR_SCHEDULING_MENU_ACTIONS = [
+	...IRCALENDAR_SCHEDULING_ARRANGE_ACTIONS,
+	"postpone",
 ] as const;
 
 export type IRCalendarSchedulingAction =
 	typeof IRCALENDAR_SCHEDULING_MENU_ACTIONS[number];
 
+export type IRCalendarSchedulingArrangeAction =
+	typeof IRCALENDAR_SCHEDULING_ARRANGE_ACTIONS[number];
+
 /**
- * 调度菜单展示顺序：非「稍后」项按下次复习日由近到远，「稍后」紧跟「正常」。
+ * 安排档位按下次复习日由近到远排序；推迟始终单独分区置底。
  */
 export function sortSchedulingMenuActionsByDueDate(
 	actions: readonly IRCalendarSchedulingAction[],
@@ -27,17 +34,13 @@ export function sortSchedulingMenuActionsByDueDate(
 		return dateA - dateB;
 	};
 
-	const withoutPostpone = actions.filter((action) => action !== "postpone");
-	const sorted = [...withoutPostpone].sort(compareDue);
-	const normalIndex = sorted.indexOf("normal");
-	if (normalIndex < 0) {
-		return [...sorted, "postpone"];
-	}
-	return [
-		...sorted.slice(0, normalIndex + 1),
-		"postpone",
-		...sorted.slice(normalIndex + 1),
-	];
+	const arrange = actions.filter(
+		(action): action is IRCalendarSchedulingArrangeAction =>
+			action !== "postpone",
+	);
+	const sortedArrange = [...arrange].sort(compareDue);
+	const includePostpone = actions.includes("postpone");
+	return includePostpone ? [...sortedArrange, "postpone"] : sortedArrange;
 }
 
 export type IRCalendarSchedulingMenuPreviewState =
@@ -52,6 +55,8 @@ export interface IRCalendarSchedulingMenuConfigItem {
 	color: string;
 	intervalMultiplier: number;
 	isPostpone: boolean;
+	disabled?: boolean;
+	metaText?: string;
 }
 
 export interface IRCalendarSchedulingMenuContext {

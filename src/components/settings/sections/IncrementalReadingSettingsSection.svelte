@@ -1,8 +1,6 @@
 <!--
   增量阅读设置组件
   职责：处理增量阅读专题的配置（调度、拆分、交错学习、导入设置）
-  
-  已移除弃用的聚焦阅读模式相关设置
 -->
 <script lang="ts">
   import { onMount, untrack } from 'svelte';

@@ -14,7 +14,6 @@
     calendarToolsTriggerEl?: HTMLButtonElement | null;
     onAddReadingTarget: () => void;
     onScanTopics: () => void;
-    onOpenTutorial: () => void;
     onToggleDayLoadPopover: (event: MouseEvent) => void;
     onToggleSearchPanel: () => void;
     onShowMonthCalendarToolsMenu: (event: MouseEvent) => void;
@@ -31,7 +30,6 @@
     calendarToolsTriggerEl = $bindable(null),
     onAddReadingTarget,
     onScanTopics,
-    onOpenTutorial,
     onToggleDayLoadPopover,
     onToggleSearchPanel,
     onShowMonthCalendarToolsMenu,
@@ -117,14 +115,6 @@
       title={t('irSidebar.calendar.searchMaterials')}
       aria-label={t('irSidebar.calendar.searchMaterials')}
       use:obsidianIcon={'search'}
-    ></button>
-    <button
-      class="clickable-icon nav-action-button"
-      type="button"
-      onclick={onOpenTutorial}
-      title={t('irSidebar.calendar.openTutorial')}
-      aria-label={t('irSidebar.calendar.openTutorial')}
-      use:obsidianIcon={'circle-help'}
     ></button>
     <button
       class="clickable-icon nav-action-button"

@@ -136,6 +136,12 @@
             <div class="detail-label">{t('about.license.statusCard.deviceUsage')}</div>
             <div class="detail-value">{formatLicenseDeviceStats(deviceStats)}</div>
           </div>
+          <div class="detail-item detail-item-wide">
+            <div class="detail-label">{t('about.license.statusCard.deviceRule')}</div>
+            <div class="detail-value detail-value-muted">
+              {t('about.license.statusCard.deviceSeatHint')}
+            </div>
+          </div>
         {/if}
         
         <!-- 激活时间 -->
@@ -298,6 +304,20 @@
     background: transparent;
     border-radius: 0;
     border-top: 1px solid var(--background-modifier-border-hover);
+  }
+
+  .detail-item-wide {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .detail-value-muted {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    font-weight: 400;
+    text-align: left;
+    line-height: 1.45;
   }
 
   .detail-grid .detail-item:first-child {

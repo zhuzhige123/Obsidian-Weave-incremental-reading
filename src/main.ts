@@ -25,6 +25,7 @@ import {
 	registerEpubHost,
 	unregisterEpubHost,
 } from "./services/epub-integration/epub-host";
+import { getSharedMarkdownBlockFocusModeService } from "./services/ui/MarkdownBlockFocusModeService";
 import { createAnchorManager } from "./services/incremental-reading/AnchorManager";
 import {
 	type ExistingChunkLike,
@@ -263,6 +264,7 @@ export default class StandaloneIncrementalReadingPlugin
 		});
 
 		await this.loadSettings();
+		getSharedMarkdownBlockFocusModeService(this.app).initializeFromSettings();
 		await migrateIRDataRootIfNeeded(this);
 		applyPluginUiLanguagePreference(this.settings.uiLanguage);
 		licenseManager.initializeCloud(this.app);
@@ -395,6 +397,14 @@ export default class StandaloneIncrementalReadingPlugin
 			},
 		});
 
+		this.addCommand({
+			id: "toggle-markdown-block-focus-mode",
+			name: i18n.t("irCommands.toggleMarkdownBlockFocusMode"),
+			callback: () => {
+				void this.toggleMarkdownBlockFocusMode();
+			},
+		});
+
 		// 注册完视图与命令后即可恢复 UI；重 I/O 与索引任务放到后台，避免拖慢 Obsidian 启动计时。
 		markServiceReady("allCoreServices");
 		void getSharedIRProjectionRuntime(this.app).preloadColdStartCaches();
@@ -458,6 +468,7 @@ export default class StandaloneIncrementalReadingPlugin
 		this.pendingFolderSubscriptionResyncPaths.clear();
 		unregisterEpubHost(this.app);
 		clearActiveWeaveParentFolder();
+		getSharedMarkdownBlockFocusModeService(this.app).destroy();
 	}
 
 	private registerWorkspaceViews(): void {
@@ -531,7 +542,8 @@ export default class StandaloneIncrementalReadingPlugin
 	}
 
 	/** Weave 宿主可通过 `app.plugins.getPlugin("weave-incremental-reading")` 调用 */
-	openDataManagementModal(): void {
+	async openDataManagementModal(): Promise<void> {
+		await this.ensureIRUserWorkspaceReady();
 		new IRDataManagementModalObsidian(this.app, {
 			plugin: this,
 		}).open();
@@ -690,6 +702,25 @@ export default class StandaloneIncrementalReadingPlugin
 			});
 		}
 		return this.settings.incrementalReading;
+	}
+
+	/** Toggle Markdown focused reading and persist the choice. No default hotkey. */
+	async toggleMarkdownBlockFocusMode(): Promise<boolean> {
+		const current = this.getIncrementalReadingSettings();
+		const nextEnabled = current.markdownBlockFocusModeEnabled !== true;
+		await this.saveIncrementalReadingSettings({
+			...current,
+			markdownBlockFocusModeEnabled: nextEnabled,
+		});
+		getSharedMarkdownBlockFocusModeService(this.app).onSettingChanged(
+			nextEnabled,
+		);
+		new Notice(
+			nextEnabled
+				? i18n.t("irNotices.markdownBlockFocusModeEnabled")
+				: i18n.t("irNotices.markdownBlockFocusModeDisabled"),
+		);
+		return nextEnabled;
 	}
 
 	async syncIncrementalReadingFolderSubscriptionFromSettings(options?: {

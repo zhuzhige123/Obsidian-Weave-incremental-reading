@@ -1,5 +1,5 @@
 <!--
-  Reading-target related IR settings (inbox deck + default note-backed).
+  Defaults used when creating a new reading point (inbox topic + note-backed).
 -->
 <script lang="ts">
   import { tr } from '../../../utils/i18n';

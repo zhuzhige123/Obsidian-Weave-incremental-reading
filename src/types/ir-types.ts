@@ -424,6 +424,11 @@ export interface IRBlockMeta {
 	sourceSequenceOrder?: number;
 	/** 用户手动改期后固定到的日期（YYYY-MM-DD），负载顺延不会移走该日条目。 */
 	manualSchedulePinnedDateKey?: string;
+	/**
+	 * 用户手动「推迟」次数（未处理先挪开）。
+	 * 安排（强化/正常/放缓/手动改期）或完成阅读后清零；达到上限后禁止再推迟。
+	 */
+	manualPostponeCount?: number;
 }
 
 /**

@@ -688,7 +688,7 @@
 								app={plugin.app}
 								active={true}
 								sourcePath={session.sourcePath}
-								weaveParentFolder={plugin.settings?.weaveParentFolder ?? ""}
+								weaveParentFolder={plugin.settings?.weaveParentFolder}
 								value={currentSegment.text}
 								fontScale={fontScale}
 								sessionId={`ir-paragraph-workbench-${currentSegment.id}`}

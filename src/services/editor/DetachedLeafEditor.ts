@@ -11,9 +11,6 @@ import {
 	asMarkdownViewInternal,
 	readMarkdownViewScope,
 } from "../../types/markdown-view-internal";
-import {
-	setActiveWeaveParentFolder,
-} from "../../config/paths";
 import { DirectoryUtils } from "../../utils/directory-utils";
 import { i18n } from "../../utils/i18n";
 import { logger } from "../../utils/logger";
@@ -277,10 +274,7 @@ export class DetachedLeafEditor extends Component {
 
 	private async prepareTempFile() {
 		const sessionId = this.options.sessionId || Date.now().toString();
-		if (this.options.weaveParentFolder !== undefined) {
-			setActiveWeaveParentFolder(this.options.weaveParentFolder);
-		}
-		// 固定写入 {IR 数据根}/editor/，优先用显式传入的 weaveParentFolder。
+		// 固定写入 {IR 数据根}/editor/：显式 parentFolder 只影响本次解析，不改全局登记。
 		const folderPath = resolveDetachedEditorTempFolder(
 			this.app,
 			undefined,

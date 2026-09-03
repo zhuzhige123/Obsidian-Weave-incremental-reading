@@ -61,6 +61,7 @@ export function buildDefaultIncrementalReadingSettings(
 		selectionQuickCreateBacklinkPosition: "start",
 		selectionQuickCreateSourceDocumentBacklinkPosition: "start",
 		appendSourceDocumentBacklinkOnSplitImport: false,
+		markdownBlockFocusModeEnabled: false,
 		scheduleStrategy: "processing",
 		dailyTimeBudgetMinutes: 40,
 		flowStretchPercent: 15,
@@ -177,6 +178,8 @@ export function normalizeIncrementalReadingSettings(
 			restSettings.readingTargetAppendSourceBacklink === true,
 		readingTargetDefaultNoteBacked:
 			restSettings.readingTargetDefaultNoteBacked === true,
+		markdownBlockFocusModeEnabled:
+			restSettings.markdownBlockFocusModeEnabled === true,
 		folderSubscription: normalizeIncrementalReadingFolderSubscriptionSettings(
 			restSettings.folderSubscription,
 		),

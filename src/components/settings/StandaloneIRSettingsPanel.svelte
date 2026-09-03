@@ -13,6 +13,7 @@
     PREMIUM_FEATURES,
   } from "../../services/premium/PremiumFeatureGuard";
   import { openObsidianWebUrl } from "../../services/obsidian/obsidian-open-web-url";
+  import { getSharedMarkdownBlockFocusModeService } from "../../services/ui/MarkdownBlockFocusModeService";
   import {
     applyPluginUiLanguagePreference,
     LANGUAGE_OPTION_LABEL_KEYS,
@@ -247,6 +248,13 @@
   }
 
 
+  async function commitMarkdownBlockFocusModeEnabled(enabled: boolean): Promise<void> {
+    await updateIncrementalReadingField((settings) => {
+      settings.markdownBlockFocusModeEnabled = enabled === true;
+    });
+    getSharedMarkdownBlockFocusModeService(plugin.app).onSettingChanged(enabled === true);
+  }
+
   async function commitLastFolder(): Promise<void> {
     const nextValue = lastFolderDraft.trim();
     if (nextValue === (incrementalReadingSettings.selectionQuickCreateLastFolder ?? "")) {
@@ -332,6 +340,31 @@
         </div>
 
         <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
+          <div class="standalone-ir-premium-preview-setting-row">
+            <div class="standalone-ir-premium-preview-setting-copy">
+              <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.markdownBlockFocusModeTitle")}</h3>
+              <p class="standalone-ir-settings-group-description">{t("irSettings.markdownBlockFocusModeDesc")}</p>
+            </div>
+            <ObsidianSettingToggle
+              compact
+              value={incrementalReadingSettings.markdownBlockFocusModeEnabled === true}
+              onChange={(enabled) => {
+                void commitMarkdownBlockFocusModeEnabled(enabled);
+              }}
+            />
+          </div>
+        </div>
+
+        {#if shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)}
+          <IncrementalReadingSettingsSection
+            {plugin}
+            showTabs={false}
+            forcedTab="auto-subscribe"
+            autoSubscribeShowTitle={true}
+          />
+        {/if}
+
+        <div class="standalone-ir-settings-group standalone-ir-settings-group--panel">
           <div class="standalone-ir-settings-group-header">
             <h3 class="standalone-ir-settings-group-title with-accent-bar accent-purple">{t("irSettings.standalone.dataFolders.title")}</h3>
             <p class="standalone-ir-settings-group-description">{t("irSettings.standalone.dataFolders.description")}</p>
@@ -382,15 +415,6 @@
             </div>
           </div>
         </div>
-
-        {#if shouldShowPremiumFeatureEntry(PREMIUM_FEATURES.FOLDER_SUBSCRIPTION)}
-          <IncrementalReadingSettingsSection
-            {plugin}
-            showTabs={false}
-            forcedTab="auto-subscribe"
-            autoSubscribeShowTitle={true}
-          />
-        {/if}
       </section>
     {/if}
 

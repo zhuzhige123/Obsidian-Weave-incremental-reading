@@ -150,6 +150,13 @@ export interface IncrementalReadingSettings {
 	readingTargetDefaultNoteBacked?: boolean;
 
 	/**
+	 * Markdown 块聚焦阅读：淡化非当前正文/标注块。
+	 * 默认关闭，避免安装/更新后编辑器显示异常；用户启用后会持久化。
+	 * @default false
+	 */
+	markdownBlockFocusModeEnabled?: boolean;
+
+	/**
 	 * Global sidebar settings.
 	 */
 	calendarSidebar?: IRCalendarSidebarSettings;
@@ -307,6 +314,7 @@ export const DEFAULT_IR_SETTINGS: IncrementalReadingSettings = {
 	readingTargetLastDeckId: "",
 	readingTargetAppendSourceBacklink: false,
 	readingTargetDefaultNoteBacked: false,
+	markdownBlockFocusModeEnabled: false,
 	scheduleStrategy: "processing",
 	dailyTimeBudgetMinutes: 40,
 	flowStretchPercent: 15,

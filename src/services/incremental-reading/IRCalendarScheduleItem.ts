@@ -57,6 +57,8 @@ export interface ScheduleItem {
 	sourceSequenceLocked?: boolean;
 	sourceSequenceAnchorDateKey?: string;
 	manualSchedulePinnedDateKey?: string;
+	/** 用户手动推迟次数（未处理先挪开）。 */
+	manualPostponeCount?: number;
 }
 
 function normalizePointTimestampMs(value: unknown): number | undefined {
@@ -157,6 +159,8 @@ function getScheduleItemSequenceMeta(
 	| "sourceSequenceOrder"
 	| "sourceSequenceLocked"
 	| "sourceSequenceAnchorDateKey"
+	| "manualSchedulePinnedDateKey"
+	| "manualPostponeCount"
 > {
 	const record =
 		meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
@@ -167,6 +171,13 @@ function getScheduleItemSequenceMeta(
 	);
 	const sourceSequenceAnchorDateKey =
 		readString(record?.sourceSequenceAnchorDateKey) || undefined;
+	const manualSchedulePinnedDateKey =
+		readString(record?.manualSchedulePinnedDateKey) || undefined;
+	const rawPostponeCount = Number(record?.manualPostponeCount || 0);
+	const manualPostponeCount =
+		Number.isFinite(rawPostponeCount) && rawPostponeCount > 0
+			? Math.round(rawPostponeCount)
+			: undefined;
 
 	return {
 		sourceSequenceGroup,
@@ -174,6 +185,8 @@ function getScheduleItemSequenceMeta(
 		sourceSequenceLocked:
 			record?.sourceSequenceLocked === true ? true : undefined,
 		sourceSequenceAnchorDateKey,
+		manualSchedulePinnedDateKey,
+		manualPostponeCount,
 	};
 }
 
@@ -215,6 +228,12 @@ export function buildScheduleItemFromProjectedItem(
 		sourceSequenceLocked: item.sourceSequenceLocked,
 		sourceSequenceAnchorDateKey: item.sourceSequenceAnchorDateKey,
 		manualSchedulePinnedDateKey: item.manualSchedulePinnedDateKey,
+		manualPostponeCount:
+			typeof item.manualPostponeCount === "number" &&
+			Number.isFinite(item.manualPostponeCount) &&
+			item.manualPostponeCount > 0
+				? Math.round(item.manualPostponeCount)
+				: undefined,
 		createdAt: normalizePointTimestampMs(item.createdAt),
 		updatedAt: normalizePointTimestampMs(item.updatedAt),
 	};

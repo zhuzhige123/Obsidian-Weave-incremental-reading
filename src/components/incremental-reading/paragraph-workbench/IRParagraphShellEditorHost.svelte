@@ -30,7 +30,7 @@
 		app,
 		active = false,
 		sourcePath = "",
-		weaveParentFolder = "",
+		weaveParentFolder = undefined,
 		value = "",
 		sessionId = "ir-paragraph-workbench",
 		fontScale = 100,

@@ -22,6 +22,7 @@
     clearPluginLocalLicenses,
     getPluginEffectiveLicenseState,
     getPluginLicensedProduct,
+    getPluginLocalLicenses,
     syncPluginLicenseSettings,
     upsertPluginLocalLicense
   } from '../../../utils/plugin-license';
@@ -33,6 +34,10 @@
   import { showNotification } from '../../../utils/notifications';
   import { showObsidianConfirm } from '../../../utils/obsidian-confirm';
   import { currentLanguage, tr, trArray } from '../../../utils/i18n';
+  import {
+    resolveLicenseDevicePoolKind,
+    resolveLicenseDeviceStats,
+  } from '../../../utils/license-device-stats';
 
   // ==================== Props ====================
   
@@ -101,9 +106,9 @@
   // ==================== License Status ====================
 
   let effectiveLicenseState = $derived.by(() => displayState ?? getPluginEffectiveLicenseState(plugin));
-
-  let currentLicenseInfo = $derived(effectiveLicenseState.primaryLicense || plugin.settings?.license || null);
-
+  let currentLicenseInfo = $derived(effectiveLicenseState.primaryLicense || plugin?.settings?.license || null);
+  let deviceStats = $derived(resolveLicenseDeviceStats(currentLicenseInfo, plugin?.app));
+  let devicePoolKind = $derived(resolveLicenseDevicePoolKind(currentLicenseInfo));
   let isLicenseActive = $derived(effectiveLicenseState.isPremiumActive);
 
   // ==================== Event Handlers ====================
@@ -167,8 +172,14 @@
     activationSuccess = false;
 
     try {
+      const previousLocal = getPluginLocalLicenses(plugin).find(
+        (license) =>
+          license.activationCode?.trim() === cleanedCode &&
+          Boolean(license.deviceFingerprint?.trim())
+      );
       const result = await licenseManager.activateLicense(cleanedCode, email, {
-        targetProduct: getPluginLicensedProduct(plugin)
+        targetProduct: getPluginLicensedProduct(plugin),
+        previousDeviceFingerprint: previousLocal?.deviceFingerprint,
       });
 
       // 记录激活尝试
@@ -204,6 +215,12 @@
         // 调用成功回调
         if (onActivationSuccess) {
           onActivationSuccess(result.licenseInfo);
+        }
+
+        if (result.cloudInfo?.mergedPreviousDevice) {
+          showNotification(t('about.license.activation.deviceMerged'), 'info');
+        } else if (result.cloudInfo?.replacedOldDevice) {
+          showNotification(t('about.license.activation.deviceReplaced'), 'info');
         }
         
         // 显示成功消息
@@ -379,6 +396,19 @@
           {#if currentLicenseInfo.boundEmail}
             <p class="success-details">
               {t('about.license.activation.boundEmail')}{currentLicenseInfo.boundEmail}
+            </p>
+          {/if}
+          {#if deviceStats}
+            <p class="success-details">
+              {t('about.license.activation.activatedDevices', {
+                used: deviceStats.used,
+                max: deviceStats.max,
+              })}
+            </p>
+            <p class="success-details">
+              {devicePoolKind === 'suite'
+                ? t('about.license.activation.deviceSeatHintSuite')
+                : t('about.license.activation.deviceSeatHintStandalone')}
             </p>
           {/if}
           

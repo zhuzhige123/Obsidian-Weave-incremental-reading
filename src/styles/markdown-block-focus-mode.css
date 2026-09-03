@@ -1,0 +1,62 @@
+/* Markdown block focus mode: dim text/annotation blocks; media always stays normal. */
+
+.weave-ir-md-block-focus {
+	--weave-ir-md-block-focus-normal-opacity: 0.15;
+}
+
+/* Dim normal editor lines (source / LP text). */
+.weave-ir-md-block-focus .cm-content > .cm-line {
+	opacity: var(--weave-ir-md-block-focus-normal-opacity);
+	transition: opacity 120ms ease;
+}
+
+.weave-ir-md-block-focus .cm-content > .cm-line.weave-ir-md-block-focus-active {
+	opacity: 1;
+}
+
+/*
+ * Annotation / callout cards in Live Preview (non-media embeds only).
+ * Videos/images are intentionally excluded so they always render normally.
+ */
+.weave-ir-md-block-focus .cm-content > .cm-embed-block:not(.media-embed):not(.image-embed):not(.video-embed) {
+	opacity: var(--weave-ir-md-block-focus-normal-opacity);
+	transition: opacity 120ms ease;
+}
+
+.weave-ir-md-block-focus
+	.cm-content
+	> .cm-embed-block.weave-ir-md-block-focus-active:not(.media-embed):not(.image-embed):not(.video-embed) {
+	opacity: 1;
+}
+
+/* Media embeds: never participate in focus dimming. */
+.weave-ir-md-block-focus .cm-content > .cm-embed-block.media-embed,
+.weave-ir-md-block-focus .cm-content > .cm-embed-block.image-embed,
+.weave-ir-md-block-focus .cm-content > .cm-embed-block.video-embed,
+.weave-ir-md-block-focus .cm-content > .media-embed,
+.weave-ir-md-block-focus .cm-content > .internal-embed.media-embed,
+.weave-ir-md-block-focus .cm-content > .internal-embed.image-embed,
+.weave-ir-md-block-focus .cm-content > .internal-embed.video-embed {
+	opacity: 1 !important;
+}
+
+/* Reading view: dim non-media blocks only. */
+.weave-ir-md-block-focus
+	.markdown-preview-sizer
+	> :not(.mod-header):not(.mod-footer):not(.internal-embed):not(.media-embed):not(.image-embed):not(.video-embed) {
+	opacity: var(--weave-ir-md-block-focus-normal-opacity);
+	transition: opacity 120ms ease;
+}
+
+.weave-ir-md-block-focus
+	.markdown-preview-sizer
+	> .weave-ir-md-block-focus-active {
+	opacity: 1;
+}
+
+.weave-ir-md-block-focus .markdown-preview-sizer > .internal-embed,
+.weave-ir-md-block-focus .markdown-preview-sizer > .media-embed,
+.weave-ir-md-block-focus .markdown-preview-sizer > .image-embed,
+.weave-ir-md-block-focus .markdown-preview-sizer > .video-embed {
+	opacity: 1 !important;
+}

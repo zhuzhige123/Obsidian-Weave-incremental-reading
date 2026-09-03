@@ -1,8 +1,11 @@
-import { type App, Platform } from "obsidian";
+import { Platform, type App } from "obsidian";
 import { getOrCreateCrossPluginDeviceId } from "./weave-install-device-id";
 
-/** 指纹算法版本；v4 起使用跨插件共享安装级 device id */
-export const DEVICE_FINGERPRINT_VERSION = 4;
+/**
+ * 指纹算法版本。
+ * v6：去掉时区等易变项；安装 ID 经 globalThis + userData + localStorage 跨插件共享。
+ */
+export const DEVICE_FINGERPRINT_VERSION = 6;
 
 function getRuntimePlatformLabel(): string {
 	if (Platform.isWin) return "win32";
@@ -16,21 +19,20 @@ function getRuntimePlatformLabel(): string {
 }
 
 /**
- * 仅收集跨库、跨插件稳定的特征。禁止 app.appId、vault 路径。
+ * 仅收集跨库、跨插件稳定的特征。
+ * 禁止：app.appId、vault 路径、hostname、时区。
+ * 三插件必须保持组件列表与顺序完全一致。
  */
-export function collectStableDeviceComponents(_app: App): string[] {
+export async function collectStableDeviceComponents(app?: App | null): Promise<string[]> {
 	const components: string[] = [];
 
-	const crossPluginId = getOrCreateCrossPluginDeviceId();
+	const crossPluginId = await getOrCreateCrossPluginDeviceId(app);
 	if (crossPluginId) {
 		components.push(`weave-install:${crossPluginId}`);
 	}
 
 	components.push(getRuntimePlatformLabel());
 	components.push(Platform.isMobile ? "mobile-ui" : "desktop-ui");
-	components.push(
-		Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown",
-	);
 	components.push(String(navigator.hardwareConcurrency || 0));
 	components.push(String(navigator.maxTouchPoints || 0));
 
@@ -44,9 +46,7 @@ export async function sha256Hex(message: string): Promise<string> {
 	return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export async function generateStableDeviceFingerprint(
-	app: App,
-): Promise<string> {
-	const fingerprint = collectStableDeviceComponents(app).join("|");
+export async function generateStableDeviceFingerprint(app: App): Promise<string> {
+	const fingerprint = (await collectStableDeviceComponents(app)).join("|");
 	return sha256Hex(fingerprint);
 }

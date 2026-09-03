@@ -44,6 +44,7 @@ vi.mock("obsidian", () => {
 import { TFile } from "obsidian";
 import {
 	clearActiveWeaveParentFolder,
+	resolveWeaveParentFolderFromApp,
 	setActiveWeaveParentFolder,
 } from "../../../config/paths";
 import { DetachedLeafEditor } from "../DetachedLeafEditor";
@@ -272,5 +273,22 @@ describe("DetachedLeafEditor temp file placement", () => {
 		expect((editor as any).tempFile?.path).toBe(
 			normalizeTestPath(expectedPath),
 		);
+	});
+
+	it("does not overwrite registered parent when explicit weaveParentFolder is passed", async () => {
+		setActiveWeaveParentFolder("登记IR根");
+		const { app, files } = createMemoryApp();
+		const editor = new DetachedLeafEditor(app, document.createElement("div"), {
+			sessionId: "session-no-global-side-effect",
+			weaveParentFolder: "显式临时根",
+			value: "explicit-only",
+		});
+
+		await (editor as any).prepareTempFile();
+
+		const expectedPath =
+			"显式临时根/editor/weave-editor-session-no-global-side-effect.md";
+		expect(files.get(normalizeTestPath(expectedPath))).toBe("explicit-only");
+		expect(resolveWeaveParentFolderFromApp(app)).toBe("登记IR根");
 	});
 });

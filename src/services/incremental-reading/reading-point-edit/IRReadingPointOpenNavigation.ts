@@ -10,6 +10,7 @@ import {
 	getCanvasNodeIdFromSourceLink,
 	getCanvasSourceNodeRectFromSourceLink,
 } from "../../ui/canvas-source-locate";
+import { getSharedMarkdownBlockFocusModeService } from "../../ui/MarkdownBlockFocusModeService";
 import type { ScheduleItem } from "../IRCalendarScheduleItem";
 import { getSharedIRPointStorageService } from "../IRPointStorageService";
 import { resolveScheduleItemWebUrl } from "../ir-web-reading-point";
@@ -96,7 +97,30 @@ export async function openParsedReadingTargetLink(
 		return await openObsidianWebUrl(app, parsed.webUrl);
 	}
 
-	return openResumeLink(app, parsed.resumeLink || fallbackLink);
+	const opened = await openResumeLink(app, parsed.resumeLink || fallbackLink);
+	if (opened) {
+		void getSharedMarkdownBlockFocusModeService(app).applyForParsedReadingTarget(
+			parsed,
+		);
+	}
+	return opened;
+}
+
+/** Open a resume link and optionally apply markdown block focus when enabled. */
+export async function openResolvedResumeLinkWithMarkdownFocus(
+	app: App,
+	rawLink: string,
+	contextPath = "",
+): Promise<boolean> {
+	const opened = await openResumeLink(app, rawLink);
+	if (!opened) {
+		return false;
+	}
+	const parsed = parseReadingTargetInput(app, rawLink, contextPath);
+	void getSharedMarkdownBlockFocusModeService(app).applyForParsedReadingTarget(
+		parsed,
+	);
+	return true;
 }
 
 async function openCanvasReadingTarget(

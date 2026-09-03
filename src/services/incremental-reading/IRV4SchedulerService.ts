@@ -57,7 +57,13 @@ import {
 	readSequenceMeta,
 } from "./IRScheduleKernel";
 import { recordScheduleMenuActionInteraction } from "./IRScheduleModeMutationService";
-import { computeScheduleModeAdjustedBlock } from "./IRScheduleModePreviewService";
+import {
+	canPostponeBlock,
+	clearManualPostponeCount,
+	computeManualRescheduleAdjustedBlock,
+	computePostponeAdjustedBlock,
+	computeScheduleModeAdjustedBlock,
+} from "./IRScheduleModePreviewService";
 import { calculateLoadSignal } from "./IRSchedulerV3";
 import { IRStateMachineV4 } from "./IRStateMachineV4";
 import { IRStorageAdapterV4 } from "./IRStorageAdapterV4";
@@ -1089,7 +1095,8 @@ export class IRV4SchedulerService {
 			};
 		}
 
-		// 5. 持久化调度（L0 mutator 单写者）
+		// 5. 持久化调度（L0 mutator 单写者）；完成=已处理，清零推迟计数
+		updatedBlock = clearManualPostponeCount(updatedBlock);
 		await persistBlockScheduleState(this.app, blockV4, updatedBlock);
 
 		if (isPdfBookmarkTaskId(updatedBlock.id)) {
@@ -1670,32 +1677,8 @@ export class IRV4SchedulerService {
 	): Promise<IRBlockMutationPreviewResultV4> {
 		await this.initialize();
 
-		const updatedBlock = this.createManualRescheduledBlock(blockV4, options);
-
-		await persistBlockScheduleState(this.app, blockV4, updatedBlock);
-		await recordScheduleMenuActionInteraction(this.app, updatedBlock.id);
-
-		const futurePlanPreview = deckPath
-			? await this.previewFuturePlanForBlockMutation(
-					deckPath,
-					blockV4,
-					updatedBlock,
-			  )
-			: undefined;
-
-		logger.info(
-			`[IRV4SchedulerService] manualRescheduleBlockWithPreviewV4: ${updatedBlock.id}, ` +
-				`nextRep=${
-					updatedBlock.nextRepDate > 0
-						? new Date(updatedBlock.nextRepDate).toLocaleDateString()
-						: "unset"
-				}`,
-		);
-
-		return {
-			block: updatedBlock,
-			futurePlanPreview,
-		};
+		const updatedBlock = computeManualRescheduleAdjustedBlock(blockV4, options);
+		return this.commitComputedScheduleBlock(blockV4, updatedBlock, deckPath);
 	}
 
 	async previewManualRescheduleBlockV4(
@@ -1706,17 +1689,18 @@ export class IRV4SchedulerService {
 	): Promise<IRBlockMutationPreviewResultV4> {
 		await this.initialize();
 
-		const updatedBlock = this.createManualRescheduledBlock(blockV4, options);
+		const updatedBlock = computeManualRescheduleAdjustedBlock(blockV4, options);
 		const includeImpactPreview = previewOptions?.includeImpactPreview === true;
-		const futurePlanPreview =
-			includeImpactPreview && deckPath
-				? await this.previewFuturePlanForBlockMutation(
-						deckPath,
-						blockV4,
-						updatedBlock,
-				  )
-				: undefined;
-
+		if (!includeImpactPreview) {
+			return this.previewComputedScheduleBlock(blockV4, updatedBlock, deckPath);
+		}
+		const futurePlanPreview = deckPath
+			? await this.previewFuturePlanForBlockMutation(
+					deckPath,
+					blockV4,
+					updatedBlock,
+			  )
+			: undefined;
 		return {
 			block: updatedBlock,
 			futurePlanPreview,
@@ -1727,40 +1711,32 @@ export class IRV4SchedulerService {
 		blockV4: IRBlockV4,
 		days: number,
 		deckPath: string,
+		options?: { contextDate?: Date | string | number | null },
 	): Promise<IRBlockMutationPreviewResultV4> {
-		const base =
-			blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
-		base.setHours(0, 0, 0, 0);
-		base.setDate(base.getDate() + Math.max(1, Math.round(days)));
-
-		return this.manualRescheduleBlockWithPreviewV4(
-			blockV4,
-			{
-				nextRepDate: base.getTime(),
-				scheduleStatus: "queued",
-			},
-			deckPath,
-		);
+		await this.initialize();
+		if (!canPostponeBlock(blockV4)) {
+			throw new Error("postpone_limit_reached");
+		}
+		const updatedBlock = computePostponeAdjustedBlock(blockV4, days, {
+			contextDate: options?.contextDate,
+		});
+		return this.commitComputedScheduleBlock(blockV4, updatedBlock, deckPath);
 	}
 
 	async previewPostponeBlockV4(
 		blockV4: IRBlockV4,
 		days: number,
 		deckPath: string,
+		options?: { contextDate?: Date | string | number | null },
 	): Promise<IRBlockMutationPreviewResultV4> {
-		const base =
-			blockV4.nextRepDate > 0 ? new Date(blockV4.nextRepDate) : new Date();
-		base.setHours(0, 0, 0, 0);
-		base.setDate(base.getDate() + Math.max(1, Math.round(days)));
-
-		return this.previewManualRescheduleBlockV4(
-			blockV4,
-			{
-				nextRepDate: base.getTime(),
-				scheduleStatus: "queued",
-			},
-			deckPath,
-		);
+		await this.initialize();
+		if (!canPostponeBlock(blockV4)) {
+			throw new Error("postpone_limit_reached");
+		}
+		const updatedBlock = computePostponeAdjustedBlock(blockV4, days, {
+			contextDate: options?.contextDate,
+		});
+		return this.previewComputedScheduleBlock(blockV4, updatedBlock, deckPath);
 	}
 
 	async applyScheduleModeWithPreviewV4(
@@ -1773,16 +1749,7 @@ export class IRV4SchedulerService {
 			blockV4,
 			mode,
 		);
-
-		return this.manualRescheduleBlockWithPreviewV4(
-			blockV4,
-			{
-				nextRepDate: updatedBlock.nextRepDate,
-				intervalDays: updatedBlock.intervalDays,
-				scheduleStatus: updatedBlock.status,
-			},
-			deckPath,
-		);
+		return this.commitComputedScheduleBlock(blockV4, updatedBlock, deckPath);
 	}
 
 	async previewScheduleModeBlockV4(
@@ -1795,46 +1762,51 @@ export class IRV4SchedulerService {
 			blockV4,
 			mode,
 		);
-
-		return this.previewManualRescheduleBlockV4(
-			blockV4,
-			{
-				nextRepDate: updatedBlock.nextRepDate,
-				intervalDays: updatedBlock.intervalDays,
-				scheduleStatus: updatedBlock.status,
-			},
-			deckPath,
-		);
+		return this.previewComputedScheduleBlock(blockV4, updatedBlock, deckPath);
 	}
 
-	private createManualRescheduledBlock(
-		blockV4: IRBlockV4,
-		options: IRManualRescheduleOptionsV4,
-	): IRBlockV4 {
-		const meta = { ...(blockV4.meta || {}) };
-		if (options.nextRepDate > 0) {
-			meta.manualSchedulePinnedDateKey = this.formatScheduleDateKey(
-				options.nextRepDate,
-			);
-		} else {
-			meta.manualSchedulePinnedDateKey = undefined;
-		}
+	/**
+	 * 将公式算出的完整 block 原样写盘（含 meta.manualPostponeCount 等）。
+	 */
+	private async commitComputedScheduleBlock(
+		before: IRBlockV4,
+		after: IRBlockV4,
+		deckPath: string,
+	): Promise<IRBlockMutationPreviewResultV4> {
+		await persistBlockScheduleState(this.app, before, after);
+		await recordScheduleMenuActionInteraction(this.app, after.id);
+
+		const futurePlanPreview = deckPath
+			? await this.previewFuturePlanForBlockMutation(deckPath, before, after)
+			: undefined;
+
+		logger.info(
+			`[IRV4SchedulerService] commitComputedScheduleBlock: ${after.id}, ` +
+				`nextRep=${
+					after.nextRepDate > 0
+						? new Date(after.nextRepDate).toLocaleDateString()
+						: "unset"
+				}`,
+		);
+
 		return {
-			...blockV4,
-			nextRepDate: options.nextRepDate,
-			intervalDays: options.intervalDays ?? blockV4.intervalDays,
-			status: options.scheduleStatus ?? blockV4.status,
-			updatedAt: Date.now(),
-			meta,
+			block: after,
+			futurePlanPreview,
 		};
 	}
 
-	private formatScheduleDateKey(timestamp: number): string {
-		const date = new Date(timestamp);
-		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-			2,
-			"0",
-		)}-${String(date.getDate()).padStart(2, "0")}`;
+	private async previewComputedScheduleBlock(
+		before: IRBlockV4,
+		after: IRBlockV4,
+		deckPath: string,
+	): Promise<IRBlockMutationPreviewResultV4> {
+		const futurePlanPreview = deckPath
+			? await this.previewFuturePlanForBlockMutation(deckPath, before, after)
+			: undefined;
+		return {
+			block: after,
+			futurePlanPreview,
+		};
 	}
 
 	private createPriorityUpdatedBlock(

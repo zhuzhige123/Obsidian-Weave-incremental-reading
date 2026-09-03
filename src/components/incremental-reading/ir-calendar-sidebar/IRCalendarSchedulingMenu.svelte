@@ -41,6 +41,9 @@
     onActivateAction,
     onFocusAction,
   }: Props = $props();
+
+  let arrangeConfig = $derived(schedulingConfig.filter((cfg) => !cfg.isPostpone));
+  let postponeConfig = $derived(schedulingConfig.filter((cfg) => cfg.isPostpone));
 </script>
 
 <FloatingMenu
@@ -54,27 +57,65 @@
   {#snippet children()}
     {#if target}
       <div class="ir-calendar-scheduling-panel">
-        <div class="ir-calendar-scheduling-grid" role="group">
-          {#each schedulingConfig as cfg (cfg.action)}
-            <button
-              type="button"
-              class="ir-calendar-scheduling-btn"
-              class:is-focused={schedulingPreviewFocusAction === cfg.action}
-              onclick={(event) => onActivateAction(cfg.action, event)}
-              onmouseenter={() => onFocusAction(cfg.action)}
-              onfocus={() => onFocusAction(cfg.action)}
-            >
-              <span class="ir-calendar-scheduling-label" style:color={cfg.color}>{cfg.label}</span>
-              {#if schedulingDateByAction[cfg.action]}
-                <span class="ir-calendar-scheduling-date">{schedulingDateByAction[cfg.action]}</span>
-              {:else if schedulingMenuPreviewState === 'error'}
-                <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.scheduling.previewUnavailable')}</span>
-              {:else}
-                <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.controls.unscheduled')}</span>
-              {/if}
-            </button>
-          {/each}
+        <div class="ir-calendar-scheduling-section" role="group" aria-label={t('irSidebar.scheduling.arrangeSection')}>
+          <div class="ir-calendar-scheduling-grid">
+            {#each arrangeConfig as cfg (cfg.action)}
+              <button
+                type="button"
+                class="ir-calendar-scheduling-btn"
+                class:is-focused={schedulingPreviewFocusAction === cfg.action}
+                disabled={cfg.disabled}
+                onclick={(event) => onActivateAction(cfg.action, event)}
+                onmouseenter={() => onFocusAction(cfg.action)}
+                onfocus={() => onFocusAction(cfg.action)}
+              >
+                <span class="ir-calendar-scheduling-label" style:color={cfg.color}>{cfg.label}</span>
+                {#if schedulingDateByAction[cfg.action]}
+                  <span class="ir-calendar-scheduling-date">{schedulingDateByAction[cfg.action]}</span>
+                {:else if schedulingMenuPreviewState === 'error'}
+                  <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.scheduling.previewUnavailable')}</span>
+                {:else}
+                  <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.controls.unscheduled')}</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
         </div>
+
+        {#if postponeConfig.length > 0}
+          <div class="ir-calendar-scheduling-divider" role="separator"></div>
+          <div class="ir-calendar-scheduling-section is-postpone" role="group" aria-label={t('irSidebar.scheduling.postponeSection')}>
+            <div class="ir-calendar-scheduling-grid">
+              {#each postponeConfig as cfg (cfg.action)}
+                <button
+                  type="button"
+                  class="ir-calendar-scheduling-btn is-postpone"
+                  class:is-focused={schedulingPreviewFocusAction === cfg.action}
+                  class:is-disabled={cfg.disabled}
+                  disabled={cfg.disabled}
+                  onclick={(event) => onActivateAction(cfg.action, event)}
+                  onmouseenter={() => onFocusAction(cfg.action)}
+                  onfocus={() => onFocusAction(cfg.action)}
+                >
+                  <span class="ir-calendar-scheduling-label-row">
+                    <span class="ir-calendar-scheduling-label" style:color={cfg.color}>{cfg.label}</span>
+                    {#if cfg.metaText}
+                      <span class="ir-calendar-scheduling-count">{cfg.metaText}</span>
+                    {/if}
+                  </span>
+                  {#if schedulingDateByAction[cfg.action]}
+                    <span class="ir-calendar-scheduling-date">{schedulingDateByAction[cfg.action]}</span>
+                  {:else if schedulingMenuPreviewState === 'error'}
+                    <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.scheduling.previewUnavailable')}</span>
+                  {:else}
+                    <span class="ir-calendar-scheduling-date is-unavailable">{t('irSidebar.controls.unscheduled')}</span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
         {#if showSchedulingPreview}
           <IRScheduleImpactPreviewPanel preview={schedulingPreviewByAction[schedulingPreviewFocusAction]} />
         {/if}
