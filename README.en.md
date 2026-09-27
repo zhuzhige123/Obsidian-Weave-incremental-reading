@@ -2,6 +2,12 @@
 
 [中文说明](README.md)
 
+![weave-series-banner-og](https://github.com/user-attachments/assets/a52c0875-9296-4dfd-bf94-114a225f2972)
+
+![weave-series-banner-og](https://github.com/user-attachments/assets/86b1adbd-d1e2-411f-842d-24402a3c054d)
+
+![weave-plugin-banner-ir1](https://github.com/user-attachments/assets/93ae9bdd-84d8-4f7e-b0f9-6ede5924a518)
+
 <div align="center">
 
 **Turn “read later” into a reading queue you can actually finish**
@@ -10,11 +16,10 @@ Standalone Obsidian incremental reading — topics, reading points, calendar sch
 
 </div>
 
-**Weave Incremental Reading** (plugin ID: `weave-incremental-reading`) is a **standalone** Obsidian plugin for incremental reading.
+Weave Incremental Reading turns “read later” into a schedulable, resumable reading queue: gather Markdown, block refs, PDF, Canvas, web pages, EPUB, and more into traceable reading points; advance them with topics and a calendar—so saving is not the same as reading. Open an item to jump back to the source and continue; progress and topics are stored as vault files. Use it alone, or combine it with other Weave plugins to keep long-term reading inside Obsidian. Your data stays fully local in your vault.
 
-It helps you turn scattered material from Markdown notes, block links, PDF (with [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)), Canvas, web pages, and EPUB into a maintainable **reading-point queue**, organized by **topics** and advanced through a **calendar**—so content does not stay stuck in “saved but never read.”
+**Weave Incremental Reading** (plugin ID: `weave-incremental-reading`) is a **standalone** Obsidian plugin in the Weave family (exactly three plugins: Weave Deck, Weave EPUB Reader, and Weave Incremental Reading). It does **not** require the Weave main plugin. Install other family plugins only when you need in-vault EPUB reading or memory-deck / card workflows.
 
-The plugin works on its own and does **not** require the Weave main plugin. Install other Weave family plugins only when you need in-vault EPUB reading or memory-deck / card workflows.
 
 ---
 

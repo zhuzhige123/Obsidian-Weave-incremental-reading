@@ -15,19 +15,20 @@
 
 
 
-**把「以后再看」变成可持续推进的阅读队列**
+**把「以后再看」变成可排期、可续读的阅读队列**
 
 Standalone incremental reading for Obsidian — topics, reading points, calendar scheduling, and source resume
 
-</div>
 
 ---
 
 ## 中文文档
 
-**Obsidian Weave**插件系列包含**Weave Deck**，**Weave epub reader**，**Weave incremental reading**三款插件，有且仅有三款。该系列完全服务于obsidian，围绕在obsidian中长期学习而诞生。
-而**Weave Incremental Reading**插件旨在帮你把散落在 Markdown、内容块链接、PDF（配合 [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)）、Canvas、网页、EPUB 等处的材料，整理成可排期、可续读、可回跳的**阅读点队列**，再用**专题**与**日历**长期推进——而不是让内容停在「收藏了就算读过了」。
+### 插件介绍
 
+Weave Incremental Reading 把「以后再看」变成可排期、可续读的阅读队列：把 Markdown、块引用、PDF、Canvas、网页、EPUB 等来源收成带溯源的阅读点，用专题与日历按节奏推进，而不是收藏即等于读过。打开条目即可回跳原文续读，进度与专题以库内文件保存。它可独立使用，也可与 Weave 系列其它插件组合，把长期阅读留在 Obsidian 里。数据完全本地化，留在你的库里。
+
+**Obsidian Weave** 插件系列包含 **Weave Deck**、**Weave EPUB Reader**、**Weave Incremental Reading** 三款插件，有且仅有三款。该系列完全服务于 Obsidian，围绕在 Obsidian 中长期学习而诞生。本插件负责其中的增量阅读队列与日历排期，**不依赖** Weave 主插件即可单独使用。
 
 ---
 
@@ -156,7 +157,6 @@ Weave 是一组面向 Obsidian 的知识工作流插件，围绕 **读 → 记 �
 
 **让阅读队列真正动起来，而不是躺在收藏夹里。**
 
-</div>
 
 ---
 
@@ -164,6 +164,4 @@ Weave 是一组面向 Obsidian 的知识工作流插件，围绕 **读 → 记 �
 
 Full English documentation: **[README.en.md](README.en.md)**
 
-**Weave Incremental Reading** turns scattered “read later” material into a durable **reading-point queue**, organized by **topics** (`.irdeck`) and advanced through a **calendar**—with source resume for Markdown, PDF++, Canvas, web pages, and EPUB.
-
-It is a **standalone** plugin in the Weave family: use it alone for incremental reading; add **Weave EPUB Reader** and/or the **Weave main plugin** when you need in-vault EPUB reading or spaced-repetition cards.
+Weave Incremental Reading turns “read later” into a schedulable, resumable reading queue: gather Markdown, block refs, PDF, Canvas, web pages, EPUB, and more into traceable reading points; advance them with topics and a calendar—so saving is not the same as reading. Open an item to jump back to the source and continue; progress and topics are stored as vault files. Use it alone, or combine it with other Weave plugins to keep long-term reading inside Obsidian. Your data stays fully local in your vault.
