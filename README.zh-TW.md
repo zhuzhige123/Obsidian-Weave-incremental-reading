@@ -1,6 +1,6 @@
 # Weave Incremental Reading（繁體中文）
 
-[中文](README.md) · [English](README.en.md) · [繁體中文](README.zh-TW.md) · [官网](https://obsidian-weave.xyz/#pricing) · [使用教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome)
+[English](README.md#english-documentation) · [简体中文](README.md#中文文档) · [繁體中文](README.zh-TW.md) · [官网](https://obsidian-weave.xyz/#pricing) · [使用教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome)
 
 <div align="center">
 
@@ -12,7 +12,7 @@
 
 </div>
 
-完整說明以主文件為準（結構已與系列統一）：
+完整說明以主文件中英雙語文檔為準：
 
-- [简体中文 README](README.md)
-- [English README](README.en.md)
+- [English Documentation](README.md#english-documentation)
+- [中文文档](README.md#中文文档)

@@ -1,6 +1,6 @@
 # Weave Incremental Reading（日本語）
 
-[中文](README.md) · [English](README.en.md) · [日本語](README.ja.md) · [Website](https://obsidian-weave.xyz/#pricing) · [Tutorials](https://obsidian-weave.xyz/tutorials.html#ir-welcome)
+[English](README.md#english-documentation) · [简体中文](README.md#中文文档) · [日本語](README.ja.md) · [Website](https://obsidian-weave.xyz/#pricing) · [Tutorials](https://obsidian-weave.xyz/tutorials.html#ir-welcome)
 
 <div align="center">
 
@@ -12,7 +12,7 @@
 
 </div>
 
-シリーズ共通の最新ドキュメントはこちらです：
+シリーズ共通の最新ドキュメント（中英二語）はメイン README に集約しています：
 
-- [中文 README](README.md)
-- [English README](README.en.md)
+- [English Documentation](README.md#english-documentation)
+- [中文文档](README.md#中文文档)
