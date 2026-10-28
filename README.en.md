@@ -42,26 +42,27 @@ Full tutorials live on the official site: [Incremental Reading tutorials](https:
 
 The calendar and Markdown reading-point workflow are **free** and cover everyday incremental reading. Premium support unlocks advanced capabilities.
 
-| Capability | Essential | Premium |
-|------------|:---------:|:-------:|
-| **All platforms** (desktop / mobile) | ✅ | ✅ |
-| **Incremental reading calendar** (heatmap, today’s queue, overdue handling) | ✅ | ✅ |
-| **Add link** (web URLs, wikilinks, block refs, PDF++, Canvas, EPUB locations, etc.) | ✅ | ✅ |
-| **Topics and reading points** (priority, suspend, archive) | ✅ | ✅ |
-| **Basic scheduling** (default rhythm, daily caps, time budget, load pull-back) | ✅ | ✅ |
-| **Source resume** (Markdown / PDF++ / Canvas / web / EPUB) | ✅ | ✅ |
-| **Markdown material import**, data management | ✅ | ✅ |
-| **Continue reading**, Markdown block focus mode | ✅ | ✅ |
-| **Analytics · Activity trend** | ✅ | ✅ |
-| Basic settings such as YAML tag sync | ✅ | ✅ |
-| **Multilingual UI** (Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Russian; more languages planned) | ✅ | ✅ |
-| **Paragraph reading workbench** and random-roam scope | 🔒 | ✅ |
-| Bulk **PDF / EPUB chapter** reading-point import | 🔒 | ✅ |
-| **Folder subscription** auto-sync | 🔒 | ✅ |
-| **Load & deferral**, **interleaved learning** | 🔒 | ✅ |
-| Advanced charts (quantity / timing / priority / future load) | 🔒 | ✅ |
-| **Reading timer**, **associated notes** | 🔒 | ✅ |
-| **Tag groups** (still evolving—do not treat as the main path yet) | 🔒 | ✅ |
+| Category | Capability | Essential | Premium |
+| --- | --- | :---: | :---: |
+| **Platform** | All platforms (desktop / mobile) | ✅ | ✅ |
+| | Multilingual UI (Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Russian; more languages planned) | ✅ | ✅ |
+| **Calendar & daily use** | Incremental reading calendar (heatmap, today’s queue, overdue handling) | ✅ | ✅ |
+| | Continue reading, Markdown block focus mode | ✅ | ✅ |
+| **Capture & import** | Add link (web URLs, wikilinks, block refs, PDF++, Canvas, EPUB locations, etc.) | ✅ | ✅ |
+| | Markdown material import, data management | ✅ | ✅ |
+| | Bulk PDF / EPUB chapter reading-point import | 🔒 | ✅ |
+| | Folder subscription auto-sync | 🔒 | ✅ |
+| **Topics & resume** | Topics and reading points (priority, suspend, archive) | ✅ | ✅ |
+| | Source resume (Markdown / PDF++ / Canvas / web / EPUB) | ✅ | ✅ |
+| | Associated notes | 🔒 | ✅ |
+| **Scheduling** | Basic scheduling (default rhythm, daily caps, time budget, load pull-back) | ✅ | ✅ |
+| | Load & deferral, interleaved learning | 🔒 | ✅ |
+| **Paragraph workbench** | Paragraph reading workbench and random-roam scope | 🔒 | ✅ |
+| **Analytics & settings** | Analytics · Activity trend | ✅ | ✅ |
+| | Advanced charts (quantity / timing / priority / future load) | 🔒 | ✅ |
+| | Reading timer | 🔒 | ✅ |
+| | Basic settings such as YAML tag sync | ✅ | ✅ |
+| | Tag groups (still evolving—do not treat as the main path yet) | 🔒 | ✅ |
 
 > Legend: ✅ included · 🔒 requires Premium support
 
