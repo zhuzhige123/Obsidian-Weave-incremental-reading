@@ -1,6 +1,6 @@
 # Weave Incremental Reading
 
-[English](README.en.md) · [官网](https://obsidian-weave.xyz/#pricing) · [使用教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome) · [更新日志](CHANGELOG.md)
+[English](#english-documentation) · [简体中文](#中文文档) · [日本語](README.ja.md) · [한국어](README.ko.md) · [繁體中文](README.zh-TW.md) · [Русский](README.ru.md) · [官网](https://obsidian-weave.xyz/#pricing) · [使用教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome) · [更新日志](CHANGELOG.md)
 
 <div align="center">
 
@@ -18,7 +18,236 @@
 
 ---
 
-## 插件概述
+## English Documentation
+
+### Overview
+
+**Weave Incremental Reading** is a **standalone** Obsidian plugin for incremental reading.
+
+It gathers Markdown, block refs, PDF, Canvas, web pages, EPUB, and more into traceable **reading points**, groups them in **topics (`.irdeck`)**, and advances them with an **incremental reading calendar**. Open an item to jump back to the source and continue. Progress and topics live as vault files; your data stays local.
+
+| Concept | Meaning |
+|---------|---------|
+| **Reading point** | Smallest unit of scheduling and resume: one reading task with source location |
+| **Topic (`.irdeck`)** | Container for reading points, grouped by theme or plan, stored in the vault |
+| **Incremental reading calendar** | Daily home: today’s queue, scheduled items, overdue work, and load |
+
+It does **not** require the Weave main plugin. Add other Weave family plugins only when you need in-vault EPUB reading or memory-deck / card workflows.
+
+Minimum Obsidian version: **1.8.7** (see `minAppVersion` in `manifest.json`). Desktop and mobile are supported.
+
+Full tutorials live on the official site: [Incremental Reading tutorials](https://obsidian-weave.xyz/tutorials.html#ir-welcome). In-plugin help is also available from the calendar. Pricing and licensing: [Website · Pricing](https://obsidian-weave.xyz/#pricing).
+
+---
+
+### Essential experience and Premium support
+
+The calendar and Markdown reading-point workflow are **free** and cover everyday incremental reading. Premium support unlocks advanced capabilities.
+
+| Category | Capability | Essential | Premium |
+| --- | --- | :---: | :---: |
+| **Platform** | All platforms (desktop / mobile) | ✅ | ✅ |
+| | Multilingual UI (Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Russian; more languages planned) | ✅ | ✅ |
+| **Calendar & daily use** | Incremental reading calendar (heatmap, today’s queue, overdue handling) | ✅ | ✅ |
+| | Continue reading, Markdown block focus mode | ✅ | ✅ |
+| **Capture & import** | Add link (web URLs, wikilinks, block refs, PDF++, Canvas, EPUB locations, etc.) | ✅ | ✅ |
+| | Markdown material import, data management | ✅ | ✅ |
+| | Bulk PDF / EPUB chapter reading-point import | 🔒 | ✅ |
+| | Folder subscription auto-sync | 🔒 | ✅ |
+| **Topics & resume** | Topics and reading points (priority, suspend, archive) | ✅ | ✅ |
+| | Source resume (Markdown / PDF++ / Canvas / web / EPUB) | ✅ | ✅ |
+| | Associated notes | 🔒 | ✅ |
+| **Scheduling** | Basic scheduling (default rhythm, daily caps, time budget, load pull-back) | ✅ | ✅ |
+| | Load & deferral, interleaved learning | 🔒 | ✅ |
+| **Paragraph workbench** | Paragraph reading workbench and random-roam scope | 🔒 | ✅ |
+| **Analytics & settings** | Analytics · Activity trend | ✅ | ✅ |
+| | Advanced charts (quantity / timing / priority / future load) | 🔒 | ✅ |
+| | Reading timer | 🔒 | ✅ |
+| | Basic settings such as YAML tag sync | ✅ | ✅ |
+| | Tag groups (still evolving—do not treat as the main path yet) | 🔒 | ✅ |
+
+> Legend: ✅ included · 🔒 requires Premium support
+
+- **Enable Premium support**: activate under **Settings → Weave Incremental Reading → License**. Premium for this plugin is **not sold separately**—it comes with the [Weave series activation code](https://obsidian-weave.xyz/#pricing). If **Weave Deck** (main plugin) is installed and activated, authorization can also be inherited.
+- Locked entries show a clear prompt or lock preview (enable **Premium feature preview** in settings). The core flow still works without a license.
+
+---
+
+### Core features
+
+#### Incremental reading calendar
+
+Your daily home: browse pending, scheduled, and overdue reading points by date, and feel load via the month heatmap. Adjust priority, handle overdue items, use continue-reading, and switch between topic view and calendar.
+
+See the official tutorial: [Incremental reading calendar](https://obsidian-weave.xyz/tutorials.html#ir-calendar).
+
+#### Add link and material import
+
+For daily capture, prefer **“+” / Add link**: paste a web URL, `[[wikilink]]`, block ref, PDF++, Canvas, or EPUB location; set name, topic, and first read day in one flow.
+
+Use **Import reading materials** when splitting a whole Markdown document or book. With Premium support you can bulk-import PDF / EPUB chapter reading points and subscribe folders so new files are picked up automatically.
+
+See: [Add reading points](https://obsidian-weave.xyz/tutorials.html#ir-add-points) · [Import and subscription](https://obsidian-weave.xyz/tutorials.html#ir-import-subscribe).
+
+#### Topics and reading points
+
+Topics are `.irdeck` files in the vault—containers for grouping. Reading points support priority, suspend, and archive; each belongs to one topic at a time. Opening a reading point jumps back to the source so you can continue.
+
+See: [Source and resume](https://obsidian-weave.xyz/tutorials.html#ir-source-resume).
+
+#### Scheduling and resume
+
+A universal default rhythm, plus daily caps and a time budget. After you mark progress, the next appearance is scheduled—so items do not sit forever in “read later.” Basic load pull-back knobs are free; load deferral and interleaved learning require Premium support.
+
+See: [Scheduling](https://obsidian-weave.xyz/tutorials.html#ir-scheduling).
+
+#### Paragraph workbench and other advanced tools
+
+With Premium support: **paragraph reading workbench** (focused segment reading and scheduling, random-roam scope), reading timer, associated notes, and analytics charts beyond Activity trend. Tag groups are still evolving—do not rely on them as the daily main path yet.
+
+See: [Settings](https://obsidian-weave.xyz/tutorials.html#ir-settings).
+
+---
+
+### Installation
+
+#### Option 1: Install from Releases (recommended)
+
+1. Open [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases) and download the latest assets
+2. Create this folder in your vault:
+
+```text
+.obsidian/plugins/weave-incremental-reading/
+```
+
+3. Copy `main.js`, `manifest.json`, and `styles.css` from the **same** release into that folder
+4. Enable **Weave Incremental Reading** under **Settings → Community plugins**
+
+#### Option 2: Track with BRAT
+
+If you use [BRAT](https://github.com/TfTHacker/obsidian42-brat), add this repository and select **Weave Incremental Reading**.
+
+#### Option 3: Community Plugins directory
+
+If listed, search for **Weave Incremental Reading** under **Settings → Community plugins → Browse**.
+
+#### Requirements
+
+| Item | Requirement |
+|------|-------------|
+| Obsidian | **≥ 1.8.7** |
+| Platforms | Desktop and mobile |
+
+---
+
+### Quick start
+
+1. Install and enable the plugin
+2. Open the **incremental reading calendar** (ribbon calendar icon, or command **Open incremental reading calendar**)
+3. Click **“+” / Add link**: paste source → name → choose topic → schedule first read day → save
+4. Open today’s items, resume at the source, mark progress; the plugin schedules the next appearance
+
+Prefer **Add link** for daily use; use material import for whole documents or books. Selection commands and context menus remain available.
+
+More detail: [Intro and quick start](https://obsidian-weave.xyz/tutorials.html#ir-intro).
+
+---
+
+### Data and privacy
+
+- Reading points, topics, schedules, and settings stay in your **local vault** by default (data root is roughly `weave Incremental reading/`, configurable in settings)
+- The plugin does **not** upload note content proactively
+- Cross-plugin calls (EPUB resume, license checks, etc.) happen only when those features are used
+- Uninstalling does **not** automatically delete `.irdeck` files or reading-point data; use the data management tool or remove files manually
+
+When syncing across devices, prioritize the vault data root and `.irdeck` files. Cache under the plugin folder is mostly rebuildable. See: [Data and maintenance](https://obsidian-weave.xyz/tutorials.html#ir-data).
+
+---
+
+### Weave family
+
+There are exactly three Weave plugins. They compose around **read → capture → schedule → review**, with clear boundaries:
+
+| Plugin | Responsibility |
+|--------|----------------|
+| **Weave Incremental Reading** (this plugin) | Reading points, topics, calendar scheduling, resume and source navigation |
+| **Weave Deck** (main plugin) | Memory decks, question banks, excerpt-to-card, FSRS review |
+| **Weave EPUB Reader** | In-vault EPUB reading, excerpts, and chapter location |
+
+| Need… | Install |
+|-------|---------|
+| Incremental reading queue only | This plugin |
+| In-vault EPUB + chapter resume | This plugin + Weave EPUB Reader |
+| Cards and spaced review | This plugin + Weave Deck |
+| Full loop | All three |
+| Precise PDF selection locations | Also [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus), then capture via **Add link** |
+
+See: [Weave family](https://obsidian-weave.xyz/tutorials.html#ir-weave-family).
+
+---
+
+### FAQ
+
+#### 1. Do I need the Weave main plugin?
+
+**No.** This plugin alone covers calendar, topics, Markdown reading points, and basic scheduling. Install other family members only for EPUB chapter resume, card review, or license inheritance.
+
+#### 2. What is free vs Premium?
+
+Free: calendar, topics, Add link, Markdown import and resume, basic scheduling, and the Activity trend analytics tab. Premium: paragraph workbench, PDF/EPUB chapter import, folder subscription, load deferral, interleaved learning, advanced charts, timer, and associated notes. See the capability table above.
+
+#### 3. How is this different from bookmarks or a “read later” folder?
+
+Bookmarks and folders only store things. This plugin gives each item a **resumable location** and a **next appearance date**, and uses the calendar to keep daily load honest—so the queue moves instead of piling up.
+
+#### 4. Where is data stored? How do I sync across devices?
+
+Business data lives in the vault data root (`.irdeck` topics, reading points, etc.) and follows whatever Obsidian Sync / iCloud / cloud-synced vault you already use. Sync vault content first; plugin-folder cache usually need not be identical across devices.
+
+#### 5. Does uninstalling delete my reading data?
+
+**No.** Uninstall does not automatically remove `.irdeck` files or reading-point data. To clean up, use the in-plugin data management tools or delete the files manually.
+
+#### 6. What else do I need for EPUB / PDF resume?
+
+- **EPUB chapter location and jump-back**: install and enable **Weave EPUB Reader**, and add reading points with location links  
+- **PDF selection locations**: use **PDF++** selection / bookmark links with **Add link**; a bare file path cannot target a selection  
+- **Bulk PDF / EPUB chapter import**: also requires Premium support on this plugin  
+
+#### 7. Should I use Add link or material import?
+
+Use **Add link** for everyday single items. Use **Import reading materials** to split a whole Markdown document or ingest a book by chapter (chapter import is Premium).
+
+#### 8. How do I activate? Subscription or one-time?
+
+Premium support is a **one-time purchase** (permanent license, email binding, up to five devices), not a monthly subscription. This plugin is **not sold separately**—buy the [Weave series activation code](https://obsidian-weave.xyz/#pricing); all three plugins’ Premium support are included. If Weave Deck is already activated, this plugin can inherit authorization. Activate under **Settings → Weave Incremental Reading → License**. More Q&A: [FAQ](https://obsidian-weave.xyz/tutorials.html#ir-faq). Email: tutaoyuan8@outlook.com.
+
+---
+
+### More documentation
+
+| Resource | Link |
+|----------|------|
+| Website / Pricing | [obsidian-weave.xyz](https://obsidian-weave.xyz/#pricing) |
+| Tutorials | [tutorials.html · Incremental Reading](https://obsidian-weave.xyz/tutorials.html#ir-welcome) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Issues | [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues) |
+| License | [GPL-3.0-or-later](LICENSE) |
+
+---
+
+### License and author
+
+Source code is released under [GPL-3.0-or-later](LICENSE).
+
+- Author: **Rabbit (zhuzhige)**
+- GitHub: https://github.com/zhuzhige123
+- Email: tutaoyuan8@outlook.com
+
+---
+
+## 中文文档
+### 插件概述
 
 **Weave Incremental Reading** 是面向 Obsidian 的**独立**增量阅读插件。
 
@@ -38,7 +267,7 @@
 
 ---
 
-## 基础体验与高级支持
+### 基础体验与高级支持
 
 日历与 Markdown 阅读点主流程**免费可用**，足以完成日常增量阅读。高级能力需激活后使用。
 
@@ -71,15 +300,15 @@
 
 ---
 
-## 核心功能
+### 核心功能
 
-### 增量阅读日历
+#### 增量阅读日历
 
 日常主界面：按日查看待处理、已排期与逾期阅读点，用月历热力感受负载。可在此调整优先级、处理逾期、开启连续阅读，并在专题视图与日历之间切换。
 
 详见官网教程：[增量阅读日历](https://obsidian-weave.xyz/tutorials.html#ir-calendar)。
 
-### 添加链接与材料导入
+#### 添加链接与材料导入
 
 日常收录优先走 **「+」/ 添加链接**：粘贴网页、`[[双链]]`、块引用、PDF++、Canvas 或 EPUB 定位，一次完成命名、专题与首次阅读日。
 
@@ -87,19 +316,19 @@
 
 详见官网教程：[添加阅读点](https://obsidian-weave.xyz/tutorials.html#ir-add-points) · [材料导入与订阅](https://obsidian-weave.xyz/tutorials.html#ir-import-subscribe)。
 
-### 专题与阅读点
+#### 专题与阅读点
 
 专题以 `.irdeck` 文件保存在知识库中，是阅读点的分组容器。阅读点可设置优先级、暂停与归档；同一时刻归属一个专题。打开阅读点即回跳到来源位置继续读。
 
 详见官网教程：[来源与续读](https://obsidian-weave.xyz/tutorials.html#ir-source-resume)。
 
-### 调度与续读
+#### 调度与续读
 
 统一默认节奏，配合每日上限与时间预算。标记进度后安排下次出现，而不是永远堆在「待读」。负荷回拉等基础调参免费可用；负载顺延、交错学习等属高级支持。
 
 详见官网教程：[调度与进度](https://obsidian-weave.xyz/tutorials.html#ir-scheduling)。
 
-### 段落工作台与其它进阶
+#### 段落工作台与其它进阶
 
 高级支持下可使用**段落阅读工作台**（按段落聚焦阅读与排程、随机漫游范围）、阅读计时器、关联笔记，以及除「活跃趋势」以外的分析图表。标签组仍在完善中，请勿当作当前版本日常主路径。
 
@@ -107,9 +336,9 @@
 
 ---
 
-## 安装指南
+### 安装指南
 
-### 方式一：从 Release 安装（推荐）
+#### 方式一：从 Release 安装（推荐）
 
 1. 打开 [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases)，下载最新版本附件
 2. 在知识库中创建目录：
@@ -121,15 +350,15 @@
 3. 将**同一次** Release 中的 `main.js`、`manifest.json`、`styles.css` 放入该目录
 4. 在 **设置 → 社区插件** 中启用 **Weave Incremental Reading**
 
-### 方式二：通过 BRAT
+#### 方式二：通过 BRAT
 
 使用 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 时，添加本仓库并选择 **Weave Incremental Reading** 跟踪更新。
 
-### 方式三：社区插件目录
+#### 方式三：社区插件目录
 
 若已上架社区目录，可在 **设置 → 社区插件 → 浏览** 中搜索 **Weave Incremental Reading** 安装与更新。
 
-### 系统要求
+#### 系统要求
 
 | 项目 | 要求 |
 |------|------|
@@ -138,7 +367,7 @@
 
 ---
 
-## 快速上手
+### 快速上手
 
 1. 安装并启用插件
 2. 打开**增量阅读日历**（功能区日历图标，或命令「打开增量阅读日历」）
@@ -151,7 +380,7 @@
 
 ---
 
-## 数据与隐私
+### 数据与隐私
 
 - 阅读点、专题、调度与设置默认保存在**本地知识库**（默认数据根大致为 `weave Incremental reading/`，可在设置中修改）
 - 插件**不会主动上传**笔记正文
@@ -162,7 +391,7 @@
 
 ---
 
-## 与 Weave 系列
+### 与 Weave 系列
 
 Weave 系列共有三款插件，围绕 **读 → 记 → 排 → 复习** 组合使用，职责彼此独立：
 
@@ -184,45 +413,45 @@ Weave 系列共有三款插件，围绕 **读 → 记 → 排 → 复习** 组�
 
 ---
 
-## 常见问题
+### 常见问题
 
-### 1. 必须安装 Weave 主插件吗？
+#### 1. 必须安装 Weave 主插件吗？
 
 **不必。** 本插件可独立完成日历、专题、Markdown 阅读点与基础调度。只有在需要 EPUB 章节续读、制卡复习，或希望继承主插件授权时，再安装对应系列成员。
 
-### 2. 免费能做什么？高级解锁什么？
+#### 2. 免费能做什么？高级解锁什么？
 
 免费覆盖日历、专题、添加链接、Markdown 导入与续读、基础调度与「活跃趋势」分析。段落工作台、PDF/EPUB 章节导入、订阅文件夹、负载顺延、交错学习、高级分析图、计时器与关联笔记等需高级支持。详见上方功能表。
 
-### 3. 和「书签 / 待读文件夹」有什么区别？
+#### 3. 和「书签 / 待读文件夹」有什么区别？
 
 书签与文件夹只负责存放；本插件给每条材料一个**可回跳位置**和**下次出现的日子**，用日历约束每日负载，让队列真正推进，而不是越积越高。
 
-### 4. 数据存在哪里？多端怎么同步？
+#### 4. 数据存在哪里？多端怎么同步？
 
 业务数据在 Vault 数据根（专题 `.irdeck`、阅读点等），会随你现有的 Obsidian Sync / iCloud / 网盘库同步。优先同步 Vault 内容；插件目录缓存通常不必跨设备强一致。
 
-### 5. 卸载会删除阅读数据吗？
+#### 5. 卸载会删除阅读数据吗？
 
 **不会。** 卸载不会自动删除 `.irdeck` 与阅读点文件。若要清理，请使用插件内数据管理工具，或手动删除对应文件。
 
-### 6. EPUB / PDF 续读还要装什么？
+#### 6. EPUB / PDF 续读还要装什么？
 
 - **EPUB 章节定位与回跳**：安装并启用 **Weave EPUB Reader**，并使用定位链接添加阅读点  
 - **PDF 选区定位**：使用 **PDF++** 生成的选区 / 书签链接再「添加链接」；仅有文件路径的阅读点无法精确到选区  
 - **PDF / EPUB 章节批量导入**：另需启用本插件的高级支持  
 
-### 7. 日常该用「添加链接」还是「材料导入」？
+#### 7. 日常该用「添加链接」还是「材料导入」？
 
 日常单条收录用 **添加链接**。整篇 Markdown 拆分、或整书按章节入库，再用 **导入阅读材料**（章节导入属高级支持）。
 
-### 8. 如何激活？订阅还是买断？
+#### 8. 如何激活？订阅还是买断？
 
 高级支持为**一次性买断**（永久授权、邮箱绑定、支持五台设备），不是按月订阅。本插件**不单独售卖**，请购买 [Weave 系列激活码](https://obsidian-weave.xyz/#pricing)；购后三款高级支持一并可用。若已激活 Weave Deck，也可在本插件中继承授权。激活入口：**设置 → Weave Incremental Reading → 授权**。更多问答见官网：[常见问题](https://obsidian-weave.xyz/tutorials.html#ir-faq)。有问题可发邮件：tutaoyuan8@outlook.com。
 
 ---
 
-## 更多文档
+### 更多文档
 
 | 资源 | 链接 |
 |------|------|
@@ -234,7 +463,7 @@ Weave 系列共有三款插件，围绕 **读 → 记 → 排 → 复习** 组�
 
 ---
 
-## 许可证与作者
+### 许可证与作者
 
 源代码以 [GPL-3.0-or-later](LICENSE) 发布。
 
