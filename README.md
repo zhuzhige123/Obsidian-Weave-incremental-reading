@@ -1,12 +1,17 @@
 # Weave Incremental Reading
 
-[简体中文](#中文文档) · [English](#english-documentation) · [日本語](README.ja.md) · [한국어](README.ko.md) · [繁體中文](README.zh-TW.md) · [Русский](README.ru.md) · [官网](https://obsidian-weave.xyz/#pricing) · [使用教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome) · [更新日志](CHANGELOG.md)
+**Weave Incremental Reading** 是面向 Obsidian 的**独立**增量阅读插件：把 Markdown、块引用、PDF、Canvas、网页、EPUB 等来源整理为带溯源的**阅读点**，用**专题（`.irdeck`）**分组，用**增量阅读日历**按日推进。打开条目即可回跳原文续读；进度与专题以库内文件保存，数据留在本地。
+
+**文档语言：** [简体中文](#中文文档) · [English](#english-documentation) · [日本語](README.ja.md) · [한국어](README.ko.md) · [繁體中文](README.zh-TW.md) · [Русский](README.ru.md)
+
+| 渠道 | 链接 |
+|------|------|
+| QQ 公开群 | [点击链接加入群聊【Obsidan-Weave系列 反馈群】](https://qm.qq.com/q/TNnSmywgeW) |
+| Discord | [Obsidian-Weave 反馈频道](https://discord.com/channels/1553861810665554023/1553867320311677039) |
+| 官方正式教程视频 | [Bilibili · Weave 系列教程](https://www.bilibili.com/video/BV1Zcs56NE9C/) |
+| 官网与图文教程 | [官网 · 价格](https://obsidian-weave.xyz/#pricing) · [使用教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome) |
 
 <div align="center">
-
-<img src="https://img.shields.io/badge/简体中文-2d333b?style=flat-square" alt="简体中文" /> <img src="https://img.shields.io/badge/繁體中文-2d333b?style=flat-square" alt="繁體中文" /> <img src="https://img.shields.io/badge/English-2d333b?style=flat-square" alt="English" /> <img src="https://img.shields.io/badge/日本語-2d333b?style=flat-square" alt="日本語" /> <img src="https://img.shields.io/badge/한국어-2d333b?style=flat-square" alt="한국어" /> <img src="https://img.shields.io/badge/Русский-2d333b?style=flat-square" alt="Русский" /> <img src="https://img.shields.io/badge/其它语言_后续支持-6b7280?style=flat-square" alt="其它语言后续支持" />
-
-<br/>
 
 ![Weave series](https://github.com/user-attachments/assets/a52c0875-9296-4dfd-bf94-114a225f2972)
 
@@ -14,16 +19,16 @@
 
 ![Weave Incremental Reading](https://github.com/user-attachments/assets/93ae9bdd-84d8-4f7e-b0f9-6ede5924a518)
 
+<br/>
+
+[![序章｜Weave 官方系列教程](https://i2.hdslb.com/bfs/archive/34dd29f15e73487ff8cc51a7eee4836367cbaf39.jpg)](https://www.bilibili.com/video/BV1Zcs56NE9C/)
+
 </div>
 
 ---
 
 ## 中文文档
 ### 插件概述
-
-**Weave Incremental Reading** 是面向 Obsidian 的**独立**增量阅读插件。
-
-它把 Markdown、块引用、PDF、Canvas、网页、EPUB 等来源整理为带溯源的**阅读点**，用**专题（`.irdeck`）**分组，用**增量阅读日历**按日推进。打开条目即可回跳原文续读；进度与专题以库内文件保存，数据留在本地。
 
 | 概念 | 说明 |
 |------|------|
@@ -35,7 +40,7 @@
 
 最低 Obsidian 版本：**1.8.7**（以 `manifest.json` 的 `minAppVersion` 为准）。桌面端与移动端均可用。
 
-完整使用教程见官网：[Incremental Reading 教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome)；日历顶部亦可打开插件内帮助。价格与授权说明见 [官网 · 价格](https://obsidian-weave.xyz/#pricing)。
+社区、官方视频与官网图文教程见文首渠道表；日历顶部亦可打开插件内帮助。
 
 ---
 
@@ -227,8 +232,6 @@ Weave 系列共有三款插件，围绕 **读 → 记 → 排 → 复习** 组�
 
 | 资源 | 链接 |
 |------|------|
-| 官网 / 价格 | [obsidian-weave.xyz](https://obsidian-weave.xyz/#pricing) |
-| 使用教程 | [tutorials.html · Incremental Reading](https://obsidian-weave.xyz/tutorials.html#ir-welcome) |
 | 更新日志 | [CHANGELOG.md](CHANGELOG.md) |
 | 问题反馈 | [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues) |
 | 许可证 | [GPL-3.0-or-later](LICENSE) |
@@ -263,7 +266,7 @@ It does **not** require the Weave main plugin. Add other Weave family plugins on
 
 Minimum Obsidian version: **1.8.7** (see `minAppVersion` in `manifest.json`). Desktop and mobile are supported.
 
-Full tutorials live on the official site: [Incremental Reading tutorials](https://obsidian-weave.xyz/tutorials.html#ir-welcome). In-plugin help is also available from the calendar. Pricing and licensing: [Website · Pricing](https://obsidian-weave.xyz/#pricing).
+See the channel table at the top of this README for tutorials, pricing, QQ, Discord, and the official video. In-plugin help is also available from the calendar.
 
 ---
 
@@ -455,8 +458,6 @@ Premium support is a **one-time purchase** (permanent license, email binding, up
 
 | Resource | Link |
 |----------|------|
-| Website / Pricing | [obsidian-weave.xyz](https://obsidian-weave.xyz/#pricing) |
-| Tutorials | [tutorials.html · Incremental Reading](https://obsidian-weave.xyz/tutorials.html#ir-welcome) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | Issues | [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues) |
 | License | [GPL-3.0-or-later](LICENSE) |

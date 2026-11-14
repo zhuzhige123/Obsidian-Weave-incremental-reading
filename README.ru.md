@@ -1,6 +1,6 @@
 # Weave Incremental Reading（Русский）
 
-[English](README.md#english-documentation) · [简体中文](README.md#中文文档) · [Русский](README.ru.md) · [Website](https://obsidian-weave.xyz/#pricing) · [Tutorials](https://obsidian-weave.xyz/tutorials.html#ir-welcome)
+**文档语言：** [English](README.md#english-documentation) · [简体中文](README.md#中文文档) · [Русский](README.ru.md)
 
 <div align="center">
 
