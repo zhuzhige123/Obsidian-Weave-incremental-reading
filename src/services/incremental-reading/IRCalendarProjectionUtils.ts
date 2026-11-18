@@ -94,7 +94,11 @@ export function derivePriorityDateKeysFromSchedule(
 			keys.add(dateKey);
 		}
 	}
-	const limit = Math.max(1, Math.min(31, Math.floor(options?.limit ?? 14)));
+	const requested = options?.limit;
+	const limit =
+		typeof requested === "number" && Number.isFinite(requested)
+			? Math.max(1, Math.floor(requested))
+			: Number.POSITIVE_INFINITY;
 	return Array.from(keys).sort().slice(0, limit);
 }
 

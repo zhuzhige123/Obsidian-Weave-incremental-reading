@@ -423,9 +423,11 @@ export default class StandaloneIncrementalReadingPlugin
 			void getSharedIRPointStorageService(this.app).ensureRuntimeBaseline();
 			getSharedIRHostCriticalWorkGuard(this.app).runVaultBackgroundWork(
 				async () => {
+					// 启动必须重建日历投影：日索引与视图状态都是派生缓存，
+					// 上一个进程留下的残值可能已与 .irdeck 脱节。
 					await this.refreshIRDeckIndexFromVault({
 						trigger: "startup",
-						recompute: false,
+						recompute: true,
 					});
 				},
 			);
@@ -1831,7 +1833,9 @@ export default class StandaloneIncrementalReadingPlugin
 				options.trigger === "vault_change" &&
 				((options.changedPaths?.length ?? 0) > 0 ||
 					(options.removedPaths?.length ?? 0) > 0);
-			if (!hasIndexChanges && !hasVaultPathTouches) {
+			const isStartupRebuild =
+				options.trigger === "startup" && options.recompute;
+			if (!hasIndexChanges && !hasVaultPathTouches && !isStartupRebuild) {
 				return;
 			}
 

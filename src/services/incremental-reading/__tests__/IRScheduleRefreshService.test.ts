@@ -32,13 +32,17 @@ vi.mock("../IRCalendarQueryService", () => ({
 	getSharedIRCalendarQueryService: () => ({
 		invalidate: calendarInvalidateMock,
 		getSettingsFingerprint: () => "settings-fp",
-		buildQueryCacheKeyForDeckIds: () => "__all__::__default__",
+		buildQueryCacheKeyForDeckIds: (deckIds: string[] = []) =>
+			deckIds.length > 0
+				? `${[...deckIds].sort().join("||")}::__default__`
+				: "__all__::__default__",
 	}),
 }));
 
 vi.mock("../IRScheduleIndexService", () => ({
 	getSharedIRScheduleIndexService: () => ({
 		invalidate: scheduleIndexInvalidateMock,
+		peekScheduleFingerprint: async () => "schedule-fp",
 	}),
 }));
 
@@ -185,6 +189,37 @@ describe("IRScheduleRefreshService", () => {
 		const [event] = (globalThis as any).window.dispatchEvent.mock.calls[0];
 		expect(event.type).toBe(IR_DATA_UPDATED_EVENT);
 		expect(event.detail).toEqual(detail);
+	});
+
+	it("projects the full schedule under the schedule-index fingerprint and the all-decks key", async () => {
+		const item = {
+			id: "a",
+			title: "A",
+			sourceFile: "a.md",
+			priority: 1,
+			intervalDays: 1,
+			scheduleStatus: "scheduled",
+			nextRepDate: 0,
+			nextReviewDate: null,
+			topicKey: "t",
+			estimatedMinutes: 1,
+			explanation: {} as any,
+		};
+		recomputeScheduleForDeckMock.mockResolvedValue({
+			generatedAt: 1,
+			deckIds: ["deck-1", "deck-2"],
+			days: [{ dateKey: "2026-05-29", items: [item] }],
+			itemsByDate: new Map([["2026-05-29", [item]]]),
+		});
+
+		await recomputeAndBroadcastIRData({} as any, "ui_refresh");
+
+		expect(projectionSyncMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				cacheKey: "__all__::__default__",
+				scheduleFingerprint: "schedule-fp",
+			}),
+		);
 	});
 
 	it("broadcasts a lightweight IR update without full cache invalidation by default", () => {
