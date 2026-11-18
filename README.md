@@ -1,4 +1,12 @@
-# Weave Incremental Reading
+# Weave Incremental Reading
+
+<p>
+<a href="https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/zhuzhige123/Obsidian-Weave-incremental-reading/total"></a>
+<a href="https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases"><img alt="release" src="https://img.shields.io/github/v/release/zhuzhige123/Obsidian-Weave-incremental-reading?display_name=tag&label=release"></a>
+<a href="./LICENSE"><img alt="license" src="https://img.shields.io/github/license/zhuzhige123/Obsidian-Weave-incremental-reading"></a>
+<a href="https://obsidian.md/plugins?search=weave%20incremental"><img alt="Obsidian Plugin" src="https://img.shields.io/badge/Obsidian-Plugin-blue?logo=obsidian&logoColor=white"></a>
+<a href="https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/zhuzhige123/Obsidian-Weave-incremental-reading"></a>
+</p>
 
 **Weave Incremental Reading** 是面向 Obsidian 的**独立**增量阅读插件：把 Markdown、块引用、PDF、Canvas、网页、EPUB 等来源整理为带溯源的**阅读点**，用**专题（`.irdeck`）**分组，用**增量阅读日历**按日推进。打开条目即可回跳原文续读；进度与专题以库内文件保存，数据留在本地。
 
