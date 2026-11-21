@@ -1,20 +1,32 @@
 # Weave Incremental Reading
 
-[中文说明](README.md)
+[中文说明](README.md) · [English](#overview)
 
 <div align="center">
 
-**Turn “read later” into a reading queue you can actually finish**
+![Weave series](https://github.com/user-attachments/assets/a52c0875-9296-4dfd-bf94-114a225f2972)
 
-Standalone Obsidian incremental reading — topics, reading points, calendar scheduling, and source resume
+![Weave series](https://github.com/user-attachments/assets/86b1adbd-d1e2-411f-842d-24402a3c054d)
+
+![Weave Incremental Reading](https://github.com/user-attachments/assets/93ae9bdd-84d8-4f7e-b0f9-6ede5924a518)
+
+**Turn “read later” into a queue you can actually finish**
+
+Standalone Obsidian incremental reading · topics · calendar scheduling · source resume
 
 </div>
 
-**Weave Incremental Reading** (plugin ID: `weave-incremental-reading`) is a **standalone** Obsidian plugin for incremental reading.
+---
 
-It helps you turn scattered material from Markdown notes, block links, PDF (with [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)), Canvas, web pages, and EPUB into a maintainable **reading-point queue**, organized by **topics** and advanced through a **calendar**—so content does not stay stuck in “saved but never read.”
+## Overview
 
-The plugin works on its own and does **not** require the Weave main plugin. Install other Weave family plugins only when you need in-vault EPUB reading or memory-deck / card workflows.
+**Weave Incremental Reading** (plugin ID: `weave-incremental-reading`) is a standalone Obsidian plugin for incremental reading.
+
+It gathers Markdown, block refs, PDF, Canvas, web pages, EPUB, and more into traceable **reading points**, groups them in **topics**, and advances them with a **calendar**—so saving is not the same as reading. Open an item to jump back to the source and continue. Progress and topics are stored as vault files; your data stays local.
+
+Use it alone—it does **not** require the Weave main plugin. Add other Weave family plugins only when you need in-vault EPUB reading or memory-deck / card workflows.
+
+Full docs: [guide/](guide/README.md) ([English](guide/en/index.md) · [中文](guide/zh/index.md)). In-plugin help is also available from the calendar.
 
 ---
 
@@ -22,19 +34,20 @@ The plugin works on its own and does **not** require the Weave main plugin. Inst
 
 | Concept | Meaning |
 |---------|---------|
-| **Reading point** | A single reading task with source traceability; open it from the queue to jump back to the original location. |
-| **Topic (IRDeck)** | A container for reading points, stored as an `.irdeck` file in your vault. Group by subject or plan. |
-| **Incremental reading calendar** | The main view: browse pending, scheduled, and overdue items by date and manage daily pace. |
+| **Reading point** | The smallest unit of scheduling and resume: one reading task with source traceability. |
+| **Topic (`.irdeck`)** | A container for reading points, stored as a topic file in the vault. |
+| **Incremental reading calendar** | The daily home: browse pending, scheduled, and overdue items by date and manage pace. |
 
 ---
 
-## Core capabilities
+## What you can do
 
-- **Incremental reading calendar** — month heatmap and day queue; load, priority, and overdue items; continue-reading helpers
-- **Unified “Add link”** — paste web URLs, wikilinks, block refs, PDF++ locations, Canvas nodes, EPUB locations; set name, topic, and first read day in one flow
-- **Topics and reading points** — priority, suspend, archive; open `.irdeck` and switch between topic view and calendar
-- **Scheduling and resume** — processing-flow / reading-list strategies, daily caps and time budget; auto next appearance after progress
-- **Material import** — split/import from Markdown; premium: folder subscription, bulk PDF / EPUB chapter import
+- **Incremental reading calendar** — month heatmap and day queue; priority, overdue, and continue-reading helpers
+- **Unified Add link** — paste web URLs, wikilinks, block refs, PDF++, Canvas, or EPUB locations; set name, topic, and first read day in one flow
+- **Topics and reading points** — priority, suspend, archive; switch between topic view and calendar
+- **Scheduling and resume** — universal default rhythm, daily caps and time budget; auto next appearance after progress
+- **Material import** — split/import from Markdown; premium: folder subscription and bulk PDF / EPUB chapter import
+- **Paragraph reading workbench** (premium) — focused paragraph reading and scheduling, with random roam and scope settings
 - **Source resume** — stable resume links for Markdown, PDF++, Canvas, web pages, and EPUB
 
 ---
@@ -43,16 +56,16 @@ The plugin works on its own and does **not** require the Weave main plugin. Inst
 
 1. Install and enable the plugin (see [Installation](#installation-and-updates))
 2. Open the **incremental reading calendar** (ribbon calendar icon, or command **Open incremental reading calendar**)
-3. Click **“+” / Add link** at the top of the calendar: paste source → edit name → choose topic → schedule first read day → save
-4. Open today’s items from the calendar, resume at the source, mark progress; the plugin schedules the next appearance
+3. Click **“+” / Add link**: paste source → name → choose topic → schedule first read day → save
+4. Open today’s items, resume at the source, mark progress; the plugin schedules the next appearance
 
-Prefer **Add link** for daily use; selection commands and context menus remain available.
+Prefer **Add link** for daily use; use material import for whole documents or books. Selection commands and context menus remain available.
 
 ---
 
 ## Installation and updates
 
-### Install from Releases (recommended today)
+### Install from Releases (recommended)
 
 1. Open [Releases](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases) and download the latest assets
 2. Create this folder in your vault:
@@ -64,13 +77,13 @@ Prefer **Add link** for daily use; selection commands and context menus remain a
 3. Copy `main.js`, `manifest.json`, and `styles.css` from the **same** release into that folder
 4. Enable **Weave Incremental Reading** under **Settings → Community plugins**
 
-### Track updates with BRAT
+### Track with BRAT
 
 If you use [BRAT](https://github.com/TfTHacker/obsidian42-brat), add this repository and select **Weave Incremental Reading**.
 
-### Obsidian Community Plugins directory
+### Community Plugins directory
 
-If the plugin is listed in the community directory, search for **Weave Incremental Reading** under **Settings → Community plugins**.
+If listed, search for **Weave Incremental Reading** under **Settings → Community plugins**.
 
 ### Requirements
 
@@ -81,51 +94,59 @@ If the plugin is listed in the community directory, search for **Weave Increment
 
 ---
 
-## Relationship to the Weave family
+## Weave family
 
-Weave is a set of Obsidian plugins organized around **read → capture → schedule → review**. This plugin owns the **incremental reading queue and calendar scheduling**. Other members are optional and complementary.
+There are exactly three Weave plugins. They compose around **read → capture → schedule → review**, with clear boundaries:
 
 | Plugin | Responsibility |
 |--------|----------------|
 | **Weave Incremental Reading** (this plugin) | Reading points, topics, calendar scheduling, resume and source navigation |
-| **Weave main plugin** | Memory decks, question banks, excerpt-to-card, FSRS review |
+| **Weave Review** (main plugin) | Memory decks, question banks, excerpt-to-card, FSRS review |
 | **Weave EPUB Reader** | In-vault EPUB reading, excerpts, and chapter location |
 
-How to combine:
+- Incremental reading only → this plugin alone
+- EPUB chapter resume → this plugin + Weave EPUB Reader
+- Cards and spaced review → this plugin + Weave Review
+- Full loop → all three
 
-- **Incremental reading only** — install this plugin alone
-- **EPUB reading with chapter resume** — this plugin + Weave EPUB Reader
-- **Cards and spaced review** — this plugin + Weave main plugin
-- **Full loop (read → capture → schedule → review)** — all three
-
-External collaboration (outside Weave): **PDF++** for PDF selection/location links via **Add link**.
+External collaboration: **PDF++** for PDF selection / location links via **Add link**.
 
 ---
 
 ## Free vs premium
 
-In the current version, the **calendar and Markdown reading-point workflow are free**, which covers everyday incremental reading.
+The calendar and Markdown reading-point workflow are **free** and cover everyday incremental reading.
 
 | Free | Premium (license required) |
 |------|----------------------------|
-| Calendar and Markdown reading points | Bulk import PDF / EPUB chapter reading points |
-| Topic and reading-point management | Custom scheduling strategies, interleaved learning |
-| Basic scheduling, today’s queue, resume | Folder subscription auto-sync |
-| Create via Add link (MD, block links, PDF++, etc.) | Analytics, reading timer, calendar background wall, and more |
-| Split/import from Markdown; data management tools | Linked notes for reading points, and further premium features |
+| Calendar, topics, Markdown reading points, basic scheduling | Paragraph reading workbench and random-roam scope |
+| Today’s queue, resume, Add link | PDF / EPUB chapter reading-point import |
+| Markdown material import, data management | Load & deferral, interleaved learning |
+| Load-tuning knobs, Markdown block focus mode | Folder subscription auto-sync |
+| Analytics entry and Activity trend tab | Quantity / timing / priority / future-load charts |
+| Basic settings such as YAML tag sync | Tag groups, reading timer, associated notes |
 
-Locked features are clearly marked; the core reading flow still works without a license.
-
-If the **Weave main plugin** is installed and activated, this plugin can inherit that license. Standalone activation: **Settings → Weave Incremental Reading → License**.
+Locked features are clearly marked; the core flow still works without a license. If **Weave Review** is installed and activated, this plugin can inherit that license. Standalone activation: **Settings → Weave Incremental Reading → License**.
 
 ---
 
 ## Data and privacy
 
 - Reading points, topics, schedules, and settings stay in your **local vault** by default
-- The plugin does **not** upload your note content proactively
-- Cross-plugin calls (EPUB resume, license checks, etc.) happen only when you use those features
+- The plugin does **not** upload note content proactively
+- Cross-plugin calls (EPUB resume, license checks, etc.) happen only when those features are used
 - Uninstalling does **not** automatically delete `.irdeck` files or reading-point data; use the data management tool or remove files manually
+
+---
+
+## Docs and support
+
+| Resource | Link |
+|----------|------|
+| User guide | [guide/](guide/README.md) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Issues | [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues) |
+| License | [GPL-3.0-or-later](LICENSE) |
 
 ---
 
@@ -133,9 +154,7 @@ If the **Weave main plugin** is installed and activated, this plugin can inherit
 
 **Rabbit (zhuzhige)** — [GitHub](https://github.com/zhuzhige123)
 
-- Email: tutaoyuan8@outlook.com
-- Issues: [Issues](https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/issues)
-- License: [GPL-3.0-or-later](LICENSE)
+Email: tutaoyuan8@outlook.com
 
 ---
 
