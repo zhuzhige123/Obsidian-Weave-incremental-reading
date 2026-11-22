@@ -27,6 +27,9 @@
 
 <img width="2048" height="1152" alt="Obsidian插件宣传图设计 (2)" src="https://github.com/user-attachments/assets/6a541a5c-1041-4111-bedc-57ccbe2841b5" />
 
+<img width="2048" height="1152" alt="增量阅读插件 英文版本 增量阅读月历阅读材料列表视图" src="https://github.com/user-attachments/assets/fd739e77-9610-424c-a16d-94bc1b103b7d" />
+
+<img width="2048" height="1152" alt="增量阅读插件 英文版本  段落阅读工作台" src="https://github.com/user-attachments/assets/584514ad-bb6d-44e1-9a6c-1624f210d180" />
 
 ---
 
