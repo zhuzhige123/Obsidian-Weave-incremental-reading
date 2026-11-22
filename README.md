@@ -1,4 +1,5 @@
-# Weave Incremental Reading
+# Weave Incremental Reading
+
 
 <p>
 <a href="https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/zhuzhige123/Obsidian-Weave-incremental-reading/total"></a>
@@ -21,17 +22,11 @@
 
 <div align="center">
 
-![Weave series](https://github.com/user-attachments/assets/a52c0875-9296-4dfd-bf94-114a225f2972)
 
-![Weave series](https://github.com/user-attachments/assets/86b1adbd-d1e2-411f-842d-24402a3c054d)
+<img width="2048" height="1152" alt="image" src="https://github.com/user-attachments/assets/e24709ca-c0b0-4010-9b6c-88e932d58280" />
 
-![Weave Incremental Reading](https://github.com/user-attachments/assets/93ae9bdd-84d8-4f7e-b0f9-6ede5924a518)
+<img width="2048" height="1152" alt="Obsidian插件宣传图设计 (2)" src="https://github.com/user-attachments/assets/6a541a5c-1041-4111-bedc-57ccbe2841b5" />
 
-<br/>
-
-[![序章｜Weave 官方系列教程](https://i2.hdslb.com/bfs/archive/34dd29f15e73487ff8cc51a7eee4836367cbaf39.jpg)](https://www.bilibili.com/video/BV1Zcs56NE9C/)
-
-</div>
 
 ---
 
