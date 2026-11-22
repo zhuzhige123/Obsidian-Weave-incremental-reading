@@ -1,6 +1,5 @@
 # Weave Incremental Reading
 
-
 <p>
 <a href="https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/zhuzhige123/Obsidian-Weave-incremental-reading/total"></a>
 <a href="https://github.com/zhuzhige123/Obsidian-Weave-incremental-reading/releases"><img alt="release" src="https://img.shields.io/github/v/release/zhuzhige123/Obsidian-Weave-incremental-reading?display_name=tag&label=release"></a>
@@ -11,7 +10,9 @@
 
 **Weave Incremental Reading** 是面向 Obsidian 的**独立**增量阅读插件：把 Markdown、块引用、PDF、Canvas、网页、EPUB 等来源整理为带溯源的**阅读点**，用**专题（`.irdeck`）**分组，用**增量阅读日历**按日推进。打开条目即可回跳原文续读；进度与专题以库内文件保存，数据留在本地。
 
-**文档语言：** [简体中文](#中文文档) · [English](#english-documentation) · [日本語](README.ja.md) · [한국어](README.ko.md) · [繁體中文](README.zh-TW.md) · [Русский](README.ru.md)
+**界面语言：** 简体中文 · 繁體中文 · English · 日本語 · 한국어 · Русский（其它语言后续支持）
+
+**文档语言：** [简体中文](#中文文档) · [English](#english-documentation) · [繁體中文](README.zh-TW.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Русский](README.ru.md) · [العربية](README.ar.md)
 
 | 渠道 | 链接 |
 |------|------|
@@ -22,14 +23,15 @@
 
 <div align="center">
 
+<img alt="image" src="https://github.com/user-attachments/assets/e24709ca-c0b0-4010-9b6c-88e932d58280" />
 
-<img width="2048" height="1152" alt="image" src="https://github.com/user-attachments/assets/e24709ca-c0b0-4010-9b6c-88e932d58280" />
+<img alt="Obsidian插件宣传图设计 (2)" src="https://github.com/user-attachments/assets/6a541a5c-1041-4111-bedc-57ccbe2841b5" />
 
-<img width="2048" height="1152" alt="Obsidian插件宣传图设计 (2)" src="https://github.com/user-attachments/assets/6a541a5c-1041-4111-bedc-57ccbe2841b5" />
+<img alt="增量阅读插件 英文版本 增量阅读月历阅读材料列表视图" src="https://github.com/user-attachments/assets/fd739e77-9610-424c-a16d-94bc1b103b7d" />
 
-<img width="2048" height="1152" alt="增量阅读插件 英文版本 增量阅读月历阅读材料列表视图" src="https://github.com/user-attachments/assets/fd739e77-9610-424c-a16d-94bc1b103b7d" />
+<img alt="增量阅读插件 英文版本 段落阅读工作台" src="https://github.com/user-attachments/assets/584514ad-bb6d-44e1-9a6c-1624f210d180" />
 
-<img width="2048" height="1152" alt="增量阅读插件 英文版本  段落阅读工作台" src="https://github.com/user-attachments/assets/584514ad-bb6d-44e1-9a6c-1624f210d180" />
+</div>
 
 ---
 
@@ -78,7 +80,7 @@
 
 > 图例：✅ 已包含 · 🔒 需启用高级支持
 
-- **启用高级支持**：在 **设置 → Weave Incremental Reading → 授权** 中激活。本插件高级支持**不单独售卖**，随 [Weave 系列激活码](https://obsidian-weave.xyz/#pricing) 一并提供；若已安装并激活 **Weave Deck（主插件）**，也可继承授权。
+- **启用高级支持**：在 **设置 → Weave Incremental Reading → 授权** 中激活。本插件高级支持**不单独售卖**，随 [Weave 系列激活码](https://obsidian-weave.xyz/#pricing) 一并提供；若已安装并激活 **Weave Review（主插件）**，也可继承授权。
 - 未激活时，高级入口会明确提示或显示为带锁预览（可在设置中开启「高级功能预览」）；基础流程不受影响。
 
 ---
@@ -181,14 +183,14 @@ Weave 系列共有三款插件，围绕 **读 → 记 → 排 → 复习** 组�
 | 插件 | 职责 |
 |------|------|
 | **Weave Incremental Reading**（本插件） | 阅读点、专题、日历调度、续读与来源回跳 |
-| **Weave Deck**（主插件） | 记忆牌组、题库、摘录制卡、FSRS 复习 |
+| **Weave Review**（主插件） | 记忆牌组、题库、摘录制卡、FSRS 复习 |
 | **Weave EPUB Reader** | 库内 EPUB 阅读、摘录与章节定位 |
 
 | 需要… | 安装 |
 |-------|------|
 | 仅增量阅读队列 | 本插件 |
 | EPUB 库内读 + 章节续读 | 本插件 + Weave EPUB Reader |
-| 制卡与间隔复习 | 本插件 + Weave Deck |
+| 制卡与间隔复习 | 本插件 + Weave Review |
 | 完整闭环 | 三款都装 |
 | PDF 选区精确定位 | 另装 [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus)，经「添加链接」纳入队列 |
 
@@ -230,7 +232,11 @@ Weave 系列共有三款插件，围绕 **读 → 记 → 排 → 复习** 组�
 
 #### 8. 如何激活？订阅还是买断？
 
-高级支持为**一次性买断**（永久授权、邮箱绑定、支持五台设备），不是按月订阅。本插件**不单独售卖**，请购买 [Weave 系列激活码](https://obsidian-weave.xyz/#pricing)；购后三款高级支持一并可用。若已激活 Weave Deck，也可在本插件中继承授权。激活入口：**设置 → Weave Incremental Reading → 授权**。更多问答见官网：[常见问题](https://obsidian-weave.xyz/tutorials.html#ir-faq)。有问题可发邮件：tutaoyuan8@outlook.com。
+高级支持为**一次性买断**（永久授权、邮箱绑定、支持五台设备），不是按月订阅。本插件**不单独售卖**，请购买 [Weave 系列激活码](https://obsidian-weave.xyz/#pricing)；购后三款高级支持一并可用。若已激活 Weave Review，也可在本插件中继承授权。激活入口：**设置 → Weave Incremental Reading → 授权**。更多问答见官网：[常见问题](https://obsidian-weave.xyz/tutorials.html#ir-faq)。有问题可发邮件：tutaoyuan8@outlook.com。
+
+#### 9. 目前支持哪些界面语言？
+
+当前：简体中文、繁體中文、English、日本語、한국어、Русский。Deutsch、Français、Español、العربية 等将逐步补充。
 
 ---
 
@@ -255,6 +261,10 @@ Weave 系列共有三款插件，围绕 **读 → 记 → 排 → 复习** 组�
 ---
 
 ## English Documentation
+
+**UI languages:** Simplified Chinese · Traditional Chinese · English · Japanese · Korean · Russian (more planned)
+
+**Documentation languages:** [简体中文](#中文文档) · [English](#english-documentation) · [繁體中文](README.zh-TW.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Русский](README.ru.md) · [العربية](README.ar.md)
 
 ### Overview
 
@@ -304,7 +314,7 @@ The calendar and Markdown reading-point workflow are **free** and cover everyday
 
 > Legend: ✅ included · 🔒 requires Premium support
 
-- **Enable Premium support**: activate under **Settings → Weave Incremental Reading → License**. Premium for this plugin is **not sold separately**—it comes with the [Weave series activation code](https://obsidian-weave.xyz/#pricing). If **Weave Deck** (main plugin) is installed and activated, authorization can also be inherited.
+- **Enable Premium support**: activate under **Settings → Weave Incremental Reading → License**. Premium for this plugin is **not sold separately**—it comes with the [Weave series activation code](https://obsidian-weave.xyz/#pricing). If **Weave Review** (main plugin) is installed and activated, authorization can also be inherited.
 - Locked entries show a clear prompt or lock preview (enable **Premium feature preview** in settings). The core flow still works without a license.
 
 ---
@@ -407,14 +417,14 @@ There are exactly three Weave plugins. They compose around **read → capture �
 | Plugin | Responsibility |
 |--------|----------------|
 | **Weave Incremental Reading** (this plugin) | Reading points, topics, calendar scheduling, resume and source navigation |
-| **Weave Deck** (main plugin) | Memory decks, question banks, excerpt-to-card, FSRS review |
+| **Weave Review** (main plugin) | Memory decks, question banks, excerpt-to-card, FSRS review |
 | **Weave EPUB Reader** | In-vault EPUB reading, excerpts, and chapter location |
 
 | Need… | Install |
 |-------|---------|
 | Incremental reading queue only | This plugin |
 | In-vault EPUB + chapter resume | This plugin + Weave EPUB Reader |
-| Cards and spaced review | This plugin + Weave Deck |
+| Cards and spaced review | This plugin + Weave Review |
 | Full loop | All three |
 | Precise PDF selection locations | Also [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus), then capture via **Add link** |
 
@@ -456,7 +466,11 @@ Use **Add link** for everyday single items. Use **Import reading materials** to 
 
 #### 8. How do I activate? Subscription or one-time?
 
-Premium support is a **one-time purchase** (permanent license, email binding, up to five devices), not a monthly subscription. This plugin is **not sold separately**—buy the [Weave series activation code](https://obsidian-weave.xyz/#pricing); all three plugins’ Premium support are included. If Weave Deck is already activated, this plugin can inherit authorization. Activate under **Settings → Weave Incremental Reading → License**. More Q&A: [FAQ](https://obsidian-weave.xyz/tutorials.html#ir-faq). Email: tutaoyuan8@outlook.com.
+Premium support is a **one-time purchase** (permanent license, email binding, up to five devices), not a monthly subscription. This plugin is **not sold separately**—buy the [Weave series activation code](https://obsidian-weave.xyz/#pricing); all three plugins’ Premium support are included. If Weave Review is already activated, this plugin can inherit authorization. Activate under **Settings → Weave Incremental Reading → License**. More Q&A: [FAQ](https://obsidian-weave.xyz/tutorials.html#ir-faq). Email: tutaoyuan8@outlook.com.
+
+#### 9. Which UI languages are supported?
+
+Currently: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, and Russian. German, French, Spanish, Arabic, and more will be added gradually.
 
 ---
 
