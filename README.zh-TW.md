@@ -10,7 +10,7 @@
 
 **文档语言：** [简体中文](README.md#中文文档) · [English](README.md#english-documentation) · [繁體中文](README.zh-TW.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Русский](README.ru.md) · [العربية](README.ar.md)
 
-完整說明、社區渠道與官方教程視頻見主文件 **[README.md](README.md)**：
+完整說明見主文件 **[README.md](README.md)**：
 
 - [English Documentation](README.md#english-documentation)
 - [中文文档](README.md#中文文档)

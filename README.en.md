@@ -10,7 +10,7 @@
 
 **Languages:** [简体中文](README.md#中文文档) · [English](README.md#english-documentation) · [繁體中文](README.zh-TW.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Русский](README.ru.md) · [العربية](README.ar.md)
 
-Full docs, community channels, and the official tutorial video are in **[README.md](README.md)**:
+Full docs are in **[README.md](README.md)**:
 
 - [English Documentation](README.md#english-documentation)
 - [中文文档](README.md#中文文档)

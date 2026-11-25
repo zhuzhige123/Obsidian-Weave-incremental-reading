@@ -14,13 +14,6 @@
 
 **文档语言：** [简体中文](#中文文档) · [English](#english-documentation) · [繁體中文](README.zh-TW.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Русский](README.ru.md) · [العربية](README.ar.md)
 
-| 渠道 | 链接 |
-|------|------|
-| QQ 公开群 | [点击链接加入群聊【Obsidan-Weave系列 反馈群】](https://qm.qq.com/q/TNnSmywgeW) |
-| Discord | [Obsidian-Weave 反馈频道](https://discord.com/channels/1553861810665554023/1553867320311677039) |
-| 官方正式教程视频 | [Bilibili · Weave 系列教程](https://www.bilibili.com/video/BV1Zcs56NE9C/) |
-| 官网与图文教程 | [官网 · 价格](https://obsidian-weave.xyz/#pricing) · [使用教程](https://obsidian-weave.xyz/tutorials.html#ir-welcome) |
-
 <div align="center">
 
 <img alt="image" src="https://github.com/user-attachments/assets/e24709ca-c0b0-4010-9b6c-88e932d58280" />
@@ -46,9 +39,7 @@
 
 本插件**不依赖** Weave 主插件即可单独使用。需要库内 EPUB 阅读或记忆牌组制卡时，再按需组合系列中的其它成员。
 
-最低 Obsidian 版本：**1.8.7**（以 `manifest.json` 的 `minAppVersion` 为准）。桌面端与移动端均可用。
-
-社区、官方视频与官网图文教程见文首渠道表；日历顶部亦可打开插件内帮助。
+最低 Obsidian 版本：**1.8.7**（以 `manifest.json` 的 `minAppVersion` 为准）。桌面端与移动端均可用。日历顶部亦可打开插件内帮助。
 
 ---
 
@@ -61,7 +52,8 @@
 | **平台** | 全平台（桌面 / 移动端） | ✅ | ✅ |
 | | 多语言界面（简体中文、繁體中文、English、日本語、한국어、Русский；其它语言后续支持） | ✅ | ✅ |
 | **日历与日常** | 增量阅读日历（月历热力、今日队列、逾期处理） | ✅ | ✅ |
-| | 连续阅读、Markdown 块聚焦模式 | ✅ | ✅ |
+| | Markdown 块聚焦模式 | ✅ | ✅ |
+| | 连续阅读、批量操作、日历列表选项（实时预览 / 类型标签 / 隐藏今日已完成） | 🔒 | ✅ |
 | **收录与导入** | 添加链接（网页、双链、块引用、PDF++、Canvas、EPUB 定位等） | ✅ | ✅ |
 | | Markdown 材料导入、数据管理 | ✅ | ✅ |
 | | PDF / EPUB 章节阅读点批量导入 | 🔒 | ✅ |
@@ -89,7 +81,7 @@
 
 #### 增量阅读日历
 
-日常主界面：按日查看待处理、已排期与逾期阅读点，用月历热力感受负载。可在此调整优先级、处理逾期、开启连续阅读，并在专题视图与日历之间切换。
+日常主界面：按日查看待处理、已排期与逾期阅读点，用月历热力感受负载。可在此调整优先级、处理逾期，并在专题视图与日历之间切换；连续阅读、批量操作与部分列表选项需启用高级支持。
 
 详见官网教程：[增量阅读日历](https://obsidian-weave.xyz/tutorials.html#ir-calendar)。
 
@@ -280,9 +272,7 @@ It gathers Markdown, block refs, PDF, Canvas, web pages, EPUB, and more into tra
 
 It does **not** require the Weave main plugin. Add other Weave family plugins only when you need in-vault EPUB reading or memory-deck / card workflows.
 
-Minimum Obsidian version: **1.8.7** (see `minAppVersion` in `manifest.json`). Desktop and mobile are supported.
-
-See the channel table at the top of this README for tutorials, pricing, QQ, Discord, and the official video. In-plugin help is also available from the calendar.
+Minimum Obsidian version: **1.8.7** (see `minAppVersion` in `manifest.json`). Desktop and mobile are supported. In-plugin help is also available from the calendar.
 
 ---
 
@@ -295,7 +285,8 @@ The calendar and Markdown reading-point workflow are **free** and cover everyday
 | **Platform** | All platforms (desktop / mobile) | ✅ | ✅ |
 | | Multilingual UI (Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Russian; more languages planned) | ✅ | ✅ |
 | **Calendar & daily use** | Incremental reading calendar (heatmap, today’s queue, overdue handling) | ✅ | ✅ |
-| | Continue reading, Markdown block focus mode | ✅ | ✅ |
+| | Markdown block focus mode | ✅ | ✅ |
+| | Continuous reading, batch operations, calendar list options (live preview / type labels / hide today’s completed) | 🔒 | ✅ |
 | **Capture & import** | Add link (web URLs, wikilinks, block refs, PDF++, Canvas, EPUB locations, etc.) | ✅ | ✅ |
 | | Markdown material import, data management | ✅ | ✅ |
 | | Bulk PDF / EPUB chapter reading-point import | 🔒 | ✅ |
@@ -323,7 +314,7 @@ The calendar and Markdown reading-point workflow are **free** and cover everyday
 
 #### Incremental reading calendar
 
-Your daily home: browse pending, scheduled, and overdue reading points by date, and feel load via the month heatmap. Adjust priority, handle overdue items, use continue-reading, and switch between topic view and calendar.
+Your daily home: browse pending, scheduled, and overdue reading points by date, and feel load via the month heatmap. Adjust priority, handle overdue items, and switch between topic view and calendar. Continuous reading, batch operations, and some list options require Premium support.
 
 See the official tutorial: [Incremental reading calendar](https://obsidian-weave.xyz/tutorials.html#ir-calendar).
 
